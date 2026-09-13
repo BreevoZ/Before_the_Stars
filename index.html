@@ -13,7 +13,7 @@
     <main class="game-shell">
       <header class="masthead">
         <div class="wordmark"><span class="brand-mark" aria-hidden="true">✳</span> BEFORE THE STARS</div>
-        <span class="version">原型 02 / 集结</span>
+        <span class="version">原型 03 / 时代</span>
       </header>
 
       <section class="battle" aria-label="战场">
@@ -21,11 +21,13 @@
           <div class="base-status player-status">
             <div class="status-heading"><span>我方基地</span><span id="player-health">600 / 600</span></div>
             <progress id="player-health-bar" aria-label="我方基地生命值" max="600" value="600"></progress>
+            <div class="age-status"><span id="player-age">I · 部落时代</span><span id="player-experience">0 / 160 经验</span></div>
           </div>
           <div class="battle-clock"><span class="eyebrow" id="phase">交战中</span><time id="clock">00:00</time></div>
           <div class="base-status enemy-status">
             <div class="status-heading"><span>敌方基地</span><span id="enemy-health">600 / 600</span></div>
             <progress id="enemy-health-bar" aria-label="敌方基地生命值" max="600" value="600"></progress>
+            <div class="age-status"><span id="enemy-age">I · 部落时代</span><span id="enemy-experience">0 / 160 经验</span></div>
           </div>
         </div>
 
@@ -50,9 +52,19 @@
             <button class="restart-button" id="restart" type="button" aria-label="重新开始战斗"><span aria-hidden="true">↻</span> 重开</button>
           </div>
 
+          <div class="evolution-panel" aria-label="时代进化">
+            <div class="evolution-progress">
+              <div class="evolution-heading"><strong id="evolution-title">部落时代</strong><span id="experience-total">0 / 160 经验</span></div>
+              <progress id="experience-bar" aria-label="进化经验" max="160" value="0"></progress>
+              <span class="evolution-hint" id="evolution-hint">击杀获得经验 · 双方独立进化</span>
+            </div>
+            <div class="evolution-unlocks"><strong id="evolution-unlocks">解锁：剑士 · 弩手 · 重甲骑士</strong><span id="evolution-benefit">基地生命 +300 · 旧兵和训练保留</span></div>
+            <button class="evolve-button" id="evolve" type="button" disabled aria-describedby="evolution-hint evolution-benefit"><span id="evolve-label">进化至城堡时代</span><kbd>E</kbd></button>
+          </div>
+
           <div class="command-grid">
             <div class="recruit-section">
-              <div class="section-heading"><h1>训练部队</h1><span>点击加入队列</span></div>
+              <div class="section-heading"><h1>训练部队</h1><span id="roster-age">部落时代 · 点击加入队列</span></div>
               <div class="unit-cards">
                 <button class="unit-card" id="recruit" data-unit="melee" type="button">
                   <span class="card-heading"><span class="unit-icon" aria-hidden="true">⚔</span><kbd>1</kbd></span>
@@ -93,7 +105,7 @@
         </section>
       </section>
 
-      <footer class="game-footer"><p>1 / 2 / 3 训练部队 · 空格训练近战兵 · T 建造炮塔 · Q 选择大招落点</p><span id="recruit-rule"></span></footer>
+      <footer class="game-footer"><p>1 / 2 / 3 训练部队 · 空格训练前排兵 · E 进化 · T 建造炮塔 · Q 选择大招落点</p><span id="recruit-rule"></span></footer>
       <p class="sr-only" id="announcement" role="status" aria-live="polite"></p>
       <noscript><p>请启用 JavaScript 后开始游戏。</p></noscript>
     </main>

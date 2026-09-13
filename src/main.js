@@ -1,4 +1,4 @@
-import { RULES, UNITS, createGame, getRecruitState, recruit, cancelTraining, getTurretState, buildTurret, castMeteor, updateGame } from './game.js';
+import { RULES, UNITS, AGES, createGame, getRecruitState, recruit, cancelTraining, getEvolutionState, evolve, getTurretState, buildTurret, castMeteor, updateGame } from './game.js';
 import { createRenderer } from './render.js';
 
 const byId = id => document.getElementById(id);
@@ -26,6 +26,8 @@ let accumulator = 0;
 let announcedResult = false;
 let targeting = false;
 let targetX = RULES.width / 2;
+let displayedAge = 0;
+let announcedAges = { player: 1, enemy: 1 };
 
 function setText(id, value) {
   const element = byId(id);
@@ -37,29 +39,73 @@ const formatTime = seconds => `${String(Math.floor(seconds / 60)).padStart(2, '0
 setText('income-rate', `+${RULES.goldPerSecond} / 秒`);
 setText('recruit-rule', `队列 ${RULES.queueLimit} 位 · 兵力上限 ${RULES.armyLimit}（含训练中）`);
 setText('meteor-description', `${RULES.meteorDamage} 范围伤害 · ${RULES.meteorCooldown} 秒冷却 · 不伤友军`);
-for (const team of ['player', 'enemy']) byId(`${team}-health-bar`).max = RULES.baseHealth;
-for (const card of cards) {
-  const stats = UNITS[card.dataset.unit];
-  card.querySelector('[data-cost]').textContent = `${stats.cost} 金币`;
-  card.querySelector('[data-training]').textContent = `${stats.trainTime}s`;
-  card.title = `${stats.health} 生命 / ${stats.damage} 攻击 / ${stats.armor} 护甲 / ${stats.range} 射程`;
-  card.setAttribute('aria-label', `训练${stats.name}，${stats.cost} 金币，耗时 ${stats.trainTime} 秒`);
-  card.addEventListener('click', () => train(card.dataset.unit));
+for (const card of cards) card.addEventListener('click', () => train(card.dataset.unit));
+
+function syncRoster() {
+  if (displayedAge === game.ages.player) return;
+  displayedAge = game.ages.player;
+  const age = AGES[displayedAge];
+  const roles = { melee: '近身推进', archer: '远程支援', heavy: '高生命 · 护甲' };
+  const icons = displayedAge === 1 ? ['⚔', '➶', '⬟'] : ['⚔', '⌁', '♜'];
+  cards.forEach((card, index) => {
+    const type = age.units[index];
+    const stats = UNITS[type];
+    card.dataset.unit = type;
+    card.dataset.age = String(displayedAge);
+    card.querySelector('strong').textContent = stats.name;
+    card.querySelector('.unit-icon').textContent = icons[index];
+    card.querySelector('.unit-role').textContent = roles[stats.role];
+    card.querySelector('[data-cost]').textContent = `${stats.cost} 金币`;
+    card.querySelector('[data-training]').textContent = `${stats.trainTime}s`;
+    card.title = `${stats.health} 生命 / ${stats.damage} 攻击 / ${stats.armor} 护甲 / ${stats.range} 射程`;
+    card.setAttribute('aria-label', `训练${stats.name}，${stats.cost} 金币，耗时 ${stats.trainTime} 秒`);
+  });
+  setText('roster-age', `${age.name} · 点击加入队列`);
+}
+
+function syncEvolution() {
+  const age = AGES[game.ages.player];
+  const nextAge = AGES[game.ages.player + 1];
+  const experience = game.experience.player;
+  const state = getEvolutionState(game);
+  setText('evolution-title', `${age.numeral} · ${age.name}`);
+  setText('experience-total', nextAge ? `${experience} / ${nextAge.experienceRequired} 经验` : `累计 ${experience} 经验`);
+  byId('experience-bar').max = nextAge?.experienceRequired ?? age.experienceRequired;
+  byId('experience-bar').value = Math.min(experience, byId('experience-bar').max);
+  byId('evolve').disabled = state !== 'ready';
+  byId('evolve').classList.toggle('ready', state === 'ready');
+  setText('evolve-label', state === 'finished' ? '战斗已结束' : nextAge ? `进化至${nextAge.name}` : '已达最高时代');
+  setText('evolution-hint', !nextAge ? '第二时代已解锁 · 本局仅支持两个时代' : state === 'ready' ? '经验已达标 · 点击进化或按 E · 不消耗金币' : `击杀获得经验 · 还差 ${nextAge.experienceRequired - experience} 经验`);
+  setText('evolution-unlocks', nextAge ? `解锁：${nextAge.units.map(type => UNITS[type].name).join(' · ')}` : '已解锁：剑士 · 弩手 · 重甲骑士');
+  setText('evolution-benefit', nextAge ? `基地生命 +${nextAge.baseHealth - age.baseHealth} · 旧兵和训练保留` : '城堡基地 · 原有炮塔和大招保留');
 }
 
 function syncUI() {
+  syncRoster();
+  syncEvolution();
+  const ageAnnouncements = [];
   for (const team of ['player', 'enemy']) {
-    const hp = game.bases[team].hp;
-    setText(`${team}-health`, `${hp} / ${RULES.baseHealth}`);
+    const { hp, maxHp } = game.bases[team];
+    setText(`${team}-health`, `${hp} / ${maxHp}`);
+    byId(`${team}-health-bar`).max = maxHp;
     byId(`${team}-health-bar`).value = hp;
     setText(`${team}-count`, game.units.filter(unit => unit.team === team).length);
+    const age = AGES[game.ages[team]];
+    const nextAge = AGES[game.ages[team] + 1];
+    setText(`${team}-age`, `${age.numeral} · ${age.name}`);
+    setText(`${team}-experience`, nextAge ? `${game.experience[team]} / ${nextAge.experienceRequired} 经验` : `${game.experience[team]} 经验 · 最高时代`);
+    if (announcedAges[team] !== game.ages[team]) {
+      ageAnnouncements.push(`${team === 'player' ? '我方' : '敌方'}已进化至${age.name}。`);
+      announcedAges[team] = game.ages[team];
+    }
   }
+  if (ageAnnouncements.length) announce(ageAnnouncements.join(''));
   setText('gold', Math.floor(game.gold.player + 0.000001));
   setText('clock', formatTime(game.elapsed));
   for (const card of cards) {
     const state = getRecruitState(game, card.dataset.unit);
     card.disabled = state !== 'ready';
-    const label = { ready: '加入队列', gold: '金币不足', 'queue-full': '队列已满', 'army-full': '兵力已满', finished: '战斗已结束' }[state];
+    const label = { ready: '加入队列', gold: '金币不足', 'queue-full': '队列已满', 'army-full': '兵力已满', locked: '时代未解锁', outdated: '已被新兵种替代', finished: '战斗已结束' }[state];
     const status = card.querySelector('[data-state]');
     if (status.textContent !== label) status.textContent = label;
   }
@@ -118,6 +164,13 @@ function constructTurret() {
   }
 }
 
+function evolvePlayer() {
+  if (evolve(game)) {
+    syncUI();
+    render(game, { targeting, targetX });
+  }
+}
+
 function toggleMeteor() {
   if (game.status !== 'playing' || game.meteorCooldown > 0) return;
   targeting = !targeting;
@@ -143,6 +196,7 @@ function restart() {
   accumulator = 0;
   lastTime = null;
   announcedResult = false;
+  announcedAges = { player: 1, enemy: 1 };
   targeting = false;
   targetX = RULES.width / 2;
   announce('新一局开始。');
@@ -154,6 +208,7 @@ function restart() {
 byId('restart').addEventListener('click', restart);
 byId('play-again').addEventListener('click', restart);
 byId('build-turret').addEventListener('click', constructTurret);
+byId('evolve').addEventListener('click', evolvePlayer);
 byId('meteor').addEventListener('click', toggleMeteor);
 byId('cancel-target').addEventListener('click', () => { targeting = false; syncUI(); byId('meteor').focus({ preventScroll: true }); });
 function pointerX(event) {
@@ -174,7 +229,8 @@ window.addEventListener('keydown', event => {
     else releaseMeteor();
     return;
   }
-  const actions = { Digit1: () => train('melee'), Digit2: () => train('archer'), Digit3: () => train('heavy'), Space: () => train('melee'), KeyT: constructTurret, KeyQ: toggleMeteor };
+  const roster = AGES[game.ages.player].units;
+  const actions = { Digit1: () => train(roster[0]), Digit2: () => train(roster[1]), Digit3: () => train(roster[2]), Space: () => train(roster[0]), KeyE: evolvePlayer, KeyT: constructTurret, KeyQ: toggleMeteor };
   if (actions[event.code]) {
     event.preventDefault();
     if (!event.repeat) actions[event.code]();

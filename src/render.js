@@ -70,7 +70,7 @@ function drawLandscape(ctx, height, ground) {
   }
 }
 
-function drawBase(ctx, base, turret, time, scale) {
+function drawBase(ctx, base, turret, age, time, scale) {
   const colors = PALETTES[base.team];
   ctx.save();
   ctx.translate(base.x, 0);
@@ -79,19 +79,47 @@ function drawBase(ctx, base, turret, time, scale) {
   ctx.beginPath();
   ctx.ellipse(0, 1, 69, 8, 0, 0, Math.PI * 2);
   ctx.fill();
-  // A low stone fort, its team banner visible above the troops.
-  polygon(ctx, [[-58, 0], [-52, -75], [-35, -97], [32, -101], [55, -77], [60, 0]], base.hitFlash > 0 ? '#efdfba' : colors.dark);
-  polygon(ctx, [[-52, -75], [-35, -97], [32, -101], [45, -83], [5, -72]], colors.light);
-  polygon(ctx, [[-52, -75], [5, -72], [9, 0], [-58, 0]], colors.main);
-  polygon(ctx, [[5, -72], [45, -83], [55, -77], [60, 0], [9, 0]], colors.dark);
-  ctx.fillStyle = '#25362c';
-  ctx.fillRect(-12, -43, 28, 43);
-  polygon(ctx, [[-12, -43], [1, -53], [16, -43]], '#25362c');
-  line(ctx, [[-49, -49], [-15, -48]], '#24372e66');
-  line(ctx, [[-52, -25], [-19, -23]], '#24372e66');
-  line(ctx, [[-30, -70], [-29, -49]], '#24372e66');
-  line(ctx, [[29, -49], [50, -53]], '#182b2466');
-  line(ctx, [[29, -25], [54, -29]], '#182b2466');
+  if (age === 2) {
+    // A crenellated keep replaces the low tribal fort; team banners remain distinct.
+    const stone = base.team === 'player' ? '#9eafa3' : '#b5a38c';
+    const shadow = base.team === 'player' ? '#536b60' : '#736653';
+    ctx.fillStyle = base.hitFlash > 0 ? '#f2e6c4' : shadow;
+    ctx.fillRect(-58, -98, 118, 98);
+    ctx.fillStyle = base.hitFlash > 0 ? '#f2e6c4' : stone;
+    ctx.fillRect(-59, -121, 33, 121);
+    ctx.fillRect(27, -121, 33, 121);
+    for (const x of [-61, -47, -33, 25, 39, 53]) ctx.fillRect(x, -134, 10, 15);
+    ctx.fillStyle = colors.main;
+    ctx.fillRect(-26, -97, 53, 97);
+    for (let y = -106; y < 0; y += 22) {
+      line(ctx, [[-59, y], [-26, y]], shadow, 2);
+      line(ctx, [[27, y], [60, y]], shadow, 2);
+      line(ctx, [[-43 + (y % 3) * 3, y], [-43 + (y % 3) * 3, y + 21]], shadow, 1);
+    }
+    ctx.fillStyle = '#25362c';
+    ctx.fillRect(-46, -94, 8, 20);
+    ctx.fillRect(39, -94, 8, 20);
+    ctx.fillRect(-13, -41, 28, 41);
+    polygon(ctx, [[-13, -41], [1, -55], [15, -41]], '#25362c');
+    ctx.fillStyle = '#98a88c';
+    for (const x of [-8, 0, 8]) ctx.fillRect(x, -40, 2, 40);
+    polygon(ctx, [[-12, -93], [13, -93], [13, -66], [1, -57], [-12, -66]], colors.flag);
+    polygon(ctx, [[0, -86], [6, -78], [0, -70], [-6, -78]], '#e5cd8d');
+  } else {
+    // A low stone fort, its team banner visible above the troops.
+    polygon(ctx, [[-58, 0], [-52, -75], [-35, -97], [32, -101], [55, -77], [60, 0]], base.hitFlash > 0 ? '#efdfba' : colors.dark);
+    polygon(ctx, [[-52, -75], [-35, -97], [32, -101], [45, -83], [5, -72]], colors.light);
+    polygon(ctx, [[-52, -75], [5, -72], [9, 0], [-58, 0]], colors.main);
+    polygon(ctx, [[5, -72], [45, -83], [55, -77], [60, 0], [9, 0]], colors.dark);
+    ctx.fillStyle = '#25362c';
+    ctx.fillRect(-12, -43, 28, 43);
+    polygon(ctx, [[-12, -43], [1, -53], [16, -43]], '#25362c');
+    line(ctx, [[-49, -49], [-15, -48]], '#24372e66');
+    line(ctx, [[-52, -25], [-19, -23]], '#24372e66');
+    line(ctx, [[-30, -70], [-29, -49]], '#24372e66');
+    line(ctx, [[29, -49], [50, -53]], '#182b2466');
+    line(ctx, [[29, -25], [54, -29]], '#182b2466');
+  }
   line(ctx, [[-9, -97], [-9, -163]], '#c4bf98', 3);
   const flutter = Math.sin(time * 2.5) * 3;
   polygon(ctx, [[-8, -162], [30, -158 + flutter], [21, -145 + flutter], [-8, -146]], colors.flag);
@@ -100,7 +128,7 @@ function drawBase(ctx, base, turret, time, scale) {
   if (turret) {
     const direction = base.team === 'player' ? 1 : -1;
     ctx.save();
-    ctx.translate(18, -103);
+    ctx.translate(18, age === 2 ? -126 : -103);
     ctx.scale(direction, 1);
     ctx.fillStyle = '#303e33';
     ctx.fillRect(-16, -9, 34, 16);
@@ -113,7 +141,7 @@ function drawBase(ctx, base, turret, time, scale) {
     if (turret.flash > 0) polygon(ctx, [[39, -23], [58, -16], [39, -7]], '#ffe1a0');
     ctx.restore();
   }
-  if (base.hp < RULES.baseHealth * 0.5) {
+  if (base.hp < base.maxHp * 0.5) {
     line(ctx, [[-29, -92], [-22, -70], [-34, -55], [-25, -38]], '#25362c', 3);
     line(ctx, [[35, -77], [22, -55], [29, -34]], '#25362c', 3);
   }
@@ -126,8 +154,9 @@ function drawBase(ctx, base, turret, time, scale) {
 function drawUnit(ctx, unit, time, scale, reducedMotion) {
   const colors = PALETTES[unit.team];
   const stats = UNITS[unit.type];
-  const heavy = unit.type === 'heavy';
-  const archer = unit.type === 'archer';
+  const heavy = stats.role === 'heavy';
+  const archer = stats.role === 'archer';
+  const advanced = stats.age === 2;
   const facing = unit.team === 'player' ? 1 : -1;
   const gait = !reducedMotion && unit.moving ? Math.sin(time * 12 + unit.id) : 0;
   const swing = unit.attackAnimation > 0 ? Math.sin(unit.attackAnimation / 0.25 * Math.PI) : 0;
@@ -142,7 +171,8 @@ function drawUnit(ctx, unit, time, scale, reducedMotion) {
   ctx.scale(facing, 1);
   line(ctx, [[-5, -18], [-6 - gait * 4, -8], [-5 - gait * 5, 0]], '#b0ae8b', 5);
   line(ctx, [[5, -18], [5 + gait * 4, -9], [6 + gait * 5, 0]], '#d2c3a0', 5);
-  ctx.fillStyle = unit.hitFlash > 0 ? '#f5edd5' : colors.main;
+  if (advanced && !archer) polygon(ctx, [[-8, -38], [-23, -9], [-8, -13]], colors.dark);
+  ctx.fillStyle = unit.hitFlash > 0 ? '#f5edd5' : advanced ? '#afbbb3' : colors.main;
   ctx.fillRect(-10, -36, 19, 21);
   ctx.fillStyle = colors.dark;
   ctx.fillRect(-10, -19, 20, 5);
@@ -152,6 +182,14 @@ function drawUnit(ctx, unit, time, scale, reducedMotion) {
   ctx.fillRect(-9, -51, 20, 7);
   ctx.fillStyle = colors.light;
   ctx.fillRect(-9, -53, 17, 4);
+  if (advanced) {
+    ctx.fillStyle = '#bac6ba';
+    ctx.fillRect(-9, -54, 19, 10);
+    polygon(ctx, [[-9, -54], [0, -59], [10, -54]], '#d0d5c1');
+    ctx.fillStyle = colors.main;
+    ctx.fillRect(-5, -35, 10, 19);
+    if (heavy) polygon(ctx, [[-5, -57], [0, -67], [14, -63], [7, -57]], colors.flag);
+  }
   if (heavy) {
     ctx.fillStyle = colors.light;
     ctx.fillRect(-14, -38, 28, 7);
@@ -163,25 +201,42 @@ function drawUnit(ctx, unit, time, scale, reducedMotion) {
   ctx.fillRect(5, -42, 3, 3);
   line(ctx, [[5, -32], [13 + swing * 8, -28 - swing * 8]], '#d5bf94', 5);
   if (archer) {
-    line(ctx, [[17, -49], [25, -38], [27, -28], [25, -18], [17, -9]], '#c2a577', 3);
-    line(ctx, [[17, -49], [11 - swing * 7, -28], [17, -9]], '#e1d9b2', 1);
-    line(ctx, [[8, -28], [32, -28]], '#e8d9ac', 2);
-    ctx.fillStyle = colors.dark;
-    ctx.fillRect(-13, -40, 6, 26);
-    line(ctx, [[-11, -40], [-16, -53]], '#bba77d', 2);
+    if (advanced) {
+      line(ctx, [[8, -26], [31, -26]], '#b4936b', 5);
+      line(ctx, [[19, -40], [29, -28], [19, -16]], '#c3cbb3', 3);
+      line(ctx, [[19, -40], [15 - swing * 4, -27], [19, -16]], '#e5d8ad', 1);
+      line(ctx, [[10, -28], [38, -28]], '#e3c892', 2);
+    } else {
+      line(ctx, [[17, -49], [25, -38], [27, -28], [25, -18], [17, -9]], '#c2a577', 3);
+      line(ctx, [[17, -49], [11 - swing * 7, -28], [17, -9]], '#e1d9b2', 1);
+      line(ctx, [[8, -28], [32, -28]], '#e8d9ac', 2);
+      ctx.fillStyle = colors.dark;
+      ctx.fillRect(-13, -40, 6, 26);
+      line(ctx, [[-11, -40], [-16, -53]], '#bba77d', 2);
+    }
   } else {
     ctx.save();
     ctx.translate(14 + swing * 8, -28 - swing * 8);
     ctx.rotate(-0.5 + swing * 1.7);
     ctx.fillStyle = '#aa8c63';
     ctx.fillRect(-2, -24, 4, 33);
-    polygon(ctx, [[0, -24], [12, -23], [15, -15], [0, -14]], '#c3c6ad');
+    if (advanced) {
+      polygon(ctx, [[-3, -4], [-3, -31], [1, -40], [5, -31], [5, -4]], '#dae0ce');
+      ctx.fillStyle = '#c5aa77';
+      ctx.fillRect(-7, -5, 17, 3);
+    } else polygon(ctx, [[0, -24], [12, -23], [15, -15], [0, -14]], '#c3c6ad');
     ctx.restore();
     ctx.fillStyle = colors.dark;
     ctx.fillRect(-14, -34, heavy ? 19 : 13, heavy ? 30 : 21);
     ctx.strokeStyle = colors.light;
     ctx.lineWidth = 2;
     ctx.strokeRect(-14, -34, heavy ? 19 : 13, heavy ? 30 : 21);
+    if (advanced) {
+      const width = heavy ? 18 : 12;
+      polygon(ctx, [[-15, -35], [-15 + width, -35], [-15 + width, -17], [-15 + width / 2, -9], [-15, -17]], colors.light);
+      line(ctx, [[-15 + width / 2, -32], [-15 + width / 2, -15]], colors.dark, 2);
+      line(ctx, [[-12, -26], [-18 + width, -26]], colors.dark, 2);
+    }
   }
   ctx.restore();
   if (unit.hp < stats.health) {
@@ -212,14 +267,14 @@ function drawProjectile(ctx, shot, scale) {
   const progress = Math.max(0, Math.min(1, 1 - shot.remaining / shot.duration));
   const x = shot.fromX + (shot.toX - shot.fromX) * progress;
   const cannon = shot.kind === 'cannon';
-  const fromY = (cannon ? -118 : -36) * scale;
+  const fromY = shot.fromY * scale;
   const y = fromY * (1 - progress) - 30 * scale * progress - Math.sin(progress * Math.PI) * (cannon ? 45 : 18);
   if (cannon) {
     ctx.fillStyle = '#e8c783';
     ctx.beginPath(); ctx.arc(x, y, 5 * scale, 0, Math.PI * 2); ctx.fill();
   } else {
     const facing = shot.toX > shot.fromX ? 1 : -1;
-    line(ctx, [[x - 13 * facing, y], [x + 4 * facing, y]], PALETTES[shot.team].light, 2);
+    line(ctx, [[x - (shot.kind === 'bolt' ? 9 : 13) * facing, y], [x + 4 * facing, y]], shot.kind === 'bolt' ? '#e5cb91' : PALETTES[shot.team].light, shot.kind === 'bolt' ? 3 : 2);
     polygon(ctx, [[x + 6 * facing, y], [x, y - 3], [x, y + 3]], '#e2d8b3');
   }
 }
@@ -249,8 +304,8 @@ export function createRenderer(canvas) {
     ctx.save();
     ctx.translate(0, ground);
     const time = reducedMotion.matches ? 0 : game.elapsed;
-    drawBase(ctx, game.bases.player, game.turrets.player, time, entityScale);
-    drawBase(ctx, game.bases.enemy, game.turrets.enemy, time, entityScale);
+    drawBase(ctx, game.bases.player, game.turrets.player, game.ages.player, time, entityScale);
+    drawBase(ctx, game.bases.enemy, game.turrets.enemy, game.ages.enemy, time, entityScale);
     // Draw the ranged rank behind the frontline, including when allies pass each other.
     for (const lane of ['back', 'front']) {
       for (const unit of game.units) if (UNITS[unit.type].lane === lane) drawUnit(ctx, unit, game.elapsed, entityScale, reducedMotion.matches);
@@ -271,6 +326,13 @@ export function createRenderer(canvas) {
     if (!reducedMotion.matches) {
       for (const effect of game.effects) {
         ctx.globalAlpha = effect.life / effect.duration;
+        if (effect.kind === 'evolve') {
+          const radius = 70 + (1 - effect.life / effect.duration) * 60;
+          ctx.strokeStyle = PALETTES[effect.team].flag;
+          ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.ellipse(effect.x, -10, radius, radius * 0.3, 0, 0, Math.PI * 2); ctx.stroke();
+          continue;
+        }
         if (effect.kind === 'meteor') {
           const radius = RULES.meteorRadius * (1 - effect.life / effect.duration);
           ctx.strokeStyle = '#edb46d'; ctx.lineWidth = 5;

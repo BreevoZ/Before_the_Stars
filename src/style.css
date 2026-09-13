@@ -21,6 +21,9 @@ button:disabled { cursor: default; }
 .enemy-status { justify-self: end; }
 .status-heading { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; margin-bottom: 10px; }
 .status-heading span:last-child { font-family: ui-monospace, monospace; color: var(--muted); }
+.age-status { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--player); }
+.age-status span:last-child { color: var(--muted); }
+.enemy-status .age-status { color: var(--enemy); }
 progress { display: block; height: 5px; width: 100%; border: 0; border-radius: 0; appearance: none; background: #34423b; color: var(--player); }
 progress::-webkit-progress-bar { background: #34423b; }
 progress::-webkit-progress-value { background: var(--player); transition: width 0.15s; }
@@ -52,6 +55,22 @@ canvas.targeting { cursor: crosshair; touch-action: manipulation; }
 .restart-button { background: transparent; border: 1px solid #46514c; color: #c0cbc3; border-radius: 4px; min-height: 36px; padding: 0 12px; font-size: 13px; white-space: nowrap; }
 .restart-button span { font-size: 18px; margin-right: 4px; }
 .restart-button:hover { background: #2b3630; color: #fff; }
+.evolution-panel { display: grid; grid-template-columns: minmax(190px, 1fr) minmax(220px, 1fr) auto; align-items: center; gap: 24px; margin-bottom: 20px; padding: 0 0 20px; border-bottom: 1px solid var(--line); }
+.evolution-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 12px; color: var(--muted); margin-bottom: 9px; }
+.evolution-heading strong { font-size: 14px; font-weight: 500; color: #e6dabd; }
+.evolution-heading span { font-variant-numeric: tabular-nums; }
+#experience-bar { height: 4px; color: var(--gold); }
+#experience-bar::-webkit-progress-value { background: var(--gold); }
+#experience-bar::-moz-progress-bar { background: var(--gold); }
+.evolution-hint { display: block; font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+.evolution-unlocks { display: flex; flex-direction: column; gap: 7px; font-size: 12px; color: var(--muted); }
+.evolution-unlocks strong { font-size: 13px; font-weight: 400; color: #d9dcc9; }
+.evolve-button { display: flex; align-items: center; justify-content: center; gap: 14px; background: #393b2a; color: #d2c69f; border: 1px solid #71694d; border-radius: 4px; min-height: 46px; padding: 10px 17px; font-size: 14px; }
+.evolve-button:disabled { opacity: 0.7; }
+.evolve-button.ready { background: #e5c989; border-color: #f2d89c; color: #293324; }
+.evolve-button.ready:hover { background: #f4dbac; }
+.evolve-button.ready kbd { color: #43513a; border-color: #798568; }
+.unit-card[data-age="2"] { border-color: #789383; background: #2b3b34; }
 .command-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 28px; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .section-heading h1, .section-heading h2 { margin: 0; font-size: 15px; font-weight: 500; }
@@ -115,6 +134,8 @@ canvas.targeting { cursor: crosshair; touch-action: manipulation; }
   .support-card { padding: 12px; gap: 10px; }
   .section-heading > span { display: none; }
   .field-caption { left: 22px; right: 22px; }
+  .evolution-panel { grid-template-columns: minmax(0, 1fr) auto; gap: 12px 20px; }
+  .evolution-unlocks { grid-column: 1 / -1; grid-row: 2; flex-direction: row; flex-wrap: wrap; gap: 8px 20px; }
 }
 @media (max-width: 680px) {
   .game-shell { padding: 0 12px 14px; }
@@ -125,6 +146,8 @@ canvas.targeting { cursor: crosshair; touch-action: manipulation; }
   .battle-hud { padding: 18px 14px; gap: 12px; grid-template-columns: 1fr 56px 1fr; }
   .status-heading { flex-direction: column; font-size: 12px; margin-bottom: 9px; }
   .enemy-status .status-heading { text-align: right; }
+  .age-status { flex-direction: column; gap: 4px; font-size: 11px; }
+  .enemy-status .age-status { text-align: right; }
   .battle-clock time { font-size: 17px; }
   canvas { height: 220px; aspect-ratio: auto; }
   .field-caption { font-size: 11px; left: 14px; right: 14px; bottom: 12px; letter-spacing: 0; }
@@ -137,6 +160,9 @@ canvas.targeting { cursor: crosshair; touch-action: manipulation; }
   .army-count { order: 3; width: 100%; margin: 0; }
   .restart-button { margin-left: auto; }
   .command-grid { grid-template-columns: 1fr; gap: 20px; }
+  .evolution-panel { grid-template-columns: 1fr; gap: 12px; padding-bottom: 16px; }
+  .evolution-unlocks { grid-column: 1; grid-row: auto; flex-direction: column; gap: 5px; }
+  .evolve-button { width: 100%; }
   .section-heading > span { display: block; }
   .unit-cards { gap: 7px; }
   .unit-card { padding: 10px 9px; }

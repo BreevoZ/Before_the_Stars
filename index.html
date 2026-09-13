@@ -13,24 +13,25 @@
     <main class="game-shell">
       <header class="masthead">
         <div class="wordmark"><span class="brand-mark" aria-hidden="true">✳</span> BEFORE THE STARS</div>
-        <span class="version">原型 01 / 前线</span>
+        <span class="version">原型 02 / 集结</span>
       </header>
 
       <section class="battle" aria-label="战场">
         <div class="battle-hud">
           <div class="base-status player-status">
-            <div class="status-heading"><span>我方基地</span><span id="player-health">360 / 360</span></div>
-            <progress id="player-health-bar" aria-label="我方基地生命值" max="360" value="360"></progress>
+            <div class="status-heading"><span>我方基地</span><span id="player-health">600 / 600</span></div>
+            <progress id="player-health-bar" aria-label="我方基地生命值" max="600" value="600"></progress>
           </div>
           <div class="battle-clock"><span class="eyebrow" id="phase">交战中</span><time id="clock">00:00</time></div>
           <div class="base-status enemy-status">
-            <div class="status-heading"><span>敌方基地</span><span id="enemy-health">360 / 360</span></div>
-            <progress id="enemy-health-bar" aria-label="敌方基地生命值" max="360" value="360"></progress>
+            <div class="status-heading"><span>敌方基地</span><span id="enemy-health">600 / 600</span></div>
+            <progress id="enemy-health-bar" aria-label="敌方基地生命值" max="600" value="600"></progress>
           </div>
         </div>
 
         <div class="field-wrap">
-          <canvas id="battlefield" width="1280" height="480" role="img" aria-label="左侧青色为我方，右侧橙色为敌方。士兵自动前进并攻击敌军或基地。"></canvas>
+          <canvas id="battlefield" width="1280" height="480" tabindex="0" role="img" aria-describedby="spell-hint" aria-label="左侧青色为我方，右侧橙色为敌方。士兵自动前进并攻击敌军或基地。"></canvas>
+          <p class="target-banner" id="target-banner" hidden>选择陨石落点 · 点击战场释放 <button id="cancel-target" type="button">取消</button></p>
           <div class="field-caption" aria-hidden="true"><span>西侧营地</span><span>边境荒原</span><span>东侧营地</span></div>
           <div class="result-overlay" id="result" hidden>
             <div class="result-card">
@@ -42,21 +43,57 @@
           </div>
         </div>
 
-        <div class="command-bar">
-          <div class="unit-info">
-            <div class="unit-symbol" aria-hidden="true">⚔</div>
-            <div><h1>近战兵</h1><p>自动推进 · 近身攻击</p></div>
+        <section class="command-panel" aria-label="作战指令">
+          <div class="resource-bar">
+            <div class="gold-balance"><span aria-hidden="true">◈</span> <strong id="gold">180</strong> <span>金币</span><small id="income-rate">+7 / 秒</small></div>
+            <div class="army-count"><span>战场兵力</span><strong id="player-count">0</strong> 我方 <span class="count-divider">/</span> <strong id="enemy-count">0</strong> 敌方</div>
+            <button class="restart-button" id="restart" type="button" aria-label="重新开始战斗"><span aria-hidden="true">↻</span> 重开</button>
           </div>
-          <div class="army-count"><span class="eyebrow">战场兵力</span><p><strong id="player-count">0</strong> 我方 <span class="count-divider">/</span> <strong id="enemy-count">0</strong> 敌方</p></div>
-          <button class="recruit-button" id="recruit" type="button">
-            <span class="cooldown-fill" id="cooldown-fill" aria-hidden="true"></span>
-            <span class="recruit-label"><span id="recruit-label">派出近战兵</span><kbd>空格</kbd></span>
-          </button>
-          <button class="restart-button" id="restart" type="button" aria-label="重新开始战斗"><span aria-hidden="true">↻</span> 重开</button>
-        </div>
+
+          <div class="command-grid">
+            <div class="recruit-section">
+              <div class="section-heading"><h1>训练部队</h1><span>点击加入队列</span></div>
+              <div class="unit-cards">
+                <button class="unit-card" id="recruit" data-unit="melee" type="button">
+                  <span class="card-heading"><span class="unit-icon" aria-hidden="true">⚔</span><kbd>1</kbd></span>
+                  <strong>近战兵</strong><span class="unit-role">近身推进</span>
+                  <span class="unit-price"><span data-cost></span><span data-training></span></span>
+                  <span class="card-state" data-state>加入队列</span>
+                </button>
+                <button class="unit-card" id="recruit-archer" data-unit="archer" type="button">
+                  <span class="card-heading"><span class="unit-icon" aria-hidden="true">➶</span><kbd>2</kbd></span>
+                  <strong>弓箭手</strong><span class="unit-role">远程支援</span>
+                  <span class="unit-price"><span data-cost></span><span data-training></span></span>
+                  <span class="card-state" data-state>加入队列</span>
+                </button>
+                <button class="unit-card" id="recruit-heavy" data-unit="heavy" type="button">
+                  <span class="card-heading"><span class="unit-icon" aria-hidden="true">⬟</span><kbd>3</kbd></span>
+                  <strong>重装兵</strong><span class="unit-role">高生命 · 护甲</span>
+                  <span class="unit-price"><span data-cost></span><span data-training></span></span>
+                  <span class="card-state" data-state>加入队列</span>
+                </button>
+              </div>
+              <div class="queue-heading"><span>训练队列 <strong id="queue-count">0 / 5</strong></span><span>点击取消 · 全额退款</span></div>
+              <div class="training-queue" id="training-queue" aria-label="训练队列"></div>
+            </div>
+
+            <div class="support-section">
+              <div class="section-heading"><h2>基地支援</h2><span>守住阵地，寻找突破</span></div>
+              <button class="support-card" id="build-turret" type="button">
+                <span class="support-icon" aria-hidden="true">⌖</span>
+                <span class="support-copy"><strong>守卫炮塔 <kbd>T</kbd></strong><span>自动炮击附近敌军 · 限一座</span><span id="turret-state">建造 · 120 金币</span></span>
+              </button>
+              <button class="support-card meteor-card" id="meteor" type="button" aria-pressed="false" aria-describedby="spell-hint">
+                <span class="support-icon" aria-hidden="true">☄</span>
+                <span class="support-copy"><strong>陨星天降 <kbd>Q</kbd></strong><span id="meteor-description">范围轰击 · 不伤友军</span><span id="meteor-state">选择落点 · 已就绪</span></span>
+              </button>
+              <p class="spell-hint" id="spell-hint">选中大招后点击战场释放；也可用方向键瞄准，Enter 释放，Esc 取消。</p>
+            </div>
+          </div>
+        </section>
       </section>
 
-      <footer class="game-footer"><p>点击出兵或按空格，摧毁敌方基地。</p><span id="recruit-rule"></span></footer>
+      <footer class="game-footer"><p>1 / 2 / 3 训练部队 · 空格训练近战兵 · T 建造炮塔 · Q 选择大招落点</p><span id="recruit-rule"></span></footer>
       <p class="sr-only" id="announcement" role="status" aria-live="polite"></p>
       <noscript><p>请启用 JavaScript 后开始游戏。</p></noscript>
     </main>

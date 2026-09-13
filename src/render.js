@@ -1,4 +1,4 @@
-import { RULES } from './game.js';
+import { RULES, UNITS } from './game.js';
 
 const PALETTES = {
   player: { light: '#b7d4b5', main: '#7faa91', dark: '#435e50', flag: '#bbd9b2' },
@@ -70,7 +70,7 @@ function drawLandscape(ctx, height, ground) {
   }
 }
 
-function drawBase(ctx, base, time, scale) {
+function drawBase(ctx, base, turret, time, scale) {
   const colors = PALETTES[base.team];
   ctx.save();
   ctx.translate(base.x, 0);
@@ -97,6 +97,22 @@ function drawBase(ctx, base, time, scale) {
   polygon(ctx, [[-8, -162], [30, -158 + flutter], [21, -145 + flutter], [-8, -146]], colors.flag);
   ctx.fillStyle = '#f0ddb0';
   ctx.fillRect(-11, -166, 4, 4);
+  if (turret) {
+    const direction = base.team === 'player' ? 1 : -1;
+    ctx.save();
+    ctx.translate(18, -103);
+    ctx.scale(direction, 1);
+    ctx.fillStyle = '#303e33';
+    ctx.fillRect(-16, -9, 34, 16);
+    ctx.fillStyle = '#aebaa2';
+    ctx.fillRect(-12, -20, 35, 13);
+    ctx.fillStyle = '#697967';
+    ctx.fillRect(12, -20, 25, 10);
+    ctx.fillStyle = '#23362c';
+    ctx.fillRect(34, -20, 4, 10);
+    if (turret.flash > 0) polygon(ctx, [[39, -23], [58, -16], [39, -7]], '#ffe1a0');
+    ctx.restore();
+  }
   if (base.hp < RULES.baseHealth * 0.5) {
     line(ctx, [[-29, -92], [-22, -70], [-34, -55], [-25, -38]], '#25362c', 3);
     line(ctx, [[35, -77], [22, -55], [29, -34]], '#25362c', 3);
@@ -109,12 +125,15 @@ function drawBase(ctx, base, time, scale) {
 
 function drawUnit(ctx, unit, time, scale, reducedMotion) {
   const colors = PALETTES[unit.team];
+  const stats = UNITS[unit.type];
+  const heavy = unit.type === 'heavy';
+  const archer = unit.type === 'archer';
   const facing = unit.team === 'player' ? 1 : -1;
   const gait = !reducedMotion && unit.moving ? Math.sin(time * 12 + unit.id) : 0;
   const swing = unit.attackAnimation > 0 ? Math.sin(unit.attackAnimation / 0.25 * Math.PI) : 0;
   ctx.save();
-  ctx.translate(unit.x, -Math.abs(gait) * 1.2);
-  ctx.scale(scale, scale);
+  ctx.translate(unit.x, (archer ? -7 : 0) - Math.abs(gait) * 1.2);
+  ctx.scale(scale * (heavy ? 1.22 : 1), scale * (heavy ? 1.12 : 1));
   ctx.fillStyle = '#101f1b80';
   ctx.beginPath();
   ctx.ellipse(0, 1, 16, 3, 0, 0, Math.PI * 2);
@@ -133,29 +152,76 @@ function drawUnit(ctx, unit, time, scale, reducedMotion) {
   ctx.fillRect(-9, -51, 20, 7);
   ctx.fillStyle = colors.light;
   ctx.fillRect(-9, -53, 17, 4);
+  if (heavy) {
+    ctx.fillStyle = colors.light;
+    ctx.fillRect(-14, -38, 28, 7);
+    ctx.fillRect(-10, -50, 20, 12);
+    ctx.fillStyle = '#293c32';
+    ctx.fillRect(1, -46, 9, 3);
+  }
   ctx.fillStyle = '#27362c';
   ctx.fillRect(5, -42, 3, 3);
   line(ctx, [[5, -32], [13 + swing * 8, -28 - swing * 8]], '#d5bf94', 5);
-  ctx.save();
-  ctx.translate(14 + swing * 8, -28 - swing * 8);
-  ctx.rotate(-0.5 + swing * 1.7);
-  ctx.fillStyle = '#aa8c63';
-  ctx.fillRect(-2, -24, 4, 33);
-  polygon(ctx, [[0, -24], [12, -23], [15, -15], [0, -14]], '#c3c6ad');
+  if (archer) {
+    line(ctx, [[17, -49], [25, -38], [27, -28], [25, -18], [17, -9]], '#c2a577', 3);
+    line(ctx, [[17, -49], [11 - swing * 7, -28], [17, -9]], '#e1d9b2', 1);
+    line(ctx, [[8, -28], [32, -28]], '#e8d9ac', 2);
+    ctx.fillStyle = colors.dark;
+    ctx.fillRect(-13, -40, 6, 26);
+    line(ctx, [[-11, -40], [-16, -53]], '#bba77d', 2);
+  } else {
+    ctx.save();
+    ctx.translate(14 + swing * 8, -28 - swing * 8);
+    ctx.rotate(-0.5 + swing * 1.7);
+    ctx.fillStyle = '#aa8c63';
+    ctx.fillRect(-2, -24, 4, 33);
+    polygon(ctx, [[0, -24], [12, -23], [15, -15], [0, -14]], '#c3c6ad');
+    ctx.restore();
+    ctx.fillStyle = colors.dark;
+    ctx.fillRect(-14, -34, heavy ? 19 : 13, heavy ? 30 : 21);
+    ctx.strokeStyle = colors.light;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-14, -34, heavy ? 19 : 13, heavy ? 30 : 21);
+  }
   ctx.restore();
-  ctx.fillStyle = colors.dark;
-  ctx.fillRect(-14, -34, 13, 21);
-  ctx.strokeStyle = colors.light;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(-14, -34, 13, 21);
-  ctx.restore();
-  if (unit.hp < RULES.unitHealth) {
+  if (unit.hp < stats.health) {
     ctx.fillStyle = '#182920';
     ctx.fillRect(-14, -65, 28, 4);
     ctx.fillStyle = colors.light;
-    ctx.fillRect(-14, -65, 28 * unit.hp / RULES.unitHealth, 4);
+    ctx.fillRect(-14, -65, 28 * unit.hp / stats.health, 4);
   }
   ctx.restore();
+}
+
+function drawTarget(ctx, x, opacity = 1) {
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  ctx.fillStyle = '#dfa16122';
+  ctx.fillRect(x - RULES.meteorRadius, -85, RULES.meteorRadius * 2, 88);
+  ctx.strokeStyle = '#edb46d';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 6]);
+  ctx.strokeRect(x - RULES.meteorRadius, -85, RULES.meteorRadius * 2, 88);
+  ctx.setLineDash([]);
+  line(ctx, [[x - 12, -32], [x + 12, -32]], '#f2d3a1');
+  line(ctx, [[x, -44], [x, -20]], '#f2d3a1');
+  ctx.restore();
+}
+
+function drawProjectile(ctx, shot, scale) {
+  const progress = Math.max(0, Math.min(1, 1 - shot.remaining / shot.duration));
+  const x = shot.fromX + (shot.toX - shot.fromX) * progress;
+  const cannon = shot.kind === 'cannon';
+  const fromY = (cannon ? -118 : -36) * scale;
+  const y = fromY * (1 - progress) - 30 * scale * progress - Math.sin(progress * Math.PI) * (cannon ? 45 : 18);
+  if (cannon) {
+    ctx.fillStyle = '#e8c783';
+    ctx.beginPath(); ctx.arc(x, y, 5 * scale, 0, Math.PI * 2); ctx.fill();
+  } else {
+    const facing = shot.toX > shot.fromX ? 1 : -1;
+    line(ctx, [[x - 13 * facing, y], [x + 4 * facing, y]], PALETTES[shot.team].light, 2);
+    polygon(ctx, [[x + 6 * facing, y], [x, y - 3], [x, y + 3]], '#e2d8b3');
+  }
 }
 
 export function createRenderer(canvas) {
@@ -177,18 +243,40 @@ export function createRenderer(canvas) {
   new ResizeObserver(resize).observe(canvas);
   resize();
 
-  return function render(game) {
+  return function render(game, { targeting = false, targetX = RULES.width / 2 } = {}) {
     const ground = sceneHeight * 0.738;
     drawLandscape(ctx, sceneHeight, ground);
     ctx.save();
     ctx.translate(0, ground);
     const time = reducedMotion.matches ? 0 : game.elapsed;
-    drawBase(ctx, game.bases.player, time, entityScale);
-    drawBase(ctx, game.bases.enemy, time, entityScale);
-    for (const unit of game.units) drawUnit(ctx, unit, game.elapsed, entityScale, reducedMotion.matches);
+    drawBase(ctx, game.bases.player, game.turrets.player, time, entityScale);
+    drawBase(ctx, game.bases.enemy, game.turrets.enemy, time, entityScale);
+    // Draw the ranged rank behind the frontline, including when allies pass each other.
+    for (const lane of ['back', 'front']) {
+      for (const unit of game.units) if (UNITS[unit.type].lane === lane) drawUnit(ctx, unit, game.elapsed, entityScale, reducedMotion.matches);
+    }
+    for (const shot of game.projectiles) drawProjectile(ctx, shot, entityScale);
+    if (targeting) drawTarget(ctx, targetX);
+    if (game.meteor) {
+      drawTarget(ctx, game.meteor.x, 0.8);
+      const progress = 1 - game.meteor.remaining / RULES.meteorDelay;
+      const x = game.meteor.x - 140 * (1 - progress);
+      const y = -ground * (1 - progress);
+      if (!reducedMotion.matches) {
+        polygon(ctx, [[x - 45, y - 85], [x + 15, y], [x - 14, y + 9]], '#e59b5899');
+        ctx.fillStyle = '#ffe0a0';
+        ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI * 2); ctx.fill();
+      }
+    }
     if (!reducedMotion.matches) {
       for (const effect of game.effects) {
-        ctx.globalAlpha = effect.life / 0.22;
+        ctx.globalAlpha = effect.life / effect.duration;
+        if (effect.kind === 'meteor') {
+          const radius = RULES.meteorRadius * (1 - effect.life / effect.duration);
+          ctx.strokeStyle = '#edb46d'; ctx.lineWidth = 5;
+          ctx.beginPath(); ctx.ellipse(effect.x, -12, radius, radius * 0.4, 0, 0, Math.PI * 2); ctx.stroke();
+          continue;
+        }
         const radius = 4 + (1 - effect.life / 0.22) * 12;
         for (let i = 0; i < 5; i++) {
           const angle = i * Math.PI * 2 / 5;

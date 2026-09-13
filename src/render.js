@@ -1,4 +1,4 @@
-import { RULES, UNITS } from './game.js';
+import { RULES, UNITS, AGES, ABILITIES, getTurretPosition } from './game.js';
 
 const PALETTES = {
   player: { light: '#b7d4b5', main: '#7faa91', dark: '#435e50', flag: '#bbd9b2' },
@@ -70,7 +70,7 @@ function drawLandscape(ctx, height, ground) {
   }
 }
 
-function drawBase(ctx, base, turret, age, time, scale) {
+function drawBase(ctx, base, age, time, scale) {
   const colors = PALETTES[base.team];
   ctx.save();
   ctx.translate(base.x, 0);
@@ -125,22 +125,6 @@ function drawBase(ctx, base, turret, age, time, scale) {
   polygon(ctx, [[-8, -162], [30, -158 + flutter], [21, -145 + flutter], [-8, -146]], colors.flag);
   ctx.fillStyle = '#f0ddb0';
   ctx.fillRect(-11, -166, 4, 4);
-  if (turret) {
-    const direction = base.team === 'player' ? 1 : -1;
-    ctx.save();
-    ctx.translate(18, age === 2 ? -126 : -103);
-    ctx.scale(direction, 1);
-    ctx.fillStyle = '#303e33';
-    ctx.fillRect(-16, -9, 34, 16);
-    ctx.fillStyle = '#aebaa2';
-    ctx.fillRect(-12, -20, 35, 13);
-    ctx.fillStyle = '#697967';
-    ctx.fillRect(12, -20, 25, 10);
-    ctx.fillStyle = '#23362c';
-    ctx.fillRect(34, -20, 4, 10);
-    if (turret.flash > 0) polygon(ctx, [[39, -23], [58, -16], [39, -7]], '#ffe1a0');
-    ctx.restore();
-  }
   if (base.hp < base.maxHp * 0.5) {
     line(ctx, [[-29, -92], [-22, -70], [-34, -55], [-25, -38]], '#25362c', 3);
     line(ctx, [[35, -77], [22, -55], [29, -34]], '#25362c', 3);
@@ -149,6 +133,61 @@ function drawBase(ctx, base, turret, age, time, scale) {
     polygon(ctx, [[-58, 0], [-44, -28], [-23, -12], [1, -29], [22, -8], [45, -21], [60, 0]], '#9c9273');
   }
   ctx.restore();
+}
+
+function drawDefenses(ctx, game, team, scale) {
+  const colors = PALETTES[team];
+  const direction = team === 'player' ? 1 : -1;
+  // Put the expanded platform supports behind every weapon, including the lower row.
+  for (let slot = 2; slot < game.turrets[team].length; slot++) {
+    const { x, y } = getTurretPosition(game, team, slot);
+    for (const offset of [-19, 19]) line(ctx, [[x + offset * scale, y * scale], [x + offset * scale, (y + 51) * scale]], colors.dark, 4 * scale);
+    line(ctx, [[x - 19 * scale, y * scale], [x + 19 * scale, (y + 48) * scale]], colors.main, 2 * scale);
+  }
+  for (let slot = 0; slot < game.turrets[team].length; slot++) {
+    const turret = game.turrets[team][slot];
+    const { x, y } = getTurretPosition(game, team, slot);
+    ctx.save(); ctx.translate(x, y * scale); ctx.scale(scale, scale);
+    ctx.fillStyle = colors.dark; ctx.fillRect(-21, -1, 42, 6);
+    ctx.fillStyle = colors.light; ctx.fillRect(-21, -3, 42, 3);
+    if (!turret) {
+      line(ctx, [[-5, -11], [5, -11]], colors.light, 1.5);
+      line(ctx, [[0, -16], [0, -6]], colors.light, 1.5);
+      ctx.restore();
+      continue;
+    }
+    ctx.scale(direction, 1);
+    ctx.fillStyle = '#66543a'; ctx.fillRect(-10, -10, 20, 9);
+    if (turret.type === 'stone') {
+      line(ctx, [[-11, -2], [-4, -27], [10, -2]], '#b29870', 4);
+      line(ctx, [[-4, -18], [15, -23]], '#d4c09a', 4);
+      ctx.fillStyle = '#b6baa5'; ctx.beginPath(); ctx.arc(14, -24, 6, 0, Math.PI * 2); ctx.fill();
+    } else if (turret.type === 'bone') {
+      for (let i = 0; i < 3; i++) {
+        line(ctx, [[-10, -9 - i * 5], [20, -14 - i * 5]], '#d9c9a2', 3);
+        polygon(ctx, [[20, -17 - i * 5], [27, -15 - i * 5], [20, -12 - i * 5]], '#eee3bb');
+      }
+    } else if (turret.type === 'firepot') {
+      polygon(ctx, [[-14, -24], [12, -24], [17, -10], [10, -3], [-10, -3], [-17, -10]], '#b67747');
+      ctx.fillStyle = '#e9b35f'; ctx.fillRect(-10, -27, 19, 5);
+      polygon(ctx, [[-7, -26], [-4, -38], [0, -31], [7, -37], [9, -25]], '#f1cf83');
+    } else if (turret.type === 'ballista') {
+      line(ctx, [[-15, -16], [26, -16]], '#c5b084', 5);
+      line(ctx, [[6, -31], [19, -16], [6, -2]], colors.light, 4);
+      line(ctx, [[6, -31], [-6, -16], [6, -2]], '#ece0b5', 1);
+      line(ctx, [[-10, -17], [32, -17]], '#e1c794', 2);
+    } else if (turret.type === 'repeater') {
+      ctx.fillStyle = '#768b7f'; ctx.fillRect(-14, -24, 27, 19);
+      for (let i = 0; i < 3; i++) line(ctx, [[-2, -22 + i * 6], [26, -22 + i * 6]], '#cbd3bc', 3);
+      ctx.fillStyle = '#b59969'; ctx.fillRect(-8, -30, 13, 6);
+    } else {
+      ctx.fillStyle = '#819486'; ctx.fillRect(-15, -23, 40, 15);
+      ctx.fillStyle = '#273c32'; ctx.fillRect(20, -24, 7, 17);
+      for (const x of [-10, 12]) { ctx.fillStyle = '#bdc1a9'; ctx.beginPath(); ctx.arc(x, -4, 6, 0, Math.PI * 2); ctx.fill(); }
+    }
+    if (turret.flash > 0) polygon(ctx, [[25, -23], [40, -17], [25, -10]], '#ffdfa0');
+    ctx.restore();
+  }
 }
 
 function drawUnit(ctx, unit, time, scale, reducedMotion) {
@@ -248,15 +287,15 @@ function drawUnit(ctx, unit, time, scale, reducedMotion) {
   ctx.restore();
 }
 
-function drawTarget(ctx, x, opacity = 1) {
+function drawTarget(ctx, x, radius, opacity = 1) {
   ctx.save();
   ctx.globalAlpha = opacity;
   ctx.fillStyle = '#dfa16122';
-  ctx.fillRect(x - RULES.meteorRadius, -85, RULES.meteorRadius * 2, 88);
+  ctx.fillRect(x - radius, -85, radius * 2, 88);
   ctx.strokeStyle = '#edb46d';
   ctx.lineWidth = 2;
   ctx.setLineDash([6, 6]);
-  ctx.strokeRect(x - RULES.meteorRadius, -85, RULES.meteorRadius * 2, 88);
+  ctx.strokeRect(x - radius, -85, radius * 2, 88);
   ctx.setLineDash([]);
   line(ctx, [[x - 12, -32], [x + 12, -32]], '#f2d3a1');
   line(ctx, [[x, -44], [x, -20]], '#f2d3a1');
@@ -266,11 +305,11 @@ function drawTarget(ctx, x, opacity = 1) {
 function drawProjectile(ctx, shot, scale) {
   const progress = Math.max(0, Math.min(1, 1 - shot.remaining / shot.duration));
   const x = shot.fromX + (shot.toX - shot.fromX) * progress;
-  const cannon = shot.kind === 'cannon';
+  const cannon = ['cannon', 'stone', 'firepot'].includes(shot.kind);
   const fromY = shot.fromY * scale;
   const y = fromY * (1 - progress) - 30 * scale * progress - Math.sin(progress * Math.PI) * (cannon ? 45 : 18);
   if (cannon) {
-    ctx.fillStyle = '#e8c783';
+    ctx.fillStyle = shot.kind === 'firepot' ? '#eea353' : shot.kind === 'stone' ? '#b9bea7' : '#e8c783';
     ctx.beginPath(); ctx.arc(x, y, 5 * scale, 0, Math.PI * 2); ctx.fill();
   } else {
     const facing = shot.toX > shot.fromX ? 1 : -1;
@@ -304,23 +343,33 @@ export function createRenderer(canvas) {
     ctx.save();
     ctx.translate(0, ground);
     const time = reducedMotion.matches ? 0 : game.elapsed;
-    drawBase(ctx, game.bases.player, game.turrets.player, game.ages.player, time, entityScale);
-    drawBase(ctx, game.bases.enemy, game.turrets.enemy, game.ages.enemy, time, entityScale);
+    drawBase(ctx, game.bases.player, game.ages.player, time, entityScale);
+    drawBase(ctx, game.bases.enemy, game.ages.enemy, time, entityScale);
+    drawDefenses(ctx, game, 'player', entityScale);
+    drawDefenses(ctx, game, 'enemy', entityScale);
     // Draw the ranged rank behind the frontline, including when allies pass each other.
     for (const lane of ['back', 'front']) {
       for (const unit of game.units) if (UNITS[unit.type].lane === lane) drawUnit(ctx, unit, game.elapsed, entityScale, reducedMotion.matches);
     }
     for (const shot of game.projectiles) drawProjectile(ctx, shot, entityScale);
-    if (targeting) drawTarget(ctx, targetX);
-    if (game.meteor) {
-      drawTarget(ctx, game.meteor.x, 0.8);
-      const progress = 1 - game.meteor.remaining / RULES.meteorDelay;
-      const x = game.meteor.x - 140 * (1 - progress);
+    if (targeting) drawTarget(ctx, targetX, ABILITIES[AGES[game.ages.player].ability].radius);
+    if (game.ability) {
+      const stats = ABILITIES[game.ability.type];
+      drawTarget(ctx, game.ability.x, stats.radius, 0.8);
+      const interval = game.ability.wavesLeft === stats.waves ? stats.delay : stats.waveInterval;
+      const progress = Math.max(0, Math.min(1, 1 - game.ability.remaining / interval));
+      const x = game.ability.x - 140 * (1 - progress);
       const y = -ground * (1 - progress);
-      if (!reducedMotion.matches) {
+      if (!reducedMotion.matches && game.ability.type === 'meteor') {
         polygon(ctx, [[x - 45, y - 85], [x + 15, y], [x - 14, y + 9]], '#e59b5899');
         ctx.fillStyle = '#ffe0a0';
         ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI * 2); ctx.fill();
+      } else if (!reducedMotion.matches) {
+        for (let i = 0; i < 13; i++) {
+          const arrowX = game.ability.x - stats.radius + i * stats.radius / 6;
+          line(ctx, [[arrowX - 14, y - 26], [arrowX, y]], '#e0d9a8', 2);
+          polygon(ctx, [[arrowX, y + 6], [arrowX - 5, y - 2], [arrowX + 2, y - 4]], '#f0d393');
+        }
       }
     }
     if (!reducedMotion.matches) {
@@ -333,8 +382,8 @@ export function createRenderer(canvas) {
           ctx.beginPath(); ctx.ellipse(effect.x, -10, radius, radius * 0.3, 0, 0, Math.PI * 2); ctx.stroke();
           continue;
         }
-        if (effect.kind === 'meteor') {
-          const radius = RULES.meteorRadius * (1 - effect.life / effect.duration);
+        if (['meteor', 'blast', 'volley'].includes(effect.kind)) {
+          const radius = effect.radius * (1 - effect.life / effect.duration);
           ctx.strokeStyle = '#edb46d'; ctx.lineWidth = 5;
           ctx.beginPath(); ctx.ellipse(effect.x, -12, radius, radius * 0.4, 0, 0, Math.PI * 2); ctx.stroke();
           continue;

@@ -1,4 +1,5 @@
-import { RULES, UNITS, AGES, createGame, getRecruitState, recruit, cancelTraining, getEvolutionState, evolve, getTurretState, buildTurret, castMeteor, updateGame } from '../src/game.js';
+import { RULES, UNITS, AGES, TURRETS, ABILITIES, createGame, getRecruitState, recruit, cancelTraining, getEvolutionState, evolve, getTurretState, buildTurret, getExpansionState, expandTurretSlots, sellTurret, getTurretPosition, castAbility, updateGame } from '../src/game.js';
+import { createRenderer } from '../src/render.js';
 
 const tests = [];
 const test = (name, run) => tests.push({ name, run });
@@ -27,7 +28,7 @@ test('Fresh match has full bases, equal starting gold, empty queues and a ready 
   assert(Object.values(game.bases).every(base => base.hp === RULES.baseHealth));
   assert(Object.values(game.gold).every(gold => gold === RULES.startingGold));
   assert(game.queues.player.length === 0 && game.queues.enemy.length === 0);
-  assert(game.meteorCooldown === 0 && !game.meteor && !game.turrets.player);
+  assert(game.abilityCooldown === 0 && !game.ability && game.turrets.player.every(tower => tower === null));
   assert(game.ages.player === 1 && game.ages.enemy === 1 && game.experience.player === 0 && game.experience.enemy === 0);
 });
 
@@ -59,7 +60,7 @@ test('Insufficient gold and invalid commands leave the wallet and queue unchange
   const before = JSON.stringify(game);
   assert(getRecruitState(game, 'melee') === 'gold');
   assert(!recruit(game) && !recruit(game, 'dragon') && !recruit(game, 'toString') && !recruit(game, 'melee', 'unknown'));
-  assert(!buildTurret(game) && !castMeteor(game, NaN));
+  assert(!buildTurret(game) && !castAbility(game, NaN));
   assert(JSON.stringify(game) === before);
 });
 
@@ -180,12 +181,156 @@ test('Base attacks stop at the wall and nearby defenders take priority', () => {
   assert(defended.bases.enemy.hp === RULES.baseHealth);
 });
 
-test('Tower purchase costs gold, has one slot per base, and supports either team', () => {
+test('Tower purchase costs gold, starts with one slot per base, and supports either team', () => {
   const game = isolatedGame();
   for (const team of ['player', 'enemy']) {
     assert(buildTurret(game, team));
-    near(game.gold[team], RULES.startingGold - RULES.turretCost);
-    assert(getTurretState(game, team) === 'built' && !buildTurret(game, team));
+    near(game.gold[team], RULES.startingGold - TURRETS.stone.cost);
+    assert(getTurretState(game, team) === 'full' && !buildTurret(game, team));
+  }
+});
+
+test('Expansion buys one empty slot at escalating prices, independently, up to four', () => {
+  const game = isolatedGame();
+  game.gold.player = 500;
+  for (const [index, cost] of RULES.turretExpansionCosts.entries()) {
+    const gold = game.gold.player;
+    assert(expandTurretSlots(game));
+    near(game.gold.player, gold - cost);
+    assert(game.turrets.player.length === index + 2 && game.turrets.player.every(tower => tower === null));
+    assert(game.turrets.enemy.length === 1 && game.gold.enemy === RULES.startingGold);
+  }
+  assert(game.gold.player === 0 && getExpansionState(game) === 'max-slots');
+  const before = JSON.stringify(game);
+  assert(!expandTurretSlots(game) && !expandTurretSlots(game, 'unknown') && JSON.stringify(game) === before);
+  game.gold.enemy = 99;
+  assert(getExpansionState(game, 'enemy') === 'gold' && !expandTurretSlots(game, 'enemy'));
+  assert(game.gold.enemy === 99 && game.turrets.enemy.length === 1);
+});
+
+test('Building validates age, funds, purchased slots and occupancy without overwriting towers', () => {
+  const game = isolatedGame();
+  assert(getTurretState(game, 'player', 'stone', 1) === 'slot-locked');
+  assert(!buildTurret(game, 'player', 'stone', 1));
+  for (const type of AGES[2].turrets) assert(getTurretState(game, 'player', type) === 'locked' && !buildTurret(game, 'player', type));
+  for (const slot of [-1, 0.5, 4, NaN]) assert(!buildTurret(game, 'player', 'stone', slot));
+  assert(!buildTurret(game, 'player', 'toString') && !buildTurret(game, 'unknown'));
+  assert(game.gold.player === RULES.startingGold);
+  assert(expandTurretSlots(game));
+  assert(getTurretState(game, 'player', 'bone', 1) === 'gold' && !buildTurret(game, 'player', 'bone', 1));
+  game.gold.player = 100;
+  assert(buildTurret(game, 'player', 'bone', 1) && game.gold.player === 0);
+  assert(game.turrets.player[0] === null && game.turrets.player[1].type === 'bone');
+  game.gold.player = 500;
+  const before = JSON.stringify(game);
+  assert(getTurretState(game, 'player', 'stone', 1) === 'occupied' && !buildTurret(game, 'player', 'stone', 1));
+  assert(JSON.stringify(game) === before);
+});
+
+test('All six tower types launch their own projectile and apply their documented damage and armor rule', () => {
+  for (const [type, stats] of Object.entries(TURRETS)) {
+    const target = soldier('enemy', 260, 'knight');
+    target.attackCooldown = 1000;
+    const game = isolatedGame([target]);
+    game.experience.player = AGES[2].experienceRequired;
+    if (stats.age === 2) evolve(game);
+    game.gold.player = stats.cost;
+    assert(buildTurret(game, 'player', type) && game.gold.player === 0, type);
+    updateGame(game, RULES.fixedStep);
+    assert(game.projectiles.length === 1 && game.projectiles[0].kind === stats.projectile, type);
+    assert(target.hp === UNITS.knight.health, `${type} must wait for impact`);
+    game.turrets.player[0].cooldown = 1000;
+    advance(game, 0.4);
+    near(target.hp, UNITS.knight.health - stats.damage + (stats.ignoreArmor ? 0 : UNITS.knight.armor), type);
+  }
+});
+
+test('Four towers fire independently from their actual positions and retain distinct cooldowns', () => {
+  const game = isolatedGame([soldier('enemy', 240, 'knight', 10000)]);
+  game.gold.player = 1500;
+  for (let i = 0; i < 3; i++) expandTurretSlots(game);
+  ['stone', 'bone', 'firepot', 'bone'].forEach((type, slot) => assert(buildTurret(game, 'player', type, slot)));
+  updateGame(game, RULES.fixedStep);
+  assert(game.projectiles.length === 4);
+  game.projectiles.forEach((shot, slot) => {
+    const origin = getTurretPosition(game, 'player', slot);
+    assert(shot.fromX === origin.x && shot.fromY === origin.y - 14);
+  });
+  advance(game, 0.7);
+  assert(game.projectiles.length === 2 && game.projectiles.every(shot => shot.kind === 'bone'));
+  assert(game.turrets.player[2].cooldown > game.turrets.player[0].cooldown);
+});
+
+test('Area tower shots hit nearby enemies after the original target dies, without friendly fire', () => {
+  for (const type of ['firepot', 'bombard']) {
+    const stats = TURRETS[type];
+    const target = soldier('enemy', 260);
+    const inside = soldier('enemy', 290, 'knight');
+    const outside = soldier('enemy', 260 + stats.splash + 40, 'archer');
+    const friendly = soldier('player', 270, 'archer');
+    const game = isolatedGame([target, inside, outside, friendly]);
+    game.units.forEach(unit => unit.attackCooldown = 1000);
+    if (stats.age === 2) { game.experience.player = AGES[2].experienceRequired; evolve(game); }
+    game.gold.player = stats.cost;
+    buildTurret(game, 'player', type);
+    updateGame(game, RULES.fixedStep);
+    assert(game.projectiles[0].targetId === target.id);
+    game.units = game.units.filter(unit => unit !== target);
+    game.turrets.player[0].cooldown = 1000;
+    advance(game, 0.4);
+    assert(inside.hp === UNITS.knight.health - stats.damage + UNITS.knight.armor, type);
+    assert(outside.hp === UNITS.archer.health && friendly.hp === UNITS.archer.health, type);
+    assert(game.bases.enemy.hp === RULES.baseHealth && game.bases.player.hp === game.bases.player.maxHp);
+  }
+});
+
+test('Evolution retains expanded slots and old towers; selling refunds the original price only once', () => {
+  const game = isolatedGame([soldier('enemy', 260, 'knight')]);
+  game.gold.player = 1000;
+  expandTurretSlots(game); expandTurretSlots(game);
+  buildTurret(game, 'player', 'firepot', 2);
+  updateGame(game, RULES.fixedStep);
+  const turret = game.turrets.player[2];
+  const shot = game.projectiles[0];
+  const opponent = JSON.stringify(game.turrets.enemy);
+  game.experience.player = AGES[2].experienceRequired;
+  evolve(game);
+  assert(game.turrets.player.length === 3 && game.turrets.player[2] === turret && turret.type === 'firepot');
+  assert(JSON.stringify(game.turrets.enemy) === opponent && game.ages.enemy === 1);
+  for (const type of AGES[1].turrets) assert(getTurretState(game, 'player', type) === 'outdated' && !buildTurret(game, 'player', type));
+  assert(buildTurret(game, 'player', 'ballista', 0));
+  const gold = game.gold.player;
+  assert(sellTurret(game, 2));
+  near(game.gold.player, gold + TURRETS.firepot.cost / 2);
+  assert(game.turrets.player[2] === null && game.turrets.player.length === 3 && game.projectiles[0] === shot);
+  const before = JSON.stringify(game);
+  for (const slot of [2, -1, 4, 0.5]) assert(!sellTurret(game, slot));
+  assert(!sellTurret(game, 0, 'unknown') && JSON.stringify(game) === before);
+  assert(buildTurret(game, 'player', 'repeater', 2));
+  advance(game, 0.4);
+  assert(game.units[0].hp < UNITS.knight.health, 'Selling must not cancel already fired shots');
+});
+
+test('Computer expands a full defense under pressure, reserves training funds, and uses its own age', () => {
+  for (const age of [1, 2]) {
+    const game = createGame();
+    game.elapsed = 20;
+    game.gold.enemy = 1000;
+    if (age === 2) { game.experience.enemy = AGES[2].experienceRequired; evolve(game, 'enemy'); }
+    buildTurret(game, 'enemy');
+    game.units = [800, 840, 880].map(x => soldier('player', x));
+    game.ai.cooldown = 0;
+    const gold = game.gold.enemy;
+    updateGame(game, RULES.fixedStep);
+    assert(game.turrets.enemy.length === 2 && game.turrets.enemy[1] === null);
+    near(game.gold.enemy, gold - RULES.turretExpansionCosts[0] + RULES.goldPerSecond * RULES.fixedStep);
+    game.ai.cooldown = 0;
+    updateGame(game, RULES.fixedStep);
+    const type = AGES[age].turrets[2];
+    assert(game.turrets.enemy[1].type === type);
+    near(game.gold.enemy, gold - RULES.turretExpansionCosts[0] - TURRETS[type].cost + RULES.goldPerSecond * 2 * RULES.fixedStep);
+    assert(game.turrets.player.length === 1 && game.turrets.player[0] === null && game.ages.player === 1);
+    near(game.gold.player, RULES.startingGold + RULES.goldPerSecond * 2 * RULES.fixedStep);
   }
 });
 
@@ -197,11 +342,11 @@ test('Tower waits for enemies in range, then fires a projectile on cooldown', ()
   assert(game.projectiles.length === 0);
   enemy.x = 240;
   updateGame(game, RULES.fixedStep);
-  assert(game.projectiles.some(shot => shot.kind === 'cannon'));
+  assert(game.projectiles.some(shot => shot.kind === 'stone'));
   assert(enemy.hp === UNITS.heavy.health);
   advance(game, 0.4);
   const hp = enemy.hp;
-  assert(hp === UNITS.heavy.health - RULES.turretDamage + UNITS.heavy.armor);
+  assert(hp === UNITS.heavy.health - TURRETS.stone.damage + UNITS.heavy.armor);
   advance(game, 0.4);
   assert(enemy.hp === hp);
 });
@@ -229,8 +374,8 @@ test('AI fields all three troop types and buys a defensive tower under pressure'
   pressured.ai.cooldown = 0;
   pressured.units = [800, 840, 880].map(x => soldier('player', x));
   updateGame(pressured, RULES.fixedStep);
-  assert(pressured.turrets.enemy);
-  near(pressured.gold.enemy, RULES.startingGold - RULES.turretCost + RULES.goldPerSecond * RULES.fixedStep);
+  assert(pressured.turrets.enemy[0].type === 'firepot');
+  near(pressured.gold.enemy, RULES.startingGold - TURRETS.firepot.cost + RULES.goldPerSecond * RULES.fixedStep);
 });
 
 test('Meteor waits for impact, hits enemies in the radius, bypasses armor, and spares allies', () => {
@@ -239,27 +384,83 @@ test('Meteor waits for impact, hits enemies in the radius, bypasses armor, and s
   const outside = soldier('enemy', 950, 'archer');
   const game = isolatedGame([friendly, soldier('enemy', 500, 'archer'), heavy, outside]);
   game.units.forEach(unit => unit.attackCooldown = 1000);
-  assert(castMeteor(game, 600));
-  assert(!castMeteor(game, 800));
+  assert(castAbility(game, 600));
+  assert(!castAbility(game, 800));
   advance(game, 0.5);
   assert(heavy.hp === UNITS.heavy.health);
   advance(game, 0.35);
-  assert(heavy.hp === UNITS.heavy.health - RULES.meteorDamage);
+  assert(heavy.hp === UNITS.heavy.health - ABILITIES.meteor.damage);
   assert(friendly.hp === UNITS.archer.health && outside.hp === UNITS.archer.health);
-  assert(game.units.length === 3 && game.meteor === null);
+  assert(game.units.length === 3 && game.ability === null);
 });
 
 test('Meteor damages the enemy base, respects cooldown, and can finish the match', () => {
   const game = isolatedGame();
-  assert(castMeteor(game, RULES.enemyBaseX));
+  assert(castAbility(game, RULES.enemyBaseX));
   advance(game, 1);
-  assert(game.bases.enemy.hp === RULES.baseHealth - RULES.meteorBaseDamage);
-  assert(game.bases.player.hp === RULES.baseHealth && !castMeteor(game, 0));
-  advance(game, RULES.meteorCooldown);
-  assert(castMeteor(game, RULES.enemyBaseX));
-  game.bases.enemy.hp = RULES.meteorBaseDamage;
+  assert(game.bases.enemy.hp === RULES.baseHealth - ABILITIES.meteor.baseDamage);
+  assert(game.bases.player.hp === RULES.baseHealth && !castAbility(game, 0));
+  advance(game, ABILITIES.meteor.cooldown);
+  assert(castAbility(game, RULES.enemyBaseX));
+  game.bases.enemy.hp = ABILITIES.meteor.baseDamage;
   advance(game, 1);
   assert(game.status === 'won');
+});
+
+test('Evolving during a falling meteor preserves its impact and cooldown, then unlocks arrow rain', () => {
+  const game = isolatedGame();
+  castAbility(game, RULES.enemyBaseX);
+  advance(game, 0.3);
+  const cooldown = game.abilityCooldown;
+  game.experience.player = AGES[2].experienceRequired;
+  evolve(game);
+  assert(game.ability.type === 'meteor' && game.abilityCooldown === cooldown && !castAbility(game, 600));
+  advance(game, 0.6);
+  assert(game.bases.enemy.hp === RULES.baseHealth - ABILITIES.meteor.baseDamage && !game.ability);
+  advance(game, ABILITIES.meteor.cooldown);
+  assert(castAbility(game, RULES.enemyBaseX));
+  assert(game.ability.type === 'volley' && game.abilityCooldown === ABILITIES.volley.cooldown);
+  assert(!castAbility(game, 600));
+  advance(game, 0.5);
+  assert(game.bases.enemy.hp === RULES.baseHealth - 40 - 12 && game.ability.wavesLeft === 3);
+  advance(game, 1.1);
+  assert(game.bases.enemy.hp === RULES.baseHealth - 40 - 4 * 12 && !game.ability);
+});
+
+test('Arrow rain resolves four physical waves at current positions and spares allies', () => {
+  const heavy = soldier('enemy', 600, 'knight');
+  const leaving = soldier('enemy', 720, 'knight');
+  const entering = soldier('enemy', 1000, 'knight');
+  const outside = soldier('enemy', 1000, 'archer');
+  const friendly = soldier('player', 600, 'archer');
+  const game = isolatedGame([heavy, leaving, entering, outside, friendly]);
+  game.units.forEach(unit => unit.attackCooldown = 1000);
+  game.experience.player = AGES[2].experienceRequired;
+  evolve(game);
+  assert(castAbility(game, 600));
+  advance(game, 0.4);
+  assert(heavy.hp === UNITS.knight.health && game.ability.wavesLeft === 4);
+  advance(game, 0.1);
+  const damage = ABILITIES.volley.damage - UNITS.knight.armor;
+  assert(heavy.hp === UNITS.knight.health - damage && leaving.hp === heavy.hp && entering.hp === UNITS.knight.health);
+  leaving.x = 1000;
+  entering.x = 720;
+  advance(game, 1.1);
+  assert(heavy.hp === UNITS.knight.health - damage * 4 && game.ability === null);
+  assert(leaving.hp === UNITS.knight.health - damage && entering.hp === UNITS.knight.health - damage * 3);
+  assert(outside.hp === UNITS.archer.health && friendly.hp === UNITS.archer.health);
+  assert(!castAbility(game, 600) && game.abilityCooldown > 43);
+});
+
+test('Arrow rain awards each kill once across overlapping waves', () => {
+  const game = isolatedGame([soldier('enemy', 550, 'archer'), soldier('enemy', 650, 'archer')]);
+  game.units.forEach(unit => unit.attackCooldown = 1000);
+  game.experience.player = AGES[2].experienceRequired;
+  evolve(game);
+  castAbility(game, 600);
+  advance(game, 1.6);
+  assert(game.units.length === 0 && game.experience.player === AGES[2].experienceRequired + 2 * UNITS.archer.experience);
+  near(game.gold.player, RULES.startingGold + RULES.goldPerSecond * game.elapsed + 2 * UNITS.archer.bounty);
 });
 
 test('Win/loss freezes economy, training, attacks, support actions, and all timers', () => {
@@ -272,7 +473,8 @@ test('Win/loss freezes economy, training, attacks, support actions, and all time
     assert(game.status === (team === 'player' ? 'won' : 'lost'));
     const before = JSON.stringify(game);
     updateGame(game, RULES.fixedStep);
-    assert(!recruit(game) && !buildTurret(game) && !castMeteor(game, 600));
+    assert(!recruit(game) && !buildTurret(game) && !castAbility(game, 600));
+    assert(!expandTurretSlots(game) && !sellTurret(game, 0));
     assert(!evolve(game) && !evolve(game, 'enemy'));
     assert(!cancelTraining(game, game.queues.player[0].id));
     assert(JSON.stringify(game) === before);
@@ -296,7 +498,7 @@ test('Complete match: taking no action loses against the computer', () => {
   assert(game.status === 'lost', `Got ${game.status} after ${game.elapsed.toFixed(1)}s`);
 });
 
-test('Complete match: combined troops, a tower, and aimed meteors can win without free gold', () => {
+test('Complete match: combined troops, a tower, and age-specific abilities can win without free gold', () => {
   const game = createGame();
   assert(buildTurret(game));
   const rotation = [2, 1, 0, 1, 0];
@@ -306,12 +508,12 @@ test('Complete match: combined troops, a tower, and aimed meteors can win withou
     const roster = AGES[state.ages.player].units;
     if (state.queues.player.length < 2 && recruit(state, roster[rotation[order % rotation.length]])) order++;
     const enemies = state.units.filter(unit => unit.team === 'enemy');
-    if (enemies.length >= 2 && state.meteorCooldown === 0) {
+    if (enemies.length >= 2 && state.abilityCooldown === 0) {
       const target = enemies.reduce((best, unit) => {
-        const count = enemies.filter(other => Math.abs(other.x - unit.x) <= RULES.meteorRadius).length;
+        const count = enemies.filter(other => Math.abs(other.x - unit.x) <= ABILITIES[AGES[state.ages.player].ability].radius).length;
         return count > best.count ? { x: unit.x, count } : best;
       }, { x: 0, count: 0 });
-      castMeteor(state, target.x);
+      castAbility(state, target.x);
     }
     assert(state.gold.player >= 0 && state.gold.enemy >= 0, 'Neither team may spend unearned gold');
   });
@@ -321,11 +523,12 @@ test('Complete match: combined troops, a tower, and aimed meteors can win withou
 
 test('New match resets both economies, queues, AI, tower, ultimate and flying projectiles', () => {
   const old = createGame();
-  recruit(old, 'archer'); buildTurret(old); castMeteor(old, 600);
+  recruit(old, 'archer'); buildTurret(old); castAbility(old, 600);
   advance(old, 10);
   const fresh = createGame();
   assert(fresh.gold.player === RULES.startingGold && fresh.queues.player.length === 0 && fresh.queues.enemy.length === 0);
-  assert(!fresh.turrets.player && !fresh.turrets.enemy && !fresh.meteor && fresh.meteorCooldown === 0);
+  assert(fresh.turrets.player.every(tower => tower === null) && fresh.turrets.enemy.every(tower => tower === null) && !fresh.ability && fresh.abilityCooldown === 0);
+  assert(fresh.turrets.player.length === 1 && fresh.turrets.enemy.length === 1 && fresh.turrets.player !== old.turrets.player);
   assert(fresh.projectiles.length === 0 && fresh.effects.length === 0 && fresh.units.length === 0);
   assert(fresh.ai.orders === 0 && fresh.ai.cooldown === RULES.aiFirstDecision && fresh.elapsed === 0);
   assert(fresh.queues !== old.queues && fresh.gold !== old.gold);
@@ -354,7 +557,7 @@ test('Tower and meteor kills also award the owning side experience', () => {
     assert(game.experience[team] === UNITS.archer.experience && game.experience[victim] === 0);
   }
   const game = isolatedGame(AGES[1].units.map((type, i) => soldier('enemy', 550 + i * 30, type, 1)));
-  castMeteor(game, 600);
+  castAbility(game, 600);
   advance(game, 1);
   assert(game.experience.player === AGES[1].units.reduce((total, type) => total + UNITS[type].experience, 0));
 });
@@ -425,12 +628,12 @@ test('Existing troops, old training times, orders and refunds survive evolution'
 
 test('Evolution preserves the existing turret, meteor cooldown and flying projectiles', () => {
   const game = isolatedGame([soldier('player', 500, 'archer'), soldier('enemy', 650)]);
-  buildTurret(game); castMeteor(game, 1000);
+  buildTurret(game); castAbility(game, 1000);
   updateGame(game, RULES.fixedStep);
-  const state = JSON.stringify({ turret: game.turrets.player, meteor: game.meteor, cooldown: game.meteorCooldown, shots: game.projectiles });
+  const state = JSON.stringify({ turret: game.turrets.player, meteor: game.ability, cooldown: game.abilityCooldown, shots: game.projectiles });
   game.experience.player = AGES[2].experienceRequired;
   evolve(game);
-  assert(JSON.stringify({ turret: game.turrets.player, meteor: game.meteor, cooldown: game.meteorCooldown, shots: game.projectiles }) === state);
+  assert(JSON.stringify({ turret: game.turrets.player, meteor: game.ability, cooldown: game.abilityCooldown, shots: game.projectiles }) === state);
 });
 
 test('Crossbow bolts use the new range, damage and impact timing against old troops', () => {
@@ -495,21 +698,21 @@ test('Browser UI: purchase, queue/refund, tower, meteor targeting, keyboard, tra
   el('restart').click();
   el('build-turret').click();
   assert(el('build-turret').disabled && el('gold').textContent === '60');
-  el('meteor').click();
-  assert(el('meteor').getAttribute('aria-pressed') === 'true' && !el('target-banner').hidden);
+  el('ability').click();
+  assert(el('ability').getAttribute('aria-pressed') === 'true' && !el('target-banner').hidden);
   const cancelSpace = new frame.contentWindow.KeyboardEvent('keydown', { code: 'Space', bubbles: true, cancelable: true });
   el('cancel-target').dispatchEvent(cancelSpace);
-  assert(!cancelSpace.defaultPrevented && !el('meteor').disabled, 'Space on the cancel button must retain native activation, not cast the spell');
+  assert(!cancelSpace.defaultPrevented && !el('ability').disabled, 'Space on the cancel button must retain native activation, not cast the spell');
   key('Escape');
-  assert(el('target-banner').hidden && !el('meteor').disabled);
+  assert(el('target-banner').hidden && !el('ability').disabled);
   key('KeyQ'); key('ArrowRight'); key('Enter');
-  assert(el('meteor').disabled && el('target-banner').hidden && el('meteor-state').textContent.includes('冷却'));
+  assert(el('ability').disabled && el('target-banner').hidden && el('ability-state').textContent.includes('冷却'));
   el('restart').click();
-  assert(el('queue-count').textContent === '0 / 5' && el('gold').textContent === '180' && !el('build-turret').disabled && !el('meteor').disabled);
-  el('meteor').click();
+  assert(el('queue-count').textContent === '0 / 5' && el('gold').textContent === '180' && !el('build-turret').disabled && !el('ability').disabled);
+  el('ability').click();
   const bounds = el('battlefield').getBoundingClientRect();
   el('battlefield').dispatchEvent(new frame.contentWindow.MouseEvent('click', { bubbles: true, clientX: bounds.x + bounds.width * 0.7, clientY: bounds.y + bounds.height / 2 }));
-  assert(el('meteor').disabled && el('target-banner').hidden);
+  assert(el('ability').disabled && el('target-banner').hidden);
   el('restart').click();
   key('Space'); key('Digit2'); key('Digit3', true);
   assert(el('queue-count').textContent === '2 / 5');
@@ -544,7 +747,7 @@ test('Browser UI: earn experience, evolve independently, replace cards and short
   for (let i = 0; i < 3000 && el('evolve').disabled && el('result').hidden; i++) {
     const card = page.querySelectorAll('[data-unit]')[rotation[order % rotation.length]];
     if (parseInt(el('queue-count').textContent, 10) < 2 && !card.disabled) { card.click(); order++; }
-    if (time > 14000 && Number(el('enemy-count').textContent) >= 2 && !el('meteor').disabled) {
+    if (time > 14000 && Number(el('enemy-count').textContent) >= 2 && !el('ability').disabled) {
       key('KeyQ'); key('Enter');
     }
     tick();
@@ -553,12 +756,17 @@ test('Browser UI: earn experience, evolve independently, replace cards and short
   const enemyAge = el('enemy-age').textContent;
   const queue = [...page.querySelectorAll('.queue-name')].map(element => element.textContent).join();
   const gold = el('gold').textContent;
+  const abilityState = el('ability-state').textContent;
   key('KeyE');
   assert(el('player-age').textContent.includes('城堡时代') && el('enemy-age').textContent === enemyAge);
   assert(el('player-health-bar').max === AGES[2].baseHealth && el('evolve').disabled);
   assert(el('gold').textContent === gold && [...page.querySelectorAll('.queue-name')].map(element => element.textContent).join() === queue);
   assert([...page.querySelectorAll('[data-unit]')].map(card => card.dataset.unit).join() === AGES[2].units.join());
   assert(el('recruit-heavy').querySelector('strong').textContent === '重甲骑士');
+  assert([...page.querySelectorAll('[data-turret]')].map(card => card.dataset.turret).join() === AGES[2].turrets.join());
+  assert(el('ability-name').textContent === ABILITIES.volley.name && el('ability').dataset.ability === 'volley');
+  assert(el('ability-state').textContent === abilityState, 'Evolution must retain the cooldown shown in the UI');
+  assert(el('turret-slots').textContent.includes(TURRETS.stone.name), 'Old tower remains visible after evolution');
   for (let i = 0; i < 200 && el('recruit').disabled && el('result').hidden; i++) tick();
   assert(!el('recruit').disabled, 'Second-age recruits must become affordable');
   key('Digit1');
@@ -573,6 +781,79 @@ test('Browser UI: earn experience, evolve independently, replace cards and short
   assert(el('player-age').textContent.includes('部落时代') && el('enemy-age').textContent.includes('部落时代'));
   assert(el('experience-total').textContent === `0 / ${AGES[2].experienceRequired} 经验`);
   assert(el('recruit').dataset.unit === 'melee' && el('evolve').disabled && el('player-health-bar').max === RULES.baseHealth);
+  assert(el('ability-name').textContent === ABILITIES.meteor.name && el('build-turret').dataset.turret === 'stone');
+  assert(el('turret-capacity').textContent === '0 / 1 炮位');
+});
+
+test('Browser UI: expand, select a slot, build different towers, sell once, and reset capacity', async () => {
+  const html = await (await fetch('../index.html')).text();
+  const frame = document.createElement('iframe');
+  frame.title = 'Defense integration test';
+  const loaded = new Promise(resolve => frame.addEventListener('load', resolve, { once: true }));
+  const clock = '<script>window.requestAnimationFrame = callback => (window.__testFrame = callback, 1);</script>';
+  frame.srcdoc = html.replace('<head>', `<head><base href="${new URL('../', location.href).href}">${clock}`);
+  document.body.append(frame);
+  await loaded;
+  const page = frame.contentDocument;
+  const el = id => page.getElementById(id);
+  const slots = [...page.querySelectorAll('.turret-slot')];
+  const towers = [...page.querySelectorAll('[data-turret]')];
+  let time = 0;
+  const tick = seconds => { for (let i = 0; i < seconds * 10; i++) frame.contentWindow.__testFrame(time += 100); };
+  frame.contentWindow.__testFrame(0);
+  assert(slots.length === 4 && slots.slice(1).every(slot => slot.disabled));
+  el('expand-turrets').click();
+  assert(el('gold').textContent === '80' && el('turret-capacity').textContent === '0 / 2 炮位');
+  assert(slots[1].getAttribute('aria-pressed') === 'true' && slots[2].disabled && towers.every(tower => tower.disabled));
+  tick(3);
+  towers[1].click();
+  assert(slots[1].textContent.includes('骨矛塔') && slots[0].getAttribute('aria-pressed') === 'true');
+  slots[1].click();
+  assert(towers.every(tower => tower.disabled) && !el('sell-turret').hidden && el('sell-turret').textContent.includes('50'));
+  const gold = Number(el('gold').textContent);
+  el('sell-turret').click();
+  assert(Number(el('gold').textContent) === gold + 50 && el('turret-capacity').textContent === '0 / 2 炮位');
+  el('sell-turret').click();
+  assert(Number(el('gold').textContent) === gold + 50 && el('sell-turret').hidden);
+  tick(16);
+  assert(!towers[2].disabled);
+  towers[2].click();
+  assert(slots[1].textContent.includes('火陶塔') && el('turret-capacity').textContent === '1 / 2 炮位');
+  el('restart').click();
+  assert(el('gold').textContent === '180' && el('turret-capacity').textContent === '0 / 1 炮位');
+  assert(slots[0].getAttribute('aria-pressed') === 'true' && slots.slice(1).every(slot => slot.disabled));
+});
+
+test('Renderer supports six tower appearances, expanded platforms and both ability animations', () => {
+  const game = isolatedGame();
+  game.experience.enemy = AGES[2].experienceRequired;
+  evolve(game, 'enemy');
+  for (const team of ['player', 'enemy']) {
+    game.gold[team] = 1500;
+    for (let i = 0; i < 3; i++) expandTurretSlots(game, team);
+    AGES[game.ages[team]].turrets.forEach((type, slot) => buildTurret(game, team, type, slot));
+  }
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'width:100%;aspect-ratio:8 / 3;display:block';
+  document.body.append(canvas);
+  const render = createRenderer(canvas);
+  function preview(id, alt) {
+    render(game);
+    assert(canvas.getContext('2d').getImageData(0, 0, 1, 1).data[3] === 255);
+    const image = document.createElement('img');
+    image.id = id; image.alt = alt; image.style.width = '100%'; image.src = canvas.toDataURL('image/png');
+    document.body.append(image);
+  }
+  castAbility(game, 640);
+  advance(game, 0.4);
+  preview('defense-preview', 'Three tribal towers, three castle towers, four platforms on each base and a falling meteor');
+  advance(game, ABILITIES.meteor.cooldown);
+  game.experience.player = AGES[2].experienceRequired;
+  evolve(game);
+  castAbility(game, 640);
+  advance(game, 0.25);
+  preview('volley-preview', 'Arrow rain and preserved tribal towers on an evolved castle');
+  canvas.remove();
 });
 
 let failures = 0;

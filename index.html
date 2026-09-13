@@ -13,7 +13,7 @@
     <main class="game-shell">
       <header class="masthead">
         <div class="wordmark"><span class="brand-mark" aria-hidden="true">✳</span> BEFORE THE STARS</div>
-        <span class="version">原型 03 / 时代</span>
+        <span class="version">原型 04 / 要塞</span>
       </header>
 
       <section class="battle" aria-label="战场">
@@ -33,7 +33,7 @@
 
         <div class="field-wrap">
           <canvas id="battlefield" width="1280" height="480" tabindex="0" role="img" aria-describedby="spell-hint" aria-label="左侧青色为我方，右侧橙色为敌方。士兵自动前进并攻击敌军或基地。"></canvas>
-          <p class="target-banner" id="target-banner" hidden>选择陨石落点 · 点击战场释放 <button id="cancel-target" type="button">取消</button></p>
+          <p class="target-banner" id="target-banner" hidden><span id="target-text">选择大招落点 · 点击战场释放</span> <button id="cancel-target" type="button">取消</button></p>
           <div class="field-caption" aria-hidden="true"><span>西侧营地</span><span>边境荒原</span><span>东侧营地</span></div>
           <div class="result-overlay" id="result" hidden>
             <div class="result-card">
@@ -90,14 +90,21 @@
             </div>
 
             <div class="support-section">
-              <div class="section-heading"><h2>基地支援</h2><span>守住阵地，寻找突破</span></div>
-              <button class="support-card" id="build-turret" type="button">
-                <span class="support-icon" aria-hidden="true">⌖</span>
-                <span class="support-copy"><strong>守卫炮塔 <kbd>T</kbd></strong><span>自动炮击附近敌军 · 限一座</span><span id="turret-state">建造 · 120 金币</span></span>
-              </button>
-              <button class="support-card meteor-card" id="meteor" type="button" aria-pressed="false" aria-describedby="spell-hint">
-                <span class="support-icon" aria-hidden="true">☄</span>
-                <span class="support-copy"><strong>陨星天降 <kbd>Q</kbd></strong><span id="meteor-description">范围轰击 · 不伤友军</span><span id="meteor-state">选择落点 · 已就绪</span></span>
+              <div class="section-heading"><h2>基地防御</h2><span id="turret-capacity">0 / 1 炮位</span></div>
+              <div class="turret-slots" id="turret-slots" aria-label="选择炮塔位置"></div>
+              <div class="turret-actions">
+                <span id="selected-turret">炮位 1 · 空位</span>
+                <button class="expand-button" id="expand-turrets" type="button">扩容 +1 · 100 金币</button>
+              </div>
+              <div class="turret-cards">
+                <button class="turret-card" id="build-turret" data-turret="stone" type="button"><span class="turret-icon" aria-hidden="true">◈</span><strong>投石塔</strong><span data-turret-role>单发重击</span><span data-turret-cost>120 金币</span><span data-turret-state>建造</span></button>
+                <button class="turret-card" data-turret="bone" type="button"><span class="turret-icon" aria-hidden="true">➶</span><strong>骨矛塔</strong><span data-turret-role>近程速射</span><span data-turret-cost>100 金币</span><span data-turret-state>建造</span></button>
+                <button class="turret-card" data-turret="firepot" type="button"><span class="turret-icon" aria-hidden="true">♨</span><strong>火陶塔</strong><span data-turret-role>范围爆炸</span><span data-turret-cost>160 金币</span><span data-turret-state>建造</span></button>
+              </div>
+              <div class="demolition-row"><span>选中炮位后建造 · 进化保留旧塔</span><button id="sell-turret" type="button" hidden>拆除 · 返还 50%</button></div>
+              <button class="support-card ability-card" id="ability" type="button" aria-pressed="false" aria-describedby="spell-hint">
+                <span class="support-icon" id="ability-icon" aria-hidden="true">☄</span>
+                <span class="support-copy"><strong><span id="ability-name">陨星天降</span> <kbd>Q</kbd></strong><span id="ability-description">范围轰击 · 不伤友军</span><span id="ability-state">选择落点 · 已就绪</span></span>
               </button>
               <p class="spell-hint" id="spell-hint">选中大招后点击战场释放；也可用方向键瞄准，Enter 释放，Esc 取消。</p>
             </div>
@@ -105,7 +112,7 @@
         </section>
       </section>
 
-      <footer class="game-footer"><p>1 / 2 / 3 训练部队 · 空格训练前排兵 · E 进化 · T 建造炮塔 · Q 选择大招落点</p><span id="recruit-rule"></span></footer>
+      <footer class="game-footer"><p>1 / 2 / 3 训练部队 · 空格训练前排兵 · E 进化 · T 建造第一种炮塔 · Q 选择大招落点</p><span id="recruit-rule"></span></footer>
       <p class="sr-only" id="announcement" role="status" aria-live="polite"></p>
       <noscript><p>请启用 JavaScript 后开始游戏。</p></noscript>
     </main>

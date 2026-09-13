@@ -1,10 +1,20 @@
-import { RULES, UNITS, AGES, createGame, getRecruitState, recruit, cancelTraining, getEvolutionState, evolve, getTurretState, buildTurret, castMeteor, updateGame } from './game.js';
+import { RULES, UNITS, AGES, TURRETS, ABILITIES, createGame, getRecruitState, recruit, cancelTraining, getEvolutionState, evolve, getTurretState, buildTurret, getExpansionState, expandTurretSlots, sellTurret, castAbility, updateGame } from './game.js';
 import { createRenderer } from './render.js';
 
 const byId = id => document.getElementById(id);
 const canvas = byId('battlefield');
 const render = createRenderer(canvas);
 const cards = [...document.querySelectorAll('[data-unit]')];
+const towerCards = [...document.querySelectorAll('[data-turret]')];
+const towerSlots = Array.from({ length: RULES.maxTurretSlots }, (_, index) => {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'turret-slot';
+  button.innerHTML = `<span>炮位 ${index + 1}</span><strong></strong>`;
+  button.addEventListener('click', () => { selectedSlot = index; syncUI(); });
+  byId('turret-slots').append(button);
+  return button;
+});
 const queueSlots = Array.from({ length: RULES.queueLimit }, (_, index) => {
   const button = document.createElement('button');
   button.type = 'button';
@@ -28,6 +38,7 @@ let targeting = false;
 let targetX = RULES.width / 2;
 let displayedAge = 0;
 let announcedAges = { player: 1, enemy: 1 };
+let selectedSlot = 0;
 
 function setText(id, value) {
   const element = byId(id);
@@ -38,8 +49,8 @@ const formatTime = seconds => `${String(Math.floor(seconds / 60)).padStart(2, '0
 
 setText('income-rate', `+${RULES.goldPerSecond} / 秒`);
 setText('recruit-rule', `队列 ${RULES.queueLimit} 位 · 兵力上限 ${RULES.armyLimit}（含训练中）`);
-setText('meteor-description', `${RULES.meteorDamage} 范围伤害 · ${RULES.meteorCooldown} 秒冷却 · 不伤友军`);
 for (const card of cards) card.addEventListener('click', () => train(card.dataset.unit));
+for (const card of towerCards) card.addEventListener('click', () => constructTurret(card.dataset.turret));
 
 function syncRoster() {
   if (displayedAge === game.ages.player) return;
@@ -61,6 +72,53 @@ function syncRoster() {
     card.setAttribute('aria-label', `训练${stats.name}，${stats.cost} 金币，耗时 ${stats.trainTime} 秒`);
   });
   setText('roster-age', `${age.name} · 点击加入队列`);
+  const towerIcons = displayedAge === 1 ? ['◈', '➶', '♨'] : ['⌖', '⋙', '●'];
+  towerCards.forEach((card, index) => {
+    const type = age.turrets[index];
+    const stats = TURRETS[type];
+    card.dataset.turret = type;
+    card.querySelector('strong').textContent = stats.name;
+    card.querySelector('.turret-icon').textContent = towerIcons[index];
+    card.querySelector('[data-turret-role]').textContent = stats.description;
+    card.querySelector('[data-turret-cost]').textContent = `${stats.cost} 金币`;
+    card.title = `${stats.damage} 攻击 / ${stats.interval} 秒间隔 / ${stats.range} 射程${stats.splash ? ` / ${stats.splash} 爆炸半径` : ''}`;
+    card.setAttribute('aria-label', `建造${stats.name}，${stats.cost} 金币，${stats.description}`);
+  });
+  const ability = ABILITIES[age.ability];
+  setText('ability-name', ability.name);
+  setText('ability-icon', age.ability === 'meteor' ? '☄' : '⇣');
+  setText('ability-description', `${ability.description} · ${ability.damage}${ability.waves > 1 ? ` × ${ability.waves}` : ''} 伤害 · ${ability.cooldown} 秒冷却`);
+  setText('target-text', `${ability.name} · 点击战场选择落点`);
+  byId('ability').dataset.ability = age.ability;
+}
+
+function syncDefenses() {
+  const slots = game.turrets.player;
+  if (selectedSlot >= slots.length) selectedSlot = 0;
+  setText('turret-capacity', `${slots.filter(Boolean).length} / ${slots.length} 炮位`);
+  towerSlots.forEach((button, index) => {
+    const locked = index >= slots.length;
+    const turret = slots[index];
+    button.disabled = locked || game.status !== 'playing';
+    button.classList.toggle('occupied', Boolean(turret));
+    button.setAttribute('aria-pressed', String(index === selectedSlot));
+    button.querySelector('strong').textContent = locked ? '未扩容' : turret ? TURRETS[turret.type].name : '空位';
+    button.setAttribute('aria-label', `炮位 ${index + 1}，${locked ? '未扩容' : turret ? TURRETS[turret.type].name : '空位'}`);
+  });
+  const selected = slots[selectedSlot];
+  setText('selected-turret', `炮位 ${selectedSlot + 1} · ${selected ? TURRETS[selected.type].name : '空位'}`);
+  byId('sell-turret').hidden = !selected;
+  byId('sell-turret').disabled = game.status !== 'playing';
+  if (selected) setText('sell-turret', `拆除 · 返还 ${Math.floor(TURRETS[selected.type].cost / 2)} 金币`);
+  const expansion = getExpansionState(game);
+  const price = RULES.turretExpansionCosts[slots.length - 1];
+  byId('expand-turrets').disabled = expansion !== 'ready';
+  setText('expand-turrets', expansion === 'max-slots' ? '已达 4 个炮位' : expansion === 'finished' ? '战斗已结束' : `扩容 +1 · ${price} 金币${expansion === 'gold' ? '（不足）' : ''}`);
+  for (const card of towerCards) {
+    const state = getTurretState(game, 'player', card.dataset.turret, selectedSlot);
+    card.disabled = state !== 'ready';
+    card.querySelector('[data-turret-state]').textContent = { ready: '在选中位置建造', gold: '金币不足', occupied: '炮位已占用', full: '请先扩容', finished: '战斗已结束', locked: '时代未解锁', outdated: '已被新炮塔替代' }[state] ?? '位置未解锁';
+  }
 }
 
 function syncEvolution() {
@@ -77,12 +135,13 @@ function syncEvolution() {
   setText('evolve-label', state === 'finished' ? '战斗已结束' : nextAge ? `进化至${nextAge.name}` : '已达最高时代');
   setText('evolution-hint', !nextAge ? '第二时代已解锁 · 本局仅支持两个时代' : state === 'ready' ? '经验已达标 · 点击进化或按 E · 不消耗金币' : `击杀获得经验 · 还差 ${nextAge.experienceRequired - experience} 经验`);
   setText('evolution-unlocks', nextAge ? `解锁：${nextAge.units.map(type => UNITS[type].name).join(' · ')}` : '已解锁：剑士 · 弩手 · 重甲骑士');
-  setText('evolution-benefit', nextAge ? `基地生命 +${nextAge.baseHealth - age.baseHealth} · 旧兵和训练保留` : '城堡基地 · 原有炮塔和大招保留');
+  setText('evolution-benefit', nextAge ? `生命 +${nextAge.baseHealth - age.baseHealth} · 新炮塔与箭雨 · 保留旧部队和炮位` : '城堡基地 · 已解锁城堡炮塔与箭雨齐射');
 }
 
 function syncUI() {
   syncRoster();
   syncEvolution();
+  syncDefenses();
   const ageAnnouncements = [];
   for (const team of ['player', 'enemy']) {
     const { hp, maxHp } = game.bases[team];
@@ -122,18 +181,11 @@ function syncUI() {
     slot.querySelector('.queue-fill').style.transform = `scaleX(${order && index === 0 ? 1 - order.remaining / UNITS[order.type].trainTime : 0})`;
     slot.setAttribute('aria-label', order ? `取消${name}，退还 ${UNITS[order.type].cost} 金币` : `空队列位 ${index + 1}`);
   });
-  const turretState = getTurretState(game);
-  byId('build-turret').disabled = turretState !== 'ready';
-  setText('turret-state', {
-    ready: `建造 · ${RULES.turretCost} 金币`, gold: `金币不足 · 需要 ${RULES.turretCost}`,
-    built: '已建造 · 自动防御中', finished: '战斗已结束',
-  }[turretState]);
-  byId('build-turret').classList.toggle('built', Boolean(game.turrets.player));
   const finished = game.status !== 'playing';
   if (finished) targeting = false;
-  byId('meteor').disabled = finished || game.meteorCooldown > 0;
-  byId('meteor').setAttribute('aria-pressed', String(targeting));
-  setText('meteor-state', finished ? '战斗已结束' : game.meteorCooldown > 0 ? `冷却中 · ${Math.ceil(game.meteorCooldown)} 秒` : targeting ? '等待落点 · 再次点击取消' : '选择落点 · 已就绪');
+  byId('ability').disabled = finished || game.abilityCooldown > 0;
+  byId('ability').setAttribute('aria-pressed', String(targeting));
+  setText('ability-state', finished ? '战斗已结束' : game.abilityCooldown > 0 ? `冷却中 · ${Math.ceil(game.abilityCooldown)} 秒` : targeting ? '等待落点 · 再次点击取消' : '选择落点 · 已就绪');
   byId('target-banner').hidden = !targeting;
   canvas.classList.toggle('targeting', targeting);
   setText('phase', finished ? '战斗结束' : document.hidden ? '已暂停' : '交战中');
@@ -156,9 +208,11 @@ function train(type) {
   }
 }
 
-function constructTurret() {
-  if (buildTurret(game)) {
-    announce('守卫炮塔已建造。');
+function constructTurret(type = AGES[game.ages.player].turrets[0]) {
+  if (buildTurret(game, 'player', type, selectedSlot)) {
+    announce(`${TURRETS[type].name}已建造。`);
+    const empty = game.turrets.player.indexOf(null);
+    if (empty >= 0) selectedSlot = empty;
     syncUI();
     render(game, { targeting, targetX });
   }
@@ -171,21 +225,21 @@ function evolvePlayer() {
   }
 }
 
-function toggleMeteor() {
-  if (game.status !== 'playing' || game.meteorCooldown > 0) return;
+function toggleAbility() {
+  if (game.status !== 'playing' || game.abilityCooldown > 0) return;
   targeting = !targeting;
   syncUI();
   if (targeting) {
-    announce('选择陨石落点。点击战场或用方向键调整，Enter 释放，Escape 取消。');
+    announce(`选择${ABILITIES[AGES[game.ages.player].ability].name}落点。点击战场或用方向键调整，Enter 释放，Escape 取消。`);
     canvas.focus({ preventScroll: true });
     canvas.scrollIntoView({ block: 'nearest' });
   }
 }
 
-function releaseMeteor() {
-  if (targeting && castMeteor(game, targetX)) {
+function releaseAbility() {
+  if (targeting && castAbility(game, targetX)) {
     targeting = false;
-    announce('陨星天降已释放。');
+    announce(`${ABILITIES[AGES[game.ages.player].ability].name}已释放。`);
     syncUI();
     render(game, { targeting, targetX });
   }
@@ -197,6 +251,7 @@ function restart() {
   lastTime = null;
   announcedResult = false;
   announcedAges = { player: 1, enemy: 1 };
+  selectedSlot = 0;
   targeting = false;
   targetX = RULES.width / 2;
   announce('新一局开始。');
@@ -207,16 +262,30 @@ function restart() {
 
 byId('restart').addEventListener('click', restart);
 byId('play-again').addEventListener('click', restart);
-byId('build-turret').addEventListener('click', constructTurret);
+byId('expand-turrets').addEventListener('click', () => {
+  if (expandTurretSlots(game)) {
+    selectedSlot = game.turrets.player.length - 1;
+    announce(`已解锁炮位 ${selectedSlot + 1}。`);
+    syncUI();
+    render(game, { targeting, targetX });
+  }
+});
+byId('sell-turret').addEventListener('click', () => {
+  if (sellTurret(game, selectedSlot)) {
+    announce('炮塔已拆除，返还一半建造费用。');
+    syncUI();
+    render(game, { targeting, targetX });
+  }
+});
 byId('evolve').addEventListener('click', evolvePlayer);
-byId('meteor').addEventListener('click', toggleMeteor);
-byId('cancel-target').addEventListener('click', () => { targeting = false; syncUI(); byId('meteor').focus({ preventScroll: true }); });
+byId('ability').addEventListener('click', toggleAbility);
+byId('cancel-target').addEventListener('click', () => { targeting = false; syncUI(); byId('ability').focus({ preventScroll: true }); });
 function pointerX(event) {
   const bounds = canvas.getBoundingClientRect();
   return Math.max(0, Math.min(RULES.width, (event.clientX - bounds.left) / bounds.width * RULES.width));
 }
 canvas.addEventListener('pointermove', event => { if (targeting) targetX = pointerX(event); });
-canvas.addEventListener('click', event => { if (targeting) { targetX = pointerX(event); releaseMeteor(); } });
+canvas.addEventListener('click', event => { if (targeting) { targetX = pointerX(event); releaseAbility(); } });
 window.addEventListener('keydown', event => {
   if (event.altKey || event.ctrlKey || event.metaKey || event.target.closest('input, textarea, select, [contenteditable]')) return;
   // Native activation must also work for the cancel-target button while aiming.
@@ -226,11 +295,11 @@ window.addEventListener('keydown', event => {
     if (event.repeat && !event.code.startsWith('Arrow')) return;
     if (event.code === 'Escape') { targeting = false; syncUI(); }
     else if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') targetX = Math.max(0, Math.min(RULES.width, targetX + (event.code === 'ArrowLeft' ? -24 : 24)));
-    else releaseMeteor();
+    else releaseAbility();
     return;
   }
   const roster = AGES[game.ages.player].units;
-  const actions = { Digit1: () => train(roster[0]), Digit2: () => train(roster[1]), Digit3: () => train(roster[2]), Space: () => train(roster[0]), KeyE: evolvePlayer, KeyT: constructTurret, KeyQ: toggleMeteor };
+  const actions = { Digit1: () => train(roster[0]), Digit2: () => train(roster[1]), Digit3: () => train(roster[2]), Space: () => train(roster[0]), KeyE: evolvePlayer, KeyT: constructTurret, KeyQ: toggleAbility };
   if (actions[event.code]) {
     event.preventDefault();
     if (!event.repeat) actions[event.code]();

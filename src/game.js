@@ -14,14 +14,27 @@ export const RULES = Object.freeze({
   startingGold: 180, goldPerSecond: 7,
   unitSpacing: 30, armyLimit: 16, queueLimit: 5,
   aiFirstDecision: 2.4, aiDecisionInterval: 1.8,
-  turretCost: 120, turretRange: 290, turretDamage: 24, turretInterval: 1.5,
-  meteorCooldown: 40, meteorDelay: 0.8, meteorRadius: 140, meteorDamage: 110, meteorBaseDamage: 40,
+  turretExpansionCosts: Object.freeze([100, 160, 240]), maxTurretSlots: 4,
   fixedStep: 1 / 60,
 });
 
+export const TURRETS = Object.freeze({
+  stone: Object.freeze({ name: '投石塔', age: 1, cost: 120, damage: 24, interval: 1.5, range: 290, projectile: 'stone', splash: 0, description: '单发重击' }),
+  bone: Object.freeze({ name: '骨矛塔', age: 1, cost: 100, damage: 12, interval: 0.65, range: 245, projectile: 'bone', splash: 0, description: '近程速射' }),
+  firepot: Object.freeze({ name: '火陶塔', age: 1, cost: 160, damage: 22, interval: 2.4, range: 260, projectile: 'firepot', splash: 65, description: '范围爆炸' }),
+  ballista: Object.freeze({ name: '重弩塔', age: 2, cost: 190, damage: 48, interval: 1.6, range: 350, projectile: 'ballista', splash: 0, ignoreArmor: true, description: '远程穿甲' }),
+  repeater: Object.freeze({ name: '连弩塔', age: 2, cost: 170, damage: 18, interval: 0.55, range: 290, projectile: 'bolt', splash: 0, description: '密集速射' }),
+  bombard: Object.freeze({ name: '轰击炮塔', age: 2, cost: 240, damage: 55, interval: 2.6, range: 325, projectile: 'cannon', splash: 90, description: '重型范围炮击' }),
+});
+
+export const ABILITIES = Object.freeze({
+  meteor: Object.freeze({ name: '陨星天降', cooldown: 40, delay: 0.8, radius: 140, damage: 110, baseDamage: 40, waves: 1, waveInterval: 0, ignoreArmor: true, description: '单次范围轰击 · 无视护甲' }),
+  volley: Object.freeze({ name: '箭雨齐射', cooldown: 45, delay: 0.45, radius: 210, damage: 32, baseDamage: 12, waves: 4, waveInterval: 0.35, ignoreArmor: false, description: '四波箭雨 · 大范围压制' }),
+});
+
 export const AGES = Object.freeze({
-  1: Object.freeze({ name: '部落时代', numeral: 'I', units: Object.freeze(['melee', 'archer', 'heavy']), experienceRequired: 0, baseHealth: RULES.baseHealth }),
-  2: Object.freeze({ name: '城堡时代', numeral: 'II', units: Object.freeze(['swordsman', 'crossbow', 'knight']), experienceRequired: 160, baseHealth: 900 }),
+  1: Object.freeze({ name: '部落时代', numeral: 'I', units: Object.freeze(['melee', 'archer', 'heavy']), turrets: Object.freeze(['stone', 'bone', 'firepot']), ability: 'meteor', experienceRequired: 0, baseHealth: RULES.baseHealth }),
+  2: Object.freeze({ name: '城堡时代', numeral: 'II', units: Object.freeze(['swordsman', 'crossbow', 'knight']), turrets: Object.freeze(['ballista', 'repeater', 'bombard']), ability: 'volley', experienceRequired: 160, baseHealth: 900 }),
 });
 
 const TEAMS = ['player', 'enemy'];
@@ -42,9 +55,9 @@ export function createGame() {
     experience: { player: 0, enemy: 0 },
     gold: { player: RULES.startingGold, enemy: RULES.startingGold },
     queues: { player: [], enemy: [] },
-    turrets: { player: null, enemy: null },
+    turrets: { player: [null], enemy: [null] },
     units: [], projectiles: [], effects: [],
-    meteor: null, meteorCooldown: 0,
+    ability: null, abilityCooldown: 0,
     nextUnitId: 1, nextOrderId: 1,
     ai: { enabled: true, cooldown: RULES.aiFirstDecision, orders: 0 },
   };
@@ -99,24 +112,67 @@ export function cancelTraining(game, orderId, team = 'player') {
   return true;
 }
 
-export function getTurretState(game, team = 'player') {
+export function getTurretState(game, team = 'player', type = null, slot = null) {
   if (!validTeam(team)) return 'invalid';
+  type ??= AGES[game.ages[team]].turrets[0];
+  if (!Object.hasOwn(TURRETS, type)) return 'invalid';
   if (game.status !== 'playing') return 'finished';
-  if (game.turrets[team]) return 'built';
-  return canAfford(game.gold[team], RULES.turretCost) ? 'ready' : 'gold';
+  if (TURRETS[type].age > game.ages[team]) return 'locked';
+  if (TURRETS[type].age < game.ages[team]) return 'outdated';
+  if (slot !== null && (!Number.isInteger(slot) || slot < 0 || slot >= RULES.maxTurretSlots)) return 'invalid';
+  if (slot === null) slot = game.turrets[team].indexOf(null);
+  if (slot === -1) return 'full';
+  if (slot >= game.turrets[team].length) return 'slot-locked';
+  if (game.turrets[team][slot]) return 'occupied';
+  return canAfford(game.gold[team], TURRETS[type].cost) ? 'ready' : 'gold';
 }
 
-export function buildTurret(game, team = 'player') {
-  if (getTurretState(game, team) !== 'ready') return false;
-  game.gold[team] = Math.max(0, game.gold[team] - RULES.turretCost);
-  game.turrets[team] = { team, cooldown: 0, flash: 0 };
+export function buildTurret(game, team = 'player', type = null, slot = null) {
+  if (getTurretState(game, team, type, slot) !== 'ready') return false;
+  type ??= AGES[game.ages[team]].turrets[0];
+  slot ??= game.turrets[team].indexOf(null);
+  game.gold[team] = Math.max(0, game.gold[team] - TURRETS[type].cost);
+  game.turrets[team][slot] = { team, type, slot, cooldown: 0, flash: 0 };
   return true;
 }
 
-export function castMeteor(game, x) {
-  if (game.status !== 'playing' || !Number.isFinite(x) || game.meteorCooldown > 0) return false;
-  game.meteor = { x: Math.max(0, Math.min(RULES.width, x)), remaining: RULES.meteorDelay };
-  game.meteorCooldown = RULES.meteorCooldown;
+export function getExpansionState(game, team = 'player') {
+  if (!validTeam(team)) return 'invalid';
+  if (game.status !== 'playing') return 'finished';
+  const capacity = game.turrets[team].length;
+  if (capacity >= RULES.maxTurretSlots) return 'max-slots';
+  return canAfford(game.gold[team], RULES.turretExpansionCosts[capacity - 1]) ? 'ready' : 'gold';
+}
+
+export function expandTurretSlots(game, team = 'player') {
+  if (getExpansionState(game, team) !== 'ready') return false;
+  const cost = RULES.turretExpansionCosts[game.turrets[team].length - 1];
+  game.gold[team] = Math.max(0, game.gold[team] - cost);
+  game.turrets[team].push(null);
+  return true;
+}
+
+export function sellTurret(game, slot, team = 'player') {
+  if (game.status !== 'playing' || !validTeam(team) || !Number.isInteger(slot)) return false;
+  const turret = game.turrets[team][slot];
+  if (!turret) return false;
+  game.gold[team] += Math.floor(TURRETS[turret.type].cost / 2);
+  game.turrets[team][slot] = null;
+  return true;
+}
+
+export function getTurretPosition(game, team, slot) {
+  const direction = team === 'player' ? 1 : -1;
+  return { x: game.bases[team].x + (slot % 2 === 0 ? 30 : -30) * direction,
+    y: (game.ages[team] === 2 ? -128 : -100) - Math.floor(slot / 2) * 48 };
+}
+
+export function castAbility(game, x) {
+  if (game.status !== 'playing' || !Number.isFinite(x) || game.abilityCooldown > 0) return false;
+  const type = AGES[game.ages.player].ability;
+  const stats = ABILITIES[type];
+  game.ability = { type, x: Math.max(0, Math.min(RULES.width, x)), remaining: stats.delay, wavesLeft: stats.waves };
+  game.abilityCooldown = stats.cooldown;
   return true;
 }
 
@@ -151,10 +207,18 @@ function updateAI(game, dt) {
   evolve(game, 'enemy');
   const invaders = game.units.filter(unit => unit.team === 'player' && unit.x > RULES.enemyBaseX - 420);
   // Save for a defensive tower when pressured; it uses the same wallet as training.
-  if (!game.turrets.enemy && game.elapsed > 18 &&
-      (invaders.length >= 3 || game.bases.enemy.hp < game.bases.enemy.maxHp * 0.65)) {
-    if (buildTurret(game, 'enemy')) return;
-    if (game.gold.enemy >= 70) return;
+  const towers = game.turrets.enemy;
+  const owned = towers.filter(Boolean).length;
+  if (game.elapsed > 18 && (invaders.length >= 3 || game.bases.enemy.hp < game.bases.enemy.maxHp * 0.65)) {
+    const choices = AGES[game.ages.enemy].turrets;
+    const type = choices[invaders.length >= 3 ? 2 : invaders.some(unit => UNITS[unit.type].armor > 0) ? 0 : 1];
+    if (towers.includes(null) && buildTurret(game, 'enemy', type)) return;
+    const reserve = TURRETS[type].cost + UNITS[AGES[game.ages.enemy].units[0]].cost;
+    if (owned === towers.length && game.gold.enemy >= reserve + (RULES.turretExpansionCosts[towers.length - 1] ?? Infinity)) {
+      expandTurretSlots(game, 'enemy');
+      return;
+    }
+    if (towers.includes(null) && game.gold.enemy >= 70) return;
   }
   if (game.queues.enemy.length >= 2) return;
   const army = [
@@ -172,13 +236,13 @@ function updateAI(game, dt) {
   if (recruit(game, type, 'enemy')) game.ai.orders++;
 }
 
-function addProjectile(game, team, kind, x, target, damage) {
+function addProjectile(game, team, kind, x, target, damage, options = {}) {
   const duration = Math.max(0.12, Math.abs(target.x - x) / (kind === 'arrow' ? 500 : 420));
   game.projectiles.push({
     team, kind, fromX: x, toX: target.x,
-    fromY: kind === 'cannon' ? (game.ages[team] === 2 ? -141 : -118) : -36,
+    fromY: options.fromY ?? -36,
     targetId: target.id ?? null, targetBase: target.id == null ? target.team : null,
-    damage, duration, remaining: duration,
+    damage, duration, remaining: duration, splash: options.splash ?? 0, ignoreArmor: options.ignoreArmor ?? false,
   });
 }
 
@@ -187,27 +251,41 @@ function updateProjectiles(game, dt, hits) {
     shot.remaining -= dt;
     const target = shot.targetBase ? game.bases[shot.targetBase] : game.units.find(unit => unit.id === shot.targetId);
     if (target) shot.toX = target.x;
-    if (shot.remaining <= 0 && target?.hp > 0) hits.push({ target, damage: shot.damage, team: shot.team });
+    if (shot.remaining <= 0) {
+      if (shot.splash > 0) {
+        // Area shots detonate at their last tracked position even if the target has died.
+        for (const victim of game.units) {
+          if (victim.team !== shot.team && Math.abs(victim.x - shot.toX) <= shot.splash) {
+            hits.push({ target: victim, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor });
+          }
+        }
+        game.effects.push({ kind: 'blast', x: shot.toX, radius: shot.splash, life: 0.4, duration: 0.4 });
+      } else if (target?.hp > 0) hits.push({ target, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor });
+    }
   }
   game.projectiles = game.projectiles.filter(shot => shot.remaining > 0);
 }
 
-function updateMeteor(game, dt, hits) {
-  game.meteorCooldown = Math.max(0, game.meteorCooldown - dt);
-  if (!game.meteor) return;
-  game.meteor.remaining -= dt;
-  if (game.meteor.remaining > 0) return;
-  const x = game.meteor.x;
+function updateAbility(game, dt, hits) {
+  game.abilityCooldown = Math.max(0, game.abilityCooldown - dt);
+  if (!game.ability) return;
+  const ability = game.ability;
+  const stats = ABILITIES[ability.type];
+  ability.remaining -= dt;
+  if (ability.remaining > 0) return;
+  const x = ability.x;
   for (const target of game.units) {
-    if (target.team === 'enemy' && Math.abs(target.x - x) <= RULES.meteorRadius) {
-      hits.push({ target, damage: RULES.meteorDamage, team: 'player', ignoreArmor: true });
+    if (target.team === 'enemy' && Math.abs(target.x - x) <= stats.radius) {
+      hits.push({ target, damage: stats.damage, team: 'player', ignoreArmor: stats.ignoreArmor });
     }
   }
-  if (Math.abs(game.bases.enemy.x - x) <= RULES.meteorRadius + RULES.baseHalfWidth) {
-    hits.push({ target: game.bases.enemy, damage: RULES.meteorBaseDamage, team: 'player', ignoreArmor: true });
+  if (Math.abs(game.bases.enemy.x - x) <= stats.radius + RULES.baseHalfWidth) {
+    hits.push({ target: game.bases.enemy, damage: stats.baseDamage, team: 'player', ignoreArmor: true });
   }
-  game.effects.push({ kind: 'meteor', x, life: 0.75, duration: 0.75 });
-  game.meteor = null;
+  game.effects.push({ kind: ability.type, x, radius: stats.radius, life: 0.75, duration: 0.75 });
+  ability.wavesLeft--;
+  if (ability.wavesLeft > 0) ability.remaining += stats.waveInterval;
+  else game.ability = null;
 }
 
 function updateUnits(game, dt, hits) {
@@ -255,18 +333,20 @@ function updateUnits(game, dt, hits) {
 
 function updateTurrets(game, dt) {
   for (const team of TEAMS) {
-    const turret = game.turrets[team];
-    if (!turret) continue;
-    turret.cooldown = Math.max(0, turret.cooldown - dt);
-    turret.flash = Math.max(0, turret.flash - dt);
-    if (turret.cooldown > 0) continue;
-    const x = game.bases[team].x;
-    const targets = game.units.filter(unit => unit.team !== team && Math.abs(unit.x - x) <= RULES.turretRange);
-    targets.sort((a, b) => Math.abs(a.x - x) - Math.abs(b.x - x));
-    if (!targets.length) continue;
-    addProjectile(game, team, 'cannon', x, targets[0], RULES.turretDamage);
-    turret.cooldown = RULES.turretInterval;
-    turret.flash = 0.16;
+    for (const turret of game.turrets[team]) {
+      if (!turret) continue;
+      const stats = TURRETS[turret.type];
+      turret.cooldown = Math.max(0, turret.cooldown - dt);
+      turret.flash = Math.max(0, turret.flash - dt);
+      if (turret.cooldown > 0) continue;
+      const { x, y } = getTurretPosition(game, team, turret.slot);
+      const targets = game.units.filter(unit => unit.team !== team && Math.abs(unit.x - x) <= stats.range);
+      targets.sort((a, b) => Math.abs(a.x - x) - Math.abs(b.x - x));
+      if (!targets.length) continue;
+      addProjectile(game, team, stats.projectile, x, targets[0], stats.damage, { fromY: y - 14, splash: stats.splash, ignoreArmor: stats.ignoreArmor });
+      turret.cooldown = stats.interval;
+      turret.flash = 0.16;
+    }
   }
 }
 
@@ -305,7 +385,7 @@ export function updateGame(game, dt) {
   for (const team of TEAMS) updateTraining(game, team, dt);
   const hits = [];
   updateProjectiles(game, dt, hits);
-  updateMeteor(game, dt, hits);
+  updateAbility(game, dt, hits);
   updateUnits(game, dt, hits);
   updateTurrets(game, dt);
   resolveHits(game, hits);

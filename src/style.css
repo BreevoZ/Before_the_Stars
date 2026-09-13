@@ -1,0 +1,117 @@
+:root {
+  color-scheme: dark;
+  font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  color: #e9eae4;
+  background: #101719;
+  font-synthesis: none;
+  --muted: #8f9e9c;
+  --line: #303d3b;
+  --player: #a9d6bb;
+  --enemy: #db926b;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+button { font: inherit; cursor: pointer; }
+button:focus-visible { outline: 3px solid #f4d79d; outline-offset: 5px; }
+button:disabled { cursor: default; }
+[hidden] { display: none !important; }
+.game-shell { width: min(1360px, 100%); margin: auto; padding: 0 40px 28px; }
+.masthead { min-height: 122px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.wordmark { display: flex; align-items: center; gap: 13px; font-size: 15px; font-weight: 650; letter-spacing: 0.16em; }
+.brand-mark { font-size: 33px; color: var(--player); font-weight: 400; }
+.version { font-size: 12px; letter-spacing: 0.12em; color: var(--muted); }
+.battle { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #192321; }
+.battle-hud { display: grid; grid-template-columns: minmax(0, 1fr) 180px minmax(0, 1fr); align-items: center; padding: 30px 38px 24px; gap: 34px; }
+.base-status { max-width: 350px; width: 100%; }
+.enemy-status { justify-self: end; }
+.status-heading { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; margin-bottom: 12px; }
+.status-heading span:last-child { font-family: ui-monospace, monospace; color: var(--muted); }
+progress { display: block; height: 5px; width: 100%; border: 0; border-radius: 0; appearance: none; background: #34423b; color: var(--player); }
+progress::-webkit-progress-bar { background: #34423b; }
+progress::-webkit-progress-value { background: var(--player); transition: width 0.15s; }
+progress::-moz-progress-bar { background: var(--player); }
+.enemy-status progress { color: var(--enemy); }
+.enemy-status progress::-webkit-progress-value { background: var(--enemy); }
+.enemy-status progress::-moz-progress-bar { background: var(--enemy); }
+.battle-clock { text-align: center; }
+.eyebrow { font-size: 12px; color: var(--muted); letter-spacing: 0.13em; }
+.battle-clock time { display: block; font-family: ui-monospace, monospace; font-size: 25px; margin-top: 8px; color: #e7e8dd; font-variant-numeric: tabular-nums; }
+.field-wrap { position: relative; }
+canvas { display: block; width: 100%; height: auto; }
+.field-caption { position: absolute; bottom: 23px; left: 38px; right: 38px; display: flex; justify-content: space-between; color: #86908a; font-size: 12px; letter-spacing: 0.18em; pointer-events: none; }
+.field-caption span:nth-child(2) { color: #65756f; }
+.command-bar { min-height: 125px; padding: 24px 32px; border-top: 1px solid var(--line); display: flex; gap: 26px; align-items: center; background: #1b2423; }
+.unit-info { display: flex; gap: 18px; align-items: center; margin-right: auto; }
+.unit-symbol { width: 60px; height: 66px; display: grid; place-items: center; background: #2a3831; border: 1px solid #465c4d; border-radius: 4px; font-size: 36px; color: var(--player); }
+.unit-info h1 { font-size: 18px; font-weight: 500; margin: 0 0 7px; }
+.unit-info p { font-size: 13px; color: var(--muted); margin: 0; }
+.army-count { margin-right: 12px; white-space: nowrap; }
+.army-count p { margin: 7px 0 0; font-size: 12px; color: var(--muted); }
+.army-count strong { font-family: ui-monospace, monospace; font-size: 19px; font-weight: 400; color: var(--player); }
+.army-count strong:last-child { color: var(--enemy); }
+.count-divider { padding: 0 12px; color: #56655e; }
+.recruit-button, .primary-button { border: 1px solid #a9d6bb; border-radius: 4px; background: var(--player); color: #192c22; min-height: 58px; font-size: 15px; font-weight: 650; }
+.recruit-button { min-width: 230px; position: relative; overflow: hidden; padding: 0 20px; }
+.recruit-button:hover:not(:disabled), .primary-button:hover { background: #c1e8d0; }
+.recruit-button:active:not(:disabled), .primary-button:active { transform: translateY(1px); }
+.recruit-button:disabled { background: #293c33; color: #b2c6b9; border-color: #45634f; }
+.recruit-label { display: flex; align-items: center; justify-content: space-between; gap: 16px; position: relative; }
+kbd { font: inherit; font-size: 11px; border: 1px solid currentColor; border-radius: 3px; padding: 3px 6px; opacity: 0.65; }
+.cooldown-fill { position: absolute; inset: 0; background: #658671; transform-origin: left; opacity: 0.3; transform: scaleX(0); }
+.restart-button { background: transparent; border: 1px solid #46514c; color: #b9c4bc; border-radius: 4px; min-height: 58px; padding: 0 18px; font-size: 14px; white-space: nowrap; }
+.restart-button span { font-size: 21px; margin-right: 4px; }
+.restart-button:hover { background: #2b3630; color: #fff; }
+.game-footer { display: flex; justify-content: space-between; gap: 20px; color: var(--muted); font-size: 13px; padding: 20px 0; }
+.game-footer p { margin: 0; }
+.game-footer > span { color: #73867c; }
+.result-overlay { position: absolute; inset: 0; display: grid; place-items: center; background: #101917bb; backdrop-filter: blur(5px); }
+.result-card { text-align: center; padding: 24px; }
+.result-card h1 { font-size: clamp(28px, 4vw, 46px); color: var(--player); font-weight: 500; letter-spacing: 0.12em; margin: 12px 0; }
+.result-card p { font-size: 14px; color: #b9c4bc; margin: 0 0 24px; }
+.primary-button { padding: 0 25px; min-width: 180px; }
+.primary-button span { margin-left: 18px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+@media (min-width: 1500px) { .game-shell { padding-top: 30px; } }
+@media (max-width: 900px) {
+  .game-shell { padding: 0 20px 20px; }
+  .masthead { min-height: 90px; }
+  .battle-hud { padding: 24px; gap: 20px; grid-template-columns: 1fr 90px 1fr; }
+  .command-bar { flex-wrap: wrap; gap: 16px; padding: 20px; }
+  .unit-info { flex: 1; }
+  .army-count { margin: 0; }
+  .recruit-button { flex: 1; }
+  .restart-button { min-width: 100px; }
+  .field-caption { left: 24px; right: 24px; bottom: 14px; }
+}
+@media (max-width: 560px) {
+  .game-shell { padding: 0 12px 16px; }
+  .masthead { min-height: 78px; gap: 8px; flex-wrap: wrap; align-content: center; }
+  .wordmark { font-size: 12px; letter-spacing: 0.09em; gap: 8px; }
+  .brand-mark { font-size: 27px; }
+  .version { font-size: 11px; letter-spacing: 0; }
+  .battle-hud { padding: 20px 14px; gap: 12px; grid-template-columns: 1fr 56px 1fr; }
+  .status-heading { flex-direction: column; font-size: 12px; margin-bottom: 9px; }
+  .enemy-status .status-heading { text-align: right; }
+  .battle-clock time { font-size: 17px; }
+  .battle-clock .eyebrow { font-size: 10px; }
+  canvas { height: 245px; object-fit: fill; }
+  .field-caption { font-size: 10px; left: 14px; right: 14px; bottom: 15px; letter-spacing: 0; }
+  .field-caption span:nth-child(2) { display: none; }
+  .unit-info { gap: 12px; min-width: 58%; }
+  .unit-symbol { height: 52px; width: 44px; font-size: 28px; }
+  .unit-info h1 { font-size: 16px; }
+  .unit-info p { font-size: 11px; }
+  .command-bar { gap: 18px 10px; padding: 18px 14px; }
+  .count-divider { padding: 0 5px; }
+  .recruit-button { min-width: 160px; padding: 0 14px; }
+  .restart-button { min-width: 80px; padding: 0 12px; }
+  .game-footer { display: block; font-size: 12px; line-height: 1.7; padding: 16px 2px; }
+  .game-footer > span { display: block; margin-top: 5px; }
+  .result-card { padding: 12px; }
+  .result-card p { font-size: 12px; margin-bottom: 14px; }
+  .result-card h1 { margin: 8px 0; }
+  .primary-button { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { progress::-webkit-progress-value { transition: none; } }

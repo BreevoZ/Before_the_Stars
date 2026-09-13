@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#101719" />
+    <meta name="description" content="Before the Stars：出兵、推进、摧毁敌方基地。" />
+    <title>Before the Stars</title>
+    <link rel="stylesheet" href="./src/style.css" />
+    <script type="module" src="./src/main.js"></script>
+  </head>
+  <body>
+    <main class="game-shell">
+      <header class="masthead">
+        <div class="wordmark"><span class="brand-mark" aria-hidden="true">✳</span> BEFORE THE STARS</div>
+        <span class="version">原型 01 / 前线</span>
+      </header>
+
+      <section class="battle" aria-label="战场">
+        <div class="battle-hud">
+          <div class="base-status player-status">
+            <div class="status-heading"><span>我方基地</span><span id="player-health">360 / 360</span></div>
+            <progress id="player-health-bar" aria-label="我方基地生命值" max="360" value="360"></progress>
+          </div>
+          <div class="battle-clock"><span class="eyebrow" id="phase">交战中</span><time id="clock">00:00</time></div>
+          <div class="base-status enemy-status">
+            <div class="status-heading"><span>敌方基地</span><span id="enemy-health">360 / 360</span></div>
+            <progress id="enemy-health-bar" aria-label="敌方基地生命值" max="360" value="360"></progress>
+          </div>
+        </div>
+
+        <div class="field-wrap">
+          <canvas id="battlefield" width="1280" height="480" role="img" aria-label="左侧青色为我方，右侧橙色为敌方。士兵自动前进并攻击敌军或基地。"></canvas>
+          <div class="field-caption" aria-hidden="true"><span>西侧营地</span><span>边境荒原</span><span>东侧营地</span></div>
+          <div class="result-overlay" id="result" hidden>
+            <div class="result-card">
+              <span class="eyebrow" id="result-label">战斗结束</span>
+              <h1 id="result-title"></h1>
+              <p id="result-detail"></p>
+              <button class="primary-button" id="play-again" type="button">再战一局 <span aria-hidden="true">↻</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="command-bar">
+          <div class="unit-info">
+            <div class="unit-symbol" aria-hidden="true">⚔</div>
+            <div><h1>近战兵</h1><p>自动推进 · 近身攻击</p></div>
+          </div>
+          <div class="army-count"><span class="eyebrow">战场兵力</span><p><strong id="player-count">0</strong> 我方 <span class="count-divider">/</span> <strong id="enemy-count">0</strong> 敌方</p></div>
+          <button class="recruit-button" id="recruit" type="button">
+            <span class="cooldown-fill" id="cooldown-fill" aria-hidden="true"></span>
+            <span class="recruit-label"><span id="recruit-label">派出近战兵</span><kbd>空格</kbd></span>
+          </button>
+          <button class="restart-button" id="restart" type="button" aria-label="重新开始战斗"><span aria-hidden="true">↻</span> 重开</button>
+        </div>
+      </section>
+
+      <footer class="game-footer"><p>点击出兵或按空格，摧毁敌方基地。</p><span id="recruit-rule"></span></footer>
+      <p class="sr-only" id="announcement" role="status" aria-live="polite"></p>
+      <noscript><p>请启用 JavaScript 后开始游戏。</p></noscript>
+    </main>
+  </body>
+</html>

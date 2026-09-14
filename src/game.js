@@ -6,6 +6,15 @@ export const UNITS = Object.freeze({
   swordsman: Object.freeze({ name: '剑士', age: 2, role: 'melee', cost: 50, trainTime: 2, health: 115, damage: 20, armor: 1, speed: 66, range: 34, attackInterval: 0.85, bounty: 17, experience: 30, lane: 'front' }),
   crossbow: Object.freeze({ name: '弩手', age: 2, role: 'archer', projectile: 'bolt', cost: 75, trainTime: 3, health: 65, damage: 30, armor: 0, speed: 50, range: 230, attackInterval: 1.5, bounty: 24, experience: 42, lane: 'back' }),
   knight: Object.freeze({ name: '重甲骑士', age: 2, role: 'heavy', cost: 130, trainTime: 4.8, health: 270, damage: 42, armor: 5, speed: 44, range: 40, attackInterval: 1.4, bounty: 40, experience: 65, lane: 'front' }),
+  duelist: Object.freeze({ name: '决斗士', age: 3, role: 'melee', cost: 80, trainTime: 2.2, health: 205, damage: 35, armor: 3, speed: 72, range: 36, attackInterval: 0.8, bounty: 28, experience: 46, lane: 'front' }),
+  musketeer: Object.freeze({ name: '火枪手', age: 3, role: 'archer', projectile: 'bullet', cost: 115, trainTime: 3.2, health: 110, damage: 60, armor: 1, speed: 48, range: 255, attackInterval: 1.7, bounty: 40, experience: 65, lane: 'back' }),
+  cannoneer: Object.freeze({ name: '炮兵', age: 3, role: 'heavy', projectile: 'cannon', splash: 55, cost: 210, trainTime: 5.2, health: 380, damage: 95, armor: 7, speed: 30, range: 185, attackInterval: 2.1, bounty: 70, experience: 110, lane: 'front' }),
+  commando: Object.freeze({ name: '突击步兵', age: 4, role: 'melee', cost: 130, trainTime: 2.4, health: 340, damage: 56, armor: 6, speed: 76, range: 38, attackInterval: 0.65, bounty: 45, experience: 80, lane: 'front' }),
+  rifleman: Object.freeze({ name: '自动步枪兵', age: 4, role: 'archer', projectile: 'bullet', cost: 190, trainTime: 3.4, health: 185, damage: 45, armor: 3, speed: 54, range: 270, attackInterval: 0.55, bounty: 65, experience: 110, lane: 'back' }),
+  tank: Object.freeze({ name: '主战坦克', age: 4, role: 'heavy', projectile: 'shell', splash: 70, cost: 350, trainTime: 5.6, health: 720, damage: 145, armor: 14, speed: 26, range: 200, attackInterval: 1.9, bounty: 120, experience: 180, lane: 'front' }),
+  blade: Object.freeze({ name: '光刃战士', age: 5, role: 'melee', ignoreArmor: true, cost: 220, trainTime: 2.6, health: 550, damage: 90, armor: 10, speed: 82, range: 40, attackInterval: 0.6, bounty: 70, experience: 140, lane: 'front' }),
+  blaster: Object.freeze({ name: '等离子射手', age: 5, role: 'archer', projectile: 'plasma', cost: 300, trainTime: 3.6, health: 300, damage: 85, armor: 5, speed: 56, range: 300, attackInterval: 0.65, bounty: 100, experience: 180, lane: 'back' }),
+  warMachine: Object.freeze({ name: '战争机甲', age: 5, role: 'heavy', projectile: 'plasma-orb', splash: 90, cost: 580, trainTime: 6, health: 1200, damage: 235, armor: 22, speed: 23, range: 220, attackInterval: 1.8, bounty: 200, experience: 300, lane: 'front' }),
 });
 
 export const RULES = Object.freeze({
@@ -25,16 +34,31 @@ export const TURRETS = Object.freeze({
   ballista: Object.freeze({ name: '重弩塔', age: 2, cost: 190, damage: 48, interval: 1.6, range: 350, projectile: 'ballista', splash: 0, ignoreArmor: true, description: '远程穿甲' }),
   repeater: Object.freeze({ name: '连弩塔', age: 2, cost: 170, damage: 18, interval: 0.55, range: 290, projectile: 'bolt', splash: 0, description: '密集速射' }),
   bombard: Object.freeze({ name: '轰击炮塔', age: 2, cost: 240, damage: 55, interval: 2.6, range: 325, projectile: 'cannon', splash: 90, description: '重型范围炮击' }),
+  smallCannon: Object.freeze({ name: '轻型加农炮', age: 3, cost: 260, damage: 70, interval: 1.2, range: 350, projectile: 'cannon', splash: 0, description: '精准直射' }),
+  organGun: Object.freeze({ name: '风琴炮', age: 3, cost: 300, damage: 30, interval: 0.38, range: 310, projectile: 'bullet', splash: 0, description: '多管速射' }),
+  mortar: Object.freeze({ name: '爆破迫击炮', age: 3, cost: 380, damage: 110, interval: 2.5, range: 370, projectile: 'shell', splash: 100, description: '大范围爆破' }),
+  machineGun: Object.freeze({ name: '重机枪塔', age: 4, cost: 420, damage: 38, interval: 0.25, range: 340, projectile: 'bullet', splash: 0, description: '持续火力' }),
+  doubleCannon: Object.freeze({ name: '双联炮塔', age: 4, cost: 520, damage: 130, interval: 1.1, range: 390, projectile: 'shell', splash: 0, ignoreArmor: true, description: '重型穿甲' }),
+  rocket: Object.freeze({ name: '火箭发射塔', age: 4, cost: 640, damage: 180, interval: 2.3, range: 400, projectile: 'rocket', splash: 110, description: '范围轰炸' }),
+  titanium: Object.freeze({ name: '钛金速射塔', age: 5, cost: 720, damage: 65, interval: 0.22, range: 370, projectile: 'plasma', splash: 0, description: '高速能量弹' }),
+  laser: Object.freeze({ name: '激光炮塔', age: 5, cost: 900, damage: 170, interval: 0.85, range: 430, projectile: 'laser', splash: 0, ignoreArmor: true, description: '远程穿甲光束' }),
+  ion: Object.freeze({ name: '离子炮塔', age: 5, cost: 1200, damage: 310, interval: 2.2, range: 450, projectile: 'plasma-orb', splash: 130, description: '离子范围爆发' }),
 });
 
 export const ABILITIES = Object.freeze({
   meteor: Object.freeze({ name: '陨星天降', cooldown: 40, delay: 0.8, radius: 140, damage: 110, baseDamage: 40, waves: 1, waveInterval: 0, ignoreArmor: true, description: '单次范围轰击 · 无视护甲' }),
   volley: Object.freeze({ name: '箭雨齐射', cooldown: 45, delay: 0.45, radius: 210, damage: 32, baseDamage: 12, waves: 4, waveInterval: 0.35, ignoreArmor: false, description: '四波箭雨 · 大范围压制' }),
+  renewal: Object.freeze({ name: '复苏之光', icon: '✚', targeting: 'allies', cooldown: 50, duration: 8, healing: 18, description: '全场友军持续回血' }),
+  airstrike: Object.freeze({ name: '轰炸空袭', icon: '✈', cooldown: 50, delay: 0.85, radius: 95, sweep: 140, damage: 150, baseDamage: 45, waves: 3, waveInterval: 0.4, ignoreArmor: false, description: '三枚炸弹 · 从左向右轰炸' }),
+  orbital: Object.freeze({ name: '轨道打击', icon: '⊕', cooldown: 55, delay: 1.25, radius: 180, damage: 450, baseDamage: 140, waves: 1, waveInterval: 0, ignoreArmor: true, description: '轨道光束 · 无视护甲' }),
 });
 
 export const AGES = Object.freeze({
-  1: Object.freeze({ name: '部落时代', numeral: 'I', units: Object.freeze(['melee', 'archer', 'heavy']), turrets: Object.freeze(['stone', 'bone', 'firepot']), ability: 'meteor', experienceRequired: 0, baseHealth: RULES.baseHealth }),
-  2: Object.freeze({ name: '城堡时代', numeral: 'II', units: Object.freeze(['swordsman', 'crossbow', 'knight']), turrets: Object.freeze(['ballista', 'repeater', 'bombard']), ability: 'volley', experienceRequired: 160, baseHealth: 900 }),
+  1: Object.freeze({ name: '原始时代', shortName: '原始', numeral: 'I', units: Object.freeze(['melee', 'archer', 'heavy']), turrets: Object.freeze(['stone', 'bone', 'firepot']), ability: 'meteor', experienceRequired: 0, baseHealth: RULES.baseHealth, income: 7, turretY: -100, unitIcons: Object.freeze(['⚔', '➶', '⬟']), turretIcons: Object.freeze(['◈', '➶', '♨']) }),
+  2: Object.freeze({ name: '中世纪', shortName: '中世纪', numeral: 'II', units: Object.freeze(['swordsman', 'crossbow', 'knight']), turrets: Object.freeze(['ballista', 'repeater', 'bombard']), ability: 'volley', experienceRequired: 160, baseHealth: 900, income: 10, turretY: -128, unitIcons: Object.freeze(['⚔', '⌁', '♜']), turretIcons: Object.freeze(['⌖', '⋙', '●']) }),
+  3: Object.freeze({ name: '文艺复兴时代', shortName: '文艺复兴', numeral: 'III', units: Object.freeze(['duelist', 'musketeer', 'cannoneer']), turrets: Object.freeze(['smallCannon', 'organGun', 'mortar']), ability: 'renewal', experienceRequired: 480, baseHealth: 1500, income: 16, turretY: -116, unitIcons: Object.freeze(['⚔', '⌐', '◉']), turretIcons: Object.freeze(['●', '⋙', '◒']) }),
+  4: Object.freeze({ name: '现代时代', shortName: '现代', numeral: 'IV', units: Object.freeze(['commando', 'rifleman', 'tank']), turrets: Object.freeze(['machineGun', 'doubleCannon', 'rocket']), ability: 'airstrike', experienceRequired: 1100, baseHealth: 2400, income: 24, turretY: -106, unitIcons: Object.freeze(['⚔', '⌁', '▰']), turretIcons: Object.freeze(['⋙', '═', '➚']) }),
+  5: Object.freeze({ name: '未来时代', shortName: '未来', numeral: 'V', units: Object.freeze(['blade', 'blaster', 'warMachine']), turrets: Object.freeze(['titanium', 'laser', 'ion']), ability: 'orbital', experienceRequired: 2200, baseHealth: 3800, income: 36, turretY: -130, unitIcons: Object.freeze(['ϟ', '⊙', '♜']), turretIcons: Object.freeze(['⊙', 'ϟ', '⊕']) }),
 });
 
 const TEAMS = ['player', 'enemy'];
@@ -164,14 +188,24 @@ export function sellTurret(game, slot, team = 'player') {
 export function getTurretPosition(game, team, slot) {
   const direction = team === 'player' ? 1 : -1;
   return { x: game.bases[team].x + (slot % 2 === 0 ? 30 : -30) * direction,
-    y: (game.ages[team] === 2 ? -128 : -100) - Math.floor(slot / 2) * 48 };
+    y: AGES[game.ages[team]].turretY - Math.floor(slot / 2) * 48 };
 }
 
-export function castAbility(game, x) {
+export function getAbilityRadius(type) {
+  const stats = ABILITIES[type];
+  return (stats.radius ?? 0) + (stats.sweep ?? 0) * (stats.waves - 1 || 0) / 2;
+}
+
+export function getAbilityImpactX(ability) {
+  const stats = ABILITIES[ability.type];
+  return Math.max(0, Math.min(RULES.width, ability.x + (stats.sweep ?? 0) * ((stats.waves - 1) / 2 - ability.wavesLeft + 1)));
+}
+
+export function castAbility(game, x = RULES.width / 2) {
   if (game.status !== 'playing' || !Number.isFinite(x) || game.abilityCooldown > 0) return false;
   const type = AGES[game.ages.player].ability;
   const stats = ABILITIES[type];
-  game.ability = { type, x: Math.max(0, Math.min(RULES.width, x)), remaining: stats.delay, wavesLeft: stats.waves };
+  game.ability = { type, x: Math.max(0, Math.min(RULES.width, x)), remaining: stats.duration ?? stats.delay, wavesLeft: stats.waves ?? 0 };
   game.abilityCooldown = stats.cooldown;
   return true;
 }
@@ -211,7 +245,9 @@ function updateAI(game, dt) {
   const owned = towers.filter(Boolean).length;
   if (game.elapsed > 18 && (invaders.length >= 3 || game.bases.enemy.hp < game.bases.enemy.maxHp * 0.65)) {
     const choices = AGES[game.ages.enemy].turrets;
-    const type = choices[invaders.length >= 3 ? 2 : invaders.some(unit => UNITS[unit.type].armor > 0) ? 0 : 1];
+    const type = invaders.length >= 3 ? choices[2] : invaders.some(unit => UNITS[unit.type].armor > 0)
+      ? choices.find(type => TURRETS[type].ignoreArmor) ?? choices[0]
+      : choices.reduce((fastest, type) => TURRETS[type].interval < TURRETS[fastest].interval ? type : fastest);
     if (towers.includes(null) && buildTurret(game, 'enemy', type)) return;
     const reserve = TURRETS[type].cost + UNITS[AGES[game.ages.enemy].units[0]].cost;
     if (owned === towers.length && game.gold.enemy >= reserve + (RULES.turretExpansionCosts[towers.length - 1] ?? Infinity)) {
@@ -237,7 +273,8 @@ function updateAI(game, dt) {
 }
 
 function addProjectile(game, team, kind, x, target, damage, options = {}) {
-  const duration = Math.max(0.12, Math.abs(target.x - x) / (kind === 'arrow' ? 500 : 420));
+  const speed = { arrow: 500, bullet: 900, laser: 1400, plasma: 700, 'plasma-orb': 480, rocket: 500 }[kind] ?? 420;
+  const duration = Math.max(0.12, Math.abs(target.x - x) / speed);
   game.projectiles.push({
     team, kind, fromX: x, toX: target.x,
     fromY: options.fromY ?? -36,
@@ -259,6 +296,8 @@ function updateProjectiles(game, dt, hits) {
             hits.push({ target: victim, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor });
           }
         }
+        // Siege units can hit a base directly; blast radius never adds extra base damage.
+        if (shot.targetBase && target?.hp > 0) hits.push({ target, damage: shot.damage, team: shot.team });
         game.effects.push({ kind: 'blast', x: shot.toX, radius: shot.splash, life: 0.4, duration: 0.4 });
       } else if (target?.hp > 0) hits.push({ target, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor });
     }
@@ -271,9 +310,18 @@ function updateAbility(game, dt, hits) {
   if (!game.ability) return;
   const ability = game.ability;
   const stats = ABILITIES[ability.type];
+  if (stats.targeting === 'allies') {
+    const healing = stats.healing * Math.min(dt, ability.remaining);
+    for (const unit of game.units) {
+      if (unit.team === 'player' && unit.hp > 0) unit.hp = Math.min(UNITS[unit.type].health, unit.hp + healing);
+    }
+    ability.remaining -= dt;
+    if (ability.remaining <= EPSILON) game.ability = null;
+    return;
+  }
   ability.remaining -= dt;
   if (ability.remaining > 0) return;
-  const x = ability.x;
+  const x = getAbilityImpactX(ability);
   for (const target of game.units) {
     if (target.team === 'enemy' && Math.abs(target.x - x) <= stats.radius) {
       hits.push({ target, damage: stats.damage, team: 'player', ignoreArmor: stats.ignoreArmor });
@@ -317,8 +365,8 @@ function updateUnits(game, dt, hits) {
     const target = enemyDistance <= stats.range + 0.01 ? closestEnemy : baseDistance <= stats.range + 0.01 ? base : null;
     if (target) {
       if (unit.attackCooldown === 0) {
-        if (stats.projectile) addProjectile(game, unit.team, stats.projectile, unit.x, target, stats.damage);
-        else hits.push({ target, damage: stats.damage, team: unit.team });
+        if (stats.projectile) addProjectile(game, unit.team, stats.projectile, unit.x, target, stats.damage, { splash: stats.splash, ignoreArmor: stats.ignoreArmor });
+        else hits.push({ target, damage: stats.damage, team: unit.team, ignoreArmor: stats.ignoreArmor });
         unit.attackCooldown = stats.attackInterval;
         unit.attackAnimation = 0.25;
       }
@@ -376,7 +424,7 @@ export function updateGame(game, dt) {
   dt = Math.min(dt, 0.05);
   game.elapsed += dt;
   for (const team of TEAMS) {
-    game.gold[team] += RULES.goldPerSecond * dt;
+    game.gold[team] += AGES[game.ages[team]].income * dt;
     game.bases[team].hitFlash = Math.max(0, game.bases[team].hitFlash - dt);
   }
   for (const effect of game.effects) effect.life -= dt;

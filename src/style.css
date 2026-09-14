@@ -56,6 +56,12 @@ canvas.targeting { cursor: crosshair; touch-action: manipulation; }
 .restart-button span { font-size: 18px; margin-right: 4px; }
 .restart-button:hover { background: #2b3630; color: #fff; }
 .evolution-panel { display: grid; grid-template-columns: minmax(190px, 1fr) minmax(220px, 1fr) auto; align-items: center; gap: 24px; margin-bottom: 20px; padding: 0 0 20px; border-bottom: 1px solid var(--line); }
+.era-track { list-style: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; padding: 0; margin: 0 0 20px; }
+.era-track li { display: flex; align-items: center; justify-content: center; gap: 8px; color: #82948b; border-top: 2px solid #39453d; padding-top: 9px; font-size: 12px; }
+.era-track li span { font-family: ui-monospace, monospace; font-size: 11px; }
+.era-track li strong { font-weight: 400; }
+.era-track .reached { border-color: #709780; color: var(--player); }
+.era-track [aria-current="step"] { border-color: var(--gold); color: var(--gold); }
 .evolution-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 12px; color: var(--muted); margin-bottom: 9px; }
 .evolution-heading strong { font-size: 14px; font-weight: 500; color: #e6dabd; }
 .evolution-heading span { font-variant-numeric: tabular-nums; }
@@ -71,6 +77,11 @@ canvas.targeting { cursor: crosshair; touch-action: manipulation; }
 .evolve-button.ready:hover { background: #f4dbac; }
 .evolve-button.ready kbd { color: #43513a; border-color: #798568; }
 .unit-card[data-age="2"] { border-color: #789383; background: #2b3b34; }
+.unit-card[data-age="3"] { border-color: #9a8860; background: #36382d; }
+.unit-card[data-age="4"] { border-color: #718884; background: #2b3638; }
+.unit-card[data-age="5"] { border-color: #689d9f; background: #25383d; }
+.ability-card[data-ability="renewal"] { border-color: #76996d; background: #293c2d; }
+.ability-card[data-ability="orbital"] { border-color: #6d9ba4; background: #25383e; }
 .command-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 28px; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .section-heading h1, .section-heading h2 { margin: 0; font-size: 15px; font-weight: 500; }
@@ -186,6 +197,8 @@ canvas.targeting { cursor: crosshair; touch-action: manipulation; }
   .restart-button { margin-left: auto; }
   .command-grid { grid-template-columns: 1fr; gap: 20px; }
   .evolution-panel { grid-template-columns: 1fr; gap: 12px; padding-bottom: 16px; }
+  .era-track { gap: 4px; margin-bottom: 16px; }
+  .era-track li { flex-direction: column; gap: 4px; font-size: 11px; }
   .evolution-unlocks { grid-column: 1; grid-row: auto; flex-direction: column; gap: 5px; }
   .evolve-button { width: 100%; }
   .section-heading > span { display: block; }

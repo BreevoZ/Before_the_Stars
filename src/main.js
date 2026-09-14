@@ -6,6 +6,12 @@ const canvas = byId('battlefield');
 const render = createRenderer(canvas);
 const cards = [...document.querySelectorAll('[data-unit]')];
 const towerCards = [...document.querySelectorAll('[data-turret]')];
+const eraSteps = Object.values(AGES).map(age => {
+  const step = document.createElement('li');
+  step.innerHTML = `<span>${age.numeral}</span><strong>${age.shortName}</strong>`;
+  byId('era-track').append(step);
+  return step;
+});
 const towerSlots = Array.from({ length: RULES.maxTurretSlots }, (_, index) => {
   const button = document.createElement('button');
   button.type = 'button';
@@ -47,7 +53,6 @@ function setText(id, value) {
 const announce = message => setText('announcement', message);
 const formatTime = seconds => `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(Math.floor(seconds) % 60).padStart(2, '0')}`;
 
-setText('income-rate', `+${RULES.goldPerSecond} / 秒`);
 setText('recruit-rule', `队列 ${RULES.queueLimit} 位 · 兵力上限 ${RULES.armyLimit}（含训练中）`);
 for (const card of cards) card.addEventListener('click', () => train(card.dataset.unit));
 for (const card of towerCards) card.addEventListener('click', () => constructTurret(card.dataset.turret));
@@ -57,7 +62,8 @@ function syncRoster() {
   displayedAge = game.ages.player;
   const age = AGES[displayedAge];
   const roles = { melee: '近身推进', archer: '远程支援', heavy: '高生命 · 护甲' };
-  const icons = displayedAge === 1 ? ['⚔', '➶', '⬟'] : ['⚔', '⌁', '♜'];
+  const icons = age.unitIcons;
+  document.body.dataset.age = String(displayedAge);
   cards.forEach((card, index) => {
     const type = age.units[index];
     const stats = UNITS[type];
@@ -65,14 +71,14 @@ function syncRoster() {
     card.dataset.age = String(displayedAge);
     card.querySelector('strong').textContent = stats.name;
     card.querySelector('.unit-icon').textContent = icons[index];
-    card.querySelector('.unit-role').textContent = roles[stats.role];
+    card.querySelector('.unit-role').textContent = stats.splash ? '重装 · 范围炮击' : stats.ignoreArmor ? '近战 · 无视护甲' : roles[stats.role];
     card.querySelector('[data-cost]').textContent = `${stats.cost} 金币`;
     card.querySelector('[data-training]').textContent = `${stats.trainTime}s`;
     card.title = `${stats.health} 生命 / ${stats.damage} 攻击 / ${stats.armor} 护甲 / ${stats.range} 射程`;
     card.setAttribute('aria-label', `训练${stats.name}，${stats.cost} 金币，耗时 ${stats.trainTime} 秒`);
   });
   setText('roster-age', `${age.name} · 点击加入队列`);
-  const towerIcons = displayedAge === 1 ? ['◈', '➶', '♨'] : ['⌖', '⋙', '●'];
+  const towerIcons = age.turretIcons;
   towerCards.forEach((card, index) => {
     const type = age.turrets[index];
     const stats = TURRETS[type];
@@ -86,10 +92,20 @@ function syncRoster() {
   });
   const ability = ABILITIES[age.ability];
   setText('ability-name', ability.name);
-  setText('ability-icon', age.ability === 'meteor' ? '☄' : '⇣');
-  setText('ability-description', `${ability.description} · ${ability.damage}${ability.waves > 1 ? ` × ${ability.waves}` : ''} 伤害 · ${ability.cooldown} 秒冷却`);
+  setText('ability-icon', ability.icon ?? (age.ability === 'meteor' ? '☄' : '⇣'));
+  setText('ability-description', ability.targeting === 'allies'
+    ? `${ability.description} · 每秒 +${ability.healing} 生命，持续 ${ability.duration} 秒 · ${ability.cooldown} 秒冷却`
+    : `${ability.description} · ${ability.damage}${ability.waves > 1 ? ` × ${ability.waves}` : ''} 伤害 · ${ability.cooldown} 秒冷却`);
+  setText('spell-hint', ability.targeting === 'allies' ? '点击或按 Q 立即治疗全场友军，无需选择落点。不修复基地，不超过各兵种的生命上限。' : '选中大招后点击战场释放；也可用方向键瞄准，Enter 释放，Esc 取消。');
   setText('target-text', `${ability.name} · 点击战场选择落点`);
   byId('ability').dataset.ability = age.ability;
+  if (ability.targeting === 'allies') targeting = false;
+  setText('income-rate', `+${age.income} / 秒`);
+  eraSteps.forEach((step, index) => {
+    step.classList.toggle('reached', index + 1 < displayedAge);
+    if (index + 1 === displayedAge) step.setAttribute('aria-current', 'step');
+    else step.removeAttribute('aria-current');
+  });
 }
 
 function syncDefenses() {
@@ -133,9 +149,9 @@ function syncEvolution() {
   byId('evolve').disabled = state !== 'ready';
   byId('evolve').classList.toggle('ready', state === 'ready');
   setText('evolve-label', state === 'finished' ? '战斗已结束' : nextAge ? `进化至${nextAge.name}` : '已达最高时代');
-  setText('evolution-hint', !nextAge ? '第二时代已解锁 · 本局仅支持两个时代' : state === 'ready' ? '经验已达标 · 点击进化或按 E · 不消耗金币' : `击杀获得经验 · 还差 ${nextAge.experienceRequired - experience} 经验`);
-  setText('evolution-unlocks', nextAge ? `解锁：${nextAge.units.map(type => UNITS[type].name).join(' · ')}` : '已解锁：剑士 · 弩手 · 重甲骑士');
-  setText('evolution-benefit', nextAge ? `生命 +${nextAge.baseHealth - age.baseHealth} · 新炮塔与箭雨 · 保留旧部队和炮位` : '城堡基地 · 已解锁城堡炮塔与箭雨齐射');
+  setText('evolution-hint', !nextAge ? '五个时代已全部解锁 · 摧毁敌方基地取得胜利' : state === 'ready' ? '经验已达标 · 点击进化或按 E · 不消耗金币' : `击杀获得经验 · 还差 ${nextAge.experienceRequired - experience} 经验`);
+  setText('evolution-unlocks', `${nextAge ? '下个时代' : '已解锁'}：${(nextAge ?? age).units.map(type => UNITS[type].name).join(' · ')}`);
+  setText('evolution-benefit', nextAge ? `生命 +${nextAge.baseHealth - age.baseHealth} · 收入 ${nextAge.income}/秒 · ${ABILITIES[nextAge.ability].name} · 三种新炮塔` : '未来要塞 · 离子科技 · 轨道打击');
 }
 
 function syncUI() {
@@ -185,7 +201,7 @@ function syncUI() {
   if (finished) targeting = false;
   byId('ability').disabled = finished || game.abilityCooldown > 0;
   byId('ability').setAttribute('aria-pressed', String(targeting));
-  setText('ability-state', finished ? '战斗已结束' : game.abilityCooldown > 0 ? `冷却中 · ${Math.ceil(game.abilityCooldown)} 秒` : targeting ? '等待落点 · 再次点击取消' : '选择落点 · 已就绪');
+  setText('ability-state', finished ? '战斗已结束' : game.ability?.type === 'renewal' ? `治疗中 · ${Math.ceil(game.ability.remaining)} 秒 · 冷却 ${Math.ceil(game.abilityCooldown)} 秒` : game.abilityCooldown > 0 ? `冷却中 · ${Math.ceil(game.abilityCooldown)} 秒` : targeting ? '等待落点 · 再次点击取消' : ABILITIES[AGES[game.ages.player].ability].targeting === 'allies' ? '立即治疗 · 已就绪' : '选择落点 · 已就绪');
   byId('target-banner').hidden = !targeting;
   canvas.classList.toggle('targeting', targeting);
   setText('phase', finished ? '战斗结束' : document.hidden ? '已暂停' : '交战中');
@@ -227,6 +243,14 @@ function evolvePlayer() {
 
 function toggleAbility() {
   if (game.status !== 'playing' || game.abilityCooldown > 0) return;
+  if (ABILITIES[AGES[game.ages.player].ability].targeting === 'allies') {
+    if (castAbility(game)) {
+      announce('复苏之光已释放，全场友军持续恢复生命。');
+      syncUI();
+      render(game);
+    }
+    return;
+  }
   targeting = !targeting;
   syncUI();
   if (targeting) {

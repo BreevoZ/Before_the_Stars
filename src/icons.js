@@ -1,0 +1,57 @@
+// Small code-native icons keep controls crisp at any display density.
+const paths = {
+  sword: '<path d="m4 20 4-4m-3-3 6 6M8 16 19 5l1-3-3 1L6 14"/>',
+  bow: '<path d="M7 3c13 4 13 14 0 18L7 3Zm0 0 6 9-6 9m-4-9h18m-3-3 3 3-3 3"/>',
+  shield: '<path d="m12 2 8 4v7c0 5-8 9-8 9S4 18 4 13V6l8-4Z"/><path d="M12 6v11m-4-7h8"/>',
+  crossbow: '<path d="m4 20 14-14M5 5c10-1 15 4 14 14L5 5Zm0 0 2 12 12 2M3 16l5 5m8-18 5 5"/>',
+  musket: '<path d="m3 17 5-6h13v3H9l-3 6-3-3Zm9-6V8m4 6v3h-4v-3"/>',
+  rifle: '<path d="M3 9h14v5H8l-5 4V9Zm14 2h5m-12 3 2 6h4l-2-6m-5-5V6h5"/>',
+  tank: '<rect x="2" y="14" width="20" height="7" rx="3.5"/><path d="M7 14V8h9l3 6M13 9h9M6 18h12"/>',
+  cannon: '<path d="M3 15h13l-4-5m-5 3 1-7 13-3 1 5-14 4"/><circle cx="7" cy="18" r="3"/><circle cx="17" cy="18" r="3"/>',
+  blade: '<path d="m4 20 5-5m-4-2 6 6m-3-5 8-11h5L10 17M16 3l-1 6 5-1"/>',
+  blaster: '<path d="M3 10h15v6H8l-4 5V10Zm15 2h4m-10 4 1 4m0-14v1"/><circle cx="12" cy="13" r="1.5"/>',
+  mech: '<path d="m7 4 5-2 5 2 2 8-4 4H9l-4-4 2-8Zm1 2h8M8 15l-4 6H2m14-6 4 6h2M5 9H2v6m17-6h3v6M9 10h6"/>',
+  stone: '<path d="m5 21 6-13 6 13M3 21h17M6 5l12 9M5 3l3-1"/><circle cx="18" cy="7" r="3"/>',
+  spears: '<path d="M4 20 18 6M2 15 14 3M9 22 21 10m-5-9 1 5-5-1m8-1 1 5-5-1m6 3 1 5-5-1"/>',
+  fire: '<path d="M6 10h12l3 8-4 4H7l-4-4 3-8Zm3-2c-3-3 2-4 2-7 5 3-1 4 3 7"/>',
+  repeater: '<path d="M3 10h12v10H3V10Zm4 0V6h6v4m2 1h7m-7 4h7m-7 4h7M6 20v2m6-2v2"/>',
+  mortar: '<path d="m7 15 8-12 6 4-9 12M3 22l5-9m4 5 5 4M1 22h19"/>',
+  turret: '<path d="M7 21V11h10v10M3 21h18M5 11V5h12v6H5Zm12-3h6"/>',
+  double: '<path d="M5 21v-7h12v7M3 21h18M4 5h11v10H4V5Zm11 2h8m-8 5h8"/>',
+  rocket: '<path d="m5 18 9-14 5-2 1 5-11 14-4-3Zm7-11 5 4M4 19l-2 3m7-7 5 7M3 22h15"/>',
+  laser: '<path d="M4 21h15M7 21l3-9M4 5h14v7H4V5Zm14 3h5M8 3v11m5-11v11"/>',
+  ion: '<circle cx="12" cy="9" r="7"/><circle cx="12" cy="9" r="3"/><path d="m9 16-3 6m9-6 3 6M4 22h16"/>',
+  meteor: '<path d="m4 12 8-8m-4 11 7-7m-8 2 4-4"/><circle cx="16" cy="17" r="5"/>',
+  volley: '<path d="m3 3 5 15m-6-3 6 3 3-6m0-11 5 15m-6-3 6 3 3-6m-2-9 5 15m-6-3 6 3 2-6"/>',
+  heal: '<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6V3Z"/>',
+  plane: '<path d="m12 2 2 7 8 5v3l-8-3v5l3 2H7l3-2v-5l-8 3v-3l8-5 2-7Z"/>',
+  orbital: '<circle cx="12" cy="12" r="7"/><path d="M12 1v7m0 8v7M1 12h7m8 0h7"/><circle cx="12" cy="12" r="1"/>',
+  base: '<path d="M3 21V9l9-7 9 7v12H3Zm6 0v-8h6v8M2 9h20"/>',
+  coin: '<circle cx="12" cy="12" r="8"/><path d="m12 7 4 5-4 5-4-5 4-5Z"/>',
+  clock: '<circle cx="12" cy="13" r="8"/><path d="M12 8v5l3 2M9 2h6"/>',
+  star: '<path d="m12 2 3 6 7 1-5 5 1 8-6-4-6 4 1-8-5-5 7-1 3-6Z"/>',
+  up: '<path d="m5 11 7-7 7 7M12 4v17"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  lock: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4m-4 5v2"/>',
+  trash: '<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>',
+  restart: '<path d="M4 10a8 8 0 1 1 1 8M4 3v7h7"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9 8a3 3 0 1 1 5 2c-2 1-2 2-2 3m0 4v.1"/>',
+  close: '<path d="m6 6 12 12M6 18 18 6"/>',
+  check: '<path d="m4 12 5 5L20 6"/>',
+  pause: '<path d="M8 5v14M16 5v14"/>',
+  play: '<path d="m7 4 13 8-13 8V4Z"/>',
+};
+export function icon(name) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] ?? paths.shield}</svg>`;
+}
+export const unitIcons = {
+  melee: 'sword', archer: 'bow', heavy: 'shield', swordsman: 'sword', crossbow: 'crossbow', knight: 'shield',
+  duelist: 'sword', musketeer: 'musket', cannoneer: 'cannon', commando: 'sword', rifleman: 'rifle', tank: 'tank',
+  blade: 'blade', blaster: 'blaster', warMachine: 'mech',
+};
+export const turretIcons = {
+  stone: 'stone', bone: 'spears', firepot: 'fire', ballista: 'crossbow', repeater: 'repeater', bombard: 'cannon',
+  smallCannon: 'cannon', organGun: 'repeater', mortar: 'mortar', machineGun: 'turret', doubleCannon: 'double', rocket: 'rocket',
+  titanium: 'blaster', laser: 'laser', ion: 'ion',
+};
+export const abilityIcons = { meteor: 'meteor', volley: 'volley', renewal: 'heal', airstrike: 'plane', orbital: 'orbital' };

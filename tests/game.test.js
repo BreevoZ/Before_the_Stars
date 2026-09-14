@@ -1131,7 +1131,7 @@ test('Browser UI: earn experience, evolve independently, replace cards and short
   assert(el('experience-total').textContent === `0 / ${AGES[2].experienceRequired} 经验`);
   assert(el('recruit').dataset.unit === 'melee' && el('evolve').disabled && el('player-health-bar').max === RULES.baseHealth);
   assert(el('ability-name').textContent === ABILITIES.meteor.name && el('build-turret').dataset.turret === 'stone');
-  assert(el('turret-capacity').textContent === '0 / 1 炮位');
+  assert(el('turret-capacity').textContent === '0 / 1');
 });
 
 test('Browser UI: expand, select a slot, build different towers, sell once, and reset capacity', async () => {
@@ -1152,7 +1152,7 @@ test('Browser UI: expand, select a slot, build different towers, sell once, and 
   frame.contentWindow.__testFrame(0);
   assert(slots.length === 4 && slots.slice(1).every(slot => slot.disabled));
   el('expand-turrets').click();
-  assert(el('gold').textContent === '80' && el('turret-capacity').textContent === '0 / 2 炮位');
+  assert(el('gold').textContent === '80' && el('turret-capacity').textContent === '0 / 2');
   assert(slots[1].getAttribute('aria-pressed') === 'true' && slots[2].disabled && towers.every(tower => tower.disabled));
   tick(3);
   towers[1].click();
@@ -1161,15 +1161,15 @@ test('Browser UI: expand, select a slot, build different towers, sell once, and 
   assert(towers.every(tower => tower.disabled) && !el('sell-turret').hidden && el('sell-turret').textContent.includes('50'));
   const gold = Number(el('gold').textContent);
   el('sell-turret').click();
-  assert(Number(el('gold').textContent) === gold + 50 && el('turret-capacity').textContent === '0 / 2 炮位');
+  assert(Number(el('gold').textContent) === gold + 50 && el('turret-capacity').textContent === '0 / 2');
   el('sell-turret').click();
   assert(Number(el('gold').textContent) === gold + 50 && el('sell-turret').hidden);
   tick(16);
   assert(!towers[2].disabled);
   towers[2].click();
-  assert(slots[1].textContent.includes('火陶塔') && el('turret-capacity').textContent === '1 / 2 炮位');
+  assert(slots[1].textContent.includes('火陶塔') && el('turret-capacity').textContent === '1 / 2');
   el('restart').click();
-  assert(el('gold').textContent === '180' && el('turret-capacity').textContent === '0 / 1 炮位');
+  assert(el('gold').textContent === '180' && el('turret-capacity').textContent === '0 / 1');
   assert(slots[0].getAttribute('aria-pressed') === 'true' && slots.slice(1).every(slot => slot.disabled));
 });
 
@@ -1199,11 +1199,17 @@ test('Browser UI: all five rosters, era progress, income, support targeting and 
     if (age > 1) key('KeyE');
     const config = AGES[age];
     assert(page.body.dataset.age === String(age) && el('player-age').textContent.includes(config.name));
-    assert(el('enemy-age').textContent.includes(AGES[1].name) && el('income-rate').textContent === `+${config.income} / 秒`);
+    assert(el('enemy-age').textContent.includes(AGES[1].name) && el('income-rate').textContent === `+${config.income}/s`);
     assert(page.querySelectorAll('#era-track li').length === 5 && page.querySelector('#era-track [aria-current]').textContent.includes(config.shortName));
     assert([...page.querySelectorAll('[data-unit]')].map(card => card.dataset.unit).join() === config.units.join());
     assert([...page.querySelectorAll('[data-turret]')].map(card => card.dataset.turret).join() === config.turrets.join());
     assert(el('ability-name').textContent === ABILITIES[config.ability].name);
+    assert(el('player-era').textContent === config.numeral);
+    const roster = [...config.units.map(type => UNITS[type]), ...config.turrets.map(type => TURRETS[type])];
+    assert([...page.querySelectorAll('[data-unit], [data-turret]')].every((card, index) =>
+      card.querySelector('svg') && card.getAttribute('aria-label').includes(roster[index].name) && card.title.includes(roster[index].name)),
+      'Icon actions must keep accessible names and inspectable descriptions in every age');
+    assert(roster.every(stats => el('help-roster').textContent.includes(stats.name)), 'The manual must follow the current age');
     for (const code of ['Digit1', 'Digit2', 'Digit3']) key(code);
     assert([...page.querySelectorAll('.queue-name')].slice(0, 3).map(name => name.textContent).join() === config.units.map(type => UNITS[type].name).join());
     page.querySelectorAll('.queue-slot').forEach(() => page.querySelector('.queue-slot').click());
@@ -1225,6 +1231,45 @@ test('Browser UI: all five rosters, era progress, income, support targeting and 
   assert(el('evolve').disabled && el('evolution-hint').textContent.includes('五个时代已全部解锁'));
   assert(el('experience-bar').value === AGES[5].experienceRequired && el('player-health-bar').max === AGES[5].baseHealth);
   URL.revokeObjectURL(fixture);
+});
+
+
+test('Browser UI: help exposes icon details, pauses training/income/cooldowns, blocks shortcuts and resumes', async () => {
+  const html = await (await fetch('../index.html')).text();
+  const frame = document.createElement('iframe');
+  frame.title = 'Minimal interface and help integration test';
+  const loaded = new Promise(resolve => frame.addEventListener('load', resolve, { once: true }));
+  const clock = '<script>window.requestAnimationFrame = callback => (window.__testFrame = callback, 1);</script>';
+  frame.srcdoc = html.replace('<head>', `<head><base href="${new URL('../', location.href).href}">${clock}`);
+  document.body.append(frame);
+  await loaded;
+  const page = frame.contentDocument;
+  const el = id => page.getElementById(id);
+  const key = code => page.body.dispatchEvent(new frame.contentWindow.KeyboardEvent('keydown', { code, bubbles: true, cancelable: true }));
+  let time = 0;
+  const tick = count => { for (let i = 0; i < count; i++) frame.contentWindow.__testFrame(time += 100); };
+  frame.contentWindow.__testFrame(0);
+  el('recruit').click();
+  key('KeyQ'); key('Enter');
+  const snapshot = () => ['gold', 'queue-count', 'player-count', 'clock', 'ability-state'].map(id => el(id).textContent).join('|');
+  const before = snapshot();
+  el('help').click();
+  assert(el('help-dialog').open && el('phase').textContent === '已暂停');
+  assert(el('help-roster').querySelectorAll('.help-unit').length === 6 && el('help-roster').textContent.includes('70 生命'));
+  assert(el('recruit').querySelector('.unit-icon svg') && el('recruit').title.includes('近战兵'));
+  assert(el('expand-turrets').getAttribute('aria-label').includes('100 金币'));
+  key('Digit1'); key('KeyE'); key('KeyQ'); key('KeyT'); key('Space');
+  tick(150);
+  assert(snapshot() === before, 'Reading help must not change resources, training, battle time or ability cooldown');
+  key('Escape');
+  assert(!el('help-dialog').open && el('phase').textContent === '交战中');
+  tick(22);
+  assert(el('player-count').textContent === '1' && Number(el('gold').textContent) > 150, 'Closing help must resume the same battle without a time jump');
+  assert(el('clock').textContent === '00:02' && el('ability-timer').textContent === '38s');
+  page.body.dispatchEvent(new frame.contentWindow.KeyboardEvent('keydown', { code: 'Slash', shiftKey: true, bubbles: true, cancelable: true }));
+  assert(el('help-dialog').open, 'The help shortcut must be reachable from the keyboard');
+  el('close-help').click();
+  assert(!el('help-dialog').open);
 });
 
 test('Renderer supports six original tower appearances, expanded platforms and both early abilities', () => {

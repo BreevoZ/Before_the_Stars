@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#101719" />
-    <meta name="description" content="Before the Stars：出兵、推进、摧毁敌方基地。" />
+    <meta name="description" content="Before the Stars：出兵、进化、攻城。" />
     <title>Before the Stars</title>
     <link rel="stylesheet" href="./src/style.css" />
     <script type="module" src="./src/main.js"></script>
@@ -13,111 +13,85 @@
     <main class="game-shell">
       <header class="masthead">
         <div class="wordmark"><span class="brand-mark" aria-hidden="true">✳</span> BEFORE THE STARS</div>
-        <span class="version">原型 06 / 攻城战</span>
+        <button class="icon-button" id="help" type="button" data-icon="help" aria-label="帮助与单位资料" title="帮助与单位资料 · ?"></button>
       </header>
-
       <section class="battle" aria-label="战场">
         <div class="battle-hud">
           <div class="base-status player-status">
-            <div class="status-heading"><span>我方基地</span><span id="player-health">600 / 600</span></div>
+            <div class="status-heading"><span class="base-emblem" title="我方基地"><span data-icon="base"></span><span id="player-era">I</span><span class="sr-only">我方基地</span></span><span id="player-health">600 / 600</span></div>
             <progress id="player-health-bar" aria-label="我方基地生命值" max="600" value="600"></progress>
-            <div class="age-status"><span id="player-age">I · 原始时代</span><span id="player-experience">0 / 160 经验</span></div>
+            <span class="sr-only" id="player-age">I · 原始时代</span><span class="sr-only" id="player-experience">0 / 160 经验</span>
           </div>
-          <div class="battle-clock"><span class="eyebrow" id="phase">交战中</span><time id="clock">00:00</time></div>
+          <div class="battle-clock"><time id="clock">00:00</time><span id="phase-icon" data-icon="play" aria-hidden="true"></span><span class="sr-only" id="phase">交战中</span></div>
           <div class="base-status enemy-status">
-            <div class="status-heading"><span>敌方基地</span><span id="enemy-health">600 / 600</span></div>
+            <div class="status-heading"><span class="base-emblem" title="敌方基地"><span data-icon="base"></span><span id="enemy-era">I</span><span class="sr-only">敌方基地</span><span id="enemy-strategy-icon" data-icon="sword"></span></span><span id="enemy-health">600 / 600</span></div>
             <progress id="enemy-health-bar" aria-label="敌方基地生命值" max="600" value="600"></progress>
-            <div class="age-status"><span id="enemy-age">I · 原始时代</span><span id="enemy-experience">0 / 160 经验</span></div>
-            <span class="enemy-strategy" id="enemy-strategy">敌军战术 · 混合推进</span>
+            <span class="sr-only" id="enemy-age">I · 原始时代</span><span class="sr-only" id="enemy-experience">0 / 160 经验</span><span class="sr-only" id="enemy-strategy">敌军战术 · 混合推进</span>
           </div>
         </div>
-
         <div class="field-wrap">
-          <canvas id="battlefield" width="1280" height="480" tabindex="0" role="img" aria-describedby="spell-hint" aria-label="左侧青色为我方，右侧橙色为敌方。士兵自动前进并攻击敌军或基地。"></canvas>
-          <p class="target-banner" id="target-banner" hidden><span id="target-text">选择大招落点 · 点击战场释放</span> <button id="cancel-target" type="button">取消</button></p>
-          <div class="field-caption" aria-hidden="true"><span>西侧营地</span><span>边境荒原</span><span>东侧营地</span></div>
+          <canvas id="battlefield" width="1280" height="480" tabindex="0" role="img" aria-describedby="spell-hint" aria-label="左侧青色为我方，右侧橙色为敌方。士兵自动前进并攻击。"></canvas>
+          <div class="target-banner" id="target-banner" hidden><span data-icon="orbital"></span><span id="target-text">选择落点</span><button class="icon-button" id="cancel-target" type="button" data-icon="close" aria-label="取消瞄准" title="取消 · Esc"></button></div>
           <div class="result-overlay" id="result" hidden>
-            <div class="result-card">
-              <span class="eyebrow" id="result-label">战斗结束</span>
-              <h1 id="result-title"></h1>
-              <p id="result-detail"></p>
-              <button class="primary-button" id="play-again" type="button">再战一局 <span aria-hidden="true">↻</span></button>
-            </div>
+            <div class="result-card"><h1 id="result-title"></h1><p id="result-detail"></p><button class="primary-button" id="play-again" type="button"><span data-icon="restart"></span>再战一局</button></div>
           </div>
         </div>
-
         <section class="command-panel" aria-label="作战指令">
           <div class="resource-bar">
-            <div class="gold-balance"><span aria-hidden="true">◈</span> <strong id="gold">180</strong> <span>金币</span><small id="income-rate">+7 / 秒</small></div>
-            <div class="army-count"><span>战场兵力</span><strong id="player-count">0</strong> 我方 <span class="count-divider">/</span> <strong id="enemy-count">0</strong> 敌方</div>
-            <button class="restart-button" id="restart" type="button" aria-label="重新开始战斗"><span aria-hidden="true">↻</span> 重开</button>
+            <div class="gold-balance" title="金币与每秒收入"><span data-icon="coin"></span><strong id="gold">180</strong><small id="income-rate">+7/s</small></div>
+            <div class="army-count" title="青色：我方兵力 · 橙色：敌方兵力"><span data-icon="sword"></span><strong id="player-count">0</strong><span class="count-divider">/</span><strong id="enemy-count">0</strong></div>
+            <button class="icon-button" id="restart" type="button" data-icon="restart" aria-label="重新开始战斗" title="重开"></button>
           </div>
-
-          <ol class="era-track" id="era-track" aria-label="我方时代进程"></ol>
-
           <div class="evolution-panel" aria-label="时代进化">
-            <div class="evolution-progress">
-              <div class="evolution-heading"><strong id="evolution-title">原始时代</strong><span id="experience-total">0 / 160 经验</span></div>
-              <progress id="experience-bar" aria-label="进化经验" max="160" value="0"></progress>
-              <span class="evolution-hint" id="evolution-hint">击杀经验 + 阵亡75%经验 · 双方独立进化</span>
+            <ol class="era-track" id="era-track" aria-label="我方时代进程"></ol>
+            <div class="evolution-progress" title="经验 · 击杀与阵亡均可获得">
+              <div class="experience-value"><span data-icon="star"></span><span id="experience-value">0 / 160</span></div>
+              <progress id="experience-bar" aria-label="进化经验" aria-describedby="experience-total" max="160" value="0"></progress>
+              <span class="sr-only" id="experience-total">0 / 160 经验</span>
             </div>
-            <div class="evolution-unlocks"><strong id="evolution-unlocks">解锁：剑士 · 弩手 · 重甲骑士</strong><span id="evolution-benefit">基地生命 +300 · 旧兵和训练保留</span></div>
-            <button class="evolve-button" id="evolve" type="button" disabled aria-describedby="evolution-hint evolution-benefit"><span id="evolve-label">进化至中世纪</span><kbd>E</kbd></button>
+            <button class="icon-button evolve-button" id="evolve" type="button" disabled aria-describedby="evolution-hint evolution-benefit"><span data-icon="up"></span><span class="sr-only" id="evolve-label">进化至中世纪</span><kbd>E</kbd></button>
+            <button class="ability-card" id="ability" type="button" aria-pressed="false" aria-describedby="ability-state spell-hint"><span id="ability-icon"></span><span class="sr-only" id="ability-name">陨星天降</span><span id="ability-timer">✓</span><span class="sr-only" id="ability-state">已就绪</span><kbd>Q</kbd></button>
           </div>
-
           <div class="command-grid">
             <div class="recruit-section">
-              <div class="section-heading"><h1>训练部队</h1><span id="roster-age">原始时代 · 点击加入队列</span></div>
+              <div class="section-heading"><h2>部队</h2><span class="sr-only" id="queue-count">0 / 5</span><span data-icon="sword" aria-hidden="true"></span></div>
               <div class="unit-cards">
-                <button class="unit-card" id="recruit" data-unit="melee" type="button">
-                  <span class="card-heading"><span class="unit-icon" aria-hidden="true">⚔</span><kbd>1</kbd></span>
-                  <strong>近战兵</strong><span class="unit-role">近身推进</span>
-                  <span class="unit-price"><span data-cost></span><span data-training></span></span>
-                  <span class="card-state" data-state>加入队列</span>
-                </button>
-                <button class="unit-card" id="recruit-archer" data-unit="archer" type="button">
-                  <span class="card-heading"><span class="unit-icon" aria-hidden="true">➶</span><kbd>2</kbd></span>
-                  <strong>弓箭手</strong><span class="unit-role">远程支援</span>
-                  <span class="unit-price"><span data-cost></span><span data-training></span></span>
-                  <span class="card-state" data-state>加入队列</span>
-                </button>
-                <button class="unit-card" id="recruit-heavy" data-unit="heavy" type="button">
-                  <span class="card-heading"><span class="unit-icon" aria-hidden="true">⬟</span><kbd>3</kbd></span>
-                  <strong>重装兵</strong><span class="unit-role">高生命 · 护甲</span>
-                  <span class="unit-price"><span data-cost></span><span data-training></span></span>
-                  <span class="card-state" data-state>加入队列</span>
-                </button>
+                <button class="unit-card" id="recruit" data-unit="melee" type="button"><span class="unit-icon"></span><kbd>1</kbd><strong class="sr-only">近战兵</strong><span class="sr-only unit-role"></span><span class="price"><span data-icon="coin"></span><span data-cost></span></span><span class="sr-only" data-training></span><span class="sr-only" data-state></span></button>
+                <button class="unit-card" id="recruit-archer" data-unit="archer" type="button"><span class="unit-icon"></span><kbd>2</kbd><strong class="sr-only">弓箭手</strong><span class="sr-only unit-role"></span><span class="price"><span data-icon="coin"></span><span data-cost></span></span><span class="sr-only" data-training></span><span class="sr-only" data-state></span></button>
+                <button class="unit-card" id="recruit-heavy" data-unit="heavy" type="button"><span class="unit-icon"></span><kbd>3</kbd><strong class="sr-only">重装兵</strong><span class="sr-only unit-role"></span><span class="price"><span data-icon="coin"></span><span data-cost></span></span><span class="sr-only" data-training></span><span class="sr-only" data-state></span></button>
               </div>
-              <div class="queue-heading"><span>训练队列 <strong id="queue-count">0 / 5</strong></span><span>点击取消 · 全额退款</span></div>
-              <div class="training-queue" id="training-queue" aria-label="训练队列"></div>
+              <div class="training-queue" id="training-queue" aria-label="训练队列；点击订单取消并退款"></div>
             </div>
-
             <div class="support-section">
-              <div class="section-heading"><h2>基地防御</h2><span id="turret-capacity">0 / 1 炮位</span></div>
-              <div class="turret-slots" id="turret-slots" aria-label="选择炮塔位置"></div>
-              <div class="turret-actions">
-                <span id="selected-turret">炮位 1 · 空位</span>
-                <button class="expand-button" id="expand-turrets" type="button">扩容 +1 · 100 金币</button>
-              </div>
+              <div class="section-heading"><h2>炮塔</h2><span id="turret-capacity" aria-label="已建造与已解锁炮位">0 / 1</span></div>
               <div class="turret-cards">
-                <button class="turret-card" id="build-turret" data-turret="stone" type="button"><span class="turret-icon" aria-hidden="true">◈</span><strong>投石塔</strong><span data-turret-role>单发重击</span><span data-turret-cost>120 金币</span><span data-turret-state>建造</span></button>
-                <button class="turret-card" data-turret="bone" type="button"><span class="turret-icon" aria-hidden="true">➶</span><strong>骨矛塔</strong><span data-turret-role>近程速射</span><span data-turret-cost>100 金币</span><span data-turret-state>建造</span></button>
-                <button class="turret-card" data-turret="firepot" type="button"><span class="turret-icon" aria-hidden="true">♨</span><strong>火陶塔</strong><span data-turret-role>范围爆炸</span><span data-turret-cost>160 金币</span><span data-turret-state>建造</span></button>
+                <button class="turret-card" id="build-turret" data-turret="stone" type="button"><span class="turret-icon"></span><strong class="sr-only">投石塔</strong><span class="sr-only" data-turret-role></span><span class="price"><span data-icon="coin"></span><span data-turret-cost></span></span><span class="sr-only" data-turret-state></span></button>
+                <button class="turret-card" data-turret="bone" type="button"><span class="turret-icon"></span><strong class="sr-only">骨矛塔</strong><span class="sr-only" data-turret-role></span><span class="price"><span data-icon="coin"></span><span data-turret-cost></span></span><span class="sr-only" data-turret-state></span></button>
+                <button class="turret-card" data-turret="firepot" type="button"><span class="turret-icon"></span><strong class="sr-only">火陶塔</strong><span class="sr-only" data-turret-role></span><span class="price"><span data-icon="coin"></span><span data-turret-cost></span></span><span class="sr-only" data-turret-state></span></button>
               </div>
-              <div class="demolition-row"><span>选中炮位后建造 · 进化保留旧塔</span><button id="sell-turret" type="button" hidden>拆除 · 返还 50%</button></div>
-              <button class="support-card ability-card" id="ability" type="button" aria-pressed="false" aria-describedby="spell-hint">
-                <span class="support-icon" id="ability-icon" aria-hidden="true">☄</span>
-                <span class="support-copy"><strong><span id="ability-name">陨星天降</span> <kbd>Q</kbd></strong><span id="ability-description">范围轰击 · 不伤友军</span><span id="ability-state">选择落点 · 已就绪</span></span>
-              </button>
-              <p class="spell-hint" id="spell-hint">选中大招后点击战场释放；也可用方向键瞄准，Enter 释放，Esc 取消。</p>
+              <div class="defense-tools">
+                <div class="turret-slots" id="turret-slots" aria-label="选择炮位"></div><span class="sr-only" id="selected-turret"></span>
+                <button class="compact-button" id="expand-turrets" type="button"><span data-icon="plus"></span><span id="expansion-price">100</span></button>
+                <button class="compact-button" id="sell-turret" type="button" hidden><span data-icon="trash"></span><span id="sale-refund"></span></button>
+              </div>
             </div>
           </div>
         </section>
       </section>
-
-      <footer class="game-footer"><p>1 / 2 / 3 训练部队 · 空格训练前排兵 · E 进化 · T 建造第一种炮塔 · Q 大招</p><span id="recruit-rule"></span></footer>
       <p class="sr-only" id="announcement" role="status" aria-live="polite"></p>
       <noscript><p>请启用 JavaScript 后开始游戏。</p></noscript>
     </main>
+    <dialog id="help-dialog" aria-labelledby="help-title">
+      <header class="help-heading"><h2 id="help-title">指挥手册</h2><button class="icon-button" id="close-help" type="button" data-icon="close" aria-label="关闭帮助"></button></header>
+      <div class="help-body">
+        <div class="help-legend"><span><i data-icon="coin"></i>金币</span><span><i data-icon="star"></i>经验</span><span><i data-icon="plus"></i>扩容</span><span><i data-icon="trash"></i>拆塔退款</span></div>
+        <p>点击兵种图标训练，点击炮塔图标在选中炮位建造。悬停可查看名称与属性；手机可在下方查看当前时代的资料。阅读手册时战斗暂停。</p>
+        <p><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> 出兵 · <kbd>空格</kbd> 前排兵 · <kbd>T</kbd> 第一种炮塔 · <kbd>E</kbd> 进化 · <kbd>Q</kbd> 大招</p>
+        <p id="spell-hint"></p><p id="recruit-rule"></p>
+        <details open><summary id="roster-age">当前时代</summary><div id="help-roster" class="help-roster"></div></details>
+        <details><summary>大招与进化</summary><p id="ability-description"></p><h3 id="evolution-title"></h3><p id="evolution-hint"></p><p id="evolution-unlocks"></p><p id="evolution-benefit"></p><p>击杀获得完整经验，己方阵亡获得 75% 经验。进化保留旧部队、训练订单、炮塔与大招冷却。</p></details>
+        <details><summary>防御与胜负</summary><p>炮位最多四个，扩容不含炮塔。拆除返还原价的一半。炮兵、坦克与机甲可在同代炮塔射程外攻城，需要出兵拦截。青色为我方，橙色为敌方；摧毁敌方基地获胜。</p></details>
+      </div>
+    </dialog>
   </body>
 </html>

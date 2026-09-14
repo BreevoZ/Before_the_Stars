@@ -8,13 +8,13 @@ export const UNITS = Object.freeze({
   knight: Object.freeze({ name: '重甲骑士', age: 2, role: 'heavy', cost: 130, trainTime: 4.8, health: 270, damage: 42, armor: 5, speed: 44, range: 40, attackInterval: 1.4, bounty: 40, experience: 65, lane: 'front' }),
   duelist: Object.freeze({ name: '决斗士', age: 3, role: 'melee', cost: 80, trainTime: 2.2, health: 205, damage: 35, armor: 3, speed: 72, range: 36, attackInterval: 0.8, bounty: 28, experience: 46, lane: 'front' }),
   musketeer: Object.freeze({ name: '火枪手', age: 3, role: 'archer', projectile: 'bullet', cost: 115, trainTime: 3.2, health: 110, damage: 60, armor: 1, speed: 48, range: 255, attackInterval: 1.7, bounty: 40, experience: 65, lane: 'back' }),
-  cannoneer: Object.freeze({ name: '炮兵', age: 3, role: 'heavy', projectile: 'cannon', splash: 55, cost: 210, trainTime: 5.2, health: 380, damage: 95, armor: 7, speed: 30, range: 185, attackInterval: 2.1, bounty: 70, experience: 110, lane: 'front' }),
+  cannoneer: Object.freeze({ name: '炮兵', age: 3, role: 'heavy', projectile: 'cannon', splash: 55, cost: 210, trainTime: 5.2, health: 380, damage: 95, armor: 7, speed: 30, range: 185, baseRange: 360, attackInterval: 2.1, bounty: 70, experience: 110, lane: 'front' }),
   commando: Object.freeze({ name: '突击步兵', age: 4, role: 'melee', cost: 130, trainTime: 2.4, health: 340, damage: 56, armor: 6, speed: 76, range: 38, attackInterval: 0.65, bounty: 45, experience: 80, lane: 'front' }),
   rifleman: Object.freeze({ name: '自动步枪兵', age: 4, role: 'archer', projectile: 'bullet', cost: 190, trainTime: 3.4, health: 185, damage: 45, armor: 3, speed: 54, range: 270, attackInterval: 0.55, bounty: 65, experience: 110, lane: 'back' }),
-  tank: Object.freeze({ name: '主战坦克', age: 4, role: 'heavy', projectile: 'shell', splash: 70, cost: 350, trainTime: 5.6, health: 720, damage: 145, armor: 14, speed: 26, range: 200, attackInterval: 1.9, bounty: 120, experience: 180, lane: 'front' }),
+  tank: Object.freeze({ name: '主战坦克', age: 4, role: 'heavy', projectile: 'shell', splash: 70, cost: 350, trainTime: 5.6, health: 720, damage: 145, armor: 14, speed: 26, range: 200, baseRange: 420, attackInterval: 1.9, bounty: 120, experience: 180, lane: 'front' }),
   blade: Object.freeze({ name: '光刃战士', age: 5, role: 'melee', ignoreArmor: true, cost: 220, trainTime: 2.6, health: 550, damage: 90, armor: 10, speed: 82, range: 40, attackInterval: 0.6, bounty: 70, experience: 140, lane: 'front' }),
   blaster: Object.freeze({ name: '等离子射手', age: 5, role: 'archer', projectile: 'plasma', cost: 300, trainTime: 3.6, health: 300, damage: 85, armor: 5, speed: 56, range: 300, attackInterval: 0.65, bounty: 100, experience: 180, lane: 'back' }),
-  warMachine: Object.freeze({ name: '战争机甲', age: 5, role: 'heavy', projectile: 'plasma-orb', splash: 90, cost: 580, trainTime: 6, health: 1200, damage: 235, armor: 22, speed: 23, range: 220, attackInterval: 1.8, bounty: 200, experience: 300, lane: 'front' }),
+  warMachine: Object.freeze({ name: '战争机甲', age: 5, role: 'heavy', projectile: 'plasma-orb', splash: 90, cost: 580, trainTime: 6, health: 1200, damage: 235, armor: 22, speed: 23, range: 220, baseRange: 500, attackInterval: 1.8, bounty: 200, experience: 300, lane: 'front' }),
 });
 
 export const RULES = Object.freeze({
@@ -23,6 +23,7 @@ export const RULES = Object.freeze({
   startingGold: 180, goldPerSecond: 7,
   unitSpacing: 30, armyLimit: 16, queueLimit: 5,
   aiFirstDecision: 2.4, aiDecisionInterval: 1.8,
+  casualtyExperienceRate: 0.75,
   turretExpansionCosts: Object.freeze([100, 160, 240]), maxTurretSlots: 4,
   fixedStep: 1 / 60,
 });
@@ -83,7 +84,7 @@ export function createGame() {
     units: [], projectiles: [], effects: [],
     ability: null, abilityCooldown: 0,
     nextUnitId: 1, nextOrderId: 1,
-    ai: { enabled: true, cooldown: RULES.aiFirstDecision, orders: 0 },
+    ai: { enabled: true, cooldown: RULES.aiFirstDecision, orders: 0, strategy: 'balanced', waves: 0 },
   };
 }
 
@@ -239,11 +240,16 @@ function updateAI(game, dt) {
   if (game.ai.cooldown > 0) return;
   game.ai.cooldown = RULES.aiDecisionInterval;
   evolve(game, 'enemy');
-  const invaders = game.units.filter(unit => unit.team === 'player' && unit.x > RULES.enemyBaseX - 420);
+  const playerArmy = game.units.filter(unit => unit.team === 'player');
+  const invaders = playerArmy.filter(unit => unit.x > RULES.enemyBaseX - 420 ||
+    (UNITS[unit.type].baseRange && Math.abs(unit.x - RULES.enemyBaseX) - RULES.baseHalfWidth <= UNITS[unit.type].baseRange + 0.01));
+  const playerTowers = game.turrets.player.filter(Boolean).length;
+  const siegeThreat = invaders.some(unit => UNITS[unit.type].baseRange);
+  game.ai.strategy = !invaders.length && playerTowers > 0 && playerArmy.length <= 2 ? 'siege' : 'balanced';
   // Save for a defensive tower when pressured; it uses the same wallet as training.
   const towers = game.turrets.enemy;
   const owned = towers.filter(Boolean).length;
-  if (game.elapsed > 18 && (invaders.length >= 3 || game.bases.enemy.hp < game.bases.enemy.maxHp * 0.65)) {
+  if (!siegeThreat && game.elapsed > 18 && (invaders.length >= 3 || game.bases.enemy.hp < game.bases.enemy.maxHp * 0.65)) {
     const choices = AGES[game.ages.enemy].turrets;
     const type = invaders.length >= 3 ? choices[2] : invaders.some(unit => UNITS[unit.type].armor > 0)
       ? choices.find(type => TURRETS[type].ignoreArmor) ?? choices[0]
@@ -256,6 +262,22 @@ function updateAI(game, dt) {
     }
     if (towers.includes(null) && game.gold.enemy >= 70) return;
   }
+  const [melee, archer, heavy] = AGES[game.ages.enemy].units;
+  if (game.ai.strategy === 'siege') {
+    // Save for a complete paid wave. Heavy troops lead, with ranged support behind.
+    // Use visible defenses, not the player's wallet or pending orders, to pick a plan.
+    if (game.queues.enemy.length) return;
+    const wave = playerTowers >= 2 && UNITS[heavy].baseRange ? [heavy, heavy, archer]
+      : [heavy, archer, game.ai.waves % 2 === 0 ? melee : archer];
+    const cost = wave.reduce((sum, type) => sum + UNITS[type].cost, 0);
+    const armySize = game.units.filter(unit => unit.team === 'enemy').length;
+    if (armySize + wave.length > RULES.armyLimit || !canAfford(game.gold.enemy, cost)) return;
+    for (const type of wave) {
+      if (recruit(game, type, 'enemy')) game.ai.orders++;
+    }
+    game.ai.waves++;
+    return;
+  }
   if (game.queues.enemy.length >= 2) return;
   const army = [
     ...game.units.filter(unit => unit.team === 'enemy').map(unit => unit.type),
@@ -263,7 +285,6 @@ function updateAI(game, dt) {
   ];
   const frontline = army.filter(type => UNITS[type].role !== 'archer').length;
   const archers = army.filter(type => UNITS[type].role === 'archer').length;
-  const [melee, archer, heavy] = AGES[game.ages.enemy].units;
   let type = melee;
   if (frontline > 0 && archers < Math.ceil(frontline / 2)) type = archer;
   else if (game.ai.orders > 1 && !army.some(type => UNITS[type].role === 'heavy')) type = heavy;
@@ -362,7 +383,8 @@ function updateUnits(game, dt, hits) {
       }
     }
     const baseDistance = Math.abs(base.x - origin) - RULES.baseHalfWidth;
-    const target = enemyDistance <= stats.range + 0.01 ? closestEnemy : baseDistance <= stats.range + 0.01 ? base : null;
+    const baseRange = stats.baseRange ?? stats.range;
+    const target = enemyDistance <= stats.range + 0.01 ? closestEnemy : baseDistance <= baseRange + 0.01 ? base : null;
     if (target) {
       if (unit.attackCooldown === 0) {
         if (stats.projectile) addProjectile(game, unit.team, stats.projectile, unit.x, target, stats.damage, { splash: stats.splash, ignoreArmor: stats.ignoreArmor });
@@ -372,7 +394,7 @@ function updateUnits(game, dt, hits) {
       }
     } else {
       const step = Math.max(0, Math.min(stats.speed * dt, allySpace,
-        (enemyDistance - stats.range) / 2, baseDistance - stats.range));
+        (enemyDistance - stats.range) / 2, baseDistance - baseRange));
       unit.x += direction * step;
       unit.moving = step > 0.001;
     }
@@ -411,6 +433,8 @@ function resolveHits(game, hits) {
       const winner = otherTeam(unit.team);
       game.gold[winner] += UNITS[unit.type].bounty;
       game.experience[winner] += UNITS[unit.type].experience;
+      // Losses teach the attacking side too, so a tower-only defense cannot freeze its age.
+      game.experience[unit.team] += Math.floor(UNITS[unit.type].experience * RULES.casualtyExperienceRate);
     }
   }
   game.units = game.units.filter(unit => unit.hp > 0);

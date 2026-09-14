@@ -169,7 +169,7 @@ test('Multiple killing blows pay the casualty bounty only once', () => {
   const gold = game.gold.player;
   updateGame(game, RULES.fixedStep);
   near(game.gold.player, gold + RULES.goldPerSecond * RULES.fixedStep + UNITS.melee.bounty);
-  assert(game.experience.player === UNITS.melee.experience && game.experience.enemy === 0);
+  assert(game.experience.player === UNITS.melee.experience && game.experience.enemy === Math.floor(UNITS.melee.experience * RULES.casualtyExperienceRate));
   advance(game, 0.2);
   near(game.gold.player, gold + RULES.goldPerSecond * game.elapsed + UNITS.melee.bounty);
   assert(game.experience.player === UNITS.melee.experience, 'A casualty must award experience only once');
@@ -382,6 +382,85 @@ test('AI fields all three troop types and buys a defensive tower under pressure'
   near(pressured.gold.enemy, RULES.startingGold - TURRETS.firepot.cost + RULES.goldPerSecond * RULES.fixedStep);
 });
 
+test('The computer saves for paid siege waves against towers and trains the heavy unit first', () => {
+  const game = createGame();
+  buildTurret(game);
+  const cost = UNITS.heavy.cost + UNITS.archer.cost + UNITS.melee.cost;
+  game.gold.enemy = cost - 1;
+  game.ai.cooldown = 0;
+  updateGame(game, RULES.fixedStep);
+  assert(game.ai.strategy === 'siege' && !game.queues.enemy.length && !game.units.length);
+  near(game.gold.enemy, cost - 1 + AGES[1].income * RULES.fixedStep);
+  game.gold.enemy = cost; game.ai.cooldown = 0;
+  updateGame(game, RULES.fixedStep);
+  assert(game.queues.enemy.map(order => order.type).join() === 'heavy,archer,melee');
+  near(game.gold.enemy, AGES[1].income * RULES.fixedStep);
+  assert(game.ai.orders === 3 && game.ai.waves === 1 && !game.units.length);
+  advance(game, UNITS.heavy.trainTime);
+  assert(game.units[0].type === 'heavy' && game.units[0].team === 'enemy');
+});
+
+test('Later-age siege waves favor two siege units, obey army capacity and use their own age', () => {
+  for (const age of [3, 4, 5]) {
+    const game = createGame();
+    game.gold.player = 1000; expandTurretSlots(game); buildTurret(game); buildTurret(game);
+    evolveTo(game, age, 'enemy');
+    const [, archer, heavy] = AGES[age].units;
+    const cost = 2 * UNITS[heavy].cost + UNITS[archer].cost;
+    game.gold.enemy = cost;
+    game.units = Array.from({ length: RULES.armyLimit - 2 }, (_, i) => soldier('enemy', 700 + i * 30));
+    game.ai.cooldown = 0;
+    updateGame(game, RULES.fixedStep);
+    assert(!game.queues.enemy.length && game.ai.waves === 0, 'Do not partially buy an over-capacity wave');
+    game.units.pop(); game.ai.cooldown = 0;
+    updateGame(game, RULES.fixedStep);
+    assert(game.queues.enemy.map(order => order.type).join() === [heavy, heavy, archer].join());
+    near(game.gold.enemy, AGES[age].income * RULES.fixedStep * 2);
+    assert(game.ages.player === 1);
+  }
+});
+
+test('Computer abandons siege saving when player troops threaten its base', () => {
+  const game = createGame();
+  buildTurret(game);
+  game.gold.enemy = UNITS.melee.cost;
+  game.ai.cooldown = 0;
+  updateGame(game, RULES.fixedStep);
+  assert(game.ai.strategy === 'siege' && !game.queues.enemy.length);
+  game.units.push(soldier('player', 1000));
+  game.ai.cooldown = 0;
+  updateGame(game, RULES.fixedStep);
+  assert(game.ai.strategy === 'balanced' && game.queues.enemy[0].type === 'melee');
+  assert(game.ai.waves === 0 && game.gold.enemy >= 0);
+});
+
+test('Siege AI does not inspect the player wallet or hidden training queue', () => {
+  const first = createGame();
+  const second = createGame();
+  buildTurret(first); buildTurret(second);
+  second.gold.player = 2000;
+  for (let i = 0; i < RULES.queueLimit; i++) recruit(second, 'heavy');
+  for (const game of [first, second]) { game.ai.cooldown = 0; updateGame(game, RULES.fixedStep); }
+  const orders = game => game.queues.enemy.map(({ type, remaining }) => ({ type, remaining }));
+  assert(first.ai.strategy === second.ai.strategy && JSON.stringify(orders(first)) === JSON.stringify(orders(second)));
+  near(first.gold.enemy, second.gold.enemy);
+});
+
+test('Computer recruits interceptors instead of buying out-ranged towers under siege', () => {
+  for (const type of ['cannoneer', 'tank', 'warMachine']) {
+    const game = createGame();
+    buildTurret(game);
+    game.elapsed = 20; game.ai.cooldown = 0;
+    game.bases.enemy.hp = 300;
+    const attacker = soldier('player', RULES.enemyBaseX - RULES.baseHalfWidth - UNITS[type].baseRange, type);
+    game.units.push(attacker);
+    updateGame(game, RULES.fixedStep);
+    assert(game.ai.strategy === 'balanced' && game.turrets.enemy[0] === null);
+    assert(game.queues.enemy[0].type === 'melee');
+    near(game.gold.enemy, RULES.startingGold - UNITS.melee.cost + AGES[1].income * RULES.fixedStep);
+  }
+});
+
 test('Meteor waits for impact, hits enemies in the radius, bypasses armor, and spares allies', () => {
   const friendly = soldier('player', 550, 'archer');
   const heavy = soldier('enemy', 600, 'heavy');
@@ -507,7 +586,7 @@ test('Complete match: combined troops, a tower, and age-specific abilities can w
   assert(buildTurret(game));
   const rotation = [2, 1, 0, 1, 0];
   let order = 0;
-  advance(game, 300, state => {
+  advance(game, 600, state => {
     evolve(state);
     const roster = AGES[state.ages.player].units;
     if (state.queues.player.length < 2 && recruit(state, roster[rotation[order % rotation.length]])) order++;
@@ -535,35 +614,32 @@ test('New match resets both economies, queues, AI, tower, ultimate and flying pr
   assert(fresh.turrets.player.length === 1 && fresh.turrets.enemy.length === 1 && fresh.turrets.player !== old.turrets.player);
   assert(fresh.projectiles.length === 0 && fresh.effects.length === 0 && fresh.units.length === 0);
   assert(fresh.ai.orders === 0 && fresh.ai.cooldown === RULES.aiFirstDecision && fresh.elapsed === 0);
+  assert(fresh.ai.strategy === 'balanced' && fresh.ai.waves === 0);
   assert(fresh.queues !== old.queues && fresh.gold !== old.gold);
 });
 
-test('Complete match: defend, earn all five ages without free resources, then win with a future army', () => {
+test('Complete match: tower-only camping cannot freeze the computer and is broken by siege units', () => {
   const game = createGame();
   buildTurret(game);
-  const reached = new Set([1]);
-  let order = 0;
-  advance(game, 1000, state => {
+  advance(game, 360, state => {
     evolve(state);
     const age = AGES[state.ages.player];
-    reached.add(state.ages.player);
-    if (state.ages.player < 5) {
-      const type = age.turrets[2];
-      const oldSlot = state.turrets.player.findIndex(tower => tower && TURRETS[tower.type].age < state.ages.player);
-      if (oldSlot >= 0 && state.gold.player >= TURRETS[type].cost) { sellTurret(state, oldSlot); buildTurret(state, 'player', type, oldSlot); }
-      const expansionCost = RULES.turretExpansionCosts[state.turrets.player.length - 1] ?? Infinity;
-      if (!state.turrets.player.includes(null) && state.gold.player >= expansionCost + TURRETS[type].cost) expandTurretSlots(state);
-      buildTurret(state, 'player', type);
-    } else if (state.queues.player.length < 2 && recruit(state, age.units[[2, 1, 0][order % 3]])) order++;
+    const type = age.turrets[2];
+    const oldSlot = state.turrets.player.findIndex(tower => tower && TURRETS[tower.type].age < state.ages.player);
+    if (oldSlot >= 0 && state.gold.player >= TURRETS[type].cost) { sellTurret(state, oldSlot); buildTurret(state, 'player', type, oldSlot); }
+    const expansionCost = RULES.turretExpansionCosts[state.turrets.player.length - 1] ?? Infinity;
+    if (!state.turrets.player.includes(null) && state.gold.player >= expansionCost + TURRETS[type].cost) expandTurretSlots(state);
+    buildTurret(state, 'player', type);
     const enemies = state.units.filter(unit => unit.team === 'enemy');
     if (age.ability !== 'renewal' && enemies.length >= 2 && state.abilityCooldown === 0) castAbility(state, enemies[0].x);
     assert(state.gold.player >= 0 && state.gold.enemy >= 0);
+    assert(!state.units.some(unit => unit.team === 'player') && !state.queues.player.length);
   });
-  assert(reached.size === 5, `Reached ${[...reached]} at ${game.elapsed.toFixed(1)}s; result ${game.status}`);
-  assert(game.status === 'won' && order > 0, `Future army must finish the match; result ${game.status}`);
+  assert(game.ages.enemy >= 3 && game.experience.enemy >= AGES[3].experienceRequired, 'Computer must evolve from losses without killing any player troops');
+  assert(game.status === 'lost' && game.ai.waves > 0, `Siege must threaten unattended towers; ${game.status} after ${game.elapsed.toFixed(1)}s`);
 });
 
-test('Experience comes from kills, not waiting, recruitment or cancellation', () => {
+test('Combat experience cannot be farmed by waiting, recruitment or cancellation', () => {
   const game = isolatedGame();
   recruit(game); cancelTraining(game, game.queues.player[0].id);
   advance(game, 30);
@@ -574,7 +650,74 @@ test('Experience comes from kills, not waiting, recruitment or cancellation', ()
 test('Simultaneous casualties award experience independently to both sides', () => {
   const game = isolatedGame([soldier('player', 500, 'melee', 1), soldier('enemy', 532, 'melee', 1)]);
   updateGame(game, RULES.fixedStep);
-  assert(game.experience.player === UNITS.melee.experience && game.experience.enemy === UNITS.melee.experience);
+  assert(game.experience.player === UNITS.melee.experience + Math.floor(UNITS.melee.experience * RULES.casualtyExperienceRate));
+  assert(game.experience.enemy === game.experience.player);
+});
+
+test('Every casualty grants its own side 75 percent experience once, with gold only for the killer', () => {
+  for (const victim of ['player', 'enemy']) {
+    for (const [type, stats] of Object.entries(UNITS)) {
+      const winner = victim === 'player' ? 'enemy' : 'player';
+      const casualty = soldier(victim, 532, type, 1);
+      casualty.attackCooldown = 1000;
+      const game = isolatedGame([soldier(winner, 500), casualty]);
+      updateGame(game, RULES.fixedStep);
+      assert(!game.units.includes(casualty));
+      assert(game.experience[victim] === Math.floor(stats.experience * RULES.casualtyExperienceRate));
+      assert(game.experience[winner] === stats.experience);
+      near(game.gold[victim], RULES.startingGold + AGES[1].income * RULES.fixedStep);
+      near(game.gold[winner], RULES.startingGold + stats.bounty + AGES[1].income * RULES.fixedStep);
+      advance(game, 1);
+      assert(game.experience[victim] === Math.floor(stats.experience * RULES.casualtyExperienceRate));
+      assert(game.experience[winner] === stats.experience);
+    }
+  }
+});
+
+test('Losing troops to a tower unlocks computer evolution while player evolution remains manual', () => {
+  const game = createGame();
+  game.units = Array.from({ length: 8 }, (_, i) => soldier('enemy', 240 + i * 2, 'archer', 1));
+  game.units.forEach(unit => unit.attackCooldown = 1000);
+  buildTurret(game, 'player', 'firepot');
+  advance(game, 0.8);
+  assert(!game.units.length && game.experience.enemy === 168 && game.experience.player === 224);
+  assert(game.ages.player === 1 && game.ages.enemy === 1);
+  game.ai.cooldown = 0;
+  updateGame(game, RULES.fixedStep);
+  assert(game.ages.enemy === 2 && game.ages.player === 1 && getEvolutionState(game) === 'ready');
+  advance(game, 8);
+  assert(game.queues.enemy[0].type === 'knight');
+});
+
+test('Siege units can bombard bases beyond same-age towers, but keep their shorter anti-unit range', () => {
+  for (const type of ['cannoneer', 'tank', 'warMachine']) {
+    for (const team of ['player', 'enemy']) {
+      const victim = team === 'player' ? 'enemy' : 'player';
+      const stats = UNITS[type];
+      const game = isolatedGame();
+      evolveTo(game, stats.age, victim);
+      game.gold[victim] = 10000;
+      for (let i = 0; i < 3; i++) expandTurretSlots(game, victim);
+      AGES[stats.age].turrets.forEach((type, slot) => buildTurret(game, victim, type, slot));
+      const direction = team === 'player' ? -1 : 1;
+      const x = game.bases[victim].x + direction * (RULES.baseHalfWidth + stats.baseRange);
+      const unit = soldier(team, x, type);
+      game.units.push(unit);
+      advance(game, 2);
+      assert(game.bases[victim].hp < game.bases[victim].maxHp && unit.hp === stats.health, type);
+      near(unit.x, x);
+      const defender = soldier(victim, x + direction * (stats.range + 35), 'heavy');
+      defender.attackCooldown = 1000;
+      game.units.push(defender);
+      unit.attackCooldown = 0;
+      updateGame(game, RULES.fixedStep);
+      assert(game.projectiles.at(-1).targetBase === victim, 'Extended base range must not also extend anti-unit range');
+      defender.x = x + direction * 30;
+      unit.attackCooldown = 0;
+      updateGame(game, RULES.fixedStep);
+      assert(game.projectiles.at(-1).targetId === defender.id, 'Nearby troops must intercept siege fire');
+    }
+  }
 });
 
 test('Tower and meteor kills also award the owning side experience', () => {
@@ -583,7 +726,7 @@ test('Tower and meteor kills also award the owning side experience', () => {
     const game = isolatedGame([soldier(victim, team === 'player' ? 240 : 1040, 'archer', 1)]);
     buildTurret(game, team);
     advance(game, 1);
-    assert(game.experience[team] === UNITS.archer.experience && game.experience[victim] === 0);
+    assert(game.experience[team] === UNITS.archer.experience && game.experience[victim] === Math.floor(UNITS.archer.experience * RULES.casualtyExperienceRate));
   }
   const game = isolatedGame(AGES[1].units.map((type, i) => soldier('enemy', 550 + i * 30, type, 1)));
   castAbility(game, 600);

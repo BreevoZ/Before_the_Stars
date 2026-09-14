@@ -24,6 +24,7 @@ button:disabled { cursor: default; }
 .age-status { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--player); }
 .age-status span:last-child { color: var(--muted); }
 .enemy-status .age-status { color: var(--enemy); }
+.enemy-strategy { display: block; margin-top: 7px; font-size: 11px; color: var(--enemy); text-align: right; }
 progress { display: block; height: 5px; width: 100%; border: 0; border-radius: 0; appearance: none; background: #34423b; color: var(--player); }
 progress::-webkit-progress-bar { background: #34423b; }
 progress::-webkit-progress-value { background: var(--player); transition: width 0.15s; }

@@ -71,10 +71,10 @@ function syncRoster() {
     card.dataset.age = String(displayedAge);
     card.querySelector('strong').textContent = stats.name;
     card.querySelector('.unit-icon').textContent = icons[index];
-    card.querySelector('.unit-role').textContent = stats.splash ? '重装 · 范围炮击' : stats.ignoreArmor ? '近战 · 无视护甲' : roles[stats.role];
+    card.querySelector('.unit-role').textContent = stats.baseRange ? `攻城射程 ${stats.baseRange} · 范围` : stats.splash ? '重装 · 范围炮击' : stats.ignoreArmor ? '近战 · 无视护甲' : roles[stats.role];
     card.querySelector('[data-cost]').textContent = `${stats.cost} 金币`;
     card.querySelector('[data-training]').textContent = `${stats.trainTime}s`;
-    card.title = `${stats.health} 生命 / ${stats.damage} 攻击 / ${stats.armor} 护甲 / ${stats.range} 射程`;
+    card.title = `${stats.health} 生命 / ${stats.damage} 攻击 / ${stats.armor} 护甲 / ${stats.range} 对兵射程${stats.baseRange ? ` / ${stats.baseRange} 攻城射程` : ''}`;
     card.setAttribute('aria-label', `训练${stats.name}，${stats.cost} 金币，耗时 ${stats.trainTime} 秒`);
   });
   setText('roster-age', `${age.name} · 点击加入队列`);
@@ -149,7 +149,7 @@ function syncEvolution() {
   byId('evolve').disabled = state !== 'ready';
   byId('evolve').classList.toggle('ready', state === 'ready');
   setText('evolve-label', state === 'finished' ? '战斗已结束' : nextAge ? `进化至${nextAge.name}` : '已达最高时代');
-  setText('evolution-hint', !nextAge ? '五个时代已全部解锁 · 摧毁敌方基地取得胜利' : state === 'ready' ? '经验已达标 · 点击进化或按 E · 不消耗金币' : `击杀获得经验 · 还差 ${nextAge.experienceRequired - experience} 经验`);
+  setText('evolution-hint', !nextAge ? '五个时代已全部解锁 · 摧毁敌方基地取得胜利' : state === 'ready' ? '经验已达标 · 点击进化或按 E · 不消耗金币' : `击杀经验 + 阵亡75%经验 · 还差 ${nextAge.experienceRequired - experience} 经验`);
   setText('evolution-unlocks', `${nextAge ? '下个时代' : '已解锁'}：${(nextAge ?? age).units.map(type => UNITS[type].name).join(' · ')}`);
   setText('evolution-benefit', nextAge ? `生命 +${nextAge.baseHealth - age.baseHealth} · 收入 ${nextAge.income}/秒 · ${ABILITIES[nextAge.ability].name} · 三种新炮塔` : '未来要塞 · 离子科技 · 轨道打击');
 }
@@ -177,6 +177,7 @@ function syncUI() {
   if (ageAnnouncements.length) announce(ageAnnouncements.join(''));
   setText('gold', Math.floor(game.gold.player + 0.000001));
   setText('clock', formatTime(game.elapsed));
+  setText('enemy-strategy', game.ai.strategy === 'siege' ? '敌军战术 · 重装攻城' : '敌军战术 · 混合推进');
   for (const card of cards) {
     const state = getRecruitState(game, card.dataset.unit);
     card.disabled = state !== 'ready';

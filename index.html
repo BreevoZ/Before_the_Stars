@@ -13,7 +13,7 @@
     <main class="game-shell">
       <header class="masthead">
         <div class="wordmark"><span class="brand-mark" aria-hidden="true">✳</span> BEFORE THE STARS</div>
-        <span class="version">原型 05 / 五个时代</span>
+        <span class="version">原型 06 / 攻城战</span>
       </header>
 
       <section class="battle" aria-label="战场">
@@ -28,6 +28,7 @@
             <div class="status-heading"><span>敌方基地</span><span id="enemy-health">600 / 600</span></div>
             <progress id="enemy-health-bar" aria-label="敌方基地生命值" max="600" value="600"></progress>
             <div class="age-status"><span id="enemy-age">I · 原始时代</span><span id="enemy-experience">0 / 160 经验</span></div>
+            <span class="enemy-strategy" id="enemy-strategy">敌军战术 · 混合推进</span>
           </div>
         </div>
 
@@ -58,7 +59,7 @@
             <div class="evolution-progress">
               <div class="evolution-heading"><strong id="evolution-title">原始时代</strong><span id="experience-total">0 / 160 经验</span></div>
               <progress id="experience-bar" aria-label="进化经验" max="160" value="0"></progress>
-              <span class="evolution-hint" id="evolution-hint">击杀获得经验 · 双方独立进化</span>
+              <span class="evolution-hint" id="evolution-hint">击杀经验 + 阵亡75%经验 · 双方独立进化</span>
             </div>
             <div class="evolution-unlocks"><strong id="evolution-unlocks">解锁：剑士 · 弩手 · 重甲骑士</strong><span id="evolution-benefit">基地生命 +300 · 旧兵和训练保留</span></div>
             <button class="evolve-button" id="evolve" type="button" disabled aria-describedby="evolution-hint evolution-benefit"><span id="evolve-label">进化至中世纪</span><kbd>E</kbd></button>

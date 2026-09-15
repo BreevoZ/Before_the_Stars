@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# Local artwork
+/assets/
+
 # Build output and caches
 dist/
 build/

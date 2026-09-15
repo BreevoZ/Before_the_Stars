@@ -5,6 +5,37 @@ const PALETTES = {
   enemy: { light: '#e1b58c', main: '#c28b67', dark: '#795744', flag: '#dea579' },
 };
 
+// One full day follows match time, so pausing and restarting also affect the sky.
+const DAY_NIGHT_CYCLE_SECONDS = 120;
+const LANDSCAPE_COLORS = ['skyTop', 'skyMiddle', 'horizon', 'farMountain', 'middleMountain',
+  'nearMountain', 'surface', 'soil', 'deepSoil', 'crust', 'grass'];
+const LANDSCAPE_KEYFRAMES = [
+  { phase: 0, stars: 0.3, colors: ['#455768', '#b58c83', '#efd09a', '#7b8070', '#586d58', '#3e5743', '#b9a477', '#424a36', '#29392d', '#74764f', '#a3a577'] },
+  { phase: 0.18, stars: 0, colors: ['#689cad', '#a8c4b8', '#e4ddad', '#889c7d', '#607f60', '#405f46', '#c1b77d', '#50583b', '#344430', '#838755', '#aebc7b'] },
+  { phase: 0.36, stars: 0, colors: ['#689cad', '#a8c4b8', '#e4ddad', '#889c7d', '#607f60', '#405f46', '#c1b77d', '#50583b', '#344430', '#838755', '#aebc7b'] },
+  { phase: 0.5, stars: 0.3, colors: ['#4a4d65', '#b57570', '#e9ad70', '#796e64', '#585e50', '#3e4c3d', '#b29262', '#424232', '#2a332b', '#6d6547', '#a09465'] },
+  { phase: 0.64, stars: 1, colors: ['#131e2b', '#263c44', '#63776a', '#3d5350', '#2b443d', '#20392f', '#718465', '#2b382f', '#1c2926', '#465840', '#6e8b6a'] },
+  { phase: 0.86, stars: 1, colors: ['#131e2b', '#263c44', '#63776a', '#3d5350', '#2b443d', '#20392f', '#718465', '#2b382f', '#1c2926', '#465840', '#6e8b6a'] },
+];
+LANDSCAPE_KEYFRAMES.push({ ...LANDSCAPE_KEYFRAMES[0], phase: 1 });
+for (const frame of LANDSCAPE_KEYFRAMES) {
+  frame.colors = frame.colors.map(hex => [1, 3, 5].map(offset => parseInt(hex.slice(offset, offset + 2), 16)));
+}
+
+function landscapeLight(phase) {
+  const nextIndex = LANDSCAPE_KEYFRAMES.findIndex(frame => frame.phase > phase);
+  const from = LANDSCAPE_KEYFRAMES[nextIndex - 1];
+  const to = LANDSCAPE_KEYFRAMES[nextIndex];
+  const progress = (phase - from.phase) / (to.phase - from.phase);
+  const blend = progress * progress * (3 - 2 * progress);
+  const light = { stars: from.stars + (to.stars - from.stars) * blend };
+  LANDSCAPE_COLORS.forEach((name, index) => {
+    light[name] = `rgb(${from.colors[index].map((value, channel) =>
+      Math.round(value + (to.colors[index][channel] - value) * blend)).join(',')})`;
+  });
+  return light;
+}
+
 function polygon(ctx, points, fill) {
   ctx.fillStyle = fill;
   ctx.beginPath();
@@ -21,44 +52,86 @@ function line(ctx, points, color, width = 2) {
   ctx.stroke();
 }
 
-function drawLandscape(ctx, height, ground) {
+function drawCelestialBody(ctx, ground, angle, moon) {
+  const elevation = Math.sin(angle);
+  if (elevation < -0.15) return;
+  const x = RULES.width / 2 - Math.cos(angle) * RULES.width * 0.39;
+  const y = ground * (1 - elevation * 0.78);
+  const radius = moon ? 27 : 32;
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, Math.max(0, (elevation + 0.15) / 0.3));
+  const glow = ctx.createRadialGradient(x, y, radius * 0.6, x, y, radius * 3.5);
+  glow.addColorStop(0, moon ? '#dce5bf30' : '#ffe3a555');
+  glow.addColorStop(1, moon ? '#dce5bf00' : '#ffe3a500');
+  ctx.fillStyle = glow;
+  ctx.fillRect(x - radius * 3.5, y - radius * 3.5, radius * 7, radius * 7);
+  ctx.fillStyle = moon ? '#d9dfba' : '#ffe3a5';
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  if (moon) {
+    ctx.fillStyle = '#9aaa9530';
+    for (const [dx, dy, size] of [[-9, -6, 7], [9, 7, 5], [-5, 13, 3]]) {
+      ctx.beginPath(); ctx.arc(x + dx, y + dy, size, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawLandscape(ctx, height, ground, time) {
+  const phase = (time % DAY_NIGHT_CYCLE_SECONDS) / DAY_NIGHT_CYCLE_SECONDS;
+  const light = landscapeLight(phase);
   const sky = ctx.createLinearGradient(0, 0, 0, ground);
-  sky.addColorStop(0, '#192321');
-  sky.addColorStop(0.6, '#35483b');
-  sky.addColorStop(1, '#7c8058');
+  sky.addColorStop(0, light.skyTop);
+  sky.addColorStop(0.6, light.skyMiddle);
+  sky.addColorStop(1, light.horizon);
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, RULES.width, height);
 
-  ctx.fillStyle = '#d2bf82';
-  ctx.beginPath();
-  ctx.arc(714, ground * 0.33, 36, 0, Math.PI * 2);
-  ctx.fill();
-  for (let i = 0; i < 30; i++) {
+  ctx.save();
+  for (let i = 0; i < 54; i++) {
     const x = (i * 173 + 51) % 1280;
-    const y = (i * 47 + 18) % (ground * 0.35);
-    ctx.fillStyle = i % 3 === 0 ? '#a4ac8b80' : '#a4ac8b35';
-    ctx.fillRect(x, y, 1.5, 1.5);
+    const y = (i * 47 + 18) % (ground * 0.62);
+    // Each star pulses every 2.4–5 seconds; whole cycles keep the day boundary seamless.
+    const cycles = 24 + (i * 7) % 27;
+    const pulse = (1 + Math.sin(phase * Math.PI * 2 * cycles + i * 2.3)) / 2;
+    const twinkle = 0.12 + pulse * pulse * 0.88;
+    const bright = i % 3 === 0;
+    const size = (bright ? 2.4 : 1.6) * (0.8 + pulse * 0.4);
+    ctx.globalAlpha = light.stars * twinkle * (bright ? 1 : 0.7);
+    ctx.fillStyle = '#f2f1d8';
+    ctx.fillRect(x - size / 2, y - size / 2, size, size);
+    if (bright) {
+      const glint = pulse ** 6;
+      ctx.globalAlpha = light.stars * glint * 0.45;
+      const reach = 2 + glint * 3;
+      line(ctx, [[x - reach, y], [x + reach, y]], '#e2e6c8', 0.8);
+      line(ctx, [[x, y - reach], [x, y + reach]], '#e2e6c8', 0.8);
+    }
   }
+  ctx.restore();
+  drawCelestialBody(ctx, ground, phase * Math.PI * 2, false);
+  drawCelestialBody(ctx, ground, phase * Math.PI * 2 + Math.PI, true);
 
   polygon(ctx, [[0, ground], [0, ground - 115], [95, ground - 149], [171, ground - 114],
     [284, ground - 195], [361, ground - 121], [425, ground - 155], [568, ground - 83],
     [672, ground - 170], [789, ground - 131], [869, ground - 209], [947, ground - 125],
-    [1052, ground - 163], [1190, ground - 107], [1280, ground - 155], [1280, ground]], '#4a5d48');
+    [1052, ground - 163], [1190, ground - 107], [1280, ground - 155], [1280, ground]], light.farMountain);
   polygon(ctx, [[0, ground], [0, ground - 70], [114, ground - 105], [266, ground - 68],
     [381, ground - 105], [504, ground - 40], [632, ground - 101], [770, ground - 62],
-    [902, ground - 110], [1040, ground - 55], [1199, ground - 96], [1280, ground - 79], [1280, ground]], '#344b3e');
+    [902, ground - 110], [1040, ground - 55], [1199, ground - 96], [1280, ground - 79], [1280, ground]], light.middleMountain);
   polygon(ctx, [[0, ground], [0, ground - 34], [192, ground - 45], [338, ground - 21],
     [552, ground - 48], [714, ground - 22], [921, ground - 40], [1097, ground - 20],
-    [1280, ground - 40], [1280, ground]], '#293e33');
+    [1280, ground - 40], [1280, ground]], light.nearMountain);
 
-  ctx.fillStyle = '#8c8861';
+  ctx.fillStyle = light.surface;
   ctx.fillRect(0, ground, 1280, 4);
-  ctx.fillStyle = '#303c30';
+  ctx.fillStyle = light.soil;
   ctx.fillRect(0, ground + 4, 1280, height - ground);
-  ctx.fillStyle = '#202d27';
+  ctx.fillStyle = light.deepSoil;
   ctx.fillRect(0, ground + 22, 1280, height - ground - 22);
   polygon(ctx, [[0, ground + 4], [1280, ground + 4], [1280, ground + 11], [1076, ground + 14],
-    [859, ground + 9], [697, ground + 18], [456, ground + 11], [289, ground + 17], [0, ground + 13]], '#586046');
+    [859, ground + 9], [697, ground + 18], [456, ground + 11], [289, ground + 17], [0, ground + 13]], light.crust);
   for (let i = 0; i < 66; i++) {
     const x = (i * 137 + 28) % 1280;
     const y = ground + 32 + (i * 29) % Math.max(1, height - ground - 55);
@@ -66,7 +139,7 @@ function drawLandscape(ctx, height, ground) {
     ctx.fillRect(x, y, 3 + i % 5, 2);
   }
   for (const x of [226, 317, 481, 802, 952, 1040]) {
-    line(ctx, [[x - 3, ground], [x - 5, ground - 9], [x, ground - 3], [x + 4, ground - 14]], '#82906a', 2);
+    line(ctx, [[x - 3, ground], [x - 5, ground - 9], [x, ground - 3], [x + 4, ground - 14]], light.grass, 2);
   }
 }
 
@@ -519,10 +592,10 @@ export function createRenderer(canvas) {
 
   return function render(game, { targeting = false, targetX = RULES.width / 2 } = {}) {
     const ground = sceneHeight * 0.738;
-    drawLandscape(ctx, sceneHeight, ground);
+    const time = reducedMotion.matches ? 0 : game.elapsed;
+    drawLandscape(ctx, sceneHeight, ground, time);
     ctx.save();
     ctx.translate(0, ground);
-    const time = reducedMotion.matches ? 0 : game.elapsed;
     drawBase(ctx, game.bases.player, game.ages.player, time, entityScale);
     drawBase(ctx, game.bases.enemy, game.ages.enemy, time, entityScale);
     drawDefenses(ctx, game, 'player', entityScale);

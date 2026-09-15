@@ -1,20 +1,20 @@
 // Pure simulation. Timings are seconds; positions are in battlefield coordinates.
 export const UNITS = Object.freeze({
-  melee: Object.freeze({ name: '近战兵', age: 1, role: 'melee', cost: 30, trainTime: 1.6, health: 70, damage: 12, armor: 0, speed: 62, range: 32, attackInterval: 0.8, bounty: 10, experience: 20, lane: 'front' }),
-  archer: Object.freeze({ name: '弓箭手', age: 1, role: 'archer', projectile: 'arrow', cost: 45, trainTime: 2.4, health: 42, damage: 14, armor: 0, speed: 54, range: 190, attackInterval: 1.2, bounty: 15, experience: 28, lane: 'back' }),
-  heavy: Object.freeze({ name: '重装兵', age: 1, role: 'heavy', cost: 85, trainTime: 4, health: 170, damage: 26, armor: 3, speed: 36, range: 36, attackInterval: 1.3, bounty: 25, experience: 45, lane: 'front' }),
-  swordsman: Object.freeze({ name: '剑士', age: 2, role: 'melee', cost: 50, trainTime: 2, health: 115, damage: 20, armor: 1, speed: 66, range: 34, attackInterval: 0.85, bounty: 17, experience: 30, lane: 'front' }),
-  crossbow: Object.freeze({ name: '弩手', age: 2, role: 'archer', projectile: 'bolt', cost: 75, trainTime: 3, health: 65, damage: 30, armor: 0, speed: 50, range: 230, attackInterval: 1.5, bounty: 24, experience: 42, lane: 'back' }),
-  knight: Object.freeze({ name: '重甲骑士', age: 2, role: 'heavy', cost: 130, trainTime: 4.8, health: 270, damage: 42, armor: 5, speed: 44, range: 40, attackInterval: 1.4, bounty: 40, experience: 65, lane: 'front' }),
-  duelist: Object.freeze({ name: '决斗士', age: 3, role: 'melee', cost: 80, trainTime: 2.2, health: 205, damage: 35, armor: 3, speed: 72, range: 36, attackInterval: 0.8, bounty: 28, experience: 46, lane: 'front' }),
-  musketeer: Object.freeze({ name: '火枪手', age: 3, role: 'archer', projectile: 'bullet', cost: 115, trainTime: 3.2, health: 110, damage: 60, armor: 1, speed: 48, range: 255, attackInterval: 1.7, bounty: 40, experience: 65, lane: 'back' }),
-  cannoneer: Object.freeze({ name: '炮兵', age: 3, role: 'heavy', projectile: 'cannon', splash: 55, cost: 210, trainTime: 5.2, health: 380, damage: 95, armor: 7, speed: 30, range: 185, baseRange: 360, attackInterval: 2.1, bounty: 70, experience: 110, lane: 'front' }),
-  commando: Object.freeze({ name: '突击步兵', age: 4, role: 'melee', cost: 130, trainTime: 2.4, health: 340, damage: 56, armor: 6, speed: 76, range: 38, attackInterval: 0.65, bounty: 45, experience: 80, lane: 'front' }),
-  rifleman: Object.freeze({ name: '自动步枪兵', age: 4, role: 'archer', projectile: 'bullet', cost: 190, trainTime: 3.4, health: 185, damage: 45, armor: 3, speed: 54, range: 270, attackInterval: 0.55, bounty: 65, experience: 110, lane: 'back' }),
-  tank: Object.freeze({ name: '主战坦克', age: 4, role: 'heavy', projectile: 'shell', splash: 70, cost: 350, trainTime: 5.6, health: 720, damage: 145, armor: 14, speed: 26, range: 200, baseRange: 420, attackInterval: 1.9, bounty: 120, experience: 180, lane: 'front' }),
-  blade: Object.freeze({ name: '光刃战士', age: 5, role: 'melee', ignoreArmor: true, cost: 220, trainTime: 2.6, health: 550, damage: 90, armor: 10, speed: 82, range: 40, attackInterval: 0.6, bounty: 70, experience: 140, lane: 'front' }),
-  blaster: Object.freeze({ name: '等离子射手', age: 5, role: 'archer', projectile: 'plasma', cost: 300, trainTime: 3.6, health: 300, damage: 85, armor: 5, speed: 56, range: 300, attackInterval: 0.65, bounty: 100, experience: 180, lane: 'back' }),
-  warMachine: Object.freeze({ name: '战争机甲', age: 5, role: 'heavy', projectile: 'plasma-orb', splash: 90, cost: 580, trainTime: 6, health: 1200, damage: 235, armor: 22, speed: 23, range: 220, baseRange: 500, attackInterval: 1.8, bounty: 200, experience: 300, lane: 'front' }),
+  melee: Object.freeze({ name: '棍棒人', age: 1, role: 'melee', cost: 30, trainTime: 1.6, health: 70, damage: 12, armor: 0, speed: 62, range: 32, attackInterval: 0.8, bounty: 10, experience: 20, lane: 'front', description: '廉价前排 · 重棍挥击', attackDuration: 0.42, height: 61 }),
+  archer: Object.freeze({ name: '弹弓手', age: 1, role: 'archer', projectile: 'sling', cost: 45, trainTime: 2.4, health: 42, damage: 14, armor: 0, speed: 54, range: 190, attackInterval: 1.2, bounty: 15, experience: 28, lane: 'back', description: '脆弱后排 · 弧线石弹', attackDuration: 0.38, muzzleX: 25, muzzleY: -43, height: 57 }),
+  heavy: Object.freeze({ name: '恐龙骑兵', age: 1, role: 'heavy', cost: 85, trainTime: 4, health: 170, damage: 26, armor: 3, speed: 36, range: 60, attackInterval: 1.3, bounty: 25, experience: 45, lane: 'front', description: '巨兽前排 · 咬击两人，副目标 45% 伤害', cleaveRadius: 60, cleaveFactor: 0.45, footprint: 42, attackDuration: 0.6, height: 89 }),
+  swordsman: Object.freeze({ name: '盾剑士', age: 2, role: 'melee', cost: 50, trainTime: 2, health: 115, damage: 20, armor: 1, speed: 66, range: 34, attackInterval: 0.85, bounty: 17, experience: 30, lane: 'front', description: '盾牌防线 · 单体弹药减伤 30%，完全穿甲除外', rangedReduction: 0.3, attackDuration: 0.4, height: 70 }),
+  crossbow: Object.freeze({ name: '长弓手', age: 2, role: 'archer', projectile: 'arrow', cost: 75, trainTime: 3, health: 65, damage: 30, armor: 0, speed: 50, range: 230, attackInterval: 1.5, bounty: 24, experience: 42, lane: 'back', description: '长弓压制 · 射程长，需前排保护', attackDuration: 0.4, muzzleX: 29, muzzleY: -42, height: 66 }),
+  knight: Object.freeze({ name: '重甲骑士', age: 2, role: 'heavy', cost: 130, trainTime: 4.8, health: 270, damage: 42, armor: 5, speed: 68, range: 72, attackInterval: 1.4, bounty: 40, experience: 65, lane: 'front', description: '骑马冲锋 · 连续前进 80 距离后首击 +32', chargeDistance: 80, chargeDamage: 32, footprint: 44, attackDuration: 0.5, height: 105 }),
+  duelist: Object.freeze({ name: '决斗士', age: 3, role: 'melee', cost: 80, trainTime: 2.2, health: 205, damage: 29, armor: 3, speed: 72, range: 46, attackInterval: 0.65, bounty: 28, experience: 46, lane: 'front', description: '迅捷刺击 · 忽略 3 点护甲', armorPierce: 3, attackDuration: 0.3, height: 72 }),
+  musketeer: Object.freeze({ name: '火枪手', age: 3, role: 'archer', projectile: 'bullet', cost: 115, trainTime: 3.2, health: 110, damage: 60, armor: 1, speed: 48, range: 255, attackInterval: 1.7, bounty: 40, experience: 65, lane: 'back', description: '火绳枪 · 单发穿甲，克制重装与盾牌', ignoreArmor: true, attackDuration: 0.48, muzzleX: 50, muzzleY: -46, height: 71 }),
+  cannoneer: Object.freeze({ name: '野战炮组', age: 3, role: 'heavy', projectile: 'cannon', splash: 55, cost: 210, trainTime: 5.2, health: 380, damage: 95, armor: 7, speed: 30, range: 185, baseRange: 360, attackInterval: 2.1, bounty: 70, experience: 110, lane: 'front', description: '轮式火炮 · 远距攻城 / 55 范围爆炸', footprint: 38, attackDuration: 0.65, muzzleX: 51, muzzleY: -35, height: 61 }),
+  commando: Object.freeze({ name: '刺刀突击兵', age: 4, role: 'melee', cost: 130, trainTime: 2.4, health: 340, damage: 56, armor: 6, speed: 76, range: 58, attackInterval: 0.65, bounty: 45, experience: 80, lane: 'front', description: '刺刀突击 · 快速接敌，近距连续刺杀', attackDuration: 0.34, height: 65 }),
+  rifleman: Object.freeze({ name: '自动步枪兵', age: 4, role: 'archer', projectile: 'bullet', cost: 190, trainTime: 3.4, health: 185, damage: 30, armor: 3, speed: 54, range: 270, attackInterval: 1.1, bounty: 65, experience: 110, lane: 'back', description: '三连点射 · 每轮 3 发，每发 30 伤害', burst: 3, burstInterval: 0.12, attackDuration: 0.16, muzzleX: 45, muzzleY: -34, height: 61 }),
+  tank: Object.freeze({ name: '主战坦克', age: 4, role: 'heavy', projectile: 'shell', splash: 70, cost: 350, trainTime: 5.6, health: 720, damage: 145, armor: 14, speed: 26, range: 200, baseRange: 420, attackInterval: 1.9, bounty: 120, experience: 180, lane: 'front', description: '履带装甲 · 远距攻城 / 70 范围炮击', footprint: 47, attackDuration: 0.6, muzzleX: 67, muzzleY: -44, height: 63 }),
+  blade: Object.freeze({ name: '光刃战士', age: 5, role: 'melee', ignoreArmor: true, cost: 220, trainTime: 2.6, health: 550, damage: 90, armor: 10, speed: 82, range: 40, attackInterval: 0.6, bounty: 70, experience: 140, lane: 'front', description: '光刃突进 · 近战完全无视护甲', attackDuration: 0.3, height: 73 }),
+  blaster: Object.freeze({ name: '等离子射手', age: 5, role: 'archer', projectile: 'plasma', cost: 300, trainTime: 3.6, health: 300, damage: 85, armor: 5, speed: 56, range: 300, attackInterval: 0.65, bounty: 100, experience: 180, lane: 'back', description: '能量火力 · 300 射程 / 忽略 8 点护甲', armorPierce: 8, attackDuration: 0.38, muzzleX: 44, muzzleY: -43, height: 74 }),
+  warMachine: Object.freeze({ name: '悬浮战争机器', age: 5, role: 'heavy', projectile: 'plasma-orb', splash: 90, cost: 580, trainTime: 6, health: 1200, damage: 235, armor: 22, speed: 23, range: 220, baseRange: 500, attackInterval: 1.8, bounty: 200, experience: 300, lane: 'front', description: '悬浮重炮 · 远距攻城 / 90 范围能量爆破', footprint: 48, attackDuration: 0.6, muzzleX: 55, muzzleY: -46, height: 74 }),
 });
 
 export const RULES = Object.freeze({
@@ -219,17 +219,25 @@ function spawnX(team) {
   return gameBaseX(team) + (team === 'player' ? 30 : -30);
 }
 
+function unitSpacing(firstType, secondType) {
+  return (UNITS[firstType].footprint ?? RULES.unitSpacing / 2) + (UNITS[secondType].footprint ?? RULES.unitSpacing / 2);
+}
+
+function attackRange(stats, target) {
+  return stats.range + (!stats.projectile && target?.type ? Math.max(0, (UNITS[target.type].footprint ?? 15) - 15) : 0);
+}
+
 function updateTraining(game, team, dt) {
   const order = game.queues[team][0];
   if (!order) return;
   order.remaining = Math.max(0, order.remaining - dt);
   const stats = UNITS[order.type];
   const allies = game.units.filter(unit => unit.team === team);
-  const blocked = allies.some(unit => UNITS[unit.type].lane === stats.lane && Math.abs(unit.x - spawnX(team)) < RULES.unitSpacing);
+  const blocked = allies.some(unit => UNITS[unit.type].lane === stats.lane && Math.abs(unit.x - spawnX(team)) < unitSpacing(order.type, unit.type));
   if (order.remaining > EPSILON || allies.length >= RULES.armyLimit || blocked) return;
   game.units.push({
     id: game.nextUnitId++, team, type: order.type, x: spawnX(team), hp: stats.health,
-    attackCooldown: 0, attackAnimation: 0, hitFlash: 0, moving: false,
+    attackCooldown: 0, attackAnimation: 0, hitFlash: 0, moving: false, distanceTravelled: 0, chargeTravel: 0,
   });
   game.queues[team].shift();
 }
@@ -294,13 +302,14 @@ function updateAI(game, dt) {
 }
 
 function addProjectile(game, team, kind, x, target, damage, options = {}) {
-  const speed = { arrow: 500, bullet: 900, laser: 1400, plasma: 700, 'plasma-orb': 480, rocket: 500 }[kind] ?? 420;
+  const speed = { sling: 460, arrow: 500, bullet: 900, laser: 1400, plasma: 700, 'plasma-orb': 480, rocket: 500 }[kind] ?? 420;
   const duration = Math.max(0.12, Math.abs(target.x - x) / speed);
   game.projectiles.push({
     team, kind, fromX: x, toX: target.x,
-    fromY: options.fromY ?? -36,
+    fromY: options.fromY ?? -36, fromUnitX: options.fromUnitX,
+    toY: target.type ? -(UNITS[target.type].height ?? 60) * 0.52 - (UNITS[target.type].lane === 'back' ? 7 : 0) : -45,
     targetId: target.id ?? null, targetBase: target.id == null ? target.team : null,
-    damage, duration, remaining: duration, splash: options.splash ?? 0, ignoreArmor: options.ignoreArmor ?? false,
+    damage, duration, remaining: duration, splash: options.splash ?? 0, ignoreArmor: options.ignoreArmor ?? false, armorPierce: options.armorPierce ?? 0,
   });
 }
 
@@ -320,7 +329,7 @@ function updateProjectiles(game, dt, hits) {
         // Siege units can hit a base directly; blast radius never adds extra base damage.
         if (shot.targetBase && target?.hp > 0) hits.push({ target, damage: shot.damage, team: shot.team });
         game.effects.push({ kind: 'blast', x: shot.toX, radius: shot.splash, life: 0.4, duration: 0.4 });
-      } else if (target?.hp > 0) hits.push({ target, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor });
+      } else if (target?.hp > 0) hits.push({ target, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce, ranged: true });
     }
   }
   game.projectiles = game.projectiles.filter(shot => shot.remaining > 0);
@@ -364,6 +373,7 @@ function updateUnits(game, dt, hits) {
     unit.attackCooldown = Math.max(0, unit.attackCooldown - dt);
     unit.attackAnimation = Math.max(0, unit.attackAnimation - dt);
     unit.hitFlash = Math.max(0, unit.hitFlash - dt);
+    unit.guardFlash = Math.max(0, (unit.guardFlash ?? 0) - dt);
     unit.moving = false;
     const direction = unit.team === 'player' ? 1 : -1;
     const origin = positions.get(unit.id);
@@ -379,24 +389,64 @@ function updateUnits(game, dt, hits) {
         enemyDistance = Math.abs(distance);
       } else if (other.team === unit.team && UNITS[other.type].lane === stats.lane && distance * direction > 0) {
         // Frontline troops can pass friendly archers, who occupy a separate rank.
-        allySpace = Math.min(allySpace, distance * direction - RULES.unitSpacing);
+        allySpace = Math.min(allySpace, distance * direction - unitSpacing(unit.type, other.type));
       }
     }
     const baseDistance = Math.abs(base.x - origin) - RULES.baseHalfWidth;
     const baseRange = stats.baseRange ?? stats.range;
-    const target = enemyDistance <= stats.range + 0.01 ? closestEnemy : baseDistance <= baseRange + 0.01 ? base : null;
+    const reach = attackRange(stats, closestEnemy);
+    const target = enemyDistance <= reach + 0.01 ? closestEnemy : baseDistance <= baseRange + 0.01 ? base : null;
+    const fire = victim => {
+      const muzzle = Math.min(stats.muzzleX ?? 0, Math.abs(victim.x - unit.x) * 0.5);
+      addProjectile(game, unit.team, stats.projectile, unit.x + direction * muzzle, victim, stats.damage,
+        { fromUnitX: unit.x, fromY: stats.muzzleY + (stats.lane === 'back' ? -7 : 0), splash: stats.splash, ignoreArmor: stats.ignoreArmor, armorPierce: stats.armorPierce });
+      unit.attackAnimation = stats.attackDuration;
+    };
+    if (unit.burstRemaining > 0) {
+      const victim = unit.burstTargetBase ? game.bases[unit.burstTargetBase] : game.units.find(other => other.id === unit.burstTargetId);
+      const distance = victim ? Math.abs(victim.x - origin) - (victim.type ? 0 : RULES.baseHalfWidth) : Infinity;
+      if (!victim || victim.hp <= 0 || distance > (victim.type ? stats.range : baseRange) + 0.01) unit.burstRemaining = 0;
+      else {
+        unit.burstCooldown -= dt;
+        if (unit.burstCooldown <= EPSILON) {
+          fire(victim);
+          unit.burstRemaining--;
+          unit.burstCooldown += stats.burstInterval;
+        }
+        continue;
+      }
+    }
     if (target) {
       if (unit.attackCooldown === 0) {
-        if (stats.projectile) addProjectile(game, unit.team, stats.projectile, unit.x, target, stats.damage, { splash: stats.splash, ignoreArmor: stats.ignoreArmor });
-        else hits.push({ target, damage: stats.damage, team: unit.team, ignoreArmor: stats.ignoreArmor });
+        if (stats.projectile) {
+          fire(target);
+          if (stats.burst) {
+            unit.burstRemaining = stats.burst - 1;
+            unit.burstCooldown = stats.burstInterval;
+            unit.burstTargetId = target.id ?? null;
+            unit.burstTargetBase = target.type ? null : target.team;
+          }
+        } else {
+          unit.lastAttackCharged = Boolean(stats.chargeDamage && (unit.chargeTravel ?? 0) >= stats.chargeDistance);
+          hits.push({ target, damage: stats.damage + (unit.lastAttackCharged ? stats.chargeDamage : 0), team: unit.team, ignoreArmor: stats.ignoreArmor, armorPierce: stats.armorPierce });
+          if (stats.cleaveRadius && target.type) {
+            const secondary = game.units.filter(other => other !== target && other.team !== unit.team &&
+              (positions.get(other.id) - origin) * direction >= 0 && Math.abs(positions.get(other.id) - positions.get(target.id)) <= stats.cleaveRadius)
+              .sort((a, b) => Math.abs(positions.get(a.id) - origin) - Math.abs(positions.get(b.id) - origin))[0];
+            if (secondary) hits.push({ target: secondary, damage: stats.damage * stats.cleaveFactor, team: unit.team });
+          }
+        }
+        unit.chargeTravel = 0;
         unit.attackCooldown = stats.attackInterval;
-        unit.attackAnimation = 0.25;
+        unit.attackAnimation = stats.attackDuration;
       }
     } else {
       const step = Math.max(0, Math.min(stats.speed * dt, allySpace,
-        (enemyDistance - stats.range) / 2, baseDistance - baseRange));
+        (enemyDistance - reach) / 2, baseDistance - baseRange));
       unit.x += direction * step;
       unit.moving = step > 0.001;
+      unit.distanceTravelled = (unit.distanceTravelled ?? 0) + step;
+      unit.chargeTravel = unit.moving ? (unit.chargeTravel ?? 0) + step : 0;
     }
   }
 }
@@ -423,8 +473,11 @@ function updateTurrets(game, dt) {
 function resolveHits(game, hits) {
   // Resolve all damage before removing casualties; rewards are paid once per death.
   for (const hit of hits) {
-    const armor = hit.target.type && !hit.ignoreArmor ? UNITS[hit.target.type].armor : 0;
-    hit.target.hp = Math.max(0, hit.target.hp - Math.max(1, hit.damage - armor));
+    const stats = hit.target.type ? UNITS[hit.target.type] : null;
+    const armor = stats && !hit.ignoreArmor ? Math.max(0, stats.armor - (hit.armorPierce ?? 0)) : 0;
+    const guard = hit.ranged && !hit.ignoreArmor ? stats?.rangedReduction ?? 0 : 0;
+    hit.target.hp = Math.max(0, hit.target.hp - Math.max(1, (hit.damage - armor) * (1 - guard)));
+    if (guard) hit.target.guardFlash = 0.18;
     hit.target.hitFlash = 0.14;
     game.effects.push({ kind: 'hit', x: hit.target.x, life: 0.22, duration: 0.22 });
   }

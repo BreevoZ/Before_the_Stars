@@ -54,11 +54,11 @@
           </div>
           <div class="command-grid">
             <div class="recruit-section">
-              <div class="section-heading"><h2>部队</h2><span class="sr-only" id="queue-count">0 / 5</span><span data-icon="sword" aria-hidden="true"></span></div>
+              <div class="section-heading"><h2>部队</h2><span class="sr-only" id="queue-count">0 / 5</span><a class="roster-link" href="./units.html" target="_blank" rel="noopener">兵种图鉴 ↗</a></div>
               <div class="unit-cards">
-                <button class="unit-card" id="recruit" data-unit="melee" type="button"><span class="unit-icon"></span><kbd>1</kbd><strong class="sr-only">近战兵</strong><span class="sr-only unit-role"></span><span class="price"><span data-icon="coin"></span><span data-cost></span></span><span class="sr-only" data-training></span><span class="sr-only" data-state></span></button>
-                <button class="unit-card" id="recruit-archer" data-unit="archer" type="button"><span class="unit-icon"></span><kbd>2</kbd><strong class="sr-only">弓箭手</strong><span class="sr-only unit-role"></span><span class="price"><span data-icon="coin"></span><span data-cost></span></span><span class="sr-only" data-training></span><span class="sr-only" data-state></span></button>
-                <button class="unit-card" id="recruit-heavy" data-unit="heavy" type="button"><span class="unit-icon"></span><kbd>3</kbd><strong class="sr-only">重装兵</strong><span class="sr-only unit-role"></span><span class="price"><span data-icon="coin"></span><span data-cost></span></span><span class="sr-only" data-training></span><span class="sr-only" data-state></span></button>
+                <button class="unit-card" id="recruit" data-unit="melee" type="button"><span class="unit-icon"></span><kbd>1</kbd><strong class="sr-only unit-name">棍棒人</strong><span class="sr-only unit-role"></span><span class="price"><span data-icon="coin"></span><span data-cost></span></span><span class="sr-only" data-training></span><span class="sr-only" data-state></span></button>
+                <button class="unit-card" id="recruit-archer" data-unit="archer" type="button"><span class="unit-icon"></span><kbd>2</kbd><strong class="sr-only unit-name">弹弓手</strong><span class="sr-only unit-role"></span><span class="price"><span data-icon="coin"></span><span data-cost></span></span><span class="sr-only" data-training></span><span class="sr-only" data-state></span></button>
+                <button class="unit-card" id="recruit-heavy" data-unit="heavy" type="button"><span class="unit-icon"></span><kbd>3</kbd><strong class="sr-only unit-name">恐龙骑兵</strong><span class="sr-only unit-role"></span><span class="price"><span data-icon="coin"></span><span data-cost></span></span><span class="sr-only" data-training></span><span class="sr-only" data-state></span></button>
               </div>
               <div class="training-queue" id="training-queue" aria-label="训练队列；点击订单取消并退款"></div>
             </div>
@@ -90,7 +90,7 @@
         <p id="spell-hint"></p><p id="recruit-rule"></p>
         <details open><summary id="roster-age">当前时代</summary><div id="help-roster" class="help-roster"></div></details>
         <details><summary>大招与进化</summary><p id="ability-description"></p><h3 id="evolution-title"></h3><p id="evolution-hint"></p><p id="evolution-unlocks"></p><p id="evolution-benefit"></p><p>击杀获得完整经验，己方阵亡获得 75% 经验。进化保留旧部队、训练订单、炮塔与大招冷却。</p></details>
-        <details><summary>防御与胜负</summary><p>炮位最多四个，扩容不含炮塔。拆除返还原价的一半。炮兵、坦克与机甲可在同代炮塔射程外攻城，需要出兵拦截。青色为我方，橙色为敌方；摧毁敌方基地获胜。</p></details>
+        <details><summary>防御与胜负</summary><p>炮位最多四个，扩容不含炮塔。拆除返还原价的一半。野战炮组、坦克与悬浮战争机器可在同代炮塔射程外攻城，需要出兵拦截。青色为我方，橙色为敌方；摧毁敌方基地获胜。</p></details>
       </div>
     </dialog>
   </body>

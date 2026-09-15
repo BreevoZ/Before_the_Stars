@@ -1,4 +1,5 @@
 import { RULES, UNITS, AGES, ABILITIES, getTurretPosition, getAbilityRadius, getAbilityImpactX } from './game.js';
+import { drawUnit } from './units.js';
 
 const PALETTES = {
   player: { light: '#b7d4b5', main: '#7faa91', dark: '#435e50', flag: '#bbd9b2' },
@@ -349,184 +350,6 @@ function drawDefenses(ctx, game, team, scale) {
   }
 }
 
-function drawAdvancedUnit(ctx, unit, time, scale, reducedMotion) {
-  const stats = UNITS[unit.type];
-  const colors = PALETTES[unit.team];
-  const future = stats.age === 5;
-  const glow = unit.team === 'player' ? '#9ff8e4' : '#ffd094';
-  const gait = !reducedMotion && unit.moving ? Math.sin(time * 12 + unit.id) : 0;
-  const recoil = unit.attackAnimation > 0 ? Math.sin(unit.attackAnimation * Math.PI / 0.25) * 3 : 0;
-  const heavy = stats.role === 'heavy';
-  ctx.save(); ctx.translate(unit.x, stats.lane === 'back' ? -7 : 0); ctx.scale(scale, scale);
-  ctx.fillStyle = '#101f1b80'; ctx.beginPath(); ctx.ellipse(0, 1, heavy ? 29 : 16, 5, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.save(); ctx.scale(unit.team === 'player' ? 1 : -1, 1);
-  const metal = unit.hitFlash > 0 ? '#fff3ce' : future ? '#92b6b5' : colors.main;
-  if (unit.type === 'cannoneer') {
-    ctx.fillStyle = '#c3b394'; ctx.fillRect(-27, -36, 11, 22);
-    ctx.fillStyle = colors.dark; ctx.fillRect(-29, -48, 16, 6);
-    line(ctx, [[-25, -13], [-27 - gait * 3, 0]], '#a49d80', 4);
-    line(ctx, [[-17, -13], [-14 + gait * 3, 0]], '#c7bc96', 4);
-    line(ctx, [[-23, -27], [-6, -16]], '#d3bf98', 4);
-    line(ctx, [[-10 - recoil, -18], [31 - recoil, -28]], '#b8a273', 13);
-    line(ctx, [[27 - recoil, -35], [33 - recoil, -22]], '#504b3a', 3);
-    for (const x of [-5, 16]) {
-      ctx.fillStyle = '#826a44'; ctx.beginPath(); ctx.arc(x, -9, 10, 0, Math.PI * 2); ctx.fill();
-      line(ctx, [[x - 7, -9], [x + 7, -9]], '#d2b882', 2); line(ctx, [[x, -16], [x, -2]], '#d2b882', 2);
-    }
-  } else if (unit.type === 'tank') {
-    ctx.fillStyle = '#283d35'; ctx.fillRect(-28, -13, 55, 13);
-    for (let x = -20; x <= 20; x += 10) { ctx.fillStyle = '#8c9a80'; ctx.beginPath(); ctx.arc(x, -6, 4, 0, Math.PI * 2); ctx.fill(); }
-    polygon(ctx, [[-29, -15], [-20, -28], [16, -28], [30, -15]], metal);
-    polygon(ctx, [[-14, -29], [-8, -41], [14, -41], [21, -29]], colors.dark);
-    line(ctx, [[7 - recoil, -36], [43 - recoil, -36]], '#a4b39c', 7);
-    ctx.fillStyle = colors.light; ctx.fillRect(-16, -22, 10, 5);
-  } else if (unit.type === 'warMachine') {
-    for (const side of [-1, 1]) {
-      line(ctx, [[side * 10, -29], [side * 18 + gait * side * 3, -14], [side * 21, -3]], '#88aca9', 9);
-      line(ctx, [[side * 14, -50], [side * 26, -33]], '#456b75', 10);
-    }
-    polygon(ctx, [[-21, -55], [-13, -67], [15, -65], [23, -46], [13, -27], [-13, -27]], metal);
-    ctx.fillStyle = '#244c58'; ctx.fillRect(-12, -57, 25, 12);
-    line(ctx, [[-8, -52], [11, -52]], glow, 4);
-    line(ctx, [[-4 - recoil, -36], [35 - recoil, -36]], '#668b94', 13);
-    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(34 - recoil, -36, 5, 0, Math.PI * 2); ctx.fill();
-  } else {
-    for (const side of [-1, 1]) line(ctx, [[side * 5, -17], [side * 5 + side * gait * 5, 0]], stats.age === 3 ? '#b8ad88' : '#728f80', 5);
-    ctx.fillStyle = metal; ctx.fillRect(-10, -37, 20, 23);
-    ctx.fillStyle = colors.dark; ctx.fillRect(-10, -22, 20, 5);
-    ctx.fillStyle = '#d1bc96'; ctx.fillRect(-7, -50, 15, 13);
-    if (stats.age === 3) {
-      polygon(ctx, [[-14, -49], [-8, -56], [0, -52], [9, -56], [15, -49]], colors.dark);
-      polygon(ctx, [[-5, -54], [-11, -63], [-2, -59], [1, -54]], '#e1c392');
-      line(ctx, [[-6, -35], [6, -17]], '#d2c39b', 2);
-    } else {
-      ctx.fillStyle = colors.dark; ctx.fillRect(-10, -55, 21, 10);
-      ctx.fillStyle = future ? glow : '#b7c5a7'; ctx.fillRect(0, -49, 11, 4);
-      if (future) { line(ctx, [[-7, -35], [-7, -24]], glow, 2); ctx.fillStyle = '#739aa4'; ctx.fillRect(-14, -39, 6, 9); }
-    }
-    const melee = stats.role === 'melee';
-    line(ctx, [[4, -33], [15 - recoil, -27]], '#c9c09c', 5);
-    if (melee) {
-      ctx.save(); ctx.translate(15, -27); ctx.rotate(-0.2 + recoil * 0.25);
-      line(ctx, [[-3, 5], [8, -29]], future ? glow : '#d5d9c1', future ? 5 : 3);
-      line(ctx, [[-6, -1], [6, 3]], '#b89a66', 3); ctx.restore();
-      if (stats.age === 4) { ctx.fillStyle = colors.dark; ctx.fillRect(-14, -32, 7, 22); }
-    } else {
-      line(ctx, [[-1 - recoil, -27], [34 - recoil, -27]], future ? '#89b8be' : '#b09e78', future ? 7 : 5);
-      line(ctx, [[18 - recoil, -28], [38 - recoil, -28]], future ? glow : '#ced0b7', 2);
-      if (stats.age === 4) { ctx.fillStyle = '#263d33'; ctx.fillRect(9, -26, 6, 10); }
-    }
-  }
-  if (stats.projectile && unit.attackAnimation > 0 && !reducedMotion) {
-    polygon(ctx, [[35, -35], [49, -28], [35, -22]], future ? '#b4fff0' : '#f5d697');
-  }
-  ctx.restore();
-  if (unit.hp < stats.health) {
-    const y = unit.type === 'warMachine' ? -77 : heavy ? -59 : -68;
-    ctx.fillStyle = '#182920'; ctx.fillRect(-16, y, 32, 4);
-    ctx.fillStyle = colors.light; ctx.fillRect(-16, y, 32 * unit.hp / stats.health, 4);
-  }
-  ctx.restore();
-}
-
-function drawUnit(ctx, unit, time, scale, reducedMotion) {
-  if (UNITS[unit.type].age >= 3) { drawAdvancedUnit(ctx, unit, time, scale, reducedMotion); return; }
-  const colors = PALETTES[unit.team];
-  const stats = UNITS[unit.type];
-  const heavy = stats.role === 'heavy';
-  const archer = stats.role === 'archer';
-  const advanced = stats.age === 2;
-  const facing = unit.team === 'player' ? 1 : -1;
-  const gait = !reducedMotion && unit.moving ? Math.sin(time * 12 + unit.id) : 0;
-  const swing = unit.attackAnimation > 0 ? Math.sin(unit.attackAnimation / 0.25 * Math.PI) : 0;
-  ctx.save();
-  ctx.translate(unit.x, (archer ? -7 : 0) - Math.abs(gait) * 1.2);
-  ctx.scale(scale * (heavy ? 1.22 : 1), scale * (heavy ? 1.12 : 1));
-  ctx.fillStyle = '#101f1b80';
-  ctx.beginPath();
-  ctx.ellipse(0, 1, 16, 3, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.save();
-  ctx.scale(facing, 1);
-  line(ctx, [[-5, -18], [-6 - gait * 4, -8], [-5 - gait * 5, 0]], '#b0ae8b', 5);
-  line(ctx, [[5, -18], [5 + gait * 4, -9], [6 + gait * 5, 0]], '#d2c3a0', 5);
-  if (advanced && !archer) polygon(ctx, [[-8, -38], [-23, -9], [-8, -13]], colors.dark);
-  ctx.fillStyle = unit.hitFlash > 0 ? '#f5edd5' : advanced ? '#afbbb3' : colors.main;
-  ctx.fillRect(-10, -36, 19, 21);
-  ctx.fillStyle = colors.dark;
-  ctx.fillRect(-10, -19, 20, 5);
-  ctx.fillStyle = '#d5bf94';
-  ctx.fillRect(-7, -49, 15, 14);
-  ctx.fillStyle = colors.dark;
-  ctx.fillRect(-9, -51, 20, 7);
-  ctx.fillStyle = colors.light;
-  ctx.fillRect(-9, -53, 17, 4);
-  if (advanced) {
-    ctx.fillStyle = '#bac6ba';
-    ctx.fillRect(-9, -54, 19, 10);
-    polygon(ctx, [[-9, -54], [0, -59], [10, -54]], '#d0d5c1');
-    ctx.fillStyle = colors.main;
-    ctx.fillRect(-5, -35, 10, 19);
-    if (heavy) polygon(ctx, [[-5, -57], [0, -67], [14, -63], [7, -57]], colors.flag);
-  }
-  if (heavy) {
-    ctx.fillStyle = colors.light;
-    ctx.fillRect(-14, -38, 28, 7);
-    ctx.fillRect(-10, -50, 20, 12);
-    ctx.fillStyle = '#293c32';
-    ctx.fillRect(1, -46, 9, 3);
-  }
-  ctx.fillStyle = '#27362c';
-  ctx.fillRect(5, -42, 3, 3);
-  line(ctx, [[5, -32], [13 + swing * 8, -28 - swing * 8]], '#d5bf94', 5);
-  if (archer) {
-    if (advanced) {
-      line(ctx, [[8, -26], [31, -26]], '#b4936b', 5);
-      line(ctx, [[19, -40], [29, -28], [19, -16]], '#c3cbb3', 3);
-      line(ctx, [[19, -40], [15 - swing * 4, -27], [19, -16]], '#e5d8ad', 1);
-      line(ctx, [[10, -28], [38, -28]], '#e3c892', 2);
-    } else {
-      line(ctx, [[17, -49], [25, -38], [27, -28], [25, -18], [17, -9]], '#c2a577', 3);
-      line(ctx, [[17, -49], [11 - swing * 7, -28], [17, -9]], '#e1d9b2', 1);
-      line(ctx, [[8, -28], [32, -28]], '#e8d9ac', 2);
-      ctx.fillStyle = colors.dark;
-      ctx.fillRect(-13, -40, 6, 26);
-      line(ctx, [[-11, -40], [-16, -53]], '#bba77d', 2);
-    }
-  } else {
-    ctx.save();
-    ctx.translate(14 + swing * 8, -28 - swing * 8);
-    ctx.rotate(-0.5 + swing * 1.7);
-    ctx.fillStyle = '#aa8c63';
-    ctx.fillRect(-2, -24, 4, 33);
-    if (advanced) {
-      polygon(ctx, [[-3, -4], [-3, -31], [1, -40], [5, -31], [5, -4]], '#dae0ce');
-      ctx.fillStyle = '#c5aa77';
-      ctx.fillRect(-7, -5, 17, 3);
-    } else polygon(ctx, [[0, -24], [12, -23], [15, -15], [0, -14]], '#c3c6ad');
-    ctx.restore();
-    ctx.fillStyle = colors.dark;
-    ctx.fillRect(-14, -34, heavy ? 19 : 13, heavy ? 30 : 21);
-    ctx.strokeStyle = colors.light;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(-14, -34, heavy ? 19 : 13, heavy ? 30 : 21);
-    if (advanced) {
-      const width = heavy ? 18 : 12;
-      polygon(ctx, [[-15, -35], [-15 + width, -35], [-15 + width, -17], [-15 + width / 2, -9], [-15, -17]], colors.light);
-      line(ctx, [[-15 + width / 2, -32], [-15 + width / 2, -15]], colors.dark, 2);
-      line(ctx, [[-12, -26], [-18 + width, -26]], colors.dark, 2);
-    }
-  }
-  ctx.restore();
-  if (unit.hp < stats.health) {
-    ctx.fillStyle = '#182920';
-    ctx.fillRect(-14, -65, 28, 4);
-    ctx.fillStyle = colors.light;
-    ctx.fillRect(-14, -65, 28 * unit.hp / stats.health, 4);
-  }
-  ctx.restore();
-}
-
 function drawTarget(ctx, x, radius, opacity = 1) {
   ctx.save();
   ctx.globalAlpha = opacity;
@@ -544,10 +367,11 @@ function drawTarget(ctx, x, radius, opacity = 1) {
 
 function drawProjectile(ctx, shot, scale) {
   const progress = Math.max(0, Math.min(1, 1 - shot.remaining / shot.duration));
-  const x = shot.fromX + (shot.toX - shot.fromX) * progress;
-  const cannon = ['cannon', 'stone', 'firepot', 'shell', 'plasma-orb'].includes(shot.kind);
+  const fromX = shot.fromUnitX === undefined ? shot.fromX : shot.fromUnitX + (shot.fromX - shot.fromUnitX) * scale;
+  const x = fromX + (shot.toX - fromX) * progress;
+  const cannon = ['sling', 'cannon', 'stone', 'firepot', 'shell', 'plasma-orb'].includes(shot.kind);
   const fromY = shot.fromY * scale;
-  const y = fromY * (1 - progress) - 30 * scale * progress - Math.sin(progress * Math.PI) * (cannon ? 45 : 18);
+  const y = fromY * (1 - progress) + (shot.toY ?? -30) * scale * progress - Math.sin(progress * Math.PI) * (shot.kind === 'sling' ? 65 : cannon ? 45 : shot.kind === 'bullet' ? 0 : 18);
   if (['plasma', 'plasma-orb', 'laser'].includes(shot.kind)) {
     const color = shot.team === 'player' ? '#a2fff0' : '#ffd0a1';
     const facing = shot.toX > shot.fromX ? 1 : -1;
@@ -562,8 +386,8 @@ function drawProjectile(ctx, shot, scale) {
     const facing = shot.toX > shot.fromX ? 1 : -1;
     line(ctx, [[x - 9 * facing, y], [x + 3 * facing, y]], '#f1d9a1', 2);
   } else if (cannon) {
-    ctx.fillStyle = shot.kind === 'firepot' ? '#eea353' : shot.kind === 'stone' ? '#b9bea7' : '#e8c783';
-    ctx.beginPath(); ctx.arc(x, y, 5 * scale, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = shot.kind === 'firepot' ? '#eea353' : ['sling', 'stone'].includes(shot.kind) ? '#b9bea7' : '#e8c783';
+    ctx.beginPath(); ctx.arc(x, y, (shot.kind === 'sling' ? 3.5 : 5) * scale, 0, Math.PI * 2); ctx.fill();
   } else {
     const facing = shot.toX > shot.fromX ? 1 : -1;
     line(ctx, [[x - (shot.kind === 'bolt' ? 9 : 13) * facing, y], [x + 4 * facing, y]], shot.kind === 'bolt' ? '#e5cb91' : PALETTES[shot.team].light, shot.kind === 'bolt' ? 3 : 2);

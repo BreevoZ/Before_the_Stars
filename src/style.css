@@ -200,3 +200,17 @@ progress::-moz-progress-bar { background: var(--player); border-radius: 2px; }
   .turret-slots { gap: 3px; }
   .compact-button { min-width: 59px; }
 }
+
+/* Unit portraits share the battlefield models. */
+.roster-link { color: var(--muted); text-decoration: none; font-size: 11px; letter-spacing: 0; }
+.roster-link:hover { color: var(--gold); }
+.roster-link:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; }
+.unit-card, .turret-card { height: 100px; }
+.unit-card { gap: 3px; padding: 3px 4px 8px; }
+.unit-card .unit-icon { display: block; width: 100%; height: 67px; }
+.unit-card .unit-icon svg { display: none; }
+.unit-card .unit-icon canvas { display: block; width: 100%; height: 67px; object-fit: contain; }
+@media (max-width: 560px) {
+  .unit-card, .turret-card { height: 90px; }
+  .unit-card .unit-icon, .unit-card .unit-icon canvas { height: 58px; }
+}

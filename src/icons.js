@@ -1,5 +1,12 @@
 // Small code-native icons keep controls crisp at any display density.
 const paths = {
+  club: '<path d="m5 21 6-10m-3-1 2-6 5-2 5 4-1 5-5 3-6-4Zm4-3 3-1"/>',
+  sling: '<path d="M11 22v-9L4 4m7 9 8-9M4 4l7 5 8-5M11 9v4"/><circle cx="11" cy="9" r="2"/>',
+  dino: '<path d="M2 15 7 13h6l2-8h5l3 4v3h-6l-2 6H8l-6-3Zm6 2-1 5m7-5 2 5m2-14h1M9 12V7m-2 2h6"/><circle cx="9" cy="4" r="2"/>',
+  knight: '<path d="M2 14h12l2-7 4 1 3 5-4 2-3 3H6l-4-4Zm4 4-1 4m10-4 2 4M10 14V7m-3 1h8M2 6h20"/><circle cx="10" cy="3" r="2"/>',
+  rapier: '<path d="m3 21 6-6m-4-3 7 7m-5-3 7-7 9-8-7 10-7 7"/><circle cx="8" cy="16" r="3"/>',
+  bayonet: '<path d="m2 18 4-6h10v3H7l-3 6-2-3Zm14-5h4m-1-2 4 2-4 2M9 12V9m1 6 2 5"/>',
+  hover: '<path d="m2 15 4-5h14l3 5-5 4H7l-5-4Zm6-5 2-7h6l3 7m-7-4h4m2 7h6M7 21h4m4 0h4"/>',
   sword: '<path d="m4 20 4-4m-3-3 6 6M8 16 19 5l1-3-3 1L6 14"/>',
   bow: '<path d="M7 3c13 4 13 14 0 18L7 3Zm0 0 6 9-6 9m-4-9h18m-3-3 3 3-3 3"/>',
   shield: '<path d="m12 2 8 4v7c0 5-8 9-8 9S4 18 4 13V6l8-4Z"/><path d="M12 6v11m-4-7h8"/>',
@@ -45,9 +52,9 @@ export function icon(name) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] ?? paths.shield}</svg>`;
 }
 export const unitIcons = {
-  melee: 'sword', archer: 'bow', heavy: 'shield', swordsman: 'sword', crossbow: 'crossbow', knight: 'shield',
-  duelist: 'sword', musketeer: 'musket', cannoneer: 'cannon', commando: 'sword', rifleman: 'rifle', tank: 'tank',
-  blade: 'blade', blaster: 'blaster', warMachine: 'mech',
+  melee: 'club', archer: 'sling', heavy: 'dino', swordsman: 'shield', crossbow: 'bow', knight: 'knight',
+  duelist: 'rapier', musketeer: 'musket', cannoneer: 'cannon', commando: 'bayonet', rifleman: 'rifle', tank: 'tank',
+  blade: 'blade', blaster: 'blaster', warMachine: 'hover',
 };
 export const turretIcons = {
   stone: 'stone', bone: 'spears', firepot: 'fire', ballista: 'crossbow', repeater: 'repeater', bombard: 'cannon',

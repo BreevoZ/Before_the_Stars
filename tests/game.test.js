@@ -1,5 +1,6 @@
 import { RULES, UNITS, AGES, TURRETS, ABILITIES, createGame, getRecruitState, recruit, cancelTraining, getEvolutionState, evolve, getTurretState, buildTurret, getExpansionState, expandTurretSlots, sellTurret, getTurretPosition, getAbilityRadius, getAbilityImpactX, castAbility, updateGame } from '../src/game.js';
 import { createRenderer } from '../src/render.js';
+import { drawUnit } from '../src/units.js';
 
 const tests = [];
 const test = (name, run) => tests.push({ name, run });
@@ -138,7 +139,7 @@ test('Frontline allies keep spacing while melee troops can pass friendly archers
   assert(mixed.units.find(unit => unit.type === 'melee').x > mixed.units[0].x, 'Archer must not block the frontline');
 });
 
-test('Archers shoot from range, with damage applied only when the arrow arrives', () => {
+test('Slingers shoot from range, with damage applied only when the stone arrives', () => {
   const target = soldier('enemy', 660, 'heavy');
   const game = isolatedGame([soldier('player', 500, 'archer'), target]);
   updateGame(game, RULES.fixedStep);
@@ -811,11 +812,11 @@ test('Evolution preserves the existing turret, meteor cooldown and flying projec
   assert(JSON.stringify({ turret: game.turrets.player, meteor: game.ability, cooldown: game.abilityCooldown, shots: game.projectiles }) === state);
 });
 
-test('Crossbow bolts use the new range, damage and impact timing against old troops', () => {
+test('Longbow arrows use medieval range, damage and impact timing against old troops', () => {
   const target = soldier('enemy', 710, 'heavy');
   const game = isolatedGame([soldier('player', 500, 'crossbow'), target]);
   updateGame(game, RULES.fixedStep);
-  assert(game.projectiles[0].kind === 'bolt' && target.hp === UNITS.heavy.health);
+  assert(game.projectiles[0].kind === 'arrow' && target.hp === UNITS.heavy.health);
   advance(game, 0.55);
   assert(target.hp === UNITS.heavy.health - UNITS.crossbow.damage + UNITS.heavy.armor);
   assert(game.units[0].hp === UNITS.crossbow.health);
@@ -933,8 +934,10 @@ test('The futuristic blade pierces armor while gunfire waits for bullet impact',
     updateGame(game, RULES.fixedStep);
     assert(game.projectiles[0].kind === UNITS[type].projectile && target.hp === UNITS.tank.health);
     unit.attackCooldown = 1000;
-    advance(game, 0.4);
-    near(target.hp, UNITS.tank.health - UNITS[type].damage + UNITS.tank.armor);
+    advance(game, 0.65);
+    const stats = UNITS[type];
+    const armor = stats.ignoreArmor ? 0 : Math.max(0, UNITS.tank.armor - (stats.armorPierce ?? 0));
+    near(target.hp, UNITS.tank.health - (stats.damage - armor) * (stats.burst ?? 1), type);
   }
 });
 
@@ -1119,7 +1122,7 @@ test('Browser UI: earn experience, evolve independently, replace cards and short
   for (let i = 0; i < 200 && el('recruit').disabled && el('result').hidden; i++) tick();
   assert(!el('recruit').disabled, 'Second-age recruits must become affordable');
   key('Digit1');
-  assert([...page.querySelectorAll('.queue-name')].some(element => element.textContent === '剑士'));
+  assert([...page.querySelectorAll('.queue-name')].some(element => element.textContent === UNITS.swordsman.name));
   const preview = document.createElement('img');
   preview.id = 'evolution-preview';
   preview.alt = 'Evolved player castle and independently progressing enemy base';
@@ -1256,7 +1259,7 @@ test('Browser UI: help exposes icon details, pauses training/income/cooldowns, b
   el('help').click();
   assert(el('help-dialog').open && el('phase').textContent === '已暂停');
   assert(el('help-roster').querySelectorAll('.help-unit').length === 6 && el('help-roster').textContent.includes('70 生命'));
-  assert(el('recruit').querySelector('.unit-icon svg') && el('recruit').title.includes('近战兵'));
+  assert(el('recruit').querySelector('.unit-icon svg') && el('recruit').title.includes(UNITS.melee.name) && el('recruit').querySelector('.unit-icon canvas'));
   assert(el('expand-turrets').getAttribute('aria-label').includes('100 金币'));
   key('Digit1'); key('KeyE'); key('KeyQ'); key('KeyT'); key('Space');
   tick(150);
@@ -1333,13 +1336,122 @@ test('Renderer supports the three new bases, nine units, nine turrets and three 
   }
 });
 
+// Unit identities have mechanical differences, in addition to their silhouettes.
+test('Dinosaur bite cleaves one nearby enemy, never a third target or a friendly unit', () => {
+  for (const team of ['player', 'enemy']) {
+    const other = team === 'player' ? 'enemy' : 'player', direction = team === 'player' ? 1 : -1;
+    const dino = soldier(team, 640, 'heavy');
+    const victims = [60, 85, 110].map(offset => soldier(other, 640 + direction * offset, 'melee', 200));
+    const ally = soldier(team, 640 + direction * 80, 'archer');
+    const game = isolatedGame([dino, ...victims, ally]);
+    game.units.forEach(unit => unit.attackCooldown = 1000); dino.attackCooldown = 0;
+    updateGame(game, RULES.fixedStep);
+    near(victims[0].hp, 174); near(victims[1].hp, 188.3);
+    near(victims[2].hp, 200); near(ally.hp, UNITS.archer.health);
+  }
+});
+
+test('Mounted knight earns one charge from actual movement and consumes it on the first hit', () => {
+  const knight = soldier('player', 300, 'knight');
+  const target = soldier('enemy', 700, 'melee', 1000); target.attackCooldown = 1000;
+  const game = isolatedGame([knight, target]);
+  for (let i = 0; i < 360 && target.hp === 1000; i++) { target.x = 700; updateGame(game, RULES.fixedStep); }
+  near(target.hp, 926, 'First hit includes the 32-point charge');
+  assert(knight.lastAttackCharged && knight.distanceTravelled >= 80 && knight.chargeTravel === 0);
+  knight.attackCooldown = 0; updateGame(game, RULES.fixedStep);
+  near(target.hp, 884, 'A stationary second hit has no charge bonus');
+  assert(!knight.lastAttackCharged);
+});
+
+test('Large mounts need their full footprint at the spawn point and in the friendly queue', () => {
+  const knight = soldier('player', 210, 'knight');
+  const blocker = soldier('enemy', 300, 'heavy', 10000);
+  const game = isolatedGame([knight, blocker]);
+  game.units.forEach(unit => unit.attackCooldown = 1000); evolveTo(game, 2);
+  assert(recruit(game, 'knight')); advance(game, 5);
+  assert(game.queues.player.length === 1 && game.queues.player[0].remaining === 0);
+  knight.x = 230; updateGame(game, RULES.fixedStep);
+  assert(game.queues.player.length === 0);
+  const newcomer = game.units.find(unit => unit.team === 'player' && unit !== knight);
+  assert(knight.x - newcomer.x >= UNITS.knight.footprint * 2);
+});
+
+test('Shield stops ordinary direct projectiles; armor-piercing musket and area cannon bypass it', () => {
+  for (const [type, expected] of [['archer', 9.1], ['musketeer', 60], ['cannoneer', 94]]) {
+    const attacker = soldier('player', 500, type), defender = soldier('enemy', 660, 'swordsman', 500);
+    defender.attackCooldown = 1000;
+    const game = isolatedGame([attacker, defender]);
+    updateGame(game, RULES.fixedStep); attacker.attackCooldown = 1000;
+    for (let i = 0; i < 100 && defender.hp === 500; i++) updateGame(game, RULES.fixedStep);
+    near(defender.hp, 500 - expected, type);
+    if (type === 'archer') assert(defender.guardFlash > 0);
+    else assert(!defender.guardFlash);
+  }
+});
+
+test('Rapier and plasma penetrate different armor amounts while the light blade ignores all armor', () => {
+  for (const [type, expected] of [['duelist', 18], ['blaster', 79], ['blade', 90]]) {
+    const attacker = soldier('player', 500, type), target = soldier('enemy', 545, 'tank');
+    target.attackCooldown = 1000;
+    const game = isolatedGame([attacker, target]);
+    updateGame(game, RULES.fixedStep); attacker.attackCooldown = 1000;
+    advance(game, 0.3);
+    near(target.hp, UNITS.tank.health - expected, type);
+  }
+});
+
+test('Rifleman fires three timed bullets, preserves an in-progress burst through evolution and then reloads', () => {
+  const gunner = soldier('player', 500, 'rifleman'), target = soldier('enemy', 760, 'tank');
+  target.attackCooldown = 1000;
+  const game = isolatedGame([gunner, target]); evolveTo(game, 4);
+  updateGame(game, RULES.fixedStep);
+  assert(game.projectiles.length === 1 && gunner.burstRemaining === 2 && target.hp === UNITS.tank.health);
+  advance(game, 0.13);
+  assert(game.projectiles.length === 2 && gunner.burstRemaining === 1);
+  evolveTo(game, 5); advance(game, 0.65);
+  near(target.hp, UNITS.tank.health - 48);
+  assert(gunner.type === 'rifleman' && gunner.burstRemaining === 0 && game.projectiles.length === 0 && gunner.attackCooldown > 0);
+});
+
+test('A burst cancels when its target dies or leaves range without transferring its remaining bullets', () => {
+  for (const remove of [true, false]) {
+    const gunner = soldier('player', 500, 'rifleman'), target = soldier('enemy', 750, 'tank');
+    target.attackCooldown = 1000;
+    const game = isolatedGame([gunner, target]); updateGame(game, RULES.fixedStep);
+    if (remove) game.units = [gunner]; else target.x = 1100;
+    const newcomer = soldier('enemy', 700, 'tank'); newcomer.attackCooldown = 1000; game.units.push(newcomer);
+    advance(game, 0.6);
+    assert(gunner.burstRemaining === 0 && newcomer.hp === UNITS.tank.health);
+    assert(game.projectiles.length === 0);
+  }
+});
+
+test('All fifteen articulated models render distinctly, animate, and respect reduced motion', () => {
+  const canvas = document.createElement('canvas'); canvas.width = 480; canvas.height = 230;
+  const ctx = canvas.getContext('2d'), silhouettes = new Set();
+  for (const type of Object.keys(UNITS)) {
+    const unit = soldier('player', 210, type);
+    const paint = (time, reduced = false) => {
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, 480, 230); ctx.translate(0, 210);
+      drawUnit(ctx, unit, time, 1.4, reduced); return canvas.toDataURL();
+    };
+    const idle = paint(0); silhouettes.add(idle);
+    unit.moving = true;
+    const walking = paint(0.4); assert(walking !== paint(0.55), `${type}: movement must animate`);
+    assert(paint(0.4, true) === paint(0.55, true), `${type}: reduced motion must be static`);
+    unit.moving = false; unit.attackAnimation = UNITS[type].attackDuration;
+    assert(paint(0) !== idle, `${type}: attack must have its own pose`);
+  }
+  assert(silhouettes.size === 15, 'Each unit needs its own silhouette');
+});
+
 let failures = 0;
 for (const { name, run } of tests) {
   const item = document.createElement('li');
   try {
     await run(); item.className = 'pass'; item.textContent = `PASS — ${name}`;
   } catch (error) {
-    failures++; item.className = 'fail'; item.textContent = `FAIL — ${name}: ${error.message}`;
+    failures++; item.dataset.stack = error.stack; item.className = 'fail'; item.textContent = `FAIL — ${name}: ${error.message}`;
   }
   document.getElementById('results').append(item);
 }

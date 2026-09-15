@@ -1,5 +1,6 @@
 import { RULES, UNITS, AGES, TURRETS, ABILITIES, createGame, getRecruitState, recruit, cancelTraining, getEvolutionState, evolve, getTurretState, buildTurret, getExpansionState, expandTurretSlots, sellTurret, castAbility, updateGame } from './game.js';
 import { createRenderer } from './render.js';
+import { drawUnit } from './units.js';
 import { icon, unitIcons, turretIcons, abilityIcons } from './icons.js';
 
 const byId = id => document.getElementById(id);
@@ -70,7 +71,6 @@ function syncRoster() {
   if (displayedAge === game.ages.player) return;
   displayedAge = game.ages.player;
   const age = AGES[displayedAge];
-  const roles = { melee: '近身推进', archer: '远程支援', heavy: '高生命 · 护甲' };
   document.body.dataset.age = String(displayedAge);
   cards.forEach((card, index) => {
     const type = age.units[index];
@@ -79,10 +79,18 @@ function syncRoster() {
     card.dataset.age = String(displayedAge);
     card.querySelector('strong').textContent = stats.name;
     setIcon(card.querySelector('.unit-icon'), unitIcons[type]);
-    card.querySelector('.unit-role').textContent = stats.baseRange ? `攻城射程 ${stats.baseRange} · 范围` : stats.splash ? '重装 · 范围炮击' : stats.ignoreArmor ? '近战 · 无视护甲' : roles[stats.role];
+    const holder = card.querySelector('.unit-icon');
+    const portrait = holder.querySelector('canvas') ?? document.createElement('canvas');
+    portrait.width = 240; portrait.height = 160;
+    portrait.setAttribute('aria-hidden', 'true');
+    holder.append(portrait);
+    const context = portrait.getContext('2d');
+    context.scale(2, 2); context.translate(0, 77);
+    drawUnit(context, { id: index, team: 'player', type, x: 43, hp: stats.health, moving: false, attackAnimation: 0 }, 0, stats.footprint ? 0.66 : 0.9, true);
+    card.querySelector('.unit-role').textContent = stats.description;
     card.querySelector('[data-cost]').textContent = stats.cost;
     card.querySelector('[data-training]').textContent = `${stats.trainTime}s`;
-    card.dataset.description = `${stats.name} · ${stats.cost} 金币 · ${stats.trainTime} 秒训练\n${stats.health} 生命 / ${stats.damage} 攻击 / ${stats.armor} 护甲 / ${stats.range} 对兵射程${stats.baseRange ? ` / ${stats.baseRange} 攻城射程` : ''}\n${card.querySelector('.unit-role').textContent}`;
+    card.dataset.description = `${stats.name} · ${stats.cost} 金币 · ${stats.trainTime} 秒训练\n${stats.health} 生命 / ${stats.damage}${stats.burst ? ` × ${stats.burst}` : ''} 攻击 / ${stats.attackInterval} 秒间隔 / ${stats.armor} 护甲 / ${stats.range} 对兵射程${stats.baseRange ? ` / ${stats.baseRange} 攻城射程` : ''}\n${stats.description}`;
     card.setAttribute('aria-label', `训练${stats.name}，${stats.cost} 金币，耗时 ${stats.trainTime} 秒`);
   });
   setText('roster-age', `${age.numeral} · ${age.name}`);

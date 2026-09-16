@@ -1,3 +1,4 @@
+import { drawTurret } from './turrets.js';
 import { RULES, UNITS, AGES, ABILITIES, getTurretPosition, getAbilityRadius, getAbilityImpactX } from './game.js';
 import { drawUnit } from './units.js';
 
@@ -253,9 +254,8 @@ function drawBase(ctx, base, age, time, scale) {
   ctx.restore();
 }
 
-function drawDefenses(ctx, game, team, scale) {
+function drawDefenses(ctx, game, team, scale, reducedMotion) {
   const colors = PALETTES[team];
-  const direction = team === 'player' ? 1 : -1;
   // Put the expanded platform supports behind every weapon, including the lower row.
   for (let slot = 2; slot < game.turrets[team].length; slot++) {
     const { x, y } = getTurretPosition(game, team, slot);
@@ -274,78 +274,7 @@ function drawDefenses(ctx, game, team, scale) {
       ctx.restore();
       continue;
     }
-    ctx.scale(direction, 1);
-    ctx.fillStyle = '#66543a'; ctx.fillRect(-10, -10, 20, 9);
-    if (turret.type === 'stone') {
-      line(ctx, [[-11, -2], [-4, -27], [10, -2]], '#b29870', 4);
-      line(ctx, [[-4, -18], [15, -23]], '#d4c09a', 4);
-      ctx.fillStyle = '#b6baa5'; ctx.beginPath(); ctx.arc(14, -24, 6, 0, Math.PI * 2); ctx.fill();
-    } else if (turret.type === 'bone') {
-      for (let i = 0; i < 3; i++) {
-        line(ctx, [[-10, -9 - i * 5], [20, -14 - i * 5]], '#d9c9a2', 3);
-        polygon(ctx, [[20, -17 - i * 5], [27, -15 - i * 5], [20, -12 - i * 5]], '#eee3bb');
-      }
-    } else if (turret.type === 'firepot') {
-      polygon(ctx, [[-14, -24], [12, -24], [17, -10], [10, -3], [-10, -3], [-17, -10]], '#b67747');
-      ctx.fillStyle = '#e9b35f'; ctx.fillRect(-10, -27, 19, 5);
-      polygon(ctx, [[-7, -26], [-4, -38], [0, -31], [7, -37], [9, -25]], '#f1cf83');
-    } else if (turret.type === 'ballista') {
-      line(ctx, [[-15, -16], [26, -16]], '#c5b084', 5);
-      line(ctx, [[6, -31], [19, -16], [6, -2]], colors.light, 4);
-      line(ctx, [[6, -31], [-6, -16], [6, -2]], '#ece0b5', 1);
-      line(ctx, [[-10, -17], [32, -17]], '#e1c794', 2);
-    } else if (turret.type === 'repeater') {
-      ctx.fillStyle = '#768b7f'; ctx.fillRect(-14, -24, 27, 19);
-      for (let i = 0; i < 3; i++) line(ctx, [[-2, -22 + i * 6], [26, -22 + i * 6]], '#cbd3bc', 3);
-      ctx.fillStyle = '#b59969'; ctx.fillRect(-8, -30, 13, 6);
-    } else if (turret.type === 'bombard') {
-      ctx.fillStyle = '#819486'; ctx.fillRect(-15, -23, 40, 15);
-      ctx.fillStyle = '#273c32'; ctx.fillRect(20, -24, 7, 17);
-      for (const x of [-10, 12]) { ctx.fillStyle = '#bdc1a9'; ctx.beginPath(); ctx.arc(x, -4, 6, 0, Math.PI * 2); ctx.fill(); }
-    } else if (turret.type === 'smallCannon') {
-      line(ctx, [[-13, -14], [27, -19]], '#c4ac71', 10);
-      line(ctx, [[23, -23], [24, -15]], '#493f32', 4);
-      for (const x of [-10, 10]) { ctx.fillStyle = '#b29b6b'; ctx.beginPath(); ctx.arc(x, -5, 7, 0, Math.PI * 2); ctx.fill(); }
-    } else if (turret.type === 'organGun') {
-      polygon(ctx, [[-16, -6], [-12, -27], [19, -27], [23, -7]], '#715c40');
-      for (let i = 0; i < 4; i++) line(ctx, [[-8, -8 - i * 6], [27, -10 - i * 6]], '#d0b17a', 3);
-    } else if (turret.type === 'mortar') {
-      line(ctx, [[-12, -2], [-8, -16], [12, -2]], '#b09c73', 4);
-      line(ctx, [[-7, -10], [13, -32]], '#9da698', 14);
-      line(ctx, [[7, -37], [19, -27]], '#3b4339', 4);
-    } else if (turret.type === 'machineGun') {
-      polygon(ctx, [[-13, -4], [-10, -22], [12, -22], [17, -4]], '#617b6c');
-      line(ctx, [[4, -20], [30, -20]], '#bbc4af', 5);
-      ctx.fillStyle = '#c2ad71'; ctx.fillRect(-14, -19, 7, 13);
-      for (let x = 15; x < 27; x += 4) line(ctx, [[x, -23], [x, -18]], '#445b50', 2);
-    } else if (turret.type === 'doubleCannon') {
-      ctx.fillStyle = '#749188'; ctx.fillRect(-17, -23, 26, 18);
-      for (const y of [-24, -12]) line(ctx, [[0, y], [31, y]], '#a5b7aa', 6);
-    } else if (turret.type === 'rocket') {
-      line(ctx, [[-9, -2], [2, -18]], '#70867d', 7);
-      ctx.save(); ctx.translate(0, -22); ctx.rotate(-0.5);
-      ctx.fillStyle = '#586e60'; ctx.fillRect(-15, -12, 37, 22);
-      for (const y of [-7, 4]) {
-        line(ctx, [[-11, y], [25, y]], '#c4c9aa', 5);
-        polygon(ctx, [[25, y - 4], [32, y], [25, y + 4]], '#e7b274');
-      }
-      ctx.restore();
-    } else if (turret.type === 'titanium') {
-      polygon(ctx, [[-17, -2], [-12, -24], [10, -28], [18, -7]], '#8faeab');
-      for (const y of [-23, -15]) line(ctx, [[0, y], [29, y]], '#b4ddce', 4);
-      ctx.fillStyle = '#75e1d7'; ctx.fillRect(-7, -20, 6, 11);
-    } else if (turret.type === 'laser') {
-      polygon(ctx, [[-15, -4], [-10, -22], [9, -26], [17, -5]], '#688c93');
-      line(ctx, [[-5, -21], [27, -21]], '#a5c4c0', 9);
-      line(ctx, [[-1, -21], [29, -21]], '#b6fff1', 3);
-      ctx.strokeStyle = '#76d8cf'; ctx.lineWidth = 2; ctx.strokeRect(10, -29, 8, 16);
-    } else if (turret.type === 'ion') {
-      polygon(ctx, [[-16, -3], [-18, -19], [-7, -33], [10, -32], [21, -18], [16, -3]], '#577a89');
-      ctx.strokeStyle = '#a6d2cd'; ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.arc(1, -20, 12, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = '#a0ffe7'; ctx.beginPath(); ctx.arc(1, -20, 6, 0, Math.PI * 2); ctx.fill();
-    }
-    if (turret.flash > 0) polygon(ctx, [[25, -23], [40, -17], [25, -10]], '#ffdfa0');
+    drawTurret(ctx, turret, game.elapsed, 1, reducedMotion);
     ctx.restore();
   }
 }
@@ -365,14 +294,37 @@ function drawTarget(ctx, x, radius, opacity = 1) {
   ctx.restore();
 }
 
+function drawFields(ctx, game, time, scale, reducedMotion) {
+  for (const field of game.fields ?? []) {
+    ctx.save(); ctx.translate(field.x, 0);
+    ctx.globalAlpha = Math.min(0.7, field.remaining / 0.5);
+    ctx.fillStyle = field.kind === 'oil' ? '#766345' : '#997144';
+    ctx.beginPath(); ctx.ellipse(0, -2, field.radius, 3 * scale, 0, 0, Math.PI * 2); ctx.fill();
+    for (let i = 0; i < 7; i++) {
+      const x = (i / 6 - 0.5) * field.radius * 1.7;
+      const lift = reducedMotion ? 7 : 6 + Math.sin(time * 6 + i * 2) * 3;
+      polygon(ctx, [[x - 3, -3], [x + 1, -lift * scale], [x + 3, -3]], field.kind === 'oil' ? '#b49a65' : '#d2b379');
+    }
+    ctx.restore();
+  }
+}
+
 function drawProjectile(ctx, shot, scale) {
   const progress = Math.max(0, Math.min(1, 1 - shot.remaining / shot.duration));
-  const fromX = shot.fromUnitX === undefined ? shot.fromX : shot.fromUnitX + (shot.fromX - shot.fromUnitX) * scale;
+  const origin = shot.fromUnitX ?? shot.fromTurretX;
+  const fromX = origin === undefined ? shot.fromX : origin + (shot.fromX - origin) * scale;
   const x = fromX + (shot.toX - fromX) * progress;
-  const cannon = ['sling', 'cannon', 'stone', 'firepot', 'shell', 'plasma-orb'].includes(shot.kind);
+  const cannon = ['sling', 'cannon', 'stone', 'boulder', 'fireball', 'egg', 'oil', 'shell', 'plasma-orb'].includes(shot.kind);
   const fromY = shot.fromY * scale;
-  const y = fromY * (1 - progress) + (shot.toY ?? -30) * scale * progress - Math.sin(progress * Math.PI) * (shot.kind === 'sling' ? 65 : cannon ? 45 : shot.kind === 'bullet' ? 0 : 18);
-  if (['plasma', 'plasma-orb', 'laser'].includes(shot.kind)) {
+  const y = fromY * (1 - progress) + (shot.toY ?? -30) * scale * progress - Math.sin(progress * Math.PI) * (shot.arc ?? (shot.kind === 'sling' ? 65 : cannon ? 45 : shot.kind === 'bullet' ? 0 : 18));
+  if (['laser', 'ion'].includes(shot.kind)) {
+    ctx.save(); ctx.globalAlpha = 0.4 + (1 - progress) * 0.5;
+    line(ctx, [[fromX, fromY], [shot.toX, (shot.toY ?? -30) * scale]], shot.team === 'player' ? '#b0d5bd' : '#ddbd94', shot.kind === 'ion' ? 4 : 1.5);
+    ctx.restore();
+  } else if (shot.kind === 'rail') {
+    const facing = shot.toX > fromX ? 1 : -1;
+    line(ctx, [[x - 19 * facing, y], [x + 4 * facing, y]], '#becbb4', 2);
+  } else if (['plasma', 'plasma-orb'].includes(shot.kind)) {
     const color = shot.team === 'player' ? '#a2fff0' : '#ffd0a1';
     const facing = shot.toX > shot.fromX ? 1 : -1;
     line(ctx, [[x - (shot.kind === 'laser' ? 34 : 15) * facing, y], [x, y]], color, shot.kind === 'plasma-orb' ? 9 : 3);
@@ -386,8 +338,9 @@ function drawProjectile(ctx, shot, scale) {
     const facing = shot.toX > shot.fromX ? 1 : -1;
     line(ctx, [[x - 9 * facing, y], [x + 3 * facing, y]], '#f1d9a1', 2);
   } else if (cannon) {
-    ctx.fillStyle = shot.kind === 'firepot' ? '#eea353' : ['sling', 'stone'].includes(shot.kind) ? '#b9bea7' : '#e8c783';
-    ctx.beginPath(); ctx.arc(x, y, (shot.kind === 'sling' ? 3.5 : 5) * scale, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = ['fireball', 'oil'].includes(shot.kind) ? '#d1aa68' : ['sling', 'stone', 'boulder'].includes(shot.kind) ? '#aeb59f' : shot.kind === 'egg' ? '#d0c5a7' : '#b29f78';
+    ctx.beginPath(); ctx.ellipse(x, y, (['sling', 'egg', 'oil'].includes(shot.kind) ? 3 : 5) * scale, (shot.kind === 'egg' ? 4 : shot.kind === 'oil' ? 6 : 5) * scale, 0, 0, Math.PI * 2); ctx.fill();
+    if (shot.kind === 'fireball') polygon(ctx, [[x - 4, y], [x - 10, y - 13], [x + 3, y - 4]], '#dabb79');
   } else {
     const facing = shot.toX > shot.fromX ? 1 : -1;
     line(ctx, [[x - (shot.kind === 'bolt' ? 9 : 13) * facing, y], [x + 4 * facing, y]], shot.kind === 'bolt' ? '#e5cb91' : PALETTES[shot.team].light, shot.kind === 'bolt' ? 3 : 2);
@@ -422,8 +375,9 @@ export function createRenderer(canvas) {
     ctx.translate(0, ground);
     drawBase(ctx, game.bases.player, game.ages.player, time, entityScale);
     drawBase(ctx, game.bases.enemy, game.ages.enemy, time, entityScale);
-    drawDefenses(ctx, game, 'player', entityScale);
-    drawDefenses(ctx, game, 'enemy', entityScale);
+    drawDefenses(ctx, game, 'player', entityScale, reducedMotion.matches);
+    drawDefenses(ctx, game, 'enemy', entityScale, reducedMotion.matches);
+    drawFields(ctx, game, time, entityScale, reducedMotion.matches);
     // Draw the ranged rank behind the frontline, including when allies pass each other.
     for (const lane of ['back', 'front']) {
       for (const unit of game.units) if (UNITS[unit.type].lane === lane) drawUnit(ctx, unit, game.elapsed, entityScale, reducedMotion.matches);
@@ -481,6 +435,10 @@ export function createRenderer(canvas) {
     if (!reducedMotion.matches) {
       for (const effect of game.effects) {
         ctx.globalAlpha = effect.life / effect.duration;
+        if (effect.kind === 'pierce') {
+          line(ctx, [[effect.x, effect.y * entityScale], [effect.toX, effect.y * entityScale]], PALETTES[effect.team].light, 2);
+          continue;
+        }
         if (effect.kind === 'evolve') {
           const radius = 70 + (1 - effect.life / effect.duration) * 60;
           ctx.strokeStyle = PALETTES[effect.team].flag;

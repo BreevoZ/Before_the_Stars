@@ -1,5 +1,8 @@
 // Small code-native icons keep controls crisp at any display density.
 const paths = {
+  egg: '<path d="M7 15c0-4 3-9 5-9s5 5 5 9a5 5 0 0 1-10 0ZM3 21h18M4 8l4 5M17 5l3 3"/>',
+  catapult: '<path d="M3 21h18M6 20l6-14 6 14M7 5l10 12M3 3h7l-2 4H5M11 15h5"/>',
+  oil: '<path d="M3 21V4h18v17M7 7h10l-1 8H8L7 7Zm3 0V4h4v3m-2 11v3"/>',
   club: '<path d="m5 21 6-10m-3-1 2-6 5-2 5 4-1 5-5 3-6-4Zm4-3 3-1"/>',
   sling: '<path d="M11 22v-9L4 4m7 9 8-9M4 4l7 5 8-5M11 9v4"/><circle cx="11" cy="9" r="2"/>',
   dino: '<path d="M2 15 7 13h6l2-8h5l3 4v3h-6l-2 6H8l-6-3Zm6 2-1 5m7-5 2 5m2-14h1M9 12V7m-2 2h6"/><circle cx="9" cy="4" r="2"/>',
@@ -57,8 +60,8 @@ export const unitIcons = {
   blade: 'blade', blaster: 'blaster', warMachine: 'hover',
 };
 export const turretIcons = {
-  stone: 'stone', bone: 'spears', firepot: 'fire', ballista: 'crossbow', repeater: 'repeater', bombard: 'cannon',
-  smallCannon: 'cannon', organGun: 'repeater', mortar: 'mortar', machineGun: 'turret', doubleCannon: 'double', rocket: 'rocket',
+  rockSling: 'sling', egg: 'egg', primitiveCatapult: 'catapult', catapult: 'catapult', fireCatapult: 'fire', oil: 'oil',
+  smallCannon: 'cannon', largeCannon: 'cannon', explosiveCannon: 'mortar', singleTurret: 'turret', doubleTurret: 'double', rocket: 'rocket',
   titanium: 'blaster', laser: 'laser', ion: 'ion',
 };
 export const abilityIcons = { meteor: 'meteor', volley: 'volley', renewal: 'heal', airstrike: 'plane', orbital: 'orbital' };

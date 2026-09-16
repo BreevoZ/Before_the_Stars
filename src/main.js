@@ -1,6 +1,7 @@
 import { RULES, UNITS, AGES, TURRETS, ABILITIES, createGame, getRecruitState, recruit, cancelTraining, getEvolutionState, evolve, getTurretState, buildTurret, getExpansionState, expandTurretSlots, sellTurret, castAbility, updateGame } from './game.js';
 import { createRenderer } from './render.js';
 import { drawUnit } from './units.js';
+import { drawTurret } from './turrets.js';
 import { icon, unitIcons, turretIcons, abilityIcons } from './icons.js';
 
 const byId = id => document.getElementById(id);
@@ -100,9 +101,14 @@ function syncRoster() {
     card.dataset.turret = type;
     card.querySelector('strong').textContent = stats.name;
     setIcon(card.querySelector('.turret-icon'), turretIcons[type]);
+    const holder = card.querySelector('.turret-icon');
+    const portrait = holder.querySelector('canvas') ?? document.createElement('canvas');
+    portrait.width = 240; portrait.height = 160; portrait.setAttribute('aria-hidden', 'true'); holder.append(portrait);
+    const context = portrait.getContext('2d'); context.scale(2, 2); context.translate(54, 70);
+    drawTurret(context, { type, team: 'player', cooldown: 0 }, 0, 1.15, true);
     card.querySelector('[data-turret-role]').textContent = stats.description;
     card.querySelector('[data-turret-cost]').textContent = stats.cost;
-    card.dataset.description = `${stats.name} · ${stats.cost} 金币\n${stats.damage} 攻击 / ${stats.interval} 秒间隔 / ${stats.range} 射程${stats.splash ? ` / ${stats.splash} 爆炸半径` : ''}\n${stats.description}`;
+    card.dataset.description = `${stats.name} · ${stats.cost} 金币\n${stats.damage}${stats.burst ? ` × ${stats.burst}` : ''} 攻击 / ${stats.interval} 秒间隔 / ${stats.range} 射程${stats.splash ? ` / ${stats.splash} 爆炸半径` : ''}${stats.chargeTime ? ` / ${stats.chargeTime} 秒充能` : ''}\n${stats.description}`;
     card.setAttribute('aria-label', `建造${stats.name}，${stats.cost} 金币，${stats.description}`);
   });
   const ability = ABILITIES[age.ability];

@@ -29,21 +29,21 @@ export const RULES = Object.freeze({
 });
 
 export const TURRETS = Object.freeze({
-  stone: Object.freeze({ name: '投石塔', age: 1, cost: 120, damage: 24, interval: 1.5, range: 290, projectile: 'stone', splash: 0, description: '单发重击' }),
-  bone: Object.freeze({ name: '骨矛塔', age: 1, cost: 100, damage: 12, interval: 0.65, range: 245, projectile: 'bone', splash: 0, description: '近程速射' }),
-  firepot: Object.freeze({ name: '火陶塔', age: 1, cost: 160, damage: 22, interval: 2.4, range: 260, projectile: 'firepot', splash: 65, description: '范围爆炸' }),
-  ballista: Object.freeze({ name: '重弩塔', age: 2, cost: 190, damage: 48, interval: 1.6, range: 350, projectile: 'ballista', splash: 0, ignoreArmor: true, description: '远程穿甲' }),
-  repeater: Object.freeze({ name: '连弩塔', age: 2, cost: 170, damage: 18, interval: 0.55, range: 290, projectile: 'bolt', splash: 0, description: '密集速射' }),
-  bombard: Object.freeze({ name: '轰击炮塔', age: 2, cost: 240, damage: 55, interval: 2.6, range: 325, projectile: 'cannon', splash: 90, description: '重型范围炮击' }),
-  smallCannon: Object.freeze({ name: '轻型加农炮', age: 3, cost: 260, damage: 70, interval: 1.2, range: 350, projectile: 'cannon', splash: 0, description: '精准直射' }),
-  organGun: Object.freeze({ name: '风琴炮', age: 3, cost: 300, damage: 30, interval: 0.38, range: 310, projectile: 'bullet', splash: 0, description: '多管速射' }),
-  mortar: Object.freeze({ name: '爆破迫击炮', age: 3, cost: 380, damage: 110, interval: 2.5, range: 370, projectile: 'shell', splash: 100, description: '大范围爆破' }),
-  machineGun: Object.freeze({ name: '重机枪塔', age: 4, cost: 420, damage: 38, interval: 0.25, range: 340, projectile: 'bullet', splash: 0, description: '持续火力' }),
-  doubleCannon: Object.freeze({ name: '双联炮塔', age: 4, cost: 520, damage: 130, interval: 1.1, range: 390, projectile: 'shell', splash: 0, ignoreArmor: true, description: '重型穿甲' }),
-  rocket: Object.freeze({ name: '火箭发射塔', age: 4, cost: 640, damage: 180, interval: 2.3, range: 400, projectile: 'rocket', splash: 110, description: '范围轰炸' }),
-  titanium: Object.freeze({ name: '钛金速射塔', age: 5, cost: 720, damage: 65, interval: 0.22, range: 370, projectile: 'plasma', splash: 0, description: '高速能量弹' }),
-  laser: Object.freeze({ name: '激光炮塔', age: 5, cost: 900, damage: 170, interval: 0.85, range: 430, projectile: 'laser', splash: 0, ignoreArmor: true, description: '远程穿甲光束' }),
-  ion: Object.freeze({ name: '离子炮塔', age: 5, cost: 1200, damage: 310, interval: 2.2, range: 450, projectile: 'plasma-orb', splash: 130, description: '离子范围爆发' }),
+  rockSling: Object.freeze({ name: '弹石器', age: 1, cost: 120, damage: 24, interval: 1.5, range: 290, projectile: 'stone', arc: 48, muzzleX: 16, muzzleY: -29, description: '弹力抛石 · 低成本单体防御' }),
+  egg: Object.freeze({ name: '自动蛋塔', age: 1, cost: 150, damage: 9, interval: 0.36, range: 245, projectile: 'egg', arc: 16, muzzleX: 22, muzzleY: -25, description: '快速抛蛋 · 压制轻装，惧怕重甲' }),
+  primitiveCatapult: Object.freeze({ name: '原始投石机', age: 1, cost: 220, damage: 52, interval: 2.6, range: 330, projectile: 'boulder', arc: 85, splash: 35, muzzleX: 11, muzzleY: -37, description: '巨石高抛 · 慢速重击 / 小范围砸击' }),
+  catapult: Object.freeze({ name: '重型投石机', age: 2, cost: 240, damage: 60, interval: 2, range: 350, projectile: 'boulder', arc: 90, splash: 55, muzzleX: 11, muzzleY: -39, description: '配重投掷 · 范围打击密集部队' }),
+  fireCatapult: Object.freeze({ name: '火焰投石机', age: 2, cost: 300, damage: 28, interval: 2.8, range: 330, projectile: 'fireball', arc: 90, splash: 45, field: 'fire', fieldRadius: 55, fieldDuration: 2.4, tickDamage: 6, tickInterval: 0.4, muzzleX: 11, muzzleY: -39, description: '火弹落地燃烧 2.4 秒 · 每 0.4 秒灼烧 6 生命，无视护甲' }),
+  oil: Object.freeze({ name: '沸油锅', age: 2, cost: 260, damage: 16, interval: 3.1, range: 175, projectile: 'oil', arc: 5, splash: 35, ignoreArmor: true, field: 'oil', fieldRadius: 45, fieldDuration: 2.4, tickDamage: 5, tickInterval: 0.4, slow: 0.55, muzzleX: 20, muzzleY: -17, description: '近城倾油 · 油区持续 2.4 秒，移速降至 55%，每 0.4 秒烫伤 5 生命' }),
+  smallCannon: Object.freeze({ name: '轻型加农炮', age: 3, cost: 260, damage: 70, interval: 1.2, range: 350, projectile: 'cannon', arc: 0, armorPierce: 3, aimable: true, muzzleX: 30, muzzleY: -19, description: '直射实心弹 · 忽略 3 点护甲' }),
+  largeCannon: Object.freeze({ name: '重型加农炮', age: 3, cost: 380, damage: 125, interval: 1.8, range: 375, projectile: 'cannon', arc: 0, ignoreArmor: true, aimable: true, muzzleX: 33, muzzleY: -19, description: '长炮管重弹 · 单体完全穿甲' }),
+  explosiveCannon: Object.freeze({ name: '爆破加农炮', age: 3, cost: 480, damage: 100, interval: 2.5, range: 370, projectile: 'shell', arc: 65, splash: 95, muzzleX: 24, muzzleY: -30, description: '榴弹曲射 · 95 范围爆破，清理密集阵线' }),
+  singleTurret: Object.freeze({ name: '单管炮塔', age: 4, cost: 420, damage: 76, interval: 0.65, range: 350, projectile: 'bullet', arc: 0, armorPierce: 4, aimable: true, muzzleX: 31, muzzleY: -22, description: '稳定点射 · 忽略 4 点护甲' }),
+  doubleTurret: Object.freeze({ name: '双管炮塔', age: 4, cost: 560, damage: 62, interval: 1.05, range: 385, projectile: 'bullet', arc: 0, burst: 2, burstInterval: 0.16, aimable: true, muzzleX: 32, muzzleY: -22, barrelGap: 7, description: '双管交替 · 每轮 2 发，间隔 0.16 秒；丢失目标即停射' }),
+  rocket: Object.freeze({ name: '火箭发射塔', age: 4, cost: 640, damage: 160, interval: 2.3, range: 400, projectile: 'rocket', arc: 45, splash: 105, muzzleX: 23, muzzleY: -32, description: '导轨火箭 · 105 范围轰炸' }),
+  titanium: Object.freeze({ name: '钛金射击塔', age: 5, cost: 720, damage: 100, interval: 0.7, range: 380, projectile: 'rail', arc: 0, armorPierce: 10, pierce: 1, pierceFactor: 0.6, pierceDistance: 90, aimable: true, muzzleX: 32, muzzleY: -22, description: '动能贯穿 · 忽略 10 护甲，再贯穿后方 90 距离内 1 人，伤害 60%' }),
+  laser: Object.freeze({ name: '激光炮塔', age: 5, cost: 900, damage: 45, interval: 0.22, range: 430, projectile: 'laser', arc: 0, ignoreArmor: true, aimable: true, muzzleX: 31, muzzleY: -23, description: '高频激光脉冲 · 单体完全穿甲' }),
+  ion: Object.freeze({ name: '离子射线塔', age: 5, cost: 1200, damage: 250, interval: 2.2, chargeTime: 0.65, range: 450, projectile: 'ion', arc: 0, ignoreArmor: true, pierce: 2, pierceFactor: 0.65, pierceDistance: 130, aimable: true, muzzleX: 25, muzzleY: -23, description: '充能 0.65 秒 · 完全穿甲，再贯穿后方 130 距离内 2 人，伤害 65%' }),
 });
 
 export const ABILITIES = Object.freeze({
@@ -55,10 +55,10 @@ export const ABILITIES = Object.freeze({
 });
 
 export const AGES = Object.freeze({
-  1: Object.freeze({ name: '原始时代', shortName: '原始', numeral: 'I', units: Object.freeze(['melee', 'archer', 'heavy']), turrets: Object.freeze(['stone', 'bone', 'firepot']), ability: 'meteor', experienceRequired: 0, baseHealth: RULES.baseHealth, income: 7, turretY: -100, unitIcons: Object.freeze(['⚔', '➶', '⬟']), turretIcons: Object.freeze(['◈', '➶', '♨']) }),
-  2: Object.freeze({ name: '中世纪', shortName: '中世纪', numeral: 'II', units: Object.freeze(['swordsman', 'crossbow', 'knight']), turrets: Object.freeze(['ballista', 'repeater', 'bombard']), ability: 'volley', experienceRequired: 160, baseHealth: 900, income: 10, turretY: -128, unitIcons: Object.freeze(['⚔', '⌁', '♜']), turretIcons: Object.freeze(['⌖', '⋙', '●']) }),
-  3: Object.freeze({ name: '文艺复兴时代', shortName: '文艺复兴', numeral: 'III', units: Object.freeze(['duelist', 'musketeer', 'cannoneer']), turrets: Object.freeze(['smallCannon', 'organGun', 'mortar']), ability: 'renewal', experienceRequired: 480, baseHealth: 1500, income: 16, turretY: -116, unitIcons: Object.freeze(['⚔', '⌐', '◉']), turretIcons: Object.freeze(['●', '⋙', '◒']) }),
-  4: Object.freeze({ name: '现代时代', shortName: '现代', numeral: 'IV', units: Object.freeze(['commando', 'rifleman', 'tank']), turrets: Object.freeze(['machineGun', 'doubleCannon', 'rocket']), ability: 'airstrike', experienceRequired: 1100, baseHealth: 2400, income: 24, turretY: -106, unitIcons: Object.freeze(['⚔', '⌁', '▰']), turretIcons: Object.freeze(['⋙', '═', '➚']) }),
+  1: Object.freeze({ name: '原始时代', shortName: '原始', numeral: 'I', units: Object.freeze(['melee', 'archer', 'heavy']), turrets: Object.freeze(['rockSling', 'egg', 'primitiveCatapult']), ability: 'meteor', experienceRequired: 0, baseHealth: RULES.baseHealth, income: 7, turretY: -100, unitIcons: Object.freeze(['⚔', '➶', '⬟']), turretIcons: Object.freeze(['◈', '➶', '♨']) }),
+  2: Object.freeze({ name: '中世纪', shortName: '中世纪', numeral: 'II', units: Object.freeze(['swordsman', 'crossbow', 'knight']), turrets: Object.freeze(['catapult', 'fireCatapult', 'oil']), ability: 'volley', experienceRequired: 160, baseHealth: 900, income: 10, turretY: -128, unitIcons: Object.freeze(['⚔', '⌁', '♜']), turretIcons: Object.freeze(['⌖', '⋙', '●']) }),
+  3: Object.freeze({ name: '文艺复兴时代', shortName: '文艺复兴', numeral: 'III', units: Object.freeze(['duelist', 'musketeer', 'cannoneer']), turrets: Object.freeze(['smallCannon', 'largeCannon', 'explosiveCannon']), ability: 'renewal', experienceRequired: 480, baseHealth: 1500, income: 16, turretY: -116, unitIcons: Object.freeze(['⚔', '⌐', '◉']), turretIcons: Object.freeze(['●', '⋙', '◒']) }),
+  4: Object.freeze({ name: '现代时代', shortName: '现代', numeral: 'IV', units: Object.freeze(['commando', 'rifleman', 'tank']), turrets: Object.freeze(['singleTurret', 'doubleTurret', 'rocket']), ability: 'airstrike', experienceRequired: 1100, baseHealth: 2400, income: 24, turretY: -106, unitIcons: Object.freeze(['⚔', '⌁', '▰']), turretIcons: Object.freeze(['⋙', '═', '➚']) }),
   5: Object.freeze({ name: '未来时代', shortName: '未来', numeral: 'V', units: Object.freeze(['blade', 'blaster', 'warMachine']), turrets: Object.freeze(['titanium', 'laser', 'ion']), ability: 'orbital', experienceRequired: 2200, baseHealth: 3800, income: 36, turretY: -130, unitIcons: Object.freeze(['ϟ', '⊙', '♜']), turretIcons: Object.freeze(['⊙', 'ϟ', '⊕']) }),
 });
 
@@ -81,7 +81,7 @@ export function createGame() {
     gold: { player: RULES.startingGold, enemy: RULES.startingGold },
     queues: { player: [], enemy: [] },
     turrets: { player: [null], enemy: [null] },
-    units: [], projectiles: [], effects: [],
+    units: [], projectiles: [], effects: [], fields: [],
     ability: null, abilityCooldown: 0,
     nextUnitId: 1, nextOrderId: 1,
     ai: { enabled: true, cooldown: RULES.aiFirstDecision, orders: 0, strategy: 'balanced', waves: 0 },
@@ -157,7 +157,7 @@ export function buildTurret(game, team = 'player', type = null, slot = null) {
   type ??= AGES[game.ages[team]].turrets[0];
   slot ??= game.turrets[team].indexOf(null);
   game.gold[team] = Math.max(0, game.gold[team] - TURRETS[type].cost);
-  game.turrets[team][slot] = { team, type, slot, cooldown: 0, flash: 0 };
+  game.turrets[team][slot] = { team, type, slot, cooldown: 0, flash: 0, shotSerial: 0, aim: 0, burstRemaining: 0, chargeRemaining: 0 };
   return true;
 }
 
@@ -190,6 +190,15 @@ export function getTurretPosition(game, team, slot) {
   const direction = team === 'player' ? 1 : -1;
   return { x: game.bases[team].x + (slot % 2 === 0 ? 30 : -30) * direction,
     y: AGES[game.ages[team]].turretY - Math.floor(slot / 2) * 48 };
+}
+
+// Shared by the simulation, turret models and portrait previews.
+export function getTurretMuzzle(turret, barrel = 0) {
+  const stats = TURRETS[turret.type];
+  const angle = stats.aimable ? turret.aim ?? 0 : 0;
+  const x = stats.muzzleX, y = stats.muzzleY + (barrel ? stats.barrelGap ?? 0 : 0);
+  return { x: x * Math.cos(angle) - (y + 18) * Math.sin(angle),
+    y: -18 + x * Math.sin(angle) + (y + 18) * Math.cos(angle) };
 }
 
 export function getAbilityRadius(type) {
@@ -259,7 +268,10 @@ function updateAI(game, dt) {
   const owned = towers.filter(Boolean).length;
   if (!siegeThreat && game.elapsed > 18 && (invaders.length >= 3 || game.bases.enemy.hp < game.bases.enemy.maxHp * 0.65)) {
     const choices = AGES[game.ages.enemy].turrets;
-    const type = invaders.length >= 3 ? choices[2] : invaders.some(unit => UNITS[unit.type].armor > 0)
+    const type = invaders.length >= 3 ? choices.reduce((best, type) =>
+      (TURRETS[type].splash ?? 0) + (TURRETS[type].fieldRadius ?? 0) + (TURRETS[type].pierce ?? 0) * 40
+      > (TURRETS[best].splash ?? 0) + (TURRETS[best].fieldRadius ?? 0) + (TURRETS[best].pierce ?? 0) * 40 ? type : best)
+      : invaders.some(unit => UNITS[unit.type].armor > 0)
       ? choices.find(type => TURRETS[type].ignoreArmor) ?? choices[0]
       : choices.reduce((fastest, type) => TURRETS[type].interval < TURRETS[fastest].interval ? type : fastest);
     if (towers.includes(null) && buildTurret(game, 'enemy', type)) return;
@@ -302,14 +314,17 @@ function updateAI(game, dt) {
 }
 
 function addProjectile(game, team, kind, x, target, damage, options = {}) {
-  const speed = { sling: 460, arrow: 500, bullet: 900, laser: 1400, plasma: 700, 'plasma-orb': 480, rocket: 500 }[kind] ?? 420;
-  const duration = Math.max(0.12, Math.abs(target.x - x) / speed);
+  const speed = { sling: 460, arrow: 500, bullet: 900, rail: 1150, egg: 650, plasma: 700, 'plasma-orb': 480, rocket: 500 }[kind] ?? 420;
+  const duration = kind === 'laser' ? 0.1 : kind === 'ion' ? 0.16 : Math.max(0.12, Math.abs(target.x - x) / speed);
   game.projectiles.push({
     team, kind, fromX: x, toX: target.x,
-    fromY: options.fromY ?? -36, fromUnitX: options.fromUnitX,
+    fromY: options.fromY ?? -36, fromUnitX: options.fromUnitX, fromTurretX: options.fromTurretX,
     toY: target.type ? -(UNITS[target.type].height ?? 60) * 0.52 - (UNITS[target.type].lane === 'back' ? 7 : 0) : -45,
     targetId: target.id ?? null, targetBase: target.id == null ? target.team : null,
     damage, duration, remaining: duration, splash: options.splash ?? 0, ignoreArmor: options.ignoreArmor ?? false, armorPierce: options.armorPierce ?? 0,
+    arc: options.arc, turretType: options.turretType,
+    pierce: options.pierce ?? 0, pierceFactor: options.pierceFactor, pierceDistance: options.pierceDistance,
+    originX: options.originX ?? x, maxRange: options.maxRange ?? Infinity,
   });
 }
 
@@ -323,16 +338,46 @@ function updateProjectiles(game, dt, hits) {
         // Area shots detonate at their last tracked position even if the target has died.
         for (const victim of game.units) {
           if (victim.team !== shot.team && Math.abs(victim.x - shot.toX) <= shot.splash) {
-            hits.push({ target: victim, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor });
+            hits.push({ target: victim, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce });
           }
         }
         // Siege units can hit a base directly; blast radius never adds extra base damage.
         if (shot.targetBase && target?.hp > 0) hits.push({ target, damage: shot.damage, team: shot.team });
         game.effects.push({ kind: 'blast', x: shot.toX, radius: shot.splash, life: 0.4, duration: 0.4 });
       } else if (target?.hp > 0) hits.push({ target, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce, ranged: true });
+      if (shot.pierce) {
+        const direction = shot.team === 'player' ? 1 : -1;
+        const victims = game.units.filter(unit => unit.team !== shot.team && unit.id !== shot.targetId && unit.hp > 0
+          && (unit.x - shot.toX) * direction > 0 && (unit.x - shot.toX) * direction <= shot.pierceDistance
+          && Math.abs(unit.x - shot.originX) <= shot.maxRange)
+          .sort((a, b) => (a.x - b.x) * direction).slice(0, shot.pierce);
+        for (const victim of victims) hits.push({ target: victim, damage: shot.damage * shot.pierceFactor, team: shot.team,
+          ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce, ranged: true });
+        if (victims.length) game.effects.push({ kind: 'pierce', x: shot.toX, toX: victims.at(-1).x, y: shot.toY, team: shot.team, life: 0.16, duration: 0.16 });
+      }
+      const stats = TURRETS[shot.turretType];
+      if (stats?.field) game.fields.push({ kind: stats.field, team: shot.team, x: shot.toX, radius: stats.fieldRadius,
+        remaining: stats.fieldDuration, duration: stats.fieldDuration, tickCooldown: stats.tickInterval,
+        tickInterval: stats.tickInterval, damage: stats.tickDamage, slow: stats.slow ?? 1 });
     }
   }
   game.projectiles = game.projectiles.filter(shot => shot.remaining > 0);
+}
+
+function updateFields(game, dt, hits) {
+  for (const unit of game.units) unit.moveMultiplier = 1;
+  for (const field of game.fields) {
+    const active = Math.min(dt, field.remaining);
+    const victims = game.units.filter(unit => unit.team !== field.team && Math.abs(unit.x - field.x) <= field.radius);
+    for (const unit of victims) unit.moveMultiplier = Math.min(unit.moveMultiplier, field.slow);
+    field.remaining = Math.max(0, field.remaining - active);
+    field.tickCooldown -= active;
+    while (field.tickCooldown <= EPSILON) {
+      for (const unit of victims) hits.push({ target: unit, damage: field.damage, team: field.team, ignoreArmor: true });
+      field.tickCooldown += field.tickInterval;
+    }
+  }
+  game.fields = game.fields.filter(field => field.remaining > EPSILON);
 }
 
 function updateAbility(game, dt, hits) {
@@ -441,7 +486,7 @@ function updateUnits(game, dt, hits) {
         unit.attackAnimation = stats.attackDuration;
       }
     } else {
-      const step = Math.max(0, Math.min(stats.speed * dt, allySpace,
+      const step = Math.max(0, Math.min(stats.speed * (unit.moveMultiplier ?? 1) * dt, allySpace,
         (enemyDistance - reach) / 2, baseDistance - baseRange));
       unit.x += direction * step;
       unit.moving = step > 0.001;
@@ -456,16 +501,50 @@ function updateTurrets(game, dt) {
     for (const turret of game.turrets[team]) {
       if (!turret) continue;
       const stats = TURRETS[turret.type];
+      turret.aim ??= 0; turret.shotSerial ??= 0;
       turret.cooldown = Math.max(0, turret.cooldown - dt);
       turret.flash = Math.max(0, turret.flash - dt);
-      if (turret.cooldown > 0) continue;
       const { x, y } = getTurretPosition(game, team, turret.slot);
-      const targets = game.units.filter(unit => unit.team !== team && Math.abs(unit.x - x) <= stats.range);
-      targets.sort((a, b) => Math.abs(a.x - x) - Math.abs(b.x - x));
-      if (!targets.length) continue;
-      addProjectile(game, team, stats.projectile, x, targets[0], stats.damage, { fromY: y - 14, splash: stats.splash, ignoreArmor: stats.ignoreArmor });
-      turret.cooldown = stats.interval;
-      turret.flash = 0.16;
+      const valid = unit => unit && unit.hp > 0 && unit.team !== team && Math.abs(unit.x - x) <= stats.range;
+      const lockedId = turret.chargeRemaining > 0 ? turret.chargeTargetId : turret.burstRemaining > 0 ? turret.burstTargetId : null;
+      const target = lockedId !== null ? game.units.find(unit => unit.id === lockedId)
+        : game.units.filter(valid).sort((a, b) => Math.abs(a.x - x) - Math.abs(b.x - x))[0];
+      if (!valid(target)) {
+        turret.burstRemaining = 0; turret.chargeRemaining = 0; turret.chargeTargetId = null;
+        continue;
+      }
+      if (stats.aimable) {
+        const toY = -UNITS[target.type].height * 0.52 - (UNITS[target.type].lane === 'back' ? 7 : 0);
+        const aim = Math.max(-0.2, Math.min(0.55, Math.atan2(toY - y + 18, Math.abs(target.x - x))));
+        turret.aim += (aim - turret.aim) * Math.min(1, dt * 12);
+      }
+      const fire = () => {
+        const barrel = stats.burst ? turret.shotSerial % stats.burst : 0;
+        const muzzle = getTurretMuzzle(turret, barrel);
+        const direction = team === 'player' ? 1 : -1;
+        addProjectile(game, team, stats.projectile, x + muzzle.x * direction, target, stats.damage,
+          { ...stats, fromY: y + muzzle.y, fromTurretX: x, turretType: turret.type, originX: x, maxRange: stats.range });
+        turret.shotSerial++; turret.lastBarrel = barrel;
+        turret.flashDuration = Math.min(0.45, stats.interval * 0.65);
+        turret.flash = turret.flashDuration;
+      };
+      if (turret.burstRemaining > 0) {
+        turret.burstCooldown -= dt;
+        if (turret.burstCooldown <= EPSILON) {
+          fire(); turret.burstRemaining--; turret.burstCooldown += stats.burstInterval;
+        }
+        continue;
+      }
+      if (turret.chargeRemaining > 0) {
+        turret.chargeRemaining = Math.max(0, turret.chargeRemaining - dt);
+        if (turret.chargeRemaining <= EPSILON) { turret.chargeRemaining = 0; fire(); turret.cooldown = stats.interval; }
+        continue;
+      }
+      if (turret.cooldown > EPSILON) continue;
+      if (stats.chargeTime) { turret.chargeRemaining = stats.chargeTime; turret.chargeTargetId = target.id; continue; }
+      fire(); turret.cooldown = stats.interval;
+      turret.burstRemaining = (stats.burst ?? 1) - 1;
+      turret.burstTargetId = target.id; turret.burstCooldown = stats.burstInterval ?? 0;
     }
   }
 }
@@ -509,6 +588,7 @@ export function updateGame(game, dt) {
   updateAI(game, dt);
   for (const team of TEAMS) updateTraining(game, team, dt);
   const hits = [];
+  updateFields(game, dt, hits);
   updateProjectiles(game, dt, hits);
   updateAbility(game, dt, hits);
   updateUnits(game, dt, hits);

@@ -1,3 +1,5 @@
+import { BASE_MOUNTS } from './base-layouts.js';
+
 // Pure simulation. Timings are seconds; positions are in battlefield coordinates.
 export const UNITS = Object.freeze({
   melee: Object.freeze({ name: '棍棒人', age: 1, role: 'melee', cost: 30, trainTime: 1.6, health: 70, damage: 12, armor: 0, speed: 62, range: 32, attackInterval: 0.8, bounty: 10, experience: 20, lane: 'front', description: '廉价前排 · 重棍挥击', attackDuration: 0.42, height: 61 }),
@@ -55,11 +57,11 @@ export const ABILITIES = Object.freeze({
 });
 
 export const AGES = Object.freeze({
-  1: Object.freeze({ name: '原始时代', shortName: '原始', numeral: 'I', units: Object.freeze(['melee', 'archer', 'heavy']), turrets: Object.freeze(['rockSling', 'egg', 'primitiveCatapult']), ability: 'meteor', experienceRequired: 0, baseHealth: RULES.baseHealth, income: 7, turretY: -100, unitIcons: Object.freeze(['⚔', '➶', '⬟']), turretIcons: Object.freeze(['◈', '➶', '♨']) }),
-  2: Object.freeze({ name: '中世纪', shortName: '中世纪', numeral: 'II', units: Object.freeze(['swordsman', 'crossbow', 'knight']), turrets: Object.freeze(['catapult', 'fireCatapult', 'oil']), ability: 'volley', experienceRequired: 160, baseHealth: 900, income: 10, turretY: -128, unitIcons: Object.freeze(['⚔', '⌁', '♜']), turretIcons: Object.freeze(['⌖', '⋙', '●']) }),
-  3: Object.freeze({ name: '文艺复兴时代', shortName: '文艺复兴', numeral: 'III', units: Object.freeze(['duelist', 'musketeer', 'cannoneer']), turrets: Object.freeze(['smallCannon', 'largeCannon', 'explosiveCannon']), ability: 'renewal', experienceRequired: 480, baseHealth: 1500, income: 16, turretY: -116, unitIcons: Object.freeze(['⚔', '⌐', '◉']), turretIcons: Object.freeze(['●', '⋙', '◒']) }),
-  4: Object.freeze({ name: '现代时代', shortName: '现代', numeral: 'IV', units: Object.freeze(['commando', 'rifleman', 'tank']), turrets: Object.freeze(['singleTurret', 'doubleTurret', 'rocket']), ability: 'airstrike', experienceRequired: 1100, baseHealth: 2400, income: 24, turretY: -106, unitIcons: Object.freeze(['⚔', '⌁', '▰']), turretIcons: Object.freeze(['⋙', '═', '➚']) }),
-  5: Object.freeze({ name: '未来时代', shortName: '未来', numeral: 'V', units: Object.freeze(['blade', 'blaster', 'warMachine']), turrets: Object.freeze(['titanium', 'laser', 'ion']), ability: 'orbital', experienceRequired: 2200, baseHealth: 3800, income: 36, turretY: -130, unitIcons: Object.freeze(['ϟ', '⊙', '♜']), turretIcons: Object.freeze(['⊙', 'ϟ', '⊕']) }),
+  1: Object.freeze({ name: '原始时代', shortName: '原始', numeral: 'I', units: Object.freeze(['melee', 'archer', 'heavy']), turrets: Object.freeze(['rockSling', 'egg', 'primitiveCatapult']), ability: 'meteor', experienceRequired: 0, baseHealth: RULES.baseHealth, income: 7, unitIcons: Object.freeze(['⚔', '➶', '⬟']), turretIcons: Object.freeze(['◈', '➶', '♨']) }),
+  2: Object.freeze({ name: '中世纪', shortName: '中世纪', numeral: 'II', units: Object.freeze(['swordsman', 'crossbow', 'knight']), turrets: Object.freeze(['catapult', 'fireCatapult', 'oil']), ability: 'volley', experienceRequired: 160, baseHealth: 900, income: 10, unitIcons: Object.freeze(['⚔', '⌁', '♜']), turretIcons: Object.freeze(['⌖', '⋙', '●']) }),
+  3: Object.freeze({ name: '文艺复兴时代', shortName: '文艺复兴', numeral: 'III', units: Object.freeze(['duelist', 'musketeer', 'cannoneer']), turrets: Object.freeze(['smallCannon', 'largeCannon', 'explosiveCannon']), ability: 'renewal', experienceRequired: 480, baseHealth: 1500, income: 16, unitIcons: Object.freeze(['⚔', '⌐', '◉']), turretIcons: Object.freeze(['●', '⋙', '◒']) }),
+  4: Object.freeze({ name: '现代时代', shortName: '现代', numeral: 'IV', units: Object.freeze(['commando', 'rifleman', 'tank']), turrets: Object.freeze(['singleTurret', 'doubleTurret', 'rocket']), ability: 'airstrike', experienceRequired: 1100, baseHealth: 2400, income: 24, unitIcons: Object.freeze(['⚔', '⌁', '▰']), turretIcons: Object.freeze(['⋙', '═', '➚']) }),
+  5: Object.freeze({ name: '未来时代', shortName: '未来', numeral: 'V', units: Object.freeze(['blade', 'blaster', 'warMachine']), turrets: Object.freeze(['titanium', 'laser', 'ion']), ability: 'orbital', experienceRequired: 2200, baseHealth: 3800, income: 36, unitIcons: Object.freeze(['ϟ', '⊙', '♜']), turretIcons: Object.freeze(['⊙', 'ϟ', '⊕']) }),
 });
 
 const TEAMS = ['player', 'enemy'];
@@ -186,10 +188,10 @@ export function sellTurret(game, slot, team = 'player') {
   return true;
 }
 
-export function getTurretPosition(game, team, slot) {
+export function getTurretPosition(game, team, slot, scale = 1) {
   const direction = team === 'player' ? 1 : -1;
-  return { x: game.bases[team].x + (slot % 2 === 0 ? 30 : -30) * direction,
-    y: AGES[game.ages[team]].turretY - Math.floor(slot / 2) * 48 };
+  const mount = BASE_MOUNTS[game.ages[team]][slot];
+  return { x: game.bases[team].x + mount.x * direction * scale, y: mount.y * scale };
 }
 
 // Shared by the simulation, turret models and portrait previews.
@@ -318,7 +320,7 @@ function addProjectile(game, team, kind, x, target, damage, options = {}) {
   const duration = kind === 'laser' ? 0.1 : kind === 'ion' ? 0.16 : Math.max(0.12, Math.abs(target.x - x) / speed);
   game.projectiles.push({
     team, kind, fromX: x, toX: target.x,
-    fromY: options.fromY ?? -36, fromUnitX: options.fromUnitX, fromTurretX: options.fromTurretX,
+    fromY: options.fromY ?? -36, fromUnitX: options.fromUnitX, fromTurretX: options.fromTurretX, fromBaseX: options.fromBaseX,
     toY: target.type ? -(UNITS[target.type].height ?? 60) * 0.52 - (UNITS[target.type].lane === 'back' ? 7 : 0) : -45,
     targetId: target.id ?? null, targetBase: target.id == null ? target.team : null,
     damage, duration, remaining: duration, splash: options.splash ?? 0, ignoreArmor: options.ignoreArmor ?? false, armorPierce: options.armorPierce ?? 0,
@@ -523,7 +525,7 @@ function updateTurrets(game, dt) {
         const muzzle = getTurretMuzzle(turret, barrel);
         const direction = team === 'player' ? 1 : -1;
         addProjectile(game, team, stats.projectile, x + muzzle.x * direction, target, stats.damage,
-          { ...stats, fromY: y + muzzle.y, fromTurretX: x, turretType: turret.type, originX: x, maxRange: stats.range });
+          { ...stats, fromY: y + muzzle.y, fromTurretX: x, fromBaseX: game.bases[team].x, turretType: turret.type, originX: x, maxRange: stats.range });
         turret.shotSerial++; turret.lastBarrel = barrel;
         turret.flashDuration = Math.min(0.45, stats.interval * 0.65);
         turret.flash = turret.flashDuration;

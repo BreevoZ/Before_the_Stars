@@ -157,7 +157,7 @@ function future(ctx, m, type) {
   ctx.restore();
 }
 
-export function drawTurret(ctx, turret, time = 0, scale = 1, reducedMotion = false) {
+export function drawTurret(ctx, turret, time = 0, scale = 1, reducedMotion = false, mounted = false) {
   const stats = TURRETS[turret.type];
   const kick = reducedMotion ? 0 : Math.max(0, (turret.flash ?? 0) / (turret.flashDuration || 0.45));
   const m = { kick, firing: kick > 0, loaded: !turret.cooldown || turret.cooldown < stats.interval * 0.55,
@@ -167,7 +167,7 @@ export function drawTurret(ctx, turret, time = 0, scale = 1, reducedMotion = fal
     cloth: turret.team === 'player' ? '#7faa91' : '#b48d70', energy: turret.team === 'player' ? '#b0d5bd' : '#ddbd94' };
   ctx.save(); ctx.scale(scale * (turret.team === 'player' ? 1 : -1), scale);
   ctx.lineCap = 'butt'; ctx.lineJoin = 'bevel';
-  polygon(ctx, [[-18, -3], [18, -3], [18, 0], [-18, 0]], M.darkSteel);
+  if (!mounted) polygon(ctx, [[-18, -3], [18, -3], [18, 0], [-18, 0]], M.darkSteel);
   switch (turret.type) {
     case 'rockSling': sling(ctx, m); break;
     case 'egg': eggTower(ctx, m); break;

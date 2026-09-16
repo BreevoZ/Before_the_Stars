@@ -2,6 +2,7 @@ import { RULES, UNITS, AGES, TURRETS, ABILITIES, createGame, getRecruitState, re
 import { createRenderer } from '../src/render.js';
 import { drawUnit } from '../src/units.js';
 import { drawTurret } from '../src/turrets.js';
+import { drawBase } from '../src/bases.js';
 
 const tests = [];
 const test = (name, run) => tests.push({ name, run });
@@ -248,6 +249,73 @@ test('All fifteen towers emit their own projectile and apply documented direct d
     const armor = stats.ignoreArmor ? 0 : Math.max(0, UNITS.knight.armor - (stats.armorPierce ?? 0));
     near(target.hp, 5000 - Math.max(1, stats.damage - armor), type);
   }
+});
+
+test('All era sockets mirror across teams, stay fixed through expansion and preserve sold extensions', () => {
+  for (let age = 1; age <= 5; age++) {
+    const game = isolatedGame();
+    for (const team of ['player', 'enemy']) { evolveTo(game, age, team); game.gold[team] = 10000; }
+    for (let slot = 0; slot < RULES.maxTurretSlots; slot++) {
+      const player = getTurretPosition(game, 'player', slot), enemy = getTurretPosition(game, 'enemy', slot);
+      near(player.x + enemy.x, RULES.width); near(player.y, enemy.y);
+      if (slot > 0) {
+        const before = getTurretPosition(game, 'player', 0);
+        for (const team of ['player', 'enemy']) assert(expandTurretSlots(game, team));
+        near(getTurretPosition(game, 'player', 0).x, before.x); near(getTurretPosition(game, 'player', 0).y, before.y);
+      }
+      assert(buildTurret(game, 'player', AGES[age].turrets[0], slot));
+      assert(sellTurret(game, slot));
+      assert(game.turrets.player.length === slot + 1 && game.turrets.player[slot] === null);
+      near(getTurretPosition(game, 'player', slot).y, player.y);
+    }
+  }
+});
+
+test('Every era fires from its architectural sockets, including mirrored mobile muzzle origins', () => {
+  for (let age = 1; age <= 5; age++) for (const team of ['player', 'enemy']) {
+    const game = isolatedGame(); evolveTo(game, age, team); game.gold[team] = 10000;
+    const direction = team === 'player' ? 1 : -1, baseX = game.bases[team].x;
+    const target = soldier(team === 'player' ? 'enemy' : 'player', baseX + direction * 160, 'tank', 10000);
+    target.attackCooldown = 1000; game.units.push(target);
+    for (let i = 0; i < 3; i++) assert(expandTurretSlots(game, team));
+    for (let slot = 0; slot < 4; slot++) assert(buildTurret(game, team, AGES[age].turrets[0], slot));
+    updateGame(game, RULES.fixedStep); assert(game.projectiles.length === 4);
+    game.projectiles.forEach((shot, slot) => {
+      const turret = game.turrets[team][slot], muzzle = getTurretMuzzle(turret);
+      near(shot.fromBaseX, baseX);
+      for (const scale of [1, 1.35]) {
+        const socket = getTurretPosition(game, team, slot, scale);
+        near(baseX + (shot.fromX - baseX) * scale, socket.x + muzzle.x * direction * scale);
+        near(shot.fromY * scale, socket.y + muzzle.y * scale);
+      }
+    });
+  }
+});
+
+test('Every purchased socket has continuous building support at desktop and mobile scales', () => {
+  const canvas = document.createElement('canvas'); canvas.width = 500; canvas.height = 420;
+  const ctx = canvas.getContext('2d'), silhouettes = new Set();
+  for (let age = 1; age <= 5; age++) for (let slots = 1; slots <= 4; slots++) {
+    const game = isolatedGame();
+    for (const team of ['player', 'enemy']) for (const scale of [1, 1.35]) {
+      game.ages[team] = age; game.bases[team].x = 250;
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.translate(0, 390); drawBase(ctx, game.bases[team], age, 0, scale, slots);
+      const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let slot = 0; slot < slots; slot++) {
+        const mount = getTurretPosition(game, team, slot, scale);
+        for (let y = Math.ceil(390 + mount.y + 2); y < 389; y += 2) {
+          assert(pixels[(y * canvas.width + Math.round(mount.x)) * 4 + 3] === 255,
+            `Age ${age}, ${team}, ${slots} sockets, scale ${scale}: socket ${slot} must connect to the building at y=${y}`);
+        }
+      }
+      if (team === 'player' && scale === 1) {
+        let silhouette = ''; for (let i = 3; i < pixels.length; i += 4) silhouette += pixels[i] > 127 ? '1' : '0';
+        silhouettes.add(silhouette);
+      }
+    }
+  }
+  assert(silhouettes.size === 20, 'Every era and purchased expansion needs a distinct building silhouette');
 });
 
 test('Four towers fire independently from their actual positions and retain distinct cooldowns', () => {

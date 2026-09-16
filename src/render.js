@@ -1,10 +1,11 @@
 import { drawTurret } from './turrets.js';
 import { RULES, UNITS, AGES, ABILITIES, getTurretPosition, getAbilityRadius, getAbilityImpactX } from './game.js';
 import { drawUnit } from './units.js';
+import { drawBase } from './bases.js';
 
 const PALETTES = {
-  player: { light: '#b7d4b5', main: '#7faa91', dark: '#435e50', flag: '#bbd9b2' },
-  enemy: { light: '#e1b58c', main: '#c28b67', dark: '#795744', flag: '#dea579' },
+  player: { light: '#b7d4b5', flag: '#bbd9b2' },
+  enemy: { light: '#e1b58c', flag: '#dea579' },
 };
 
 // One full day follows match time, so pausing and restarting also affect the sky.
@@ -145,136 +146,14 @@ function drawLandscape(ctx, height, ground, time) {
   }
 }
 
-function drawBase(ctx, base, age, time, scale) {
-  const colors = PALETTES[base.team];
-  ctx.save();
-  ctx.translate(base.x, 0);
-  ctx.scale(scale, scale);
-  ctx.fillStyle = '#14231e88';
-  ctx.beginPath();
-  ctx.ellipse(0, 1, 69, 8, 0, 0, Math.PI * 2);
-  ctx.fill();
-  if (age === 3) {
-    polygon(ctx, [[-64, 0], [-59, -84], [-36, -116], [35, -116], [61, -84], [65, 0]], colors.dark);
-    ctx.fillStyle = base.hitFlash > 0 ? '#f2e6c4' : '#ae9e7a';
-    ctx.fillRect(-43, -104, 86, 104);
-    for (let y = -88; y < 0; y += 18) line(ctx, [[-43, y], [43, y]], '#82765d', 2);
-    polygon(ctx, [[-51, -105], [-31, -130], [29, -130], [52, -105]], '#98714c');
-    ctx.fillStyle = colors.main;
-    ctx.fillRect(-60, -116, 23, 116); ctx.fillRect(38, -116, 23, 116);
-    for (const x of [-50, 48]) {
-      ctx.fillStyle = '#e0c89b'; ctx.fillRect(x - 8, -91, 16, 29);
-      ctx.fillStyle = '#2c372d'; ctx.fillRect(x - 5, -86, 10, 22);
-    }
-    ctx.fillStyle = '#344033'; ctx.fillRect(-15, -45, 30, 45);
-    ctx.beginPath(); ctx.arc(0, -45, 15, Math.PI, Math.PI * 2); ctx.fill();
-    line(ctx, [[-20, -3], [-20, -45], [-14, -60], [14, -60], [20, -45], [20, -3]], '#dfcfa7', 4);
-  } else if (age === 4) {
-    polygon(ctx, [[-65, 0], [-62, -83], [-45, -106], [44, -106], [64, -82], [68, 0]], base.hitFlash > 0 ? '#e5e0cd' : '#7c8980');
-    ctx.fillStyle = '#435b50'; ctx.fillRect(-56, -84, 111, 24);
-    for (const x of [-46, 20]) { ctx.fillStyle = '#182b28'; ctx.fillRect(x, -77, 26, 9); }
-    ctx.fillStyle = '#263d34'; ctx.fillRect(-28, -46, 56, 46);
-    for (let y = -41; y < 0; y += 9) line(ctx, [[-27, y], [27, y]], '#778a78', 2);
-    for (const x of [-37, 34]) {
-      ctx.fillStyle = '#d5be75'; ctx.fillRect(x, -45, 5, 45);
-      for (let y = -42; y < 0; y += 12) line(ctx, [[x, y], [x + 5, y + 5]], '#435447', 3);
-    }
-    line(ctx, [[0, -107], [0, -137]], '#abb7a6', 4);
-    ctx.save(); ctx.translate(0, -141); ctx.rotate(-0.45 + Math.sin(time) * 0.15);
-    ctx.fillStyle = '#a7b6a8'; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI); ctx.fill();
-    line(ctx, [[0, 3], [0, -15]], '#d8d7b4', 2); ctx.restore();
-    ctx.fillStyle = colors.flag; ctx.fillRect(-54, -52, 15, 5);
-  } else if (age === 5) {
-    const glow = base.team === 'player' ? '#89eee2' : '#ffc188';
-    polygon(ctx, [[-66, 0], [-55, -111], [-32, -130], [32, -130], [55, -111], [66, 0]], base.hitFlash > 0 ? '#e3f4e8' : '#435c64');
-    polygon(ctx, [[-55, -111], [-34, -127], [-27, -14], [-57, -3]], '#99b4b1');
-    polygon(ctx, [[34, -127], [55, -111], [57, -3], [27, -14]], '#78938e');
-    polygon(ctx, [[-20, -103], [0, -118], [20, -103], [20, -59], [0, -44], [-20, -59]], '#213a42');
-    ctx.fillStyle = glow; ctx.globalAlpha = 0.65 + Math.sin(time * 2) * 0.2;
-    ctx.beginPath(); ctx.ellipse(0, -81, 11, 26, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
-    for (const x of [-44, 42]) line(ctx, [[x, -103], [x * 1.15, -15]], glow, 3);
-    polygon(ctx, [[-19, 0], [-19, -29], [0, -40], [19, -29], [19, 0]], '#142e33');
-    line(ctx, [[-19, 0], [-19, -29], [0, -40], [19, -29], [19, 0]], glow, 2);
-    ctx.fillStyle = colors.main; ctx.fillRect(-37, -136, 74, 8);
-  } else if (age === 2) {
-    // A crenellated keep replaces the low tribal fort; team banners remain distinct.
-    const stone = base.team === 'player' ? '#9eafa3' : '#b5a38c';
-    const shadow = base.team === 'player' ? '#536b60' : '#736653';
-    ctx.fillStyle = base.hitFlash > 0 ? '#f2e6c4' : shadow;
-    ctx.fillRect(-58, -98, 118, 98);
-    ctx.fillStyle = base.hitFlash > 0 ? '#f2e6c4' : stone;
-    ctx.fillRect(-59, -121, 33, 121);
-    ctx.fillRect(27, -121, 33, 121);
-    for (const x of [-61, -47, -33, 25, 39, 53]) ctx.fillRect(x, -134, 10, 15);
-    ctx.fillStyle = colors.main;
-    ctx.fillRect(-26, -97, 53, 97);
-    for (let y = -106; y < 0; y += 22) {
-      line(ctx, [[-59, y], [-26, y]], shadow, 2);
-      line(ctx, [[27, y], [60, y]], shadow, 2);
-      line(ctx, [[-43 + (y % 3) * 3, y], [-43 + (y % 3) * 3, y + 21]], shadow, 1);
-    }
-    ctx.fillStyle = '#25362c';
-    ctx.fillRect(-46, -94, 8, 20);
-    ctx.fillRect(39, -94, 8, 20);
-    ctx.fillRect(-13, -41, 28, 41);
-    polygon(ctx, [[-13, -41], [1, -55], [15, -41]], '#25362c');
-    ctx.fillStyle = '#98a88c';
-    for (const x of [-8, 0, 8]) ctx.fillRect(x, -40, 2, 40);
-    polygon(ctx, [[-12, -93], [13, -93], [13, -66], [1, -57], [-12, -66]], colors.flag);
-    polygon(ctx, [[0, -86], [6, -78], [0, -70], [-6, -78]], '#e5cd8d');
-  } else {
-    // A low stone fort, its team banner visible above the troops.
-    polygon(ctx, [[-58, 0], [-52, -75], [-35, -97], [32, -101], [55, -77], [60, 0]], base.hitFlash > 0 ? '#efdfba' : colors.dark);
-    polygon(ctx, [[-52, -75], [-35, -97], [32, -101], [45, -83], [5, -72]], colors.light);
-    polygon(ctx, [[-52, -75], [5, -72], [9, 0], [-58, 0]], colors.main);
-    polygon(ctx, [[5, -72], [45, -83], [55, -77], [60, 0], [9, 0]], colors.dark);
-    ctx.fillStyle = '#25362c';
-    ctx.fillRect(-12, -43, 28, 43);
-    polygon(ctx, [[-12, -43], [1, -53], [16, -43]], '#25362c');
-    line(ctx, [[-49, -49], [-15, -48]], '#24372e66');
-    line(ctx, [[-52, -25], [-19, -23]], '#24372e66');
-    line(ctx, [[-30, -70], [-29, -49]], '#24372e66');
-    line(ctx, [[29, -49], [50, -53]], '#182b2466');
-    line(ctx, [[29, -25], [54, -29]], '#182b2466');
-  }
-  if (age <= 3) {
-  line(ctx, [[-9, -97], [-9, -163]], '#c4bf98', 3);
-  const flutter = Math.sin(time * 2.5) * 3;
-  polygon(ctx, [[-8, -162], [30, -158 + flutter], [21, -145 + flutter], [-8, -146]], colors.flag);
-  ctx.fillStyle = '#f0ddb0';
-  ctx.fillRect(-11, -166, 4, 4);
-  }
-  if (base.hp < base.maxHp * 0.5) {
-    line(ctx, [[-29, -92], [-22, -70], [-34, -55], [-25, -38]], '#25362c', 3);
-    line(ctx, [[35, -77], [22, -55], [29, -34]], '#25362c', 3);
-  }
-  if (base.hp === 0) {
-    polygon(ctx, [[-58, 0], [-44, -28], [-23, -12], [1, -29], [22, -8], [45, -21], [60, 0]], '#9c9273');
-  }
-  ctx.restore();
-}
-
 function drawDefenses(ctx, game, team, scale, reducedMotion) {
-  const colors = PALETTES[team];
-  // Put the expanded platform supports behind every weapon, including the lower row.
-  for (let slot = 2; slot < game.turrets[team].length; slot++) {
-    const { x, y } = getTurretPosition(game, team, slot);
-    for (const offset of [-19, 19]) line(ctx, [[x + offset * scale, y * scale], [x + offset * scale, (y + 51) * scale]], colors.dark, 4 * scale);
-    line(ctx, [[x - 19 * scale, y * scale], [x + 19 * scale, (y + 48) * scale]], colors.main, 2 * scale);
-  }
+  if (game.bases[team].hp <= 0) return;
   for (let slot = 0; slot < game.turrets[team].length; slot++) {
     const turret = game.turrets[team][slot];
-    const { x, y } = getTurretPosition(game, team, slot);
-    ctx.save(); ctx.translate(x, y * scale); ctx.scale(scale, scale);
-    ctx.fillStyle = colors.dark; ctx.fillRect(-21, -1, 42, 6);
-    ctx.fillStyle = colors.light; ctx.fillRect(-21, -3, 42, 3);
-    if (!turret) {
-      line(ctx, [[-5, -11], [5, -11]], colors.light, 1.5);
-      line(ctx, [[0, -16], [0, -6]], colors.light, 1.5);
-      ctx.restore();
-      continue;
-    }
-    drawTurret(ctx, turret, game.elapsed, 1, reducedMotion);
+    if (!turret) continue;
+    const { x, y } = getTurretPosition(game, team, slot, scale);
+    ctx.save(); ctx.translate(x, y);
+    drawTurret(ctx, turret, game.elapsed, scale, reducedMotion, true);
     ctx.restore();
   }
 }
@@ -311,7 +190,7 @@ function drawFields(ctx, game, time, scale, reducedMotion) {
 
 function drawProjectile(ctx, shot, scale) {
   const progress = Math.max(0, Math.min(1, 1 - shot.remaining / shot.duration));
-  const origin = shot.fromUnitX ?? shot.fromTurretX;
+  const origin = shot.fromBaseX ?? shot.fromUnitX ?? shot.fromTurretX;
   const fromX = origin === undefined ? shot.fromX : origin + (shot.fromX - origin) * scale;
   const x = fromX + (shot.toX - fromX) * progress;
   const cannon = ['sling', 'cannon', 'stone', 'boulder', 'fireball', 'egg', 'oil', 'shell', 'plasma-orb'].includes(shot.kind);
@@ -373,8 +252,8 @@ export function createRenderer(canvas) {
     drawLandscape(ctx, sceneHeight, ground, time);
     ctx.save();
     ctx.translate(0, ground);
-    drawBase(ctx, game.bases.player, game.ages.player, time, entityScale);
-    drawBase(ctx, game.bases.enemy, game.ages.enemy, time, entityScale);
+    drawBase(ctx, game.bases.player, game.ages.player, time, entityScale, game.turrets.player.length);
+    drawBase(ctx, game.bases.enemy, game.ages.enemy, time, entityScale, game.turrets.enemy.length);
     drawDefenses(ctx, game, 'player', entityScale, reducedMotion.matches);
     drawDefenses(ctx, game, 'enemy', entityScale, reducedMotion.matches);
     drawFields(ctx, game, time, entityScale, reducedMotion.matches);

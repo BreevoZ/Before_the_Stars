@@ -3,6 +3,7 @@ node_modules/
 
 # Local artwork
 /assets/
+/.openai/
 
 # Build output and caches
 dist/

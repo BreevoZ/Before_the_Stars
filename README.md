@@ -24,7 +24,11 @@ python3 -m http.server 8000 --bind 127.0.0.1
 
 ### 在线手机测试
 
-项目可直接部署到静态托管，不需要安装依赖或编译。Sites 托管配置位于 `.openai/hosting.json`；发布前运行 `python3 scripts/prepare-site.py`，仅将 Git 已跟踪的网页、`src/` 和浏览器测试复制到忽略的 `dist/`，不会上传本地 `assets/`、存档或环境文件。本地开发仍直接从项目根目录启动。
+试玩地址：[Before the Stars](https://breevoz.github.io/Before_the_Stars/) · [快速调试](https://breevoz.github.io/Before_the_Stars/?mode=debug)。
+
+GitHub Pages 从 `main` 分支的根目录发布，`.nojekyll` 保证原生静态文件直接提供；不需要安装依赖或编译。向 `main` 推送更新后自动发布，可在仓库 Actions 中查看部署结果。`assets/`、本地托管配置和环境文件均被 Git 忽略，不会上传。
+
+如需迁移其他静态托管，可运行 `python3 scripts/prepare-site.py`，仅将 Git 已跟踪的网页、`src/` 和浏览器测试复制到忽略的 `dist/`。本地开发仍直接从项目根目录启动。
 
 手机打开站点首页即可试玩，`/?mode=debug` 可快速测试进化和重建，底部保留经典模式与图鉴入口。建议分别检查竖屏与横屏的招募、炮位选择、大招瞄准、暂停、存档及结算对话框。手机与电脑的存档独立；需要迁移时通过「存档」导出／导入。
 

@@ -112,8 +112,8 @@ function gaitGuides(ctx, unit, time, scale) {
   ctx.save(); ctx.translate(unit.x, 0); ctx.scale((unit.team === 'player' ? 1 : -1) * scale, scale);
   for (const leg of pose.legs) {
     ctx.strokeStyle = leg.far ? '#e7bf8c' : '#d6e8bd'; ctx.lineWidth = 0.7;
-    ctx.beginPath(); [leg.hip, leg.knee, leg.ankle, leg.foot].forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
-    for (const [x, y] of [leg.hip, leg.knee, leg.ankle]) { ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.beginPath(); leg.joints.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
+    for (const [x, y] of leg.joints.slice(0, -1)) { ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.stroke(); }
     if (leg.planted) { ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(leg.foot[0] - 4, 0); ctx.lineTo(leg.foot[0] + 6, 0); ctx.stroke(); }
   }
   ctx.restore();

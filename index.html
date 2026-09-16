@@ -13,9 +13,10 @@
     <main class="game-shell">
       <header class="masthead">
         <div class="wordmark"><span class="brand-mark" aria-hidden="true">✳</span> BEFORE THE STARS</div>
-        <div class="masthead-actions"><a class="animation-link" href="./animations.html" title="无需开局，查看所有动画">动画</a>
+        <div class="masthead-actions"><a class="animation-link" id="mode-link" href="?mode=incremental">增量模式</a><button class="text-button" id="archives" type="button" hidden>文明档案</button><button class="text-button" id="pause-battle" type="button" hidden aria-pressed="false">暂停</button><a class="animation-link" href="./animations.html" title="无需开局，查看所有动画">动画</a>
         <button class="icon-button" id="help" type="button" data-icon="help" aria-label="帮助与单位资料" title="帮助与单位资料 · ?"></button></div>
       </header>
+      <p id="save-warning" class="save-warning" role="status" hidden></p>
       <section class="battle" aria-label="战场">
         <div class="battle-hud">
           <div class="base-status player-status">
@@ -34,7 +35,7 @@
           <canvas id="battlefield" width="1280" height="480" tabindex="0" role="img" aria-describedby="spell-hint" aria-label="左侧青色为我方，右侧橙色为敌方。士兵自动前进并攻击。"></canvas>
           <div class="target-banner" id="target-banner" hidden><span data-icon="orbital"></span><span id="target-text">选择落点</span><button class="icon-button" id="cancel-target" type="button" data-icon="close" aria-label="取消瞄准" title="取消 · Esc"></button></div>
           <div class="result-overlay" id="result" hidden>
-            <div class="result-card"><h1 id="result-title"></h1><p id="result-detail"></p><button class="primary-button" id="play-again" type="button"><span data-icon="restart"></span>再战一局</button></div>
+            <div class="result-card"><h1 id="result-title"></h1><p id="result-detail"></p><button class="primary-button" id="play-again" type="button"><span data-icon="restart"></span>再战一局</button><small id="result-hint" hidden></small></div>
           </div>
         </div>
         <section class="command-panel" aria-label="作战指令">
@@ -82,6 +83,19 @@
       <p class="sr-only" id="announcement" role="status" aria-live="polite"></p>
       <noscript><p>请启用 JavaScript 后开始游戏。</p></noscript>
     </main>
+    <dialog id="archives-dialog" aria-labelledby="archives-title">
+      <header class="help-heading"><h2 id="archives-title">文明档案</h2><button class="icon-button" id="close-archives" type="button" data-icon="close" aria-label="关闭文明档案"></button></header>
+      <div class="archive-body">
+        <p class="archive-eyebrow" id="archive-run"></p>
+        <div class="legacy-summary"><span><strong id="cycles">0</strong> 有效循环</span><span><strong id="legacy">0</strong> 文明遗产</span></div>
+        <p id="cycle-outcome"></p>
+        <p id="rebuild-rules" hidden>重建将清除本轮金币、经验、时代、部队、训练订单、炮位与炮塔，从原始时代重新开始。保留有效循环、遗产、永久升级和自动招募偏好。</p>
+        <section aria-labelledby="upgrades-title"><h3 id="upgrades-title">永久档案</h3><p class="archive-note">仅两轮之间购买，新文明开始时生效。每种最多 5 级。</p><div id="upgrade-list"></div><p class="archive-note" id="active-bonuses"></p></section>
+        <section aria-labelledby="automation-title"><h3 id="automation-title">自动招募</h3><p id="automation-hint"></p><div class="automation-controls"><label><input type="checkbox" id="auto-enabled"> 启用</label><label>目标 <select id="auto-target"><option value="front">前排</option><option value="ranged">远程</option><option value="heavy">重型</option></select></label></div></section>
+        <button class="primary-button" id="rebuild-civilization" type="button" hidden>重建文明</button>
+        <details class="save-tools"><summary>存档与恢复</summary><p class="archive-note">每 10 秒及关键操作自动保存。离开期间不推进战斗、没有离线收益。刷新恢复上次保存的完整战场。</p><p id="save-status" role="status"></p><div class="save-actions"><button id="manual-save" type="button">手动保存</button><button id="export-save" type="button">导出存档</button><button id="recover-save" type="button">恢复备份</button></div><label class="import-file">选择存档文件 <input id="import-file" type="file" accept=".json,application/json"></label><label for="save-data">或粘贴存档内容</label><textarea id="save-data" rows="4" spellcheck="false" placeholder="导入前会校验完整存档；确认后替换当前增量进度。"></textarea><div class="save-actions"><button id="import-save" type="button">校验并导入</button><button id="clear-progress" class="danger-button" type="button">清空全部进度</button></div></details>
+      </div>
+    </dialog>
     <dialog id="help-dialog" aria-labelledby="help-title">
       <header class="help-heading"><h2 id="help-title">指挥手册</h2><button class="icon-button" id="close-help" type="button" data-icon="close" aria-label="关闭帮助"></button></header>
       <div class="help-body">

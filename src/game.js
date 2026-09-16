@@ -72,8 +72,8 @@ const validTeam = team => TEAMS.includes(team);
 const validType = type => Object.hasOwn(UNITS, type);
 const canAfford = (gold, cost) => gold + EPSILON >= cost;
 
-export function createGame() {
-  return {
+export function createGame(options = {}) {
+  const game = {
     status: 'playing', elapsed: 0,
     bases: {
       player: { team: 'player', x: RULES.playerBaseX, hp: RULES.baseHealth, maxHp: RULES.baseHealth, hitFlash: 0 },
@@ -89,6 +89,21 @@ export function createGame() {
     nextUnitId: 1, nextOrderId: 1,
     ai: { enabled: true, cooldown: RULES.aiFirstDecision, orders: 0, strategy: 'balanced', waves: 0 },
   };
+  if (options.mode === 'incremental') {
+    game.mode = 'incremental';
+    game.modifiers = { income: options.modifiers?.income ?? 1, experience: options.modifiers?.experience ?? 1 };
+  }
+  return game;
+}
+
+export function getIncomeRate(game, team = 'player') {
+  return AGES[game.ages[team]].income * (team === 'player' && game.mode === 'incremental' ? game.modifiers.income : 1);
+}
+
+// Preserve the classic reward first (including casualty rounding), then apply
+// the player's archive multiplier and floor each individual award once more.
+export function getExperienceReward(game, baseReward, team = 'player') {
+  return Math.floor(baseReward * (team === 'player' && game.mode === 'incremental' ? game.modifiers.experience : 1));
 }
 
 export function getEvolutionState(game, team = 'player') {
@@ -127,7 +142,7 @@ export function recruit(game, type = 'melee', team = 'player') {
   if (getRecruitState(game, type, team) !== 'ready') return false;
   const stats = UNITS[type];
   game.gold[team] = Math.max(0, game.gold[team] - stats.cost);
-  game.queues[team].push({ id: game.nextOrderId++, type, remaining: stats.trainTime });
+  game.queues[team].push({ id: game.nextOrderId++, type, remaining: stats.trainTime, paid: stats.cost });
   return true;
 }
 
@@ -136,7 +151,7 @@ export function cancelTraining(game, orderId, team = 'player') {
   const index = game.queues[team].findIndex(order => order.id === orderId);
   if (index < 0) return false;
   const [order] = game.queues[team].splice(index, 1);
-  game.gold[team] += UNITS[order.type].cost;
+  game.gold[team] += order.paid ?? UNITS[order.type].cost;
   return true;
 }
 
@@ -589,9 +604,9 @@ function resolveHits(game, hits) {
     if (unit.hp <= 0) {
       const winner = otherTeam(unit.team);
       game.gold[winner] += UNITS[unit.type].bounty;
-      game.experience[winner] += UNITS[unit.type].experience;
+      game.experience[winner] += getExperienceReward(game, UNITS[unit.type].experience, winner);
       // Losses teach the attacking side too, so a tower-only defense cannot freeze its age.
-      game.experience[unit.team] += Math.floor(UNITS[unit.type].experience * RULES.casualtyExperienceRate);
+      game.experience[unit.team] += getExperienceReward(game, Math.floor(UNITS[unit.type].experience * RULES.casualtyExperienceRate), unit.team);
     }
   }
   game.units = game.units.filter(unit => unit.hp > 0);
@@ -605,7 +620,7 @@ export function updateGame(game, dt) {
   dt = Math.min(dt, 0.05);
   game.elapsed += dt;
   for (const team of TEAMS) {
-    game.gold[team] += AGES[game.ages[team]].income * dt;
+    game.gold[team] += getIncomeRate(game, team) * dt;
     game.bases[team].hitFlash = Math.max(0, game.bases[team].hitFlash - dt);
   }
   for (const effect of game.effects) effect.life -= dt;

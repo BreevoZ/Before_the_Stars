@@ -1,4 +1,5 @@
-import { RULES, UNITS, AGES, TURRETS, ABILITIES, createGame, getRecruitState, recruit, cancelTraining, getEvolutionState, evolve, getTurretState, buildTurret, getExpansionState, expandTurretSlots, sellTurret, castAbility, updateGame } from './game.js';
+import { RULES, UNITS, AGES, TURRETS, ABILITIES, createGame, getIncomeRate, getRecruitState, recruit, cancelTraining, getEvolutionState, evolve, getTurretState, buildTurret, getExpansionState, expandTurretSlots, sellTurret, castAbility, updateGame } from './game.js';
+import { createCivilizationUI, formatMultiplier } from './civilization-ui.js';
 import { createRenderer } from './render.js';
 import { drawUnit } from './units.js';
 import { drawTurret } from './turrets.js';
@@ -40,14 +41,22 @@ const queueSlots = Array.from({ length: RULES.queueLimit }, (_, index) => {
   button.addEventListener('click', () => {
     const order = game.queues.player[index];
     if (order && cancelTraining(game, order.id)) {
-      announce(`已取消${UNITS[order.type].name}，退还 ${UNITS[order.type].cost} 金币。`);
+      announce(`已取消${UNITS[order.type].name}，退还 ${order.paid ?? UNITS[order.type].cost} 金币。`);
       syncUI();
     }
   });
   byId('training-queue').append(button);
   return button;
 });
-let game = createGame();
+const incremental = new URLSearchParams(location.search).get('mode') === 'incremental';
+const civilization = incremental ? createCivilizationUI(resetBattle => {
+  game = civilization.session.game;
+  accumulator = 0; lastTime = null;
+  if (resetBattle) resetBattleView();
+  syncUI(); render(game, { targeting, targetX });
+  if (resetBattle && !civilization.modalOpen && game.status === 'playing') byId('recruit').focus({ preventScroll: true });
+}) : null;
+let game = civilization?.session.game ?? createGame();
 let lastTime = null;
 let accumulator = 0;
 let announcedResult = false;
@@ -122,8 +131,6 @@ function syncRoster() {
   setIcon(byId('target-banner').querySelector('[data-icon]'), abilityIcons[age.ability]);
   byId('ability').dataset.ability = age.ability;
   if (ability.targeting === 'allies') targeting = false;
-  setText('income-rate', `+${age.income}/s`);
-  byId('income-rate').title = `每秒收入 ${age.income} 金币`;
   byId('help-roster').innerHTML = [
     { title: '部队', controls: cards, icons: unitIcons, key: 'unit' },
     { title: '炮塔', controls: towerCards, icons: turretIcons, key: 'turret' },
@@ -194,7 +201,7 @@ function syncEvolution() {
   setText('evolve-label', state === 'finished' ? '战斗已结束' : nextAge ? `进化至${nextAge.name}` : '已达最高时代');
   setText('evolution-hint', !nextAge ? '五个时代已全部解锁 · 摧毁敌方基地取得胜利' : state === 'ready' ? '经验已达标 · 点击进化或按 E · 不消耗金币' : `击杀经验 + 阵亡75%经验 · 还差 ${nextAge.experienceRequired - experience} 经验`);
   setText('evolution-unlocks', `${nextAge ? '下个时代' : '已解锁'}：${(nextAge ?? age).units.map(type => UNITS[type].name).join(' · ')}`);
-  setText('evolution-benefit', nextAge ? `生命 +${nextAge.baseHealth - age.baseHealth} · 收入 ${nextAge.income}/秒 · ${ABILITIES[nextAge.ability].name} · 三种新炮塔` : '未来要塞 · 离子科技 · 轨道打击');
+  setText('evolution-benefit', nextAge ? `生命 +${nextAge.baseHealth - age.baseHealth} · 收入 ${formatMultiplier(nextAge.income * (game.modifiers?.income ?? 1))}/秒 · ${ABILITIES[nextAge.ability].name} · 三种新炮塔` : '未来要塞 · 离子科技 · 轨道打击');
   byId('evolve').title = `${byId('evolve-label').textContent} · E\n${byId('evolution-hint').textContent}\n${byId('evolution-benefit').textContent}`;
   byId('evolve').setAttribute('aria-label', byId('evolve-label').textContent);
 }
@@ -223,6 +230,9 @@ function syncUI() {
   }
   if (ageAnnouncements.length) announce(ageAnnouncements.join(''));
   setText('gold', Math.floor(game.gold.player + 0.000001));
+  setText('income-rate', `+${formatMultiplier(getIncomeRate(game))}/s`);
+  byId('income-rate').title = civilization ? `${AGES[game.ages.player].income} 基础收入 × ${formatMultiplier(game.modifiers.income)} 生产档案；仅增加被动金币` : `每秒收入 ${getIncomeRate(game)} 金币`;
+  if (civilization) byId('experience-bar').closest('.evolution-progress').title = `战争档案 ×${formatMultiplier(game.modifiers.experience)}；击杀经验、按 75% 向下取整的阵亡经验，再乘倍率逐笔向下取整。详情见文明档案。`;
   setText('clock', formatTime(game.elapsed));
   setText('enemy-strategy', game.ai.strategy === 'siege' ? '敌军战术 · 重装攻城' : '敌军战术 · 混合推进');
   setIcon(byId('enemy-strategy-icon'), game.ai.strategy === 'siege' ? 'cannon' : 'sword');
@@ -247,8 +257,8 @@ function syncUI() {
     setIcon(slot.querySelector('.queue-icon'), order ? unitIcons[order.type] : '');
     slot.querySelector('.queue-time').textContent = !order ? '·' : index > 0 ? '' : order.remaining <= 0.000001 ? '…' : time;
     slot.querySelector('.queue-fill').style.transform = `scaleX(${order && index === 0 ? 1 - order.remaining / UNITS[order.type].trainTime : 0})`;
-    slot.setAttribute('aria-label', order ? `取消${name}，退还 ${UNITS[order.type].cost} 金币` : `空队列位 ${index + 1}`);
-    slot.title = order ? `${name} · ${time}\n点击取消，退还 ${UNITS[order.type].cost} 金币` : `空队列位 ${index + 1}`;
+    slot.setAttribute('aria-label', order ? `取消${name}，退还 ${order.paid ?? UNITS[order.type].cost} 金币` : `空队列位 ${index + 1}`);
+    slot.title = order ? `${name} · ${time}\n点击取消，退还 ${order.paid ?? UNITS[order.type].cost} 金币` : `空队列位 ${index + 1}`;
   });
   const finished = game.status !== 'playing';
   if (finished) targeting = false;
@@ -260,7 +270,7 @@ function syncUI() {
   byId('ability').setAttribute('aria-label', byId('ability-name').textContent);
   byId('target-banner').hidden = !targeting;
   canvas.classList.toggle('targeting', targeting);
-  const paused = document.hidden || helpDialog.open;
+  const paused = document.hidden || helpDialog.open || civilization?.paused;
   setText('phase', finished ? '战斗结束' : paused ? '已暂停' : '交战中');
   setIcon(byId('phase-icon'), finished ? 'check' : paused ? 'pause' : 'play');
   byId('phase-icon').title = byId('phase').textContent;
@@ -271,9 +281,11 @@ function syncUI() {
     const detail = game.status === 'won' ? '敌方基地已被摧毁。' : game.status === 'lost' ? '我方基地已被摧毁。' : '双方基地同时被摧毁。';
     setText('result-title', title);
     setText('result-detail', `${detail}用时 ${formatTime(game.elapsed)}`);
-    announce(`${title}。${detail}`);
+    civilization?.sync();
+    announce(`${byId('result-title').textContent}。${byId('result-detail').textContent}`);
     byId('play-again').focus({ preventScroll: true });
   }
+  civilization?.sync();
 }
 
 function train(type) {
@@ -295,6 +307,7 @@ function constructTurret(type = AGES[game.ages.player].turrets[0]) {
 
 function evolvePlayer() {
   if (evolve(game)) {
+    civilization?.save();
     syncUI();
     render(game, { targeting, targetX });
   }
@@ -329,7 +342,16 @@ function releaseAbility() {
 }
 
 function restart() {
+  if (civilization) return civilization.restart();
   game = createGame();
+  resetBattleView();
+  announce('新一局开始。');
+  syncUI();
+  render(game, { targeting, targetX });
+  byId('recruit').focus({ preventScroll: true });
+}
+
+function resetBattleView() {
   accumulator = 0;
   lastTime = null;
   announcedResult = false;
@@ -337,10 +359,7 @@ function restart() {
   selectedSlot = 0;
   targeting = false;
   targetX = RULES.width / 2;
-  announce('新一局开始。');
-  syncUI();
-  render(game, { targeting, targetX });
-  byId('recruit').focus({ preventScroll: true });
+  displayedAge = 0;
 }
 
 function openHelp() {
@@ -364,7 +383,7 @@ helpDialog.addEventListener('cancel', event => {
   closeHelp();
 });
 byId('restart').addEventListener('click', restart);
-byId('play-again').addEventListener('click', restart);
+byId('play-again').addEventListener('click', () => civilization ? civilization.resultAction() : restart());
 byId('expand-turrets').addEventListener('click', () => {
   if (expandTurretSlots(game)) {
     selectedSlot = game.turrets.player.length - 1;
@@ -390,6 +409,7 @@ function pointerX(event) {
 canvas.addEventListener('pointermove', event => { if (targeting) targetX = pointerX(event); });
 canvas.addEventListener('click', event => { if (targeting) { targetX = pointerX(event); releaseAbility(); } });
 window.addEventListener('keydown', event => {
+  if (civilization?.modalOpen) return;
   if (helpDialog.open) {
     if (event.code === 'Escape') { event.preventDefault(); closeHelp(); }
     return;
@@ -420,14 +440,18 @@ window.addEventListener('keydown', event => {
 document.addEventListener('visibilitychange', () => {
   accumulator = 0;
   lastTime = null;
+  if (document.hidden) civilization?.save();
   syncUI();
 });
+window.addEventListener('pagehide', () => civilization?.save());
+byId('mode-link').addEventListener('click', () => civilization?.save());
 
 function frame(timestamp) {
-  if (lastTime !== null && !document.hidden && !helpDialog.open && game.status === 'playing') {
+  if (lastTime !== null && !document.hidden && !helpDialog.open && !civilization?.paused && game.status === 'playing') {
     accumulator += Math.min((timestamp - lastTime) / 1000, 0.1);
     while (accumulator >= RULES.fixedStep) {
-      updateGame(game, RULES.fixedStep);
+      if (civilization) civilization.step(RULES.fixedStep);
+      else updateGame(game, RULES.fixedStep);
       accumulator -= RULES.fixedStep;
     }
   }

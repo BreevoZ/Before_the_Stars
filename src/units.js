@@ -113,9 +113,9 @@ function cavePerson(ctx, c, m, slinger) {
 function mountLegs(ctx, pose, horse, far) {
   for (const leg of pose.legs.filter(leg => leg.far === far)) {
     const color = horse ? (far ? MATERIAL.woodDark : MATERIAL.wood) : (far ? MATERIAL.oliveDark : MATERIAL.olive);
-    limb(ctx, [leg.hip, leg.knee], color, horse ? 5 : 9);
-    limb(ctx, [leg.knee, leg.ankle], color, horse ? 3.5 : 5);
-    limb(ctx, [leg.ankle, leg.foot], far ? shade(color) : color, horse ? 3 : 4);
+    for (const [index, bone] of leg.bones.entries()) {
+      limb(ctx, [bone.from, bone.to], far && index === leg.bones.length - 1 ? shade(color) : color, bone.width);
+    }
     const [x, y] = leg.foot;
     if (horse) shape(ctx, [[x - 3, y - 2], [x + 2, y - 2], [x + 4, y + 2], [x - 3, y + 2]], MATERIAL.leather);
     else {

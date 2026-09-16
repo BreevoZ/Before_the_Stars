@@ -219,3 +219,49 @@ progress::-moz-progress-bar { background: var(--player); border-radius: 2px; }
 .masthead-actions { display: flex; align-items: center; gap: 16px; }
 .animation-link { color: var(--muted, #97a48e); font-size: 12px; text-decoration: none; }
 .animation-link:hover { color: #dbe3c9; }
+
+/* Civilization controls use the same quiet palette; the battlefield keeps priority. */
+.text-button { border: 0; background: transparent; color: var(--muted); padding: 10px 0; font-size: 12px; white-space: nowrap; }
+.text-button:hover { color: var(--gold); }
+#archives-dialog { width: min(610px, calc(100% - 24px)); max-height: 88dvh; padding: 0; border: 1px solid #506555; border-radius: 12px; color: #e9eae4; background: #18231e; }
+#archives-dialog::backdrop { background: #080f13ba; backdrop-filter: blur(5px); }
+.archive-body { padding: 20px 24px; font-size: 13px; line-height: 1.7; color: #acbab0; }
+.archive-body p { margin: 0 0 16px; }
+.archive-eyebrow { font-size: 11px; color: var(--muted); }
+.legacy-summary { display: flex; flex-wrap: wrap; gap: 28px; margin-bottom: 20px; }
+.legacy-summary strong { font-size: 26px; font-weight: 500; color: var(--gold); margin-right: 6px; }
+.archive-body section { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 16px; }
+.archive-body h3 { margin: 0 0 8px; font-size: 14px; color: #e0e9d9; font-weight: 500; }
+.archive-note { font-size: 11px; color: var(--muted); }
+.upgrade-row { display: flex; align-items: center; gap: 16px; justify-content: space-between; margin: 16px 0; }
+.upgrade-row h4 { margin: 0 0 4px; font-size: 13px; color: #dbe6d5; font-weight: 500; }
+.upgrade-row h4 span { color: var(--muted); margin-left: 6px; font-size: 11px; }
+.upgrade-row p { margin: 0; font-size: 12px; }
+.upgrade-row button, .save-actions button { border: 1px solid #465a49; background: #26372c; border-radius: 5px; min-height: 40px; padding: 6px 12px; font-size: 12px; color: var(--player); }
+.upgrade-row button { flex-shrink: 0; }
+.upgrade-row button:disabled { opacity: .5; }
+.automation-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; margin-bottom: 20px; }
+.automation-controls input { accent-color: var(--player); }
+.automation-controls select { margin-left: 8px; }
+.archive-body select, .archive-body textarea { font: inherit; color: #dbe6d5; background: #101c17; border: 1px solid #465a49; border-radius: 4px; padding: 7px; }
+.archive-body textarea { width: 100%; display: block; margin: 8px 0; resize: vertical; font-size: 11px; }
+.archive-body :is(select, input, textarea):focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.save-tools { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 16px; }
+.save-tools summary { cursor: pointer; padding-bottom: 14px; }
+.save-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.save-actions .danger-button { color: var(--enemy); border-color: #6b5542; background: transparent; }
+.import-file { display: block; margin: 20px 0 12px; }
+.import-file input { display: block; width: 100%; margin-top: 6px; }
+.save-warning { color: var(--gold); border-left: 2px solid #8a7750; padding: 8px 12px; font-size: 12px; line-height: 1.7; }
+#result-hint { display: block; color: var(--muted); margin-top: 12px; font-size: 11px; }
+.result-overlay.destruction { background: #0b1013ed; animation: civilization-darken 2.4s ease-out both; }
+.destruction .result-card h1 { font-size: clamp(21px, 3vw, 32px); letter-spacing: 4px; }
+.result-card p { max-width: 530px; line-height: 1.7; }
+@keyframes civilization-darken { from { background: #10171985; backdrop-filter: blur(0); } to { background: #0b1013ed; backdrop-filter: blur(5px); } }
+@media (prefers-reduced-motion: reduce) { .result-overlay.destruction { animation: none; } }
+@media (max-width: 640px) {
+  .masthead { height: auto; min-height: 62px; flex-wrap: wrap; gap: 0; padding-block: 10px; }
+  .masthead-actions { gap: 13px; margin-left: auto; }
+  .archive-body { padding: 16px; }
+  .upgrade-row { gap: 8px; }
+}

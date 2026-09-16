@@ -30,17 +30,51 @@ export function registerAnimationTests(test, assert, near) {
       for (const moving of [false, true]) for (const strike of [0, 1]) for (let i = 0; i < 120; i++) {
         const pose = getMountPose({ horse, moving, strike, distance: stride * i / 120 });
         for (const leg of pose.legs) {
-          near(Math.hypot(leg.hip[0] - leg.knee[0], leg.hip[1] - leg.knee[1]), leg.upper);
-          near(Math.hypot(leg.ankle[0] - leg.knee[0], leg.ankle[1] - leg.knee[1]), leg.lower, `${horse ? 'Horse' : 'Dinosaur'} lower bone at phase ${i / 120}`);
+          for (const bone of leg.bones) near(Math.hypot(bone.from[0] - bone.to[0], bone.from[1] - bone.to[1]), bone.length,
+            `${horse ? 'Horse' : 'Dinosaur'} bone at phase ${i / 120}`);
         }
       }
       for (const boundary of [duty * stride, stride]) {
         const legAt = distance => getMountPose({ horse, distance, moving: true }).legs.find(leg => leg.phase !== undefined && !leg.far && !leg.front);
         const a = legAt(boundary - 0.0001), b = legAt(boundary), c = legAt(boundary + 0.0001);
         assert(Math.hypot(a.foot[0] - c.foot[0], a.foot[1] - c.foot[1]) < 0.001);
+        a.joints.forEach((joint, index) => assert(Math.hypot(joint[0] - c.joints[index][0], joint[1] - c.joints[index][1]) < 0.01, 'Joints must not pop at lift-off or touchdown'));
         assert(Math.abs((b.foot[0] - a.foot[0]) / 0.0001 - (c.foot[0] - b.foot[0]) / 0.0001) < 0.01, 'Foot velocity must not snap at contact');
       }
     }
+  });
+
+  test('Horse forelegs keep a straight loaded carpus and tuck correctly; hind legs have separate forward stifles and backward hocks', () => {
+    const turn = (a, b, c) => (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+    const length = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+    let liftedForeleg = false;
+    for (const moving of [false, true]) for (let frame = 0; frame < 240; frame++) {
+      const pose = getMountPose({ horse: true, moving, distance: frame * 48 / 240 });
+      for (const leg of pose.legs) {
+        assert(leg.joints.length === 5, 'Include the proximal joint, carpus/hock, fetlock and hoof');
+        if (leg.front) {
+          assert(turn(leg.hip, leg.elbow, leg.carpus) < 0, 'The elbow must point backward');
+          assert(turn(leg.elbow, leg.carpus, leg.fetlock) > 0, 'The foreleg carpus must not bend backward');
+          const straightness = length(leg.elbow, leg.fetlock) / (18 + 13);
+          if (leg.planted) assert(straightness > 0.99, 'Loaded forelegs should not stay deeply buckled');
+          if (!leg.planted && leg.foot[1] < -9) {
+            assert(straightness < 0.8, 'Fold the carpus when lifting the hoof');
+            assert(leg.fetlock[0] < leg.carpus[0], 'A lifted front hoof tucks behind the carpus');
+            liftedForeleg = true;
+          }
+        } else {
+          assert(turn(leg.hip, leg.stifle, leg.hock) > 0, 'The stifle must fold forward');
+          assert(turn(leg.stifle, leg.hock, leg.fetlock) < 0, 'The hock must fold backward');
+          assert(leg.stifle[1] < leg.hock[1] && leg.hock[1] < leg.fetlock[1], 'Keep the rear joints in anatomical order');
+        }
+        for (const facing of [-1, 1]) {
+          const [a, b, c] = (leg.front ? [leg.elbow, leg.carpus, leg.fetlock] : [leg.stifle, leg.hock, leg.fetlock])
+            .map(([x, y]) => [x * facing, y]);
+          assert(turn(a, b, c) * facing * (leg.front ? 1 : -1) > 0, 'Mirroring must preserve the joint bend relative to facing');
+        }
+      }
+    }
+    assert(liftedForeleg);
   });
 
   test('Mounted and dagger attacks prepare continuously, contact on damage, then settle without residual motion', () => {
@@ -80,7 +114,7 @@ export function registerAnimationTests(test, assert, near) {
         const mount = getMountPose({ horse: type === 'knight', bodyOffset: attack.body });
         mount.legs.forEach((leg, index) => {
           near(length(leg.foot, resting.legs[index].foot), 0, 'Body momentum must not move planted feet');
-          near(length(leg.hip, leg.knee), leg.upper); near(length(leg.knee, leg.ankle), leg.lower);
+          for (const bone of leg.bones) near(length(bone.from, bone.to), bone.length);
         });
       } else for (const side of [-1, 1]) {
         const hip = [side * 5 + attack.body.x, -24 + attack.body.y], ankle = [side < 0 ? -9 : 14, -5];

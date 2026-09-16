@@ -1,5 +1,6 @@
 import { RULES, UNITS, AGES, TURRETS, ABILITIES, createGame, getIncomeRate, getRecruitState, recruit, cancelTraining, getEvolutionState, evolve, getTurretState, buildTurret, getExpansionState, expandTurretSlots, sellTurret, castAbility, updateGame } from './game.js';
 import { createCivilizationUI, formatMultiplier } from './civilization-ui.js';
+import { getGameMode } from './debug.js';
 import { createRenderer } from './render.js';
 import { drawUnit } from './units.js';
 import { drawTurret } from './turrets.js';
@@ -48,14 +49,25 @@ const queueSlots = Array.from({ length: RULES.queueLimit }, (_, index) => {
   byId('training-queue').append(button);
   return button;
 });
-const incremental = new URLSearchParams(location.search).get('mode') === 'incremental';
+const mode = getGameMode(location.search);
+const incremental = mode !== 'classic';
+document.body.dataset.mode = mode;
+if (mode !== 'incremental') {
+  byId('mode-link').href = './';
+  byId('mode-link').textContent = '返回增量模式';
+}
+if (mode === 'debug') {
+  byId('debug-link').href = '?mode=classic';
+  byId('debug-link').textContent = '经典模式';
+  document.title = 'Before the Stars · 快速调试';
+}
 const civilization = incremental ? createCivilizationUI(resetBattle => {
   game = civilization.session.game;
   accumulator = 0; lastTime = null;
   if (resetBattle) resetBattleView();
   syncUI(); render(game, { targeting, targetX });
   if (resetBattle && !civilization.modalOpen && game.status === 'playing') byId('recruit').focus({ preventScroll: true });
-}) : null;
+}, { debug: mode === 'debug' }) : null;
 let game = civilization?.session.game ?? createGame();
 let lastTime = null;
 let accumulator = 0;
@@ -445,11 +457,12 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('pagehide', () => civilization?.save());
 byId('mode-link').addEventListener('click', () => civilization?.save());
+byId('debug-link').addEventListener('click', () => civilization?.save());
 
 function frame(timestamp) {
   if (lastTime !== null && !document.hidden && !helpDialog.open && !civilization?.paused && game.status === 'playing') {
-    accumulator += Math.min((timestamp - lastTime) / 1000, 0.1);
-    while (accumulator >= RULES.fixedStep) {
+    accumulator += Math.min((timestamp - lastTime) / 1000, 0.1) * (civilization?.timeScale ?? 1);
+    while (accumulator >= RULES.fixedStep && game.status === 'playing') {
       if (civilization) civilization.step(RULES.fixedStep);
       else updateGame(game, RULES.fixedStep);
       accumulator -= RULES.fixedStep;

@@ -3,8 +3,9 @@
 // Test-only in-memory storage and controllable clock. Never touch a player's save.
 const root = new URL('../', location.href).href;
 const { raw, unavailable = false } = JSON.parse(window.name || '{}');
-const { SAVE_KEY } = await import('../src/save.js?fixture-bootstrap');
-const entries = new Map(raw ? [[SAVE_KEY, raw]] : []);
+const { SAVE_KEY, DEBUG_SAVE_KEY } = await import('../src/save.js?fixture-bootstrap');
+const key = new URLSearchParams(location.search).get('mode') === 'debug' ? DEBUG_SAVE_KEY : SAVE_KEY;
+const entries = new Map(raw ? [[key, raw]] : []);
 const available = () => { if (unavailable) throw new Error('Storage denied'); };
 window.__storage = { getItem: key => { available(); return entries.get(key) ?? null; }, setItem: (key, value) => { available(); entries.set(key, value); }, removeItem: key => { available(); entries.delete(key); } };
 window.__confirmMessages = [];
@@ -12,7 +13,7 @@ window.confirm = message => { window.__confirmMessages.push(message); return Boo
 window.requestAnimationFrame = callback => (window.__testFrame = callback, 1);
 const fixture = URL.createObjectURL(new Blob([`export * from '${root}src/save.js?isolated';
 import { createSaveStore as original } from '${root}src/save.js?isolated';
-export function createSaveStore() { return original(() => window.__storage); }`], { type: 'text/javascript' }));
+export function createSaveStore(unused, options) { return original(() => window.__storage, options); }`], { type: 'text/javascript' }));
 const map = JSON.stringify({ imports: { [`${root}src/save.js`]: fixture } });
 const html = await (await fetch('../index.html')).text();
 document.open();

@@ -1,8 +1,10 @@
 import { RULES, AGES, UNITS, TURRETS, ABILITIES } from './game.js';
 import { SAVE_VERSION, SURFACE, UPGRADE_COSTS, AUTOMATION_TARGETS, AUTOMATION_INTERVAL, getBonuses } from './progression-config.js';
+import { DEBUG_SPEEDS } from './debug.js';
 
 export const SAVE_KEY = 'before-the-stars.incremental.v1';
 export const BACKUP_KEY = `${SAVE_KEY}.backup`;
+export const DEBUG_SAVE_KEY = 'before-the-stars.debug.v1';
 export const MAX_SAVE_BYTES = 2_000_000;
 const teams = ['player', 'enemy'];
 const limit = 1e12;
@@ -44,6 +46,8 @@ function safeTree(value, depth = 0, key = '') {
 export function validateSession(session) {
   check(object(session), '根记录');
   check(session.version === SAVE_VERSION, '不支持的存档版本');
+  check(session.debug === undefined || session.debug === true, '调试标记');
+  check(session.debug === true ? DEBUG_SPEEDS.includes(session.debugSpeed) : session.debugSpeed === undefined, '调试速度');
   safeTree(session);
   const { permanent: p, run, game: g } = session;
   check(object(p) && object(run) && object(g), '缺少永久、文明或战斗状态');
@@ -167,31 +171,37 @@ export function parseSession(text) {
 
 // Both permanent rewards and the settlement marker are committed in ONE record.
 // A corrupt/unknown record blocks automatic writes until explicit recovery/import/reset.
-export function createSaveStore(getStorage = () => globalThis.localStorage) {
+export function createSaveStore(getStorage = () => globalThis.localStorage, { debug = false } = {}) {
+  const saveKey = debug ? DEBUG_SAVE_KEY : SAVE_KEY, backupKey = `${saveKey}.backup`;
   let blocked = false, observed = null;
-  const valid = raw => { try { return raw ? parseSession(raw) : null; } catch { return null; } };
+  function checkMode(session) {
+    check((session.debug === true) === debug, '正式存档与调试存档不能互相导入');
+    return session;
+  }
+  const parse = raw => checkMode(parseSession(raw));
+  const valid = raw => { try { return raw ? parse(raw) : null; } catch { return null; } };
   const errorResult = error => ({ ok: false, error: error.message || '本地存储不可用，请导出存档。' });
   function load() {
     try {
       const storage = getStorage();
-      observed = storage.getItem(SAVE_KEY);
-      const backupRaw = storage.getItem(BACKUP_KEY), backup = valid(backupRaw);
+      observed = storage.getItem(saveKey);
+      const backupRaw = storage.getItem(backupKey), backup = valid(backupRaw);
       if (observed === null && backupRaw === null) return { session: null, ok: true };
-      try { return { session: parseSession(observed), ok: true }; }
+      try { return { session: parse(observed), ok: true }; }
       catch (error) { blocked = true; return { ...errorResult(error), session: null, backupAvailable: Boolean(backup), blocked: true }; }
     } catch (error) { return { ...errorResult(error), session: null }; }
   }
   function write(session, replace = false) {
     try {
       if (blocked && !replace) throw new Error('原存档已受保护：请恢复备份、导入有效存档或明确清空后再保存。');
-      const raw = serializeSession(session), storage = getStorage();
-      const previous = storage.getItem(SAVE_KEY);
+      const raw = serializeSession(checkMode(session)), storage = getStorage();
+      const previous = storage.getItem(saveKey);
       if (!replace && previous !== observed) {
         blocked = true;
         throw new Error('另一页面已更新存档。请刷新读取最新进度；当前进度可先导出。');
       }
-      if (valid(previous)) storage.setItem(BACKUP_KEY, previous);
-      storage.setItem(SAVE_KEY, raw);
+      if (valid(previous)) storage.setItem(backupKey, previous);
+      storage.setItem(saveKey, raw);
       observed = raw; blocked = false;
       return { ok: true };
     } catch (error) { return errorResult(error); }
@@ -200,17 +210,17 @@ export function createSaveStore(getStorage = () => globalThis.localStorage) {
     load, save: session => write(session), replace: session => write(session, true),
     recover() {
       try {
-        const session = parseSession(getStorage().getItem(BACKUP_KEY));
+        const session = parse(getStorage().getItem(backupKey));
         const result = write(session, true);
         return { ...result, session: result.ok ? session : null };
       } catch (error) { return errorResult(error); }
     },
     clear(session) {
       try {
-        const raw = serializeSession(session), storage = getStorage();
+        const raw = serializeSession(checkMode(session)), storage = getStorage();
         // Do not report a failed reset after having already replaced the main record.
-        storage.removeItem(BACKUP_KEY);
-        storage.setItem(SAVE_KEY, raw);
+        storage.removeItem(backupKey);
+        storage.setItem(saveKey, raw);
         observed = raw; blocked = false;
         return { ok: true };
       } catch (error) { return errorResult(error); }

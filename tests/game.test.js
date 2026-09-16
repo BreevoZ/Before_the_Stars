@@ -8,6 +8,11 @@ import { drawProjectile, drawImpact, drawFields, drawAbilityImpact } from '../sr
 import { registerAnimationTests } from './animation-cases.js';
 import { registerProgressionTests } from './progression-cases.js';
 
+function loadClassicFixture(frame, html) {
+  frame.name = JSON.stringify({ html });
+  frame.src = './classic-fixture.html?mode=classic';
+}
+
 const tests = [];
 const test = (name, run) => tests.push({ name, run });
 function assert(condition, message = 'Assertion failed') { if (!condition) throw new Error(message); }
@@ -1144,7 +1149,7 @@ test('Invalid time deltas cannot corrupt state', () => {
 test('Browser UI: purchase, queue/refund, tower, meteor targeting, keyboard, training and reset', async () => {
   const frame = document.createElement('iframe');
   const loaded = new Promise(resolve => frame.addEventListener('load', resolve, { once: true }));
-  frame.src = '../'; frame.title = 'Game integration test';
+  frame.src = '../?mode=classic'; frame.title = 'Game integration test';
   document.body.append(frame);
   await loaded;
   const page = frame.contentDocument;
@@ -1192,7 +1197,7 @@ test('Browser UI: earn experience, evolve independently, replace cards and short
   const loaded = new Promise(resolve => frame.addEventListener('load', resolve, { once: true }));
   // Control only the frame clock; all gold, experience and progression come from normal play.
   const clock = '<script>window.requestAnimationFrame = callback => (window.__testFrame = callback, 1);</script>';
-  frame.srcdoc = html.replace('<head>', `<head><base href="${new URL('../', location.href).href}">${clock}`);
+  loadClassicFixture(frame, html.replace('<head>', `<head><base href="${new URL('../', location.href).href}">${clock}`));
   document.body.append(frame);
   await loaded;
   const page = frame.contentDocument;
@@ -1251,7 +1256,7 @@ test('Browser UI: expand, select a slot, build different towers, sell once, and 
   frame.title = 'Defense integration test';
   const loaded = new Promise(resolve => frame.addEventListener('load', resolve, { once: true }));
   const clock = '<script>window.requestAnimationFrame = callback => (window.__testFrame = callback, 1);</script>';
-  frame.srcdoc = html.replace('<head>', `<head><base href="${new URL('../', location.href).href}">${clock}`);
+  loadClassicFixture(frame, html.replace('<head>', `<head><base href="${new URL('../', location.href).href}">${clock}`));
   document.body.append(frame);
   await loaded;
   const page = frame.contentDocument;
@@ -1298,7 +1303,7 @@ test('Browser UI: all five rosters, era progress, income, support targeting and 
   const map = JSON.stringify({ imports: { [`${root}src/game.js`]: fixture } });
   const setup = `<base href="${root}"><script type="importmap">${map}</script><script>window.requestAnimationFrame = callback => (window.__testFrame = callback, 1);</script>`;
   const loaded = new Promise(resolve => frame.addEventListener('load', resolve, { once: true }));
-  frame.srcdoc = html.replace('<head>', `<head>${setup}`);
+  loadClassicFixture(frame, html.replace('<head>', `<head>${setup}`));
   document.body.append(frame);
   await loaded;
   const page = frame.contentDocument;
@@ -1351,7 +1356,7 @@ test('Browser UI: help exposes icon details, pauses training/income/cooldowns, b
   frame.title = 'Minimal interface and help integration test';
   const loaded = new Promise(resolve => frame.addEventListener('load', resolve, { once: true }));
   const clock = '<script>window.requestAnimationFrame = callback => (window.__testFrame = callback, 1);</script>';
-  frame.srcdoc = html.replace('<head>', `<head><base href="${new URL('../', location.href).href}">${clock}`);
+  loadClassicFixture(frame, html.replace('<head>', `<head><base href="${new URL('../', location.href).href}">${clock}`));
   document.body.append(frame);
   await loaded;
   const page = frame.contentDocument;

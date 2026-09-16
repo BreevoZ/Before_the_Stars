@@ -13,10 +13,18 @@
     <main class="game-shell">
       <header class="masthead">
         <div class="wordmark"><span class="brand-mark" aria-hidden="true">✳</span> BEFORE THE STARS</div>
-        <div class="masthead-actions"><a class="animation-link" id="mode-link" href="?mode=incremental">增量模式</a><button class="text-button" id="archives" type="button" hidden>文明档案</button><button class="text-button" id="pause-battle" type="button" hidden aria-pressed="false">暂停</button><a class="animation-link" href="./animations.html" title="无需开局，查看所有动画">动画</a>
+        <div class="masthead-actions"><button class="text-button" id="archives" type="button" hidden>文明档案</button><button class="text-button" id="pause-battle" type="button" hidden aria-pressed="false">暂停</button><a class="animation-link" href="./animations.html" title="无需开局，查看所有动画">动画</a>
         <button class="icon-button" id="help" type="button" data-icon="help" aria-label="帮助与单位资料" title="帮助与单位资料 · ?"></button></div>
       </header>
       <p id="save-warning" class="save-warning" role="status" hidden></p>
+      <section id="debug-tools" class="debug-tools" aria-label="快速调试" hidden>
+        <span class="debug-label">调试 · 独立存档</span>
+        <label>速度 <select id="debug-speed"><option value="1">1×</option><option value="5">5×</option><option value="10" selected>10×</option><option value="20">20×</option></select></label>
+        <button type="button" data-debug-command="resources" title="增加 10000 金币，补足手动进化到未来所需经验">补充资源</button>
+        <button type="button" data-debug-command="victory" title="摧毁当前敌方基地，走正常胜利流程">战役胜利</button>
+        <button type="button" data-debug-command="finale" title="将敌人推进到未来并摧毁基地，测试遗产结算">终局结算</button>
+        <button type="button" data-debug-command="defeat" title="摧毁我方基地，测试无奖励重试">战败</button>
+      </section>
       <section class="battle" aria-label="战场">
         <div class="battle-hud">
           <div class="base-status player-status">
@@ -80,6 +88,7 @@
           </div>
         </section>
       </section>
+      <nav class="mode-links" aria-label="其他模式"><a id="mode-link" href="?mode=classic">经典模式</a><a id="debug-link" href="?mode=debug">快速调试</a></nav>
       <p class="sr-only" id="announcement" role="status" aria-live="polite"></p>
       <noscript><p>请启用 JavaScript 后开始游戏。</p></noscript>
     </main>

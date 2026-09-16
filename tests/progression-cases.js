@@ -1,7 +1,8 @@
 import { RULES, AGES, UNITS, TURRETS, ABILITIES, createGame, getIncomeRate, getExperienceReward, recruit, evolve, buildTurret, expandTurretSlots, castAbility } from '../src/game.js';
 import { SURFACE } from '../src/progression-config.js';
 import { createProgression, resolveBattle, updateProgression, continueCivilization, rebuildCivilization, abandonCivilization, purchaseUpgrade, setAutomation } from '../src/progression.js';
-import { serializeSession, parseSession, createSaveStore, SAVE_KEY, BACKUP_KEY } from '../src/save.js';
+import { serializeSession, parseSession, createSaveStore, SAVE_KEY, BACKUP_KEY, DEBUG_SAVE_KEY } from '../src/save.js';
+import { getGameMode, createDebugProgression, supplyDebugRun, runDebugCommand, DEBUG_GOLD } from '../src/debug.js';
 
 function ageTo(game, age, team = 'player') {
   game.experience[team] = AGES[age].experienceRequired;
@@ -21,9 +22,9 @@ function memoryStorage() {
   const entries = new Map();
   return { getItem: key => entries.get(key) ?? null, setItem: (key, value) => entries.set(key, value), removeItem: key => entries.delete(key) };
 }
-async function mountFixture(raw, unavailable = false) {
+async function mountFixture(raw, unavailable = false, mode = 'incremental') {
   const frame = document.createElement('iframe'); frame.title = 'Incremental civilization integration test';
-  frame.name = JSON.stringify({ raw, unavailable }); frame.src = './incremental-fixture.html?mode=incremental';
+  frame.name = JSON.stringify({ raw, unavailable }); frame.src = `./incremental-fixture.html${mode ? `?mode=${mode}` : ''}`;
   document.body.append(frame);
   await new Promise((resolve, reject) => {
     const start = performance.now();
@@ -38,6 +39,40 @@ async function mountFixture(raw, unavailable = false) {
 
 export function registerProgressionTests(test, assert, near) {
   const throws = action => { let threw = false; try { action(); } catch { threw = true; } assert(threw, 'Expected invalid save to be rejected'); };
+  test('Modes: default and legacy incremental URLs use civilization; classic and debug require explicit URLs', () => {
+    for (const search of ['', '?mode=incremental', '?mode=unknown']) assert(getGameMode(search) === 'incremental');
+    assert(getGameMode('?mode=classic') === 'classic' && getGameMode('?mode=debug') === 'debug');
+    assert(!createGame().mode, 'The simulation factory must still default to classic rules');
+  });
+  test('Debug: commands are gated, use normal one-time settlement, and retain upgrades across rebuild', () => {
+    const formal = createProgression(), before = serializeSession(formal);
+    assert(!supplyDebugRun(formal) && !runDebugCommand(formal, 'finale') && serializeSession(formal) === before);
+    const s = createDebugProgression();
+    assert(s.debug && s.debugSpeed === 10 && s.game.gold.player === RULES.startingGold + DEBUG_GOLD);
+    assert(s.game.ages.player === 1 && s.game.experience.player === AGES[5].experienceRequired);
+    assert(runDebugCommand(s, 'victory') && s.run.phase === 'victory' && !s.permanent.legacy);
+    assert(!runDebugCommand(s, 'finale'));
+    continueCivilization(s, s.run.battleId);
+    assert(runDebugCommand(s, 'finale') && s.run.phase === 'destruction' && s.permanent.legacy === 1);
+    assert(!runDebugCommand(s, 'finale') && s.permanent.completedCycles === 1);
+    purchaseUpgrade(s, 'production'); rebuildCivilization(s, s.run.runId); supplyDebugRun(s);
+    assert(s.debug && s.game.modifiers.income === 1.5 && s.game.gold.player === RULES.startingGold + DEBUG_GOLD);
+    assert(runDebugCommand(s, 'defeat') && s.run.phase === 'defeat' && s.permanent.completedCycles === 1);
+    assert(serializeSession(parseSession(serializeSession(s))) === serializeSession(s));
+  });
+  test('Debug: save, backup, import and clear are isolated from production progress', () => {
+    const storage = memoryStorage(), formal = createSaveStore(() => storage), debug = createSaveStore(() => storage, { debug: true });
+    const normal = createProgression(), fast = createDebugProgression();
+    formal.load(); debug.load(); assert(formal.save(normal).ok && formal.save(normal).ok);
+    const raw = storage.getItem(SAVE_KEY), backup = storage.getItem(BACKUP_KEY);
+    assert(debug.save(fast).ok && storage.getItem(DEBUG_SAVE_KEY));
+    assert(!formal.replace(fast).ok && !debug.replace(normal).ok);
+    assert(debug.clear(createDebugProgression()).ok);
+    assert(storage.getItem(SAVE_KEY) === raw && storage.getItem(BACKUP_KEY) === backup);
+    const restored = createSaveStore(() => storage, { debug: true }).load();
+    assert(restored.ok && restored.session.debug && restored.session.debugSpeed === 10);
+    fast.debugSpeed = 999; throws(() => serializeSession(fast));
+  });
   test('M1: default classic game has no permanent modifiers and fresh civilizations have unique IDs', () => {
     const classic = createGame({ modifiers: { income: 9, experience: 9 } });
     assert(!classic.mode && !classic.modifiers);
@@ -351,5 +386,50 @@ export function registerProgressionTests(test, assert, near) {
       if (!unavailable) assert(frame.contentWindow.__storage.getItem(SAVE_KEY) === '{broken');
       frame.remove();
     }
+  });
+  test('Modes browser: bare URL opens normal civilization and keeps secondary modes below the battlefield', async () => {
+    const frame = await mountFixture(null, false, ''), page = frame.contentDocument;
+    assert(page.body.dataset.mode === 'incremental' && !page.getElementById('archives').hidden);
+    assert(page.getElementById('debug-tools').hidden && page.getElementById('gold').textContent === '180');
+    assert(page.querySelector('.mode-links #mode-link').getAttribute('href') === '?mode=classic');
+    assert(page.querySelector('.mode-links #debug-link').getAttribute('href') === '?mode=debug');
+    assert(frame.contentWindow.__storage.getItem(SAVE_KEY) && !frame.contentWindow.__storage.getItem(DEBUG_SAVE_KEY));
+    frame.remove();
+  });
+  test('Debug browser: fast fixed-step simulation pauses; ending, upgrading, rebuilding and reloading work in isolation', async () => {
+    let frame = await mountFixture(null, false, 'debug');
+    const page = () => frame.contentDocument, el = id => page().getElementById(id);
+    let time = 0;
+    const tick = seconds => { for (let i = 0; i < Math.round(seconds * 60); i++) frame.contentWindow.__testFrame(time += 1000 / 60); };
+    const command = name => page().querySelector(`[data-debug-command="${name}"]`).click();
+    assert(page().body.dataset.mode === 'debug' && !el('debug-tools').hidden && el('debug-speed').value === '10');
+    assert(el('gold').textContent === String(RULES.startingGold + DEBUG_GOLD));
+    frame.contentWindow.__testFrame(0); tick(1);
+    el('archives').click(); el('manual-save').click();
+    let saved = parseSession(frame.contentWindow.__storage.getItem(DEBUG_SAVE_KEY));
+    assert(Math.abs(saved.game.elapsed - 10) < 0.1, '10x speed must run 600 ordinary simulation steps per real second');
+    const elapsed = saved.game.elapsed; tick(5); el('manual-save').click();
+    saved = parseSession(frame.contentWindow.__storage.getItem(DEBUG_SAVE_KEY)); near(saved.game.elapsed, elapsed);
+    el('close-archives').click(); el('pause-battle').click(); tick(5);
+    el('pause-battle').click(); el('debug-speed').value = '20'; el('debug-speed').dispatchEvent(new Event('change'));
+    tick(0.5); el('archives').click(); el('manual-save').click();
+    saved = parseSession(frame.contentWindow.__storage.getItem(DEBUG_SAVE_KEY));
+    assert(saved.game.elapsed - elapsed > 9 && saved.game.elapsed - elapsed < 10.1);
+    el('close-archives').click(); command('victory');
+    assert(el('result-title').textContent === '战役胜利'); el('play-again').click();
+    assert(el('enemy-era').textContent === 'II');
+    command('finale'); assert(el('result-title').textContent === '文明未能幸存');
+    command('finale'); el('play-again').click();
+    assert(el('cycles').textContent === '1' && el('legacy').textContent === '1');
+    el('buy-production').click(); el('rebuild-civilization').click();
+    assert(el('income-rate').textContent === '+10.5/s' && el('gold').textContent === String(RULES.startingGold + DEBUG_GOLD));
+    saved = parseSession(frame.contentWindow.__storage.getItem(DEBUG_SAVE_KEY));
+    assert(!frame.contentWindow.__storage.getItem(SAVE_KEY)); frame.remove();
+    frame = await mountFixture(serializeSession(saved), false, 'debug');
+    assert(el('debug-speed').value === '20' && el('gold').textContent === String(saved.game.gold.player), 'Reload must not grant resources twice');
+    assert(el('income-rate').textContent === '+10.5/s');
+    command('defeat'); el('play-again').click(); assert(el('cycles').textContent === '1' && el('legacy').textContent === '0');
+    frame.style.width = '360px'; assert(page().documentElement.scrollWidth <= frame.clientWidth);
+    frame.remove();
   });
 }

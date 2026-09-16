@@ -219,6 +219,15 @@ progress::-moz-progress-bar { background: var(--player); border-radius: 2px; }
 .masthead-actions { display: flex; align-items: center; gap: 16px; }
 .animation-link { color: var(--muted, #97a48e); font-size: 12px; text-decoration: none; }
 .animation-link:hover { color: #dbe3c9; }
+.mode-links { display: flex; justify-content: flex-end; gap: 18px; padding-top: 14px; }
+.mode-links a { color: #899b90; font-size: 11px; text-decoration: none; }
+.mode-links a:hover { color: var(--player); }
+.mode-links a:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; }
+.debug-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 14px; padding: 10px 14px; border: 1px dashed #64765d; border-radius: 7px; color: var(--muted); font-size: 11px; }
+.debug-label { color: var(--gold); margin-right: auto; }
+.debug-tools button, .debug-tools select { color: #cfdbc9; font: inherit; background: #26372c; border: 1px solid #465a49; border-radius: 4px; min-height: 34px; padding: 4px 9px; }
+.debug-tools button:disabled { opacity: .4; }
+.debug-tools select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 /* Civilization controls use the same quiet palette; the battlefield keeps priority. */
 .text-button { border: 0; background: transparent; color: var(--muted); padding: 10px 0; font-size: 12px; white-space: nowrap; }

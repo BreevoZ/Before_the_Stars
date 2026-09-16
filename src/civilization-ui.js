@@ -2,15 +2,17 @@ import { getIncomeRate, AGES } from './game.js';
 import { createProgression, updateProgression, continueCivilization, rebuildCivilization, abandonCivilization, purchaseUpgrade, getUpgradeState, setAutomation } from './progression.js';
 import { UPGRADES, UPGRADE_COSTS, SAVE_INTERVAL } from './progression-config.js';
 import { createSaveStore, serializeSession, parseSession, MAX_SAVE_BYTES } from './save.js';
+import { createDebugProgression, supplyDebugRun, runDebugCommand, DEBUG_SPEEDS } from './debug.js';
 
 const el = id => document.getElementById(id);
 const text = (id, value) => { if (el(id).textContent !== String(value)) el(id).textContent = value; };
 export const formatMultiplier = value => String(value);
 
-export function createCivilizationUI(onChange) {
-  const store = createSaveStore();
+export function createCivilizationUI(onChange, { debug = false } = {}) {
+  const store = createSaveStore(undefined, { debug });
   const loaded = store.load();
-  let session = loaded.session ?? createProgression();
+  const freshSession = () => debug ? createDebugProgression() : createProgression();
+  let session = loaded.session ?? freshSession();
   let saveElapsed = 0, manualPause = false;
   const dialog = el('archives-dialog');
   function report(result, success = '已保存完整文明进度。') {
@@ -24,10 +26,11 @@ export function createCivilizationUI(onChange) {
   function open() { if (!dialog.open) dialog.showModal(); changed(); }
   function replace(next) { session = next; saveElapsed = 0; changed(true); }
   function transition(action) {
+    const runId = session.run.runId;
     if (!action()) return;
+    if (debug && session.run.runId !== runId) supplyDebugRun(session);
     save(); dialog.close(); changed(true);
   }
-  el('mode-link').href = './'; text('mode-link', '经典模式');
   el('restart').title = '重开本轮文明 · 永久进度保留';
   el('restart').setAttribute('aria-label', '重开本轮文明');
   el('archives').hidden = false; el('pause-battle').hidden = false;
@@ -35,6 +38,19 @@ export function createCivilizationUI(onChange) {
   el('close-archives').addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => changed());
   el('pause-battle').addEventListener('click', () => { manualPause = !manualPause; changed(); });
+  if (debug) {
+    el('debug-tools').hidden = false;
+    el('clear-progress').textContent = '清空调试进度';
+    el('debug-speed').value = String(session.debugSpeed);
+    el('debug-speed').addEventListener('change', () => {
+      const speed = Number(el('debug-speed').value);
+      if (!DEBUG_SPEEDS.includes(speed)) return;
+      session.debugSpeed = speed; save(); changed();
+    });
+    document.querySelectorAll('[data-debug-command]').forEach(button => button.addEventListener('click', () => {
+      if (runDebugCommand(session, button.dataset.debugCommand)) { save(); changed(); }
+    }));
+  }
   for (const [key, config] of Object.entries(UPGRADES)) {
     const row = document.createElement('div'); row.className = 'upgrade-row';
     row.innerHTML = `<div><h4>${config.name} <span id="level-${key}"></span></h4><p id="effect-${key}"></p></div><button type="button" id="buy-${key}"></button>`;
@@ -55,7 +71,7 @@ export function createCivilizationUI(onChange) {
     try {
       const raw = serializeSession(session); el('save-data').value = raw;
       const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' }));
-      const link = document.createElement('a'); link.href = url; link.download = `before-the-stars-${session.run.runId}.json`;
+      const link = document.createElement('a'); link.href = url; link.download = `before-the-stars-${debug ? 'debug-' : ''}${session.run.runId}.json`;
       link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
       text('save-status', '存档已导出；下方也保留可复制的完整内容。');
     } catch (error) { report({ ok: false, error: error.message }); }
@@ -71,6 +87,7 @@ export function createCivilizationUI(onChange) {
   el('import-save').addEventListener('click', () => {
     try {
       const next = parseSession(el('save-data').value);
+      if ((next.debug === true) !== debug) throw new Error('正式存档与调试存档不能互相导入。');
       if (!window.confirm(`存档有效：${next.permanent.completedCycles} 次循环，${next.permanent.legacy} 遗产。替换当前全部增量进度？建议先导出当前存档。`)) return;
       if (report(store.replace(next), '存档已导入，战斗保持在保存时刻。')) replace(next);
     } catch (error) { text('save-status', `未导入：${error.message}`); }
@@ -81,8 +98,8 @@ export function createCivilizationUI(onChange) {
     if (report(result, '已恢复有效备份。')) replace(result.session);
   });
   el('clear-progress').addEventListener('click', () => {
-    if (!window.confirm('清空全部增量进度及本地备份？这会永久删除循环次数、遗产、升级和当前文明，无法撤销。建议先导出存档。')) return;
-    const next = createProgression();
+    if (!window.confirm(debug ? '清空调试进度及调试备份？正式增量存档保持不变。' : '清空全部增量进度及本地备份？这会永久删除循环次数、遗产、升级和当前文明，无法撤销。建议先导出存档。')) return;
+    const next = freshSession();
     if (report(store.clear(next), '全部进度已清空。')) { replace(next); dialog.close(); }
   });
 
@@ -90,6 +107,10 @@ export function createCivilizationUI(onChange) {
     const { run, permanent: p, game } = session;
     const between = ['destruction', 'defeat'].includes(run.phase);
     document.body.dataset.civilizationPhase = run.phase;
+    if (debug) {
+      el('debug-speed').value = String(session.debugSpeed);
+      document.querySelectorAll('[data-debug-command]').forEach(button => { button.disabled = run.phase !== 'battle'; });
+    }
     text('archives-title', run.phase === 'destruction' ? '文明毁灭 · 遗产' : '文明档案');
     text('archive-run', `地表文明 · 第 ${run.battleNumber} 场冲突 · 本轮 ${Math.floor(run.elapsed / 60)} 分 ${Math.floor(run.elapsed % 60)} 秒`);
     text('cycles', p.completedCycles); text('legacy', p.legacy);
@@ -130,6 +151,7 @@ export function createCivilizationUI(onChange) {
     get session() { return session; },
     get paused() { return manualPause || dialog.open; },
     get modalOpen() { return dialog.open; },
+    get timeScale() { return debug ? session.debugSpeed : 1; },
     sync, save, open,
     step(dt) {
       const resolved = updateProgression(session, dt);

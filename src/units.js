@@ -1,4 +1,5 @@
 import { UNITS } from './game.js';
+import { getMountPose } from './mount-motion.js';
 
 // The landscape's sage, stone and ochre palette carries into every era.
 // Silhouettes and a few material planes describe equipment; no enclosing ink outlines.
@@ -105,17 +106,26 @@ function cavePerson(ctx, c, m, slinger) {
   }
   ctx.restore();
 }
-function mountLegs(ctx, m, horse) {
-  for (const back of [true, false]) for (const side of [-1, 1]) {
-    const x = side * 22 + (back ? -5 : 2);
-    const gait = Math.sin(m.stride + (side < 0 ? Math.PI : 0) + (back ? 1.8 : 0)) * Number(m.moving);
-    limb(ctx, [[x, -24], [x - gait * 5, -13], [x + gait * 9, -3 - Math.max(0, gait) * 4]], back ? MATERIAL.oliveDark : horse ? MATERIAL.wood : MATERIAL.olive, horse ? 5 : 7);
-    stroke(ctx, [[x + gait * 9 - 2, -2 - Math.max(0, gait) * 4], [x + gait * 9 + 4, -2 - Math.max(0, gait) * 4]], horse ? MATERIAL.leather : MATERIAL.hide, 2.5);
+function mountLegs(ctx, pose, horse, far) {
+  for (const leg of pose.legs.filter(leg => leg.far === far)) {
+    const color = horse ? (far ? MATERIAL.woodDark : MATERIAL.wood) : (far ? MATERIAL.oliveDark : MATERIAL.olive);
+    limb(ctx, [leg.hip, leg.knee], color, horse ? 5 : 9);
+    limb(ctx, [leg.knee, leg.ankle], color, horse ? 3.5 : 5);
+    limb(ctx, [leg.ankle, leg.foot], far ? shade(color) : color, horse ? 3 : 4);
+    const [x, y] = leg.foot;
+    if (horse) shape(ctx, [[x - 3, y - 2], [x + 2, y - 2], [x + 4, y + 2], [x - 3, y + 2]], MATERIAL.leather);
+    else {
+      stroke(ctx, [[x - 2, y], [x + 7, y], [x + 10, y + 1]], color, 3);
+      stroke(ctx, [[x + 5, y], [x + 8, y + 2]], MATERIAL.hide, 1.5);
+      stroke(ctx, [[x + 8, y], [x + 11, y + 1]], MATERIAL.hide, 1.5);
+    }
   }
 }
 function dinosaur(ctx, c, m) {
-  mountLegs(ctx, m, false);
-  ctx.save(); ctx.translate(m.strike * 4, -Math.abs(m.gait) * 0.8);
+  const pose = getMountPose({ distance: m.distance, moving: m.moving, strike: m.strike, offset: m.mountOffset });
+  m = { ...m, gait: pose.sway };
+  mountLegs(ctx, pose, false, true);
+  ctx.save(); ctx.translate(pose.body.x, pose.body.y);
   shape(ctx, [[-18, -38], [-38, -34], [-67, -38 + m.gait * 2], [-47, -25], [-22, -19]], MATERIAL.oliveDark);
   shape(ctx, [[-36, -34], [-22, -47], [7, -46], [24, -34], [23, -21], [7, -14], [-20, -16], [-32, -23]], MATERIAL.olive);
   shape(ctx, [[-32, -26], [-16, -21], [13, -21], [23, -28], [23, -21], [7, -14], [-20, -16]], MATERIAL.oliveDark);
@@ -127,6 +137,11 @@ function dinosaur(ctx, c, m) {
   if (m.strike > 0.2) for (const x of [49, 58]) shape(ctx, [[x, -45], [x + 3, -45], [x + 1, -42]], MATERIAL.steelLight);
   stroke(ctx, [[44, -55], [47, -55]], INK, 1.4);
   stroke(ctx, [[37, -48], [24, -36], [-7, -48]], MATERIAL.woodLight, 1.5);
+  // Small forelimbs stay clear of the ground; the hind legs carry the rider.
+  limb(ctx, [[23, -37], [19, -28], [28, -25]], MATERIAL.oliveDark, 3.5);
+  stroke(ctx, [[28, -25], [32, -23], [32, -26]], MATERIAL.hide, 1.5);
+  ctx.restore(); mountLegs(ctx, pose, false, false);
+  ctx.save(); ctx.translate(pose.body.x, pose.body.y);
   shape(ctx, [[-22, -45], [3, -47], [14, -29], [-18, -22]], c.cloth);
   shape(ctx, [[-21, -44], [-17, -44], [-10, -24], [-14, -23]], c.trim);
   limb(ctx, [[-6, -58], [7, -44], [0, -29]], c.skin, 5);
@@ -172,14 +187,18 @@ function swordAndBow(ctx, c, m, bow, unit) {
   ctx.restore();
 }
 function cavalry(ctx, c, m, unit) {
-  mountLegs(ctx, m, true);
-  ctx.save(); ctx.translate(m.strike * 4, -Math.abs(m.gait) * 0.8);
+  const pose = getMountPose({ horse: true, distance: m.distance, moving: m.moving, strike: m.strike, offset: m.mountOffset });
+  m = { ...m, gait: pose.sway };
+  mountLegs(ctx, pose, true, true);
+  ctx.save(); ctx.translate(pose.body.x, pose.body.y);
   shape(ctx, [[-26, -39], [-37, -33], [-42, -16 + m.gait * 2], [-36, -21], [-30, -33]], MATERIAL.hair);
   shape(ctx, [[-32, -35], [-24, -45], [12, -46], [26, -35], [23, -23], [-22, -19], [-31, -25]], MATERIAL.wood);
   shape(ctx, [[17, -32], [20, -50], [26, -64], [35, -57], [43, -45], [36, -36], [29, -25]], MATERIAL.woodLight);
   shape(ctx, [[23, -56], [23, -68], [29, -61], [33, -67], [37, -56]], MATERIAL.woodLight);
   shape(ctx, [[28, -57], [41, -51], [47, -43], [43, -39], [30, -42], [22, -49]], MATERIAL.steel);
   stroke(ctx, [[33, -52], [35, -52]], INK, 1);
+  ctx.restore(); mountLegs(ctx, pose, true, false);
+  ctx.save(); ctx.translate(pose.body.x, pose.body.y);
   shape(ctx, [[-29, -40], [18, -43], [22, -17], [5, -12], [-10, -18], [-26, -13]], c.cloth);
   shape(ctx, [[-22, -39], [-17, -40], [-13, -19], [-18, -16]], c.trim);
   shape(ctx, [[-16, -66], [-4, -70], [10, -62], [6, -47], [-16, -47]], c.metal);
@@ -365,7 +384,7 @@ export function drawUnit(ctx, unit, time, scale = 1, reducedMotion = false) {
   const distance = unit.distanceTravelled ?? (unit.moving ? time * stats.speed : 0);
   const stride = distance / (stats.footprint ? 13 : 6) + unit.id * 1.7;
   const m = { moving, distance: reducedMotion ? 0 : distance, stride, gait: moving ? Math.sin(stride) : 0,
-    clock: reducedMotion ? 0 : time, breathe: reducedMotion ? 0 : Math.sin(time * 2 + unit.id), reduced: reducedMotion,
+    clock: reducedMotion ? 0 : time, breathe: reducedMotion ? 0 : Math.sin(time * 2 + unit.id), reduced: reducedMotion, mountOffset: (unit.id * 0.17) % 1,
     remaining, progress, age: progress * duration, kick: reducedMotion ? 0 : (1 - progress) ** 2,
     strike: reducedMotion || !remaining ? 0 : Math.max(0, Math.sin(Math.PI * Math.min(1, progress * 1.3 + 0.15))),
     windup: !reducedMotion && !moving && unit.attackCooldown > 0 && unit.attackCooldown < 0.18 ? 1 - unit.attackCooldown / 0.18 : 0 };

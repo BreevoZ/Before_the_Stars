@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>动画工坊 · Before the Stars</title>
+  <link rel="stylesheet" href="./src/animations.css">
+  <script type="module" src="./src/animations.js"></script>
+</head>
+<body>
+  <header class="site-header"><a href="./index.html">← 返回战场</a><span>BEFORE THE STARS</span></header>
+  <main>
+    <nav class="catalog-nav" aria-label="图鉴分类"><a href="./units.html">兵种</a><a href="./turrets.html">炮塔</a><a href="./animations.html" aria-current="page">动画</a></nav>
+    <div class="intro"><p class="eyebrow">MOTION STUDIES</p><h1>动画工坊</h1><p>每一步、每一击，都可以慢慢看。点击画面放大。</p></div>
+    <section class="transport" aria-label="动画播放控制">
+      <div class="control-row">
+        <button type="button" data-control="play">暂停</button><button type="button" data-control="step" title="前进 1/60 秒，并暂停">下一帧</button><button type="button" data-control="reset">重播</button>
+        <label>速度 <select id="speed"><option value="0.25">¼ ×</option><option value="0.5">½ ×</option><option value="1" selected>1 ×</option></select></label>
+        <label>模型阵营 <select id="team"><option value="player">我方</option><option value="enemy">敌方</option></select></label>
+        <label>部队动作 <select id="action"><option value="march">行进</option><option value="attack">攻击 / 冲锋</option><option value="idle">待机</option><option value="hit">受击 / 格挡</option></select></label>
+        <label class="check"><input id="guides" type="checkbox">步态辅助线</label>
+      </div>
+      <div class="timeline"><label for="timeline">时间</label><input id="timeline" data-timeline type="range" min="0" max="8" step="0.0166666667" value="0"><output data-time for="timeline">0.00 / 8.00 s</output></div>
+    </section>
+    <div class="filters">
+      <nav id="categories" aria-label="动画分类"></nav>
+      <div class="find"><label for="search">搜索</label><input id="search" type="search" placeholder="恐龙、火箭、星空…"><label class="sr-only" for="era">时代</label><select id="era"><option value="all">所有时代</option><option value="1">原始</option><option value="2">中世纪</option><option value="3">文艺复兴</option><option value="4">现代</option><option value="5">未来</option></select></div>
+    </div>
+    <p class="result-count" id="count" aria-live="polite"></p>
+    <div id="clips" class="clips"></div>
+    <p id="empty" hidden>没有找到匹配的动画。试试其他名称或时代。</p>
+    <p class="footnote">预览与战场共用模型、特效和战斗时序。8 秒时间轴内，短动画自动循环；部队原地行进，地面随步伐滚动。大招展示我方施放过程。</p>
+  </main>
+  <dialog id="viewer" aria-labelledby="viewer-title">
+    <div class="viewer-heading"><div><p class="eyebrow" id="viewer-category"></p><h2 id="viewer-title"></h2></div><button id="close-viewer" type="button" aria-label="关闭放大预览">关闭 ×</button></div>
+    <canvas id="viewer-canvas" role="img" aria-label="放大的动画预览"></canvas>
+    <p id="viewer-description"></p>
+    <div class="viewer-controls"><button type="button" data-control="play">暂停</button><button type="button" data-control="step">下一帧</button><button type="button" data-control="reset">重播</button><label>慢放 <select id="viewer-speed"><option value="0.25">¼ ×</option><option value="0.5">½ ×</option><option value="1" selected>1 ×</option></select></label></div>
+    <div class="viewer-controls"><label>部队动作 <select id="viewer-action"><option value="march">行进</option><option value="attack">攻击 / 冲锋</option><option value="idle">待机</option><option value="hit">受击 / 格挡</option></select></label><label>模型阵营 <select id="viewer-team"><option value="player">我方</option><option value="enemy">敌方</option></select></label><label class="check"><input id="viewer-guides" type="checkbox">步态辅助线</label></div>
+    <div class="timeline"><label for="viewer-timeline">时间</label><input id="viewer-timeline" data-timeline type="range" min="0" max="8" step="0.0166666667" value="0"><output data-time for="viewer-timeline">0.00 / 8.00 s</output></div>
+  </dialog>
+</body>
+</html>

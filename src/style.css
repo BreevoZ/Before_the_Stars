@@ -215,3 +215,7 @@ progress::-moz-progress-bar { background: var(--player); border-radius: 2px; }
   .unit-card, .turret-card { height: 90px; }
   .unit-card .unit-icon, .unit-card .unit-icon canvas, .turret-card .turret-icon, .turret-card .turret-icon canvas { height: 58px; }
 }
+
+.masthead-actions { display: flex; align-items: center; gap: 16px; }
+.animation-link { color: var(--muted, #97a48e); font-size: 12px; text-decoration: none; }
+.animation-link:hover { color: #dbe3c9; }

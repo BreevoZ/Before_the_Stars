@@ -5,6 +5,7 @@ import { drawTurret } from '../src/turrets.js';
 import { drawBase } from '../src/bases.js';
 import { getProjectilePose, getProjectileProfile, createProjectileImpact } from '../src/projectiles.js';
 import { drawProjectile, drawImpact, drawFields, drawAbilityImpact } from '../src/combat-effects.js';
+import { registerAnimationTests } from './animation-cases.js';
 
 const tests = [];
 const test = (name, run) => tests.push({ name, run });
@@ -1748,6 +1749,7 @@ test('Weapon impacts and abilities render distinctly, animate, and restore canva
   assert(oil !== paint(() => drawFields(ctx, game, 0, 1, true)), 'Boiling oil must not look like burning ground');
 });
 
+registerAnimationTests(test, assert, near);
 let failures = 0;
 for (const { name, run } of tests) {
   const item = document.createElement('li');

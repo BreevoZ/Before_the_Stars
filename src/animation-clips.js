@@ -5,6 +5,7 @@ import { drawBase } from './bases.js';
 import { drawProjectile, drawFields } from './combat-effects.js';
 import { drawLandscape, drawBattleEffects } from './render.js';
 import { getMountPose } from './mount-motion.js';
+import { BASE_DESIGNS } from './base-layouts.js';
 
 export const CLIP_SECONDS = 8;
 export const CATEGORIES = { all: '全部', unit: '部队', turret: '炮塔', combat: '弹道与命中', ability: '大招与地面', scene: '基地与环境' };
@@ -21,7 +22,7 @@ export const ANIMATION_CLIPS = [
   }))),
   ...Object.entries(AGES).map(([age, stats]) => ({ id: `ability-${stats.ability}`, category: 'ability', kind: 'ability', type: stats.ability, age: +age, name: ABILITIES[stats.ability].name, note: ABILITIES[stats.ability].description })),
   ...['fire', 'oil'].map(type => ({ id: `field-${type}`, category: 'ability', kind: 'field', type, age: 2, name: type === 'fire' ? '燃烧区域' : '沸油与蒸汽', note: '落地后持续 2.4 秒 · 末段消散' })),
-  ...Object.entries(AGES).map(([age, stats]) => ({ id: `base-${age}`, category: 'scene', kind: 'base', age: +age, name: `${stats.shortName}基地`, note: '1–4 炮位扩容 → 进化光环 → 受损 → 废墟' })),
+  ...Object.entries(AGES).map(([age, stats]) => ({ id: `base-${age}`, category: 'scene', kind: 'base', age: +age, name: `${stats.shortName}基地 · ${BASE_DESIGNS[age].name}`, note: `${BASE_DESIGNS[age].description} 预览扩容、受损与废墟。` })),
   { id: 'day-night', category: 'scene', kind: 'sky', name: '昼夜更替', note: '将完整的 120 秒昼夜压缩到 8 秒预览' },
   { id: 'stars', category: 'scene', kind: 'stars', name: '星空闪烁', note: '夜间原速 · 每颗星拥有独立的闪烁节奏' },
 ];
@@ -134,7 +135,7 @@ export function createClipPainter(canvas, clip) {
     }
     const direction = team === 'player' ? 1 : -1;
     const worldWidth = clip.kind === 'ability' ? 850 : clip.kind === 'combat' ? 450 : clip.kind === 'base' ? 280 : clip.kind === 'unit' ? 200 : 270;
-    const worldHeight = clip.kind === 'ability' ? 410 : clip.kind === 'base' ? 240 : clip.kind === 'combat' ? 240 : 150;
+    const worldHeight = clip.kind === 'ability' ? 410 : clip.kind === 'base' ? 270 : clip.kind === 'combat' ? 240 : 150;
     const scale = Math.min(width / worldWidth, height / worldHeight);
     ctx.setTransform(scale, 0, 0, scale, width / 2, height * 0.84);
     const floorWidth = width / scale;

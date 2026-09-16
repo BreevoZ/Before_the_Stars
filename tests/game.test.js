@@ -305,12 +305,25 @@ test('Every purchased socket has continuous building support at desktop and mobi
       ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.translate(0, 390); drawBase(ctx, game.bases[team], age, 0, scale, slots);
       const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      // Follow opaque structure from the foundation. Curved braces and arches
+      // may carry a socket without a solid vertical column directly beneath it.
+      const connected = new Uint8Array(canvas.width * canvas.height), queue = [];
+      const visit = index => {
+        if (index >= 0 && index < connected.length && !connected[index] && pixels[index * 4 + 3] > 240) {
+          connected[index] = 1; queue.push(index);
+        }
+      };
+      for (let x = 0; x < canvas.width; x++) visit(389 * canvas.width + x);
+      for (let i = 0; i < queue.length; i++) {
+        const index = queue[i], x = index % canvas.width;
+        if (x > 0) visit(index - 1);
+        if (x < canvas.width - 1) visit(index + 1);
+        visit(index - canvas.width); visit(index + canvas.width);
+      }
       for (let slot = 0; slot < slots; slot++) {
         const mount = getTurretPosition(game, team, slot, scale);
-        for (let y = Math.ceil(390 + mount.y + 2); y < 389; y += 2) {
-          assert(pixels[(y * canvas.width + Math.round(mount.x)) * 4 + 3] === 255,
-            `Age ${age}, ${team}, ${slots} sockets, scale ${scale}: socket ${slot} must connect to the building at y=${y}`);
-        }
+        const pixel = Math.ceil(390 + mount.y + 2) * canvas.width + Math.round(mount.x);
+        assert(connected[pixel], `Age ${age}, ${team}, ${slots} sockets, scale ${scale}: socket ${slot} must connect to the foundation`);
       }
       if (team === 'player' && scale === 1) {
         let silhouette = ''; for (let i = 3; i < pixels.length; i += 4) silhouette += pixels[i] > 127 ? '1' : '0';
@@ -319,6 +332,25 @@ test('Every purchased socket has continuous building support at desktop and mobi
     }
   }
   assert(silhouettes.size === 20, 'Every era and purchased expansion needs a distinct building silhouette');
+});
+
+test('Base eras remain distinguishable as flat silhouettes before and after full expansion', () => {
+  const canvas = document.createElement('canvas'); canvas.width = 220; canvas.height = 260;
+  const ctx = canvas.getContext('2d');
+  for (const slots of [1, 4]) {
+    const masks = [];
+    for (let age = 1; age <= 5; age++) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, 220, 260); ctx.translate(110, 240);
+      drawBase(ctx, { x: 0, team: 'player', hp: 600, maxHp: 600 }, age, 0, 1, slots);
+      const data = ctx.getImageData(0, 0, 220, 260).data;
+      masks.push(Uint8Array.from({ length: 220 * 260 }, (_, i) => data[i * 4 + 3] > 240 ? 1 : 0));
+    }
+    for (let a = 0; a < 5; a++) for (let b = a + 1; b < 5; b++) {
+      let union = 0, overlap = 0;
+      for (let i = 0; i < masks[a].length; i++) { union += masks[a][i] | masks[b][i]; overlap += masks[a][i] & masks[b][i]; }
+      assert(overlap / union < 0.8, `Eras ${a + 1}/${b + 1}, ${slots} sockets: ${(overlap / union * 100).toFixed(1)}% silhouette overlap; color alone must not distinguish eras`);
+    }
+  }
 });
 
 test('Four towers fire independently from their actual positions and retain distinct cooldowns', () => {

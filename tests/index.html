@@ -8,6 +8,12 @@
       body { font: 15px/1.6 system-ui, sans-serif; margin: 32px; background: #101719; color: #e9eae4; }
       .pass { color: #a9d6bb; } .fail { color: #ff9a85; }
       iframe { display: block; width: min(1100px, 100%); height: 700px; border: 1px solid #46514c; margin-top: 24px; }
+      /* Keep the game fixture at the phone's real width (320px minimum). */
+      @media (max-width: 640px) {
+        body { margin: 12px 0; }
+        h1, #summary { padding-inline: 12px; }
+        iframe { border-inline: 0; }
+      }
     </style>
     <script type="module" src="./game.test.js"></script>
   </head>

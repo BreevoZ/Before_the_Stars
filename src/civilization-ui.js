@@ -1,6 +1,8 @@
 import { getIncomeRate, AGES } from './game.js';
-import { createProgression, updateProgression, continueCivilization, rebuildCivilization, abandonCivilization, purchaseUpgrade, getUpgradeState, setAutomation } from './progression.js';
-import { UPGRADES, UPGRADE_COSTS, SAVE_INTERVAL } from './progression-config.js';
+import { createProgression, updateProgression, continueCivilization, rebuildCivilization, abandonCivilization } from './progression.js';
+import { SAVE_INTERVAL, SURFACE } from './progression-config.js';
+import { getTalentBonuses, getLegacyReward, TALENT_VALUES } from './talents.js';
+import { createTalentUI } from './talent-ui.js';
 import { createSaveStore, serializeSession, parseSession, MAX_SAVE_BYTES } from './save.js';
 import { createDebugProgression, supplyDebugRun, runDebugCommand, DEBUG_SPEEDS } from './debug.js';
 
@@ -60,17 +62,7 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
       if (runDebugCommand(session, button.dataset.debugCommand)) { save(); changed(); }
     }));
   }
-  for (const [key, config] of Object.entries(UPGRADES)) {
-    const row = document.createElement('div'); row.className = 'upgrade-row';
-    row.innerHTML = `<div><h4>${config.name} <span id="level-${key}"></span></h4><p id="effect-${key}"></p></div><button type="button" id="buy-${key}"></button>`;
-    el('upgrade-list').append(row);
-    el(`buy-${key}`).addEventListener('click', () => { if (purchaseUpgrade(session, key)) { save(); changed(); } });
-  }
-  function automationChanged() {
-    if (setAutomation(session, el('auto-enabled').checked, el('auto-target').value)) { save(); changed(); }
-  }
-  el('auto-enabled').addEventListener('change', automationChanged);
-  el('auto-target').addEventListener('change', automationChanged);
+  const talentControls = createTalentUI(() => session, () => { save(); changed(); });
   el('rebuild-civilization').addEventListener('click', () => {
     const runId = session.run.runId;
     transition(() => rebuildCivilization(session, runId));
@@ -127,18 +119,9 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
       run.phase === 'defeat' ? '本轮未完成终局，无遗产奖励。已有永久档案仍然保留。' : '击败未来时代的敌方基地，完成地表文明循环；仅进化至未来并不算通关。');
     el('rebuild-rules').hidden = !between; el('rebuild-civilization').hidden = !between;
     text('rebuild-civilization', run.phase === 'defeat' ? '从原始时代重试' : '重建文明');
-    for (const [key, config] of Object.entries(UPGRADES)) {
-      const level = p.upgrades[key], state = getUpgradeState(session, key);
-      text(`level-${key}`, `${level} / ${UPGRADE_COSTS.length}`);
-      text(`effect-${key}`, `${config.description} ×${formatMultiplier(config.base ** level)}${level < UPGRADE_COSTS.length ? ` → ×${formatMultiplier(config.base ** (level + 1))}` : ' · 已满级'}`);
-      text(`buy-${key}`, level >= UPGRADE_COSTS.length ? '已满级' : `${UPGRADE_COSTS[level]} 遗产 · 升级`);
-      el(`buy-${key}`).disabled = state !== 'ready';
-      el(`buy-${key}`).title = { 'during-run': '两轮之间才能购买', legacy: '文明遗产不足', max: '已达最高等级', ready: '购买后在下轮开始时生效' }[state];
-    }
-    text('active-bonuses', `本轮：生产档案 ${run.upgrades.production} 级，${AGES[game.ages.player].income} × ${formatMultiplier(game.modifiers.income)} = ${formatMultiplier(getIncomeRate(game))} 金币/秒；战争档案 ${run.upgrades.warfare} 级，经验 ×${formatMultiplier(game.modifiers.experience)}。阵亡先按原规则向下取整，再乘倍率逐笔向下取整。击杀金币不变。`);
-    text('automation-hint', p.automation.unlocked ? '每 0.25 秒尝试一次正常付费招募；进化后跟随对应兵种位置。暂停、隐藏页面或结算时停止。' : '首次有效循环后永久免费解锁，默认关闭。');
-    el('auto-enabled').disabled = !p.automation.unlocked; el('auto-target').disabled = !p.automation.unlocked;
-    el('auto-enabled').checked = p.automation.enabled; el('auto-target').value = p.automation.target;
+    talentControls.sync();
+    const growth = getTalentBonuses(run.talents);
+    text('active-bonuses', `本轮：生产档案 ${run.upgrades.production} 级，${AGES[game.ages.player].income} × ${formatMultiplier(game.modifiers.income)} = ${formatMultiplier(getIncomeRate(game))} 金币/秒；战争档案 ${run.upgrades.warfare} 级，经验 ×${formatMultiplier(game.modifiers.experience)}。阵亡先按原规则向下取整，再乘倍率逐笔向下取整。重建储备提供起始金币 +${growth.startingGold}；战利品回收使击杀金币 ×${growth.bounty}，逐笔向下取整。终局遗产：(${SURFACE.legacyPerCycle} + ${run.talents.conservation}) × ${1 + run.talents.continuity * TALENT_VALUES.legacyMultiplierPerLevel}，向下取整 = ${getLegacyReward(run.talents)}。`);
     el('archives').hidden = p.completedCycles === 0;
     text('archives', `档案 · ${p.legacy}`);
     el('archives').setAttribute('aria-label', `文明档案，${p.legacy} 文明遗产`);
@@ -153,6 +136,7 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     }
   }
   if (!loaded.ok) report(loaded);
+  else if (loaded.migrated) report(store.save(session), '旧存档已升级，原有进度、档案等级和自动招募设置均已保留。');
   else if (!loaded.session) save();
   else text('save-status', '已恢复上次保存的完整进度，没有离线推进。');
   return {

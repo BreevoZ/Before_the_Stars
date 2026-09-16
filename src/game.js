@@ -95,7 +95,7 @@ export function createGame(options = {}) {
   };
   if (options.mode === 'incremental') {
     game.mode = 'incremental';
-    game.modifiers = { income: options.modifiers?.income ?? 1, experience: options.modifiers?.experience ?? 1 };
+    game.modifiers = { income: options.modifiers?.income ?? 1, experience: options.modifiers?.experience ?? 1, bounty: options.modifiers?.bounty ?? 1 };
   }
   return game;
 }
@@ -108,6 +108,10 @@ export function getIncomeRate(game, team = 'player') {
 // the player's archive multiplier and floor each individual award once more.
 export function getExperienceReward(game, baseReward, team = 'player') {
   return Math.floor(baseReward * (team === 'player' && game.mode === 'incremental' ? game.modifiers.experience : 1));
+}
+
+export function getBountyReward(game, baseReward, team = 'player') {
+  return Math.floor(baseReward * (team === 'player' && game.mode === 'incremental' ? game.modifiers.bounty : 1));
 }
 
 export function getEvolutionState(game, team = 'player') {
@@ -610,7 +614,7 @@ function resolveHits(game, hits) {
   for (const unit of game.units) {
     if (unit.hp <= 0) {
       const winner = otherTeam(unit.team);
-      game.gold[winner] += UNITS[unit.type].bounty;
+      game.gold[winner] += getBountyReward(game, UNITS[unit.type].bounty, winner);
       game.experience[winner] += getExperienceReward(game, UNITS[unit.type].experience, winner);
       // Losses teach the attacking side too, so a tower-only defense cannot freeze its age.
       game.experience[unit.team] += getExperienceReward(game, Math.floor(UNITS[unit.type].experience * RULES.casualtyExperienceRate), unit.team);

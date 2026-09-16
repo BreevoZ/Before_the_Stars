@@ -246,7 +246,7 @@ function syncUI() {
   if (ageAnnouncements.length) announce(ageAnnouncements.join(''));
   setText('gold', Math.floor(game.gold.player + 0.000001));
   setText('income-rate', `+${formatMultiplier(getIncomeRate(game))}/s`);
-  byId('income-rate').title = civilization ? `${AGES[game.ages.player].income} 基础收入 × ${formatMultiplier(game.modifiers.income)} 生产档案；仅增加被动金币` : `每秒收入 ${getIncomeRate(game)} 金币`;
+  byId('income-rate').title = civilization ? `${AGES[game.ages.player].income} 基础收入 × ${formatMultiplier(game.modifiers.income)} 生产档案；击杀金币另由战利品回收 ×${game.modifiers.bounty} 加成并向下取整` : `每秒收入 ${getIncomeRate(game)} 金币`;
   if (civilization) byId('experience-bar').closest('.evolution-progress').title = `战争档案 ×${formatMultiplier(game.modifiers.experience)}；击杀经验、按 75% 向下取整的阵亡经验，再乘倍率逐笔向下取整。首次终局胜利后可在文明档案查看。`;
   setText('clock', formatTime(game.elapsed));
   setText('enemy-strategy', game.ai.strategy === 'siege' ? '敌军战术 · 重装攻城' : '敌军战术 · 混合推进');

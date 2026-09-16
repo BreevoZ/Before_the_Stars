@@ -10,7 +10,7 @@ export const UPGRADES = Object.freeze({
 export const UPGRADE_COSTS = Object.freeze([1, 2, 4, 8, 16]);
 export const AUTOMATION_INTERVAL = 0.25;
 export const AUTOMATION_TARGETS = Object.freeze(['front', 'ranged', 'heavy']);
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 export const SAVE_INTERVAL = 10;
 export function getBonuses(levels) {
   return { income: UPGRADES.production.base ** levels.production, experience: UPGRADES.warfare.base ** levels.warfare };

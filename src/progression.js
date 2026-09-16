@@ -1,6 +1,7 @@
 import { AGES, createGame, updateGame } from './game.js';
-import { updateAutomation } from './automation.js';
-import { SURFACE, UPGRADES, UPGRADE_COSTS, SAVE_VERSION, AUTOMATION_TARGETS, getBonuses } from './progression-config.js';
+import { updateAutomation, createAutomation, configureAutomation } from './automation.js';
+import { SURFACE, UPGRADES, UPGRADE_COSTS, SAVE_VERSION, getBonuses } from './progression-config.js';
+import { emptyTalents, getTalentBonuses, getLegacyReward } from './talents.js';
 
 function uniqueId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
@@ -9,14 +10,16 @@ function uniqueId() {
 function startRun(session) {
   const runId = uniqueId();
   const upgrades = { ...session.permanent.upgrades };
+  const talents = { ...session.permanent.talents }, bonuses = getTalentBonuses(talents);
   session.run = { runId, battleNumber: 1, battleId: `${runId}:1`, phase: 'battle',
-    processedBattleId: null, settled: false, earnedLegacy: 0, upgrades, autoElapsed: 0, elapsed: 0 };
-  session.game = createGame({ mode: 'incremental', modifiers: getBonuses(upgrades) });
+    processedBattleId: null, settled: false, earnedLegacy: 0, upgrades, talents, autoElapsed: 0, autoTurn: 'recruit', elapsed: 0 };
+  session.game = createGame({ mode: 'incremental', modifiers: { ...getBonuses(upgrades), bounty: bonuses.bounty } });
+  session.game.gold.player += bonuses.startingGold;
 }
 
 export function createProgression() {
-  const session = { version: SAVE_VERSION, permanent: { completedCycles: 0, legacy: 0,
-    upgrades: { production: 0, warfare: 0 }, automation: { unlocked: false, enabled: false, target: 'front' } } };
+  const session = { version: SAVE_VERSION, permanent: { completedCycles: 0, legacy: 0, totalLegacy: 0,
+    upgrades: { production: 0, warfare: 0 }, talents: emptyTalents(), automation: createAutomation() } };
   startRun(session);
   return session;
 }
@@ -32,9 +35,10 @@ export function resolveBattle(session) {
     run.phase = 'destruction';
     if (!run.settled) {
       run.settled = true;
-      run.earnedLegacy = SURFACE.legacyPerCycle;
+      run.earnedLegacy = getLegacyReward(run.talents);
       permanent.completedCycles++;
       permanent.legacy += run.earnedLegacy;
+      permanent.totalLegacy += run.earnedLegacy;
       // First unlock is free and opt-in; subsequent cycles preserve preferences.
       permanent.automation.unlocked = true;
     }
@@ -57,7 +61,7 @@ export function continueCivilization(session, battleId) {
   const { game, run } = session;
   if (run.phase !== 'victory' || battleId !== run.battleId || game.status !== 'won' || game.ages.enemy >= SURFACE.finalEnemyAge) return false;
   const nextAge = game.ages.enemy + 1;
-  const next = createGame({ mode: 'incremental', modifiers: getBonuses(run.upgrades) });
+  const next = createGame({ mode: 'incremental', modifiers: { ...getBonuses(run.upgrades), bounty: getTalentBonuses(run.talents).bounty } });
   next.ages.player = game.ages.player;
   next.experience.player = game.experience.player;
   next.gold.player = game.gold.player + game.queues.player.reduce((sum, order) => sum + order.paid, 0);
@@ -73,6 +77,7 @@ export function continueCivilization(session, battleId) {
   run.battleId = `${run.runId}:${run.battleNumber}`;
   run.phase = 'battle';
   run.autoElapsed = 0;
+  run.autoTurn = 'recruit';
   session.game = next;
   return true;
 }
@@ -92,6 +97,7 @@ export function abandonCivilization(session, runId) {
 
 export function getUpgradeState(session, key) {
   if (!Object.hasOwn(UPGRADES, key)) return 'invalid';
+  if (!session.permanent.completedCycles) return 'locked';
   if (!['destruction', 'defeat'].includes(session.run.phase)) return 'during-run';
   const level = session.permanent.upgrades[key];
   if (level >= UPGRADE_COSTS.length) return 'max';
@@ -106,8 +112,5 @@ export function purchaseUpgrade(session, key) {
 }
 
 export function setAutomation(session, enabled, target) {
-  if (!session.permanent.automation.unlocked || typeof enabled !== 'boolean' || !AUTOMATION_TARGETS.includes(target)) return false;
-  Object.assign(session.permanent.automation, { enabled, target });
-  session.run.autoElapsed = 0;
-  return true;
+  return configureAutomation(session, { enabled, target });
 }

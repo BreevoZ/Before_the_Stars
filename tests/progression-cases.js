@@ -22,7 +22,7 @@ function memoryStorage() {
   const entries = new Map();
   return { getItem: key => entries.get(key) ?? null, setItem: (key, value) => entries.set(key, value), removeItem: key => entries.delete(key) };
 }
-async function mountFixture(raw, unavailable = false, mode = 'incremental') {
+export async function mountFixture(raw, unavailable = false, mode = 'incremental') {
   const frame = document.createElement('iframe'); frame.title = 'Incremental civilization integration test';
   frame.name = JSON.stringify({ raw, unavailable }); frame.src = `./incremental-fixture.html${mode ? `?mode=${mode}` : ''}`;
   document.body.append(frame);
@@ -135,7 +135,7 @@ export function registerProgressionTests(test, assert, near) {
     const s = createProgression(), base = JSON.stringify({ AGES, UNITS });
     assert(!purchaseUpgrade(s, 'production'));
     finish(s);
-    s.permanent.completedCycles = s.permanent.legacy = 62;
+    s.permanent.totalLegacy = s.permanent.completedCycles = s.permanent.legacy = 62;
     for (const key of ['production', 'warfare']) {
       for (const cost of [1, 2, 4, 8, 16]) {
         const balance = s.permanent.legacy;

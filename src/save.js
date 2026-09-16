@@ -1,7 +1,10 @@
 import { RULES, AGES, UNITS, TURRETS, ABILITIES } from './game.js';
 import { SAVE_VERSION, SURFACE, UPGRADE_COSTS, AUTOMATION_TARGETS, AUTOMATION_INTERVAL, getBonuses } from './progression-config.js';
 import { DEBUG_SPEEDS } from './debug.js';
+import { TALENTS, emptyTalents, getTalentBonuses, getTalentSpending, getLegacyReward } from './talents.js';
+import { createAutomation, validAutomation } from './automation.js';
 
+// Keep the original storage keys so existing players are migrated in place.
 export const SAVE_KEY = 'before-the-stars.incremental.v1';
 export const BACKUP_KEY = `${SAVE_KEY}.backup`;
 export const DEBUG_SAVE_KEY = 'before-the-stars.debug.v1';
@@ -25,6 +28,15 @@ function levels(value) {
   check(object(value) && Object.keys(value).length === 2, '升级等级');
   for (const key of ['production', 'warfare']) check(int(value[key], 0, UPGRADE_COSTS.length), key);
 }
+function talentLevels(value, upgrades) {
+  check(object(value) && Object.keys(value).length === Object.keys(TALENTS).length, '天赋等级');
+  for (const [key, config] of Object.entries(TALENTS)) {
+    check(int(value[key], 0, config.costs.length), `天赋 ${key}`);
+    if (value[key]) for (const [parent, required] of Object.entries(config.requires)) {
+      check((value[parent] ?? upgrades[parent]) >= required, '天赋前置条件');
+    }
+  }
+}
 function safeTree(value, depth = 0, key = '') {
   check(depth <= 12, '嵌套过深');
   if (value === Infinity && key === 'maxRange') return;
@@ -43,36 +55,50 @@ function safeTree(value, depth = 0, key = '') {
   } else check(value === null || bool(value), '数据类型');
 }
 
-export function validateSession(session) {
+function validateRecord(session, oldVersion = false) {
   check(object(session), '根记录');
-  check(session.version === SAVE_VERSION, '不支持的存档版本');
+  check(session.version === (oldVersion ? 1 : SAVE_VERSION), '不支持的存档版本');
   check(session.debug === undefined || session.debug === true, '调试标记');
   check(session.debug === true ? DEBUG_SPEEDS.includes(session.debugSpeed) : session.debugSpeed === undefined, '调试速度');
   safeTree(session);
   const { permanent: p, run, game: g } = session;
   check(object(p) && object(run) && object(g), '缺少永久、文明或战斗状态');
-  check(int(p.completedCycles) && int(p.legacy) && p.legacy <= p.completedCycles * SURFACE.legacyPerCycle, '遗产或循环数');
+  check(int(p.completedCycles) && int(p.legacy), '遗产或循环数');
   levels(p.upgrades); levels(run.upgrades);
-  const spent = Object.values(p.upgrades).reduce((sum, level) => sum + UPGRADE_COSTS.slice(0, level).reduce((a, b) => a + b, 0), 0);
-  check(p.legacy + spent === p.completedCycles * SURFACE.legacyPerCycle, '遗产收支不一致');
+  if (!oldVersion) { talentLevels(p.talents, p.upgrades); talentLevels(run.talents, run.upgrades); }
+  const totalLegacy = oldVersion ? p.completedCycles * SURFACE.legacyPerCycle : p.totalLegacy;
+  const maxReward = oldVersion ? SURFACE.legacyPerCycle : getLegacyReward(Object.fromEntries(Object.entries(TALENTS).map(([key, config]) => [key, config.costs.length])));
+  check(int(totalLegacy, p.completedCycles * SURFACE.legacyPerCycle, Math.min(limit, p.completedCycles * maxReward)), '累计遗产');
+  const spent = Object.values(p.upgrades).reduce((sum, level) => sum + UPGRADE_COSTS.slice(0, level).reduce((a, b) => a + b, 0), 0)
+    + (oldVersion ? 0 : getTalentSpending(p.talents));
+  check(p.legacy + spent === totalLegacy, '遗产收支不一致');
   const auto = p.automation;
   check(object(auto) && bool(auto.unlocked) && bool(auto.enabled) && AUTOMATION_TARGETS.includes(auto.target), '自动招募设置');
   check(auto.unlocked === (p.completedCycles > 0) && (auto.unlocked || !auto.enabled), '自动招募解锁');
+  if (!oldVersion) check(validAutomation(auto, p.talents), '自动购买设置或解锁条件');
   check(id(run.runId) && int(run.battleNumber, 1, SURFACE.finalEnemyAge) && run.battleId === `${run.runId}:${run.battleNumber}`, '文明或战斗标识');
   check(run.processedBattleId === null || (id(run.processedBattleId) && run.processedBattleId.startsWith(`${run.runId}:`)), '胜利处理标记');
   check(['battle', 'victory', 'destruction', 'defeat'].includes(run.phase) && bool(run.settled), '流程阶段');
-  check(int(run.earnedLegacy, 0, SURFACE.legacyPerCycle), '本轮遗产');
+  const reward = oldVersion ? SURFACE.legacyPerCycle : getLegacyReward(run.talents);
+  check(int(run.earnedLegacy, 0, reward), '本轮遗产');
   numbers(run, ['elapsed', 'autoElapsed']);
   check(run.autoElapsed < AUTOMATION_INTERVAL + 1e-8, '自动招募时钟');
-  check(run.settled === (run.phase === 'destruction') && run.earnedLegacy === (run.settled ? SURFACE.legacyPerCycle : 0), '重复结算保护标记');
+  if (!oldVersion) check(['recruit', 'defense'].includes(run.autoTurn), '自动购买调度');
+  check(run.settled === (run.phase === 'destruction') && run.earnedLegacy === (run.settled ? reward : 0), '重复结算保护标记');
   check(!run.settled || p.completedCycles > 0, '已结算循环数');
+  check(run.earnedLegacy <= totalLegacy, '结算与累计遗产');
   for (const key of Object.keys(p.upgrades)) check(run.upgrades[key] <= p.upgrades[key], '本轮升级快照');
   if (run.phase === 'battle' || run.phase === 'victory') {
     check(run.upgrades.production === p.upgrades.production && run.upgrades.warfare === p.upgrades.warfare, '战斗中升级');
   }
+  if (!oldVersion) for (const key of Object.keys(TALENTS)) {
+    check(run.talents[key] <= p.talents[key], '本轮天赋快照');
+    if (['battle', 'victory'].includes(run.phase)) check(run.talents[key] === p.talents[key], '战斗中购买天赋');
+  }
   check(g.mode === 'incremental' && object(g.modifiers), '战斗模式');
   const bonuses = getBonuses(run.upgrades);
   check(g.modifiers.income === bonuses.income && g.modifiers.experience === bonuses.experience, '本轮倍率');
+  if (!oldVersion) check(g.modifiers.bounty === getTalentBonuses(run.talents).bounty, '本轮战利品倍率');
   check(['playing', 'won', 'lost', 'draw'].includes(g.status), '战斗状态');
   check((run.phase === 'battle' && g.status === 'playing') ||
     (['victory', 'destruction'].includes(run.phase) && g.status === 'won') ||
@@ -160,6 +186,8 @@ export function validateSession(session) {
   return session;
 }
 
+export function validateSession(session) { return validateRecord(session); }
+
 export function serializeSession(session) {
   validateSession(session);
   return JSON.stringify(session, (key, value) => key === 'maxRange' && value === Infinity ? 'unbounded' : value);
@@ -167,6 +195,17 @@ export function serializeSession(session) {
 export function parseSession(text) {
   check(typeof text === 'string' && text.length <= MAX_SAVE_BYTES, '文件大小');
   const session = JSON.parse(text, (key, value) => key === 'maxRange' && value === 'unbounded' ? Infinity : value);
+  if (session?.version === 1) {
+    // Validate the complete old record before introducing any defaults. Never
+    // rerun settlement or starting-resource grants while upgrading a save.
+    validateRecord(session, true);
+    const auto = session.permanent.automation;
+    session.permanent.automation = { ...createAutomation(), unlocked: auto.unlocked, enabled: auto.enabled, target: auto.target };
+    session.permanent.totalLegacy = session.permanent.completedCycles * SURFACE.legacyPerCycle;
+    session.permanent.talents = emptyTalents(); session.run.talents = emptyTalents();
+    session.run.autoTurn = 'recruit'; session.game.modifiers.bounty = 1;
+    session.version = SAVE_VERSION;
+  }
   return validateSession(session);
 }
 
@@ -188,7 +227,7 @@ export function createSaveStore(getStorage = () => globalThis.localStorage, { de
       observed = storage.getItem(saveKey);
       const backupRaw = storage.getItem(backupKey), backup = valid(backupRaw);
       if (observed === null && backupRaw === null) return { session: null, ok: true };
-      try { return { session: parse(observed), ok: true }; }
+      try { return { session: parse(observed), ok: true, migrated: JSON.parse(observed).version !== SAVE_VERSION }; }
       catch (error) { blocked = true; return { ...errorResult(error), session: null, backupAvailable: Boolean(backup), blocked: true }; }
     } catch (error) { return { ...errorResult(error), session: null }; }
   }

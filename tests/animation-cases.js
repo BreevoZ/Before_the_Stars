@@ -2,8 +2,60 @@ import { UNITS, TURRETS, ABILITIES, RULES, createGame, updateGame } from '../src
 import { getMountPose, solveJoint } from '../src/mount-motion.js';
 import { getMeleeMotion, rotatePoint } from '../src/melee-motion.js';
 import { ANIMATION_CLIPS, createClipSampler, createClipPainter } from '../src/animation-clips.js';
+import { drawLandscape } from '../src/render.js';
+
+function sampleSky(width, height, ratio = 1, time = 83) {
+  const canvas = document.createElement('canvas'), stars = [];
+  canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio);
+  const ctx = canvas.getContext('2d'), fillRect = ctx.fillRect.bind(ctx);
+  const scale = canvas.width / RULES.width, sceneHeight = height / width * RULES.width;
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.fillRect = (x, y, w, h) => {
+    if (ctx.fillStyle === '#f2f1d8') {
+      const point = new DOMPoint(x + w / 2, y + h / 2).matrixTransform(ctx.getTransform());
+      stars.push({ x: point.x / canvas.width, y: point.y / (sceneHeight * 0.738 * scale), alpha: ctx.globalAlpha });
+    }
+    fillRect(x, y, w, h);
+  };
+  drawLandscape(ctx, sceneHeight, sceneHeight * 0.738, time);
+  return stars;
+}
 
 export function registerAnimationTests(test, assert, near) {
+  test('Star positions stay scattered and stable across phone, desktop, zoom and pixel ratios', () => {
+    const reference = sampleSky(1280, 370);
+    // The old modulo distribution collapsed to three rows at this sky height.
+    const resonantHeight = 47 * 3 / (0.62 * 0.738);
+    for (const [width, height] of [[320, 220], [390, 220], [844, 244], [1280, 370], [1280, resonantHeight]]) {
+      for (const ratio of [0.75, 1, 1.25, 2]) {
+        const stars = sampleSky(width, height, ratio);
+        assert(stars.length === 54);
+        const rows = new Set(), tiles = new Set();
+        stars.forEach((star, i) => {
+          assert(star.x > 0 && star.x < 1 && star.y > 0 && star.y < 0.65, 'Keep stars inside the sky');
+          rows.add(Math.floor(star.y / 0.65 * 10));
+          tiles.add(`${Math.floor(star.x * 4)},${Math.floor(star.y / 0.65 * 4)}`);
+          near(star.x, reference[i].x, 'Resizing must preserve each star’s horizontal position');
+          near(star.y, reference[i].y, 'Resizing must preserve each star’s relative elevation');
+        });
+        assert(rows.size >= 8 && tiles.size >= 14, 'Stars must not collapse into rows or diagonal bands');
+      }
+    }
+  });
+
+  test('Stars twinkle independently without drifting, replay exactly, and disappear in daylight', () => {
+    const initial = sampleSky(390, 220, 2, 83), later = sampleSky(390, 220, 2, 83.5);
+    assert(JSON.stringify(initial) === JSON.stringify(sampleSky(390, 220, 2, 83)), 'Paused and replayed sky must be deterministic');
+    let brighter = 0, dimmer = 0;
+    later.forEach((star, i) => {
+      near(star.x, initial[i].x); near(star.y, initial[i].y);
+      if (star.alpha > initial[i].alpha + 0.01) brighter++;
+      if (star.alpha < initial[i].alpha - 0.01) dimmer++;
+    });
+    assert(brighter > 5 && dimmer > 5, 'Different stars must brighten and dim independently');
+    assert(sampleSky(390, 220, 2, 30).every(star => star.alpha === 0));
+  });
+
   test('Mounts keep planted feet still in world space, with separate two- and four-leg support patterns', () => {
     for (const horse of [false, true]) {
       const stride = getMountPose({ horse }).stride;

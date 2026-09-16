@@ -11,6 +11,19 @@ const PALETTES = {
 
 // One full day follows match time, so pausing and restarting also affect the sky.
 const DAY_NIGHT_CYCLE_SECONDS = 120;
+// Hash each axis independently. A height-dependent modulo creates rows/diagonals
+// at certain aspect ratios; normalized points keep the same sky through resizing.
+function starNoise(seed) {
+  let value = Math.imul(seed ^ (seed >>> 16), 0x21f0aaad);
+  value = Math.imul(value ^ (value >>> 15), 0x735a2d97);
+  return ((value ^ (value >>> 15)) >>> 0) / 4294967296;
+}
+const STARS = [];
+for (let seed = 0x51a7; STARS.length < 54; seed += 2) {
+  const x = starNoise(seed), y = starNoise(seed + 1);
+  // Keep a little breathing room without imposing a visible grid.
+  if (STARS.every(star => Math.hypot(x - star.x, y - star.y) > 0.055)) STARS.push({ x, y });
+}
 const LANDSCAPE_COLORS = ['skyTop', 'skyMiddle', 'horizon', 'farMountain', 'middleMountain',
   'nearMountain', 'surface', 'soil', 'deepSoil', 'crust', 'grass'];
 const LANDSCAPE_KEYFRAMES = [
@@ -93,9 +106,9 @@ export function drawLandscape(ctx, height, ground, time) {
   ctx.fillRect(0, 0, RULES.width, height);
 
   ctx.save();
-  for (let i = 0; i < 54; i++) {
-    const x = (i * 173 + 51) % 1280;
-    const y = (i * 47 + 18) % (ground * 0.62);
+  for (let i = 0; i < STARS.length; i++) {
+    const x = (0.02 + STARS[i].x * 0.96) * RULES.width;
+    const y = (0.04 + STARS[i].y * 0.58) * ground;
     // Each star pulses every 2.4–5 seconds; whole cycles keep the day boundary seamless.
     const cycles = 24 + (i * 7) % 27;
     const pulse = (1 + Math.sin(phase * Math.PI * 2 * cycles + i * 2.3)) / 2;

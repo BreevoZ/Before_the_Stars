@@ -5,11 +5,12 @@ import { drawBase } from './bases.js';
 import { drawProjectile, drawFields } from './combat-effects.js';
 import { drawLandscape, drawBattleEffects } from './render.js';
 import { getMountPose } from './mount-motion.js';
+import { getMeleeMotion } from './melee-motion.js';
 import { BASE_DESIGNS } from './base-layouts.js';
 
 export const CLIP_SECONDS = 8;
 export const CATEGORIES = { all: '全部', unit: '部队', turret: '炮塔', combat: '弹道与命中', ability: '大招与地面', scene: '基地与环境' };
-const mountNotes = { heavy: '双足承重 · 趾爪落地 · 髋部随步伐起伏', knight: '四足错相 · 蹄部支撑 · 膝与飞节分段弯曲' };
+const mountNotes = { heavy: '探颈咬合 · 骑手同步刺矛 · 沿矛身回收', knight: '锥身骑枪 · 护手握持 · 沿枪轴直刺' };
 export const ANIMATION_CLIPS = [
   ...['heavy', 'knight', ...Object.keys(UNITS).filter(type => !mountNotes[type])].map(type => ({
     id: `unit-${type}`, category: 'unit', kind: 'unit', type, age: UNITS[type].age,
@@ -103,9 +104,11 @@ function ground(ctx, width, distance = 0, direction = 1) {
 function gaitGuides(ctx, unit, time, scale) {
   if (!mountNotes[unit.type]) return;
   const remaining = unit.attackAnimation ?? 0;
-  const progress = remaining > 0 ? 1 - remaining / UNITS[unit.type].attackDuration : 1;
-  const strike = remaining ? Math.max(0, Math.sin(Math.PI * Math.min(1, progress * 1.3 + 0.15))) : 0;
-  const pose = getMountPose({ horse: unit.type === 'knight', distance: unit.distanceTravelled ?? time * UNITS[unit.type].speed, moving: unit.moving, strike, offset: (unit.id * 0.17) % 1 });
+  const attack = getMeleeMotion(unit.type, { remaining, duration: UNITS[unit.type].attackDuration,
+    cooldown: unit.attackCooldown ?? 0, approach: unit.attackApproach ?? 0, moving: unit.moving,
+    charged: (unit.lastAttackCharged && remaining > 0) || (unit.chargeTravel ?? 0) >= UNITS.knight.chargeDistance });
+  const pose = getMountPose({ horse: unit.type === 'knight', distance: unit.distanceTravelled ?? time * UNITS[unit.type].speed,
+    moving: unit.moving, bodyOffset: attack.body, offset: (unit.id * 0.17) % 1 });
   ctx.save(); ctx.translate(unit.x, 0); ctx.scale((unit.team === 'player' ? 1 : -1) * scale, scale);
   for (const leg of pose.legs) {
     ctx.strokeStyle = leg.far ? '#e7bf8c' : '#d6e8bd'; ctx.lineWidth = 0.7;

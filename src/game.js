@@ -12,7 +12,7 @@ export const UNITS = Object.freeze({
   duelist: Object.freeze({ name: '决斗士', age: 3, role: 'melee', cost: 80, trainTime: 2.2, health: 205, damage: 29, armor: 3, speed: 72, range: 46, attackInterval: 0.65, bounty: 28, experience: 46, lane: 'front', description: '迅捷刺击 · 忽略 3 点护甲', armorPierce: 3, attackDuration: 0.3, height: 72 }),
   musketeer: Object.freeze({ name: '火枪手', age: 3, role: 'archer', projectile: 'bullet', cost: 115, trainTime: 3.2, health: 110, damage: 60, armor: 1, speed: 48, range: 255, attackInterval: 1.7, bounty: 40, experience: 65, lane: 'back', description: '火绳枪 · 单发穿甲，克制重装与盾牌', ignoreArmor: true, attackDuration: 0.48, muzzleX: 50, muzzleY: -46, height: 71 }),
   cannoneer: Object.freeze({ name: '野战炮组', age: 3, role: 'heavy', projectile: 'cannon', splash: 55, cost: 210, trainTime: 5.2, health: 380, damage: 95, armor: 7, speed: 30, range: 185, baseRange: 360, attackInterval: 2.1, bounty: 70, experience: 110, lane: 'front', description: '轮式火炮 · 远距攻城 / 55 范围爆炸', footprint: 38, attackDuration: 0.65, muzzleX: 51, muzzleY: -35, height: 61 }),
-  commando: Object.freeze({ name: '刺刀突击兵', age: 4, role: 'melee', cost: 130, trainTime: 2.4, health: 340, damage: 56, armor: 6, speed: 76, range: 58, attackInterval: 0.65, bounty: 45, experience: 80, lane: 'front', description: '刺刀突击 · 快速接敌，近距连续刺杀', attackDuration: 0.34, height: 65 }),
+  commando: Object.freeze({ name: '匕首突击兵', age: 4, role: 'melee', cost: 130, trainTime: 2.4, health: 340, damage: 56, armor: 6, speed: 76, range: 58, attackInterval: 0.65, bounty: 45, experience: 80, lane: 'front', description: '匕首突击 · 压低重心，近距快速刺击', attackDuration: 0.34, height: 65 }),
   rifleman: Object.freeze({ name: '自动步枪兵', age: 4, role: 'archer', projectile: 'bullet', cost: 190, trainTime: 3.4, health: 185, damage: 30, armor: 3, speed: 54, range: 270, attackInterval: 1.1, bounty: 65, experience: 110, lane: 'back', description: '三连点射 · 每轮 3 发，每发 30 伤害', burst: 3, burstInterval: 0.12, attackDuration: 0.16, muzzleX: 45, muzzleY: -34, height: 61 }),
   tank: Object.freeze({ name: '主战坦克', age: 4, role: 'heavy', projectile: 'shell', splash: 70, cost: 350, trainTime: 5.6, health: 720, damage: 145, armor: 14, speed: 26, range: 200, baseRange: 420, attackInterval: 1.9, bounty: 120, experience: 180, lane: 'front', description: '履带装甲 · 远距攻城 / 70 范围炮击', footprint: 47, attackDuration: 0.6, muzzleX: 67, muzzleY: -44, height: 63 }),
   blade: Object.freeze({ name: '光刃战士', age: 5, role: 'melee', ignoreArmor: true, cost: 220, trainTime: 2.6, health: 550, damage: 90, armor: 10, speed: 82, range: 40, attackInterval: 0.6, bounty: 70, experience: 140, lane: 'front', description: '光刃突进 · 近战完全无视护甲', attackDuration: 0.3, height: 73 }),
@@ -425,6 +425,7 @@ function updateUnits(game, dt, hits) {
     unit.hitFlash = Math.max(0, unit.hitFlash - dt);
     unit.guardFlash = Math.max(0, (unit.guardFlash ?? 0) - dt);
     unit.moving = false;
+    unit.attackApproach = 0;
     const direction = unit.team === 'player' ? 1 : -1;
     const origin = positions.get(unit.id);
     const base = game.bases[otherTeam(unit.team)];
@@ -497,6 +498,12 @@ function updateUnits(game, dt, hits) {
       unit.moving = step > 0.001;
       unit.distanceTravelled = (unit.distanceTravelled ?? 0) + step;
       unit.chargeTravel = unit.moving ? (unit.chargeTravel ?? 0) + step : 0;
+      // Visual anticipation for a ready melee weapon's first approach. Combat
+      // still resolves at the existing range and cooldown, without a new delay.
+      if (!stats.projectile && unit.moving && unit.attackCooldown === 0 && !unit.attackAnimation) {
+        const gap = Math.min(enemyDistance - reach, baseDistance - baseRange) - step;
+        unit.attackApproach = Math.max(0, Math.min(1, 1 - gap / (stats.speed * 0.22)));
+      }
     }
   }
 }
@@ -572,7 +579,7 @@ function resolveHits(game, hits) {
     hit.target.hitFlash = 0.14;
     if (hit.visual !== false) {
       const direction = hit.team === 'player' ? 1 : -1;
-      const style = { melee: 'blunt', heavy: 'bite', swordsman: 'slash', knight: 'thrust', duelist: 'thrust', commando: 'thrust', blade: 'blade' }[hit.attacker] ?? 'blunt';
+      const style = { melee: 'blunt', heavy: 'bite', swordsman: 'slash', knight: 'thrust', duelist: 'thrust', commando: 'knife', blade: 'blade' }[hit.attacker] ?? 'blunt';
       game.effects.push({ kind: 'impact', style, x: hit.target.x - (stats ? 0 : direction * RULES.baseHalfWidth),
         anchorX: stats ? undefined : hit.target.x, y: stats ? -stats.height * 0.52 - (stats.lane === 'back' ? 7 : 0) : -45,
         angle: direction > 0 ? 0 : Math.PI, team: hit.team, surface: impactSurface(game, hit.target), life: 0.22, duration: 0.22 });

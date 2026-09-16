@@ -203,6 +203,11 @@ export function drawImpact(ctx, effect, scale = 1, targetX = effect.x) {
     case 'slash': case 'blade':
       ctx.save(); ctx.rotate(effect.angle - 0.7);
       polygon(ctx, [[-13 * p, -2], [13, 0], [-10 * p, 2]], effect.style === 'blade' ? color : C.shell); ctx.restore(); break;
+    case 'knife':
+      ctx.save(); ctx.rotate(effect.angle);
+      line(ctx, [[-5 * p, 2], [6 * (1 - p), -1]], C.shell, 1.2);
+      if (effect.surface === 'metal') sparks(ctx, p, 0, C.shell, 2, 6);
+      ctx.restore(); break;
     case 'thrust':
       sparks(ctx, p, effect.angle, C.shell, 2, 12); break;
     case 'bite':

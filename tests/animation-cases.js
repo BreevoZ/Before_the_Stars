@@ -1,5 +1,6 @@
-import { UNITS, TURRETS, ABILITIES } from '../src/game.js';
-import { getMountPose } from '../src/mount-motion.js';
+import { UNITS, TURRETS, ABILITIES, RULES, createGame, updateGame } from '../src/game.js';
+import { getMountPose, solveJoint } from '../src/mount-motion.js';
+import { getMeleeMotion, rotatePoint } from '../src/melee-motion.js';
 import { ANIMATION_CLIPS, createClipSampler, createClipPainter } from '../src/animation-clips.js';
 
 export function registerAnimationTests(test, assert, near) {
@@ -39,6 +40,130 @@ export function registerAnimationTests(test, assert, near) {
         assert(Math.hypot(a.foot[0] - c.foot[0], a.foot[1] - c.foot[1]) < 0.001);
         assert(Math.abs((b.foot[0] - a.foot[0]) / 0.0001 - (c.foot[0] - b.foot[0]) / 0.0001) < 0.01, 'Foot velocity must not snap at contact');
       }
+    }
+  });
+
+  test('Mounted and dagger attacks prepare continuously, contact on damage, then settle without residual motion', () => {
+    const numbers = value => typeof value === 'number' ? [value] : Object.values(value).flatMap(numbers);
+    const closePose = (a, b) => numbers(a).forEach((value, index) => near(value, numbers(b)[index]));
+    for (const type of ['heavy', 'knight', 'commando']) for (const charged of [false, true]) {
+      const duration = UNITS[type].attackDuration;
+      const pose = values => getMeleeMotion(type, { duration, charged, ...values });
+      const idle = pose({}), contact = pose({ remaining: duration });
+      assert(pose({ cooldown: 0.15 }).drive < 0, `${type}: weight must load before advancing`);
+      near(contact.drive, 1, `${type}: visual contact must coincide with damage`);
+      closePose(pose({ cooldown: 0.000001 }), contact);
+      closePose(pose({ cooldown: 0.22 - 0.000001 }), idle);
+      closePose(pose({ remaining: 0.000001 }), idle);
+      closePose(pose({ remaining: duration, cooldown: 0.1, moving: true, reduced: true }), idle);
+      let previous = contact.drive;
+      for (let i = 1; i <= 100; i++) {
+        const next = pose({ remaining: duration * (1 - i / 100) }).drive;
+        assert(next <= previous + 0.00001, 'Recovery must not thrust for a second time'); previous = next;
+      }
+    }
+    assert(getMeleeMotion('heavy', { cooldown: 0.12 }).jawAngle > 0.4, 'Open the mouth before biting');
+    near(getMeleeMotion('heavy', { remaining: 0.6, duration: 0.6 }).jawAngle, 0);
+    assert(getMeleeMotion('knight', { remaining: 0.5, duration: 0.5, charged: true }).riderLean
+      > getMeleeMotion('knight', { remaining: 0.5, duration: 0.5 }).riderLean, 'A charge needs a stronger rider brace');
+  });
+
+  test('Attack weight shifts keep mount feet planted and preserve arm and leg lengths through preparation and recovery', () => {
+    const length = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+    for (const type of ['heavy', 'knight', 'commando']) for (const charged of [false, true]) for (let i = 0; i <= 120; i++) {
+      const duration = UNITS[type].attackDuration;
+      const attack = getMeleeMotion(type, { duration, charged,
+        cooldown: i < 40 ? 0.22 * (1 - i / 40) : 0,
+        remaining: i >= 40 ? duration * (1 - (i - 40) / 80) : 0 });
+      if (type !== 'commando') {
+        const resting = getMountPose({ horse: type === 'knight' });
+        const mount = getMountPose({ horse: type === 'knight', bodyOffset: attack.body });
+        mount.legs.forEach((leg, index) => {
+          near(length(leg.foot, resting.legs[index].foot), 0, 'Body momentum must not move planted feet');
+          near(length(leg.hip, leg.knee), leg.upper); near(length(leg.knee, leg.ankle), leg.lower);
+        });
+      } else for (const side of [-1, 1]) {
+        const hip = [side * 5 + attack.body.x, -24 + attack.body.y], ankle = [side < 0 ? -9 : 14, -5];
+        const knee = solveJoint(hip, ankle, 14, 13, -1);
+        near(length(hip, knee), 14); near(length(knee, ankle), 13);
+      }
+      const shoulder = type === 'heavy' ? [-4, -64] : type === 'knight' ? [4, -64] : [5, -40];
+      const upper = type === 'heavy' ? 15 : 16, lower = type === 'heavy' ? 14 : 15;
+      const elbow = solveJoint(shoulder, attack.hand, upper, lower, 1);
+      near(length(shoulder, elbow), upper); near(length(elbow, attack.hand), lower, `${type}: the gripping arm must not stretch`);
+    }
+  });
+
+  test('Both mounted weapons extend and retract on one fixed axis, even while the rider braces for a charge', () => {
+    for (const type of ['heavy', 'knight']) for (const charged of [false, true]) {
+      const seat = type === 'heavy' ? [-8, -52] : [-6, -48];
+      const duration = UNITS[type].attackDuration;
+      const pose = input => getMeleeMotion(type, { duration, charged, ...input });
+      const grip = motion => {
+        const hand = rotatePoint(motion.hand, seat, motion.riderLean);
+        return [hand[0] + motion.body.x, hand[1] + motion.body.y];
+      };
+      const resting = pose({}), start = grip(resting), angle = resting.weaponAngle;
+      const axis = [Math.cos(angle), Math.sin(angle)];
+      let pulledBack = false, extended = false;
+      for (let frame = 0; frame <= 140; frame++) {
+        const motion = pose(frame < 40 ? { cooldown: 0.22 * (1 - frame / 40) }
+          : { remaining: duration * (1 - (frame - 40) / 100) });
+        const hand = grip(motion), dx = hand[0] - start[0], dy = hand[1] - start[1];
+        near(motion.weaponAngle, angle, 'A straight thrust must not turn into a sweeping arc');
+        near(dx * -axis[1] + dy * axis[0], 0, 'Rider lean must not lift the weapon off its attack line');
+        const extension = dx * axis[0] + dy * axis[1];
+        pulledBack ||= extension < -3; extended ||= extension > 17;
+        if (frame === 40) assert(extension > 17, `${type}: extend the spear at contact`);
+        if (frame === 140) near(extension, 0, 'Retract along the same line');
+      }
+      assert(pulledBack && extended, `${type}: the rider must draw back and drive the weapon forward`);
+    }
+  });
+
+  test('First melee contact is anticipated during approach without delaying damage or animating an empty march', () => {
+    for (const type of ['heavy', 'knight', 'commando']) for (const team of ['player', 'enemy']) {
+      const game = createGame(); game.ai.enabled = false;
+      const direction = team === 'player' ? 1 : -1, stats = UNITS[type];
+      const attacker = { id: 1, type, team, x: 640, hp: stats.health, attackCooldown: 0, attackAnimation: 0, hitFlash: 0 };
+      const target = { id: 2, type: 'swordsman', team: team === 'player' ? 'enemy' : 'player', x: 640 + direction * 140,
+        hp: 1e8, attackCooldown: 1000, attackAnimation: 0, hitFlash: 0 };
+      game.units.push(attacker, target);
+      let prepared = false, biteOpened = false, hit = false;
+      near(getMeleeMotion(type, { moving: true }).drive, 0, 'An empty march must not swing a weapon');
+      for (let frame = 0; frame < 300 && !hit; frame++) {
+        updateGame(game, RULES.fixedStep);
+        const motion = getMeleeMotion(type, { duration: stats.attackDuration, remaining: attacker.attackAnimation,
+          cooldown: attacker.attackCooldown, moving: attacker.moving, approach: attacker.attackApproach });
+        if (!attacker.attackAnimation) {
+          prepared ||= attacker.attackApproach > 0 && motion.drive > 0.5;
+          biteOpened ||= motion.jawAngle > 0.4;
+        } else {
+          hit = true; near(motion.drive, 1); assert(target.hp < 1e8, 'Contact must immediately resolve damage');
+        }
+      }
+      assert(prepared && hit, `${type}: the first approach must prepare and hit`);
+      if (type === 'heavy') assert(biteOpened, 'The first bite must open its jaws before contact');
+    }
+  });
+
+  test('Real melee hits arrive at the contact pose on both teams and the commando uses a knife impact', () => {
+    for (const type of ['heavy', 'knight', 'commando']) for (const team of ['player', 'enemy']) {
+      const sample = createClipSampler(ANIMATION_CLIPS.find(clip => clip.id === `combat-unit-${type}`), team);
+      let hits = 0, previous = 0;
+      for (let frame = 0; frame <= 170; frame++) {
+        const { game, sourceId } = sample(frame / 60), source = game.units.find(unit => unit.id === sourceId);
+        if (source.attackAnimation > previous) {
+          const motion = getMeleeMotion(type, { remaining: source.attackAnimation, duration: UNITS[type].attackDuration,
+            cooldown: source.attackCooldown, charged: source.lastAttackCharged });
+          near(motion.drive, 1);
+          const style = { heavy: 'bite', knight: 'thrust', commando: 'knife' }[type];
+          assert(game.effects.some(effect => effect.kind === 'impact' && effect.style === style && effect.life > 0.2), `${type}: impact must match the contact frame`);
+          hits++;
+        }
+        previous = source.attackAnimation;
+      }
+      assert(hits >= 2, `${type}: verify consecutive attacks`);
     }
   });
 

@@ -1,5 +1,6 @@
 import { UNITS } from './game.js';
-import { getMountPose } from './mount-motion.js';
+import { getMountPose, solveJoint } from './mount-motion.js';
+import { getMeleeMotion, rotatePoint } from './melee-motion.js';
 
 // The landscape's sage, stone and ochre palette carries into every era.
 // Silhouettes and a few material planes describe equipment; no enclosing ink outlines.
@@ -27,6 +28,9 @@ function stroke(ctx, points, color, width = 2) {
 function limb(ctx, points, color, width = 5) {
   ctx.save(); ctx.lineCap = 'butt'; ctx.lineJoin = 'bevel';
   stroke(ctx, points, color, width); ctx.restore();
+}
+function pivot(ctx, [x, y], angle) {
+  ctx.translate(x, y); ctx.rotate(angle); ctx.translate(-x, -y);
 }
 function oval(ctx, x, y, rx, ry, color, outline = null) {
   ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
@@ -122,35 +126,54 @@ function mountLegs(ctx, pose, horse, far) {
   }
 }
 function dinosaur(ctx, c, m) {
-  const pose = getMountPose({ distance: m.distance, moving: m.moving, strike: m.strike, offset: m.mountOffset });
-  m = { ...m, gait: pose.sway };
+  const attack = getMeleeMotion('heavy', m);
+  const pose = getMountPose({ distance: m.distance, moving: m.moving, bodyOffset: attack.body, offset: m.mountOffset });
+  const neck = [20, -30], seat = [-8, -52];
   mountLegs(ctx, pose, false, true);
   ctx.save(); ctx.translate(pose.body.x, pose.body.y);
-  shape(ctx, [[-18, -38], [-38, -34], [-67, -38 + m.gait * 2], [-47, -25], [-22, -19]], MATERIAL.oliveDark);
+  shape(ctx, [[-18, -38], [-38, -34], [-67, -38 + pose.sway * 2 - attack.tailLift], [-47, -25], [-22, -19]], MATERIAL.oliveDark);
   shape(ctx, [[-36, -34], [-22, -47], [7, -46], [24, -34], [23, -21], [7, -14], [-20, -16], [-32, -23]], MATERIAL.olive);
   shape(ctx, [[-32, -26], [-16, -21], [13, -21], [23, -28], [23, -21], [7, -14], [-20, -16]], MATERIAL.oliveDark);
+  for (const [x, y] of [[-30, -41], [8, -44]]) shape(ctx, [[x - 4, y + 2], [x, y - 4], [x + 5, y + 1]], MATERIAL.hide);
+  // Neck and jaw rotate at separate joints: open before contact, close on impact.
+  ctx.save(); pivot(ctx, neck, attack.neckAngle);
   shape(ctx, [[17, -30], [21, -49], [31, -62], [44, -63], [43, -44], [30, -24]], MATERIAL.olive);
-  for (const [x, y] of [[-30, -41], [8, -44], [19, -49]]) shape(ctx, [[x - 4, y + 2], [x, y - 4], [x + 5, y + 1]], MATERIAL.hide);
+  shape(ctx, [[15, -47], [19, -53], [24, -48]], MATERIAL.hide);
+  const jawTip = rotatePoint([64, -46], [38, -45], attack.jawAngle);
+  shape(ctx, [[38, -45], [64, -46], jawTip], MATERIAL.inset);
+  ctx.save(); pivot(ctx, [38, -45], attack.jawAngle);
+  shape(ctx, [[38, -45], [64, -46], [59, -40], [39, -40]], MATERIAL.hide);
+  ctx.restore();
   shape(ctx, [[31, -61], [45, -62], [61, -55], [65, -47], [42, -45], [31, -49]], MATERIAL.olive);
-  const jaw = m.strike * 4;
-  shape(ctx, [[38, -45], [64, -46], [59, -40 + jaw], [39, -40 + jaw]], MATERIAL.hide);
-  if (m.strike > 0.2) for (const x of [49, 58]) shape(ctx, [[x, -45], [x + 3, -45], [x + 1, -42]], MATERIAL.steelLight);
+  if (attack.jawAngle > 0.08) for (const x of [49, 58]) shape(ctx, [[x, -46], [x + 3, -46], [x + 1, -43]], MATERIAL.steelLight);
   stroke(ctx, [[44, -55], [47, -55]], INK, 1.4);
-  stroke(ctx, [[37, -48], [24, -36], [-7, -48]], MATERIAL.woodLight, 1.5);
-  // Small forelimbs stay clear of the ground; the hind legs carry the rider.
-  limb(ctx, [[23, -37], [19, -28], [28, -25]], MATERIAL.oliveDark, 3.5);
-  stroke(ctx, [[28, -25], [32, -23], [32, -26]], MATERIAL.hide, 1.5);
+  stroke(ctx, [[38, -53], [37, -46], [44, -45]], MATERIAL.woodLight, 1.3);
+  ctx.restore();
+  // Reins stay attached while the neck reaches and the seated rider absorbs it.
+  const bridle = rotatePoint([37, -48], neck, attack.neckAngle);
+  const reinHand = rotatePoint([7, -54], seat, attack.riderLean);
+  stroke(ctx, [bridle, [22, -40 + attack.drive * 2], reinHand], MATERIAL.woodLight, 1.3);
+  limb(ctx, [[23, -37], [19 - attack.drive * 2, -28], [28 - attack.drive * 2, -25]], MATERIAL.oliveDark, 3.5);
+  stroke(ctx, [[28 - attack.drive * 2, -25], [32 - attack.drive * 2, -23], [32 - attack.drive * 2, -26]], MATERIAL.hide, 1.5);
   ctx.restore(); mountLegs(ctx, pose, false, false);
   ctx.save(); ctx.translate(pose.body.x, pose.body.y);
   shape(ctx, [[-22, -45], [3, -47], [14, -29], [-18, -22]], c.cloth);
   shape(ctx, [[-21, -44], [-17, -44], [-10, -24], [-14, -23]], c.trim);
-  limb(ctx, [[-6, -58], [7, -44], [0, -29]], c.skin, 5);
+  limb(ctx, [seat, [7, -42], [0, -29]], c.skin, 5);
+  pivot(ctx, seat, attack.riderLean);
   shape(ctx, [[-16, -69], [-4, -71], [2, -52], [-15, -50]], MATERIAL.hide);
   face(ctx, -9, -79, c);
-  limb(ctx, [[-6, -65], [7, -61], [20, -67]], c.skin, 4);
-  stroke(ctx, [[-12, -66], [57, -76]], MATERIAL.woodLight, 3);
-  shape(ctx, [[57, -79], [70, -78], [59, -73]], MATERIAL.steelLight);
-  ctx.restore();
+  limb(ctx, [[-10, -64], [-5, -54], [7, -54]], shade(c.skin), 4);
+  const shoulder = [-4, -64], elbow = solveJoint(shoulder, attack.hand, 15, 14, 1);
+  limb(ctx, [shoulder, elbow, attack.hand], c.skin, 4);
+  ctx.save(); ctx.translate(...attack.hand); ctx.rotate(attack.weaponAngle - attack.riderLean);
+  stroke(ctx, [[-33, 0], [34, 0]], MATERIAL.woodLight, 3);
+  // A lashed, broad stone point distinguishes the primitive spear.
+  shape(ctx, [[30, 0], [36, -4], [46, 0], [36, 4]], MATERIAL.steel);
+  shape(ctx, [[30, 0], [36, -4], [46, 0]], MATERIAL.steelLight);
+  for (const x of [26, 29, 32]) stroke(ctx, [[x - 1, -2], [x + 1, 2]], MATERIAL.hideDark, 1.2);
+  stroke(ctx, [[-1, -2], [2, -2]], c.skin, 3);
+  ctx.restore(); ctx.restore();
 }
 function medievalHelmet(ctx, x, y, c, closed = false) {
   shape(ctx, [[x - 7, y + 1], [x - 7, y - 6], [x, y - 13], [x + 7, y - 6], [x + 8, y + 1]], c.metal);
@@ -187,34 +210,58 @@ function swordAndBow(ctx, c, m, bow, unit) {
   ctx.restore();
 }
 function cavalry(ctx, c, m, unit) {
-  const pose = getMountPose({ horse: true, distance: m.distance, moving: m.moving, strike: m.strike, offset: m.mountOffset });
-  m = { ...m, gait: pose.sway };
+  const charged = (unit.lastAttackCharged && m.remaining > 0) || (unit.chargeTravel ?? 0) >= UNITS.knight.chargeDistance;
+  const attack = getMeleeMotion('knight', { ...m, charged });
+  const pose = getMountPose({ horse: true, distance: m.distance, moving: m.moving, bodyOffset: attack.body, offset: m.mountOffset });
+  const neck = [19, -33], seat = [-6, -48];
   mountLegs(ctx, pose, true, true);
   ctx.save(); ctx.translate(pose.body.x, pose.body.y);
-  shape(ctx, [[-26, -39], [-37, -33], [-42, -16 + m.gait * 2], [-36, -21], [-30, -33]], MATERIAL.hair);
+  shape(ctx, [[-26, -39], [-37, -33], [-42, -16 + pose.sway * 2], [-36, -21], [-30, -33]], MATERIAL.hair);
   shape(ctx, [[-32, -35], [-24, -45], [12, -46], [26, -35], [23, -23], [-22, -19], [-31, -25]], MATERIAL.wood);
+  ctx.save(); pivot(ctx, neck, attack.neckAngle);
   shape(ctx, [[17, -32], [20, -50], [26, -64], [35, -57], [43, -45], [36, -36], [29, -25]], MATERIAL.woodLight);
   shape(ctx, [[23, -56], [23, -68], [29, -61], [33, -67], [37, -56]], MATERIAL.woodLight);
   shape(ctx, [[28, -57], [41, -51], [47, -43], [43, -39], [30, -42], [22, -49]], MATERIAL.steel);
   stroke(ctx, [[33, -52], [35, -52]], INK, 1);
+  stroke(ctx, [[39, -48], [40, -42], [44, -42]], MATERIAL.leather, 1.2);
+  ctx.restore();
+  const bridle = rotatePoint([40, -44], neck, attack.neckAngle);
+  const reinHand = rotatePoint([-4, -56], seat, attack.riderLean);
+  stroke(ctx, [bridle, [19, -41], reinHand], MATERIAL.leather, 1.2);
   ctx.restore(); mountLegs(ctx, pose, true, false);
   ctx.save(); ctx.translate(pose.body.x, pose.body.y);
   shape(ctx, [[-29, -40], [18, -43], [22, -17], [5, -12], [-10, -18], [-26, -13]], c.cloth);
   shape(ctx, [[-22, -39], [-17, -40], [-13, -19], [-18, -16]], c.trim);
+  limb(ctx, [seat, [8, -35], [2, -20]], MATERIAL.steelLight, 6);
+  stroke(ctx, [[-2, -18], [6, -18]], MATERIAL.steelDark, 2);
+  pivot(ctx, seat, attack.riderLean);
+  shape(ctx, [[-17, -66], [-23, -46], [-35, -49 + pose.sway * 3 - attack.capeLift]], c.cloth);
   shape(ctx, [[-16, -66], [-4, -70], [10, -62], [6, -47], [-16, -47]], c.metal);
-  limb(ctx, [[-5, -48], [8, -35], [2, -20]], MATERIAL.steelLight, 6);
   medievalHelmet(ctx, -7, -79, c, true);
-  feather(ctx, -9, -91, c.cloth, m.gait * 1.5);
-  shape(ctx, [[-17, -66], [-23, -46], [-35, -49 + m.gait * 3]], c.cloth);
-  limb(ctx, [[4, -64], [16, -58], [28, -60]], c.metal, 5);
-  const charge = unit.lastAttackCharged && m.remaining > 0;
-  const lanceY = -63 + (m.moving || charge ? 5 : 0);
-  stroke(ctx, [[-17, lanceY + 6], [73 + m.strike * 7, lanceY]], MATERIAL.woodLight, 3);
-  shape(ctx, [[72 + m.strike * 7, lanceY - 4], [87 + m.strike * 7, lanceY], [72 + m.strike * 7, lanceY + 3]], MATERIAL.steelLight);
-  shape(ctx, [[23, lanceY], [43, lanceY + 4 + m.gait * 2], [23, lanceY + 11]], c.cloth, null);
+  feather(ctx, -9, -91, c.cloth, pose.sway * 1.5 - attack.capeLift * 0.2);
+  limb(ctx, [[-9, -63], [-12, -55], [-4, -56]], MATERIAL.steelDark, 4);
+  const shoulder = [4, -64], elbow = solveJoint(shoulder, attack.hand, 16, 15, 1);
+  limb(ctx, [shoulder, elbow, attack.hand], c.metal, 5);
+  // A tapered riding lance with a counterweight, wrapped grip and cup guard.
+  // Counter-rotation keeps its pitch fixed as the rider leans into the thrust.
+  ctx.save(); ctx.translate(...attack.hand); ctx.rotate(attack.weaponAngle - attack.riderLean);
+  shape(ctx, [[-43, -2], [-35, -3.5], [-7, -2], [-7, 2], [-35, 3.5], [-43, 2]], MATERIAL.woodDark);
+  stroke(ctx, [[-40, -2], [-40, 2]], MATERIAL.bronze, 2);
+  shape(ctx, [[3, -4], [40, -1.3], [40, 1.3], [3, 4]], MATERIAL.hide);
+  shape(ctx, [[3, -4], [40, -1.3], [40, 0], [3, 0]], MATERIAL.steelLight);
+  for (const x of [15, 27]) {
+    const thickness = 4 - (x - 3) * 2.7 / 37;
+    shape(ctx, [[x, -thickness], [x + 4, -thickness + 0.3], [x + 4, thickness - 0.3], [x, thickness]], c.cloth);
+  }
+  shape(ctx, [[39, -1.5], [45, -1.4], [51, 0], [45, 1.4], [39, 1.5]], MATERIAL.steelLight);
+  stroke(ctx, [[-7, 0], [3, 0]], MATERIAL.leather, 4);
+  for (const x of [-5, -2, 1]) stroke(ctx, [[x, -2], [x + 1, 2]], MATERIAL.hide, 0.8);
+  shape(ctx, [[2, -2], [8, -7], [10, -6], [6, 0], [10, 6], [8, 7], [2, 2]], MATERIAL.bronze);
+  stroke(ctx, [[8, -7], [10, -6], [6, 0], [10, 6], [8, 7]], MATERIAL.bronzeLight, 1);
+  stroke(ctx, [[-2, -2], [1, -2]], c.metal, 3);
+  ctx.restore();
   shape(ctx, [[-18, -65], [-3, -64], [-2, -49], [-11, -40], [-20, -48]], shade(c.cloth));
   shape(ctx, [[-16, -63], [-5, -62], [-4, -50], [-11, -43], [-18, -49]], c.cloth);
-  if (charge && !m.reduced) { ctx.save(); ctx.globalAlpha = m.kick * 0.5; stroke(ctx, [[-48, -34], [-29, -34]], '#e8cd8f', 2); ctx.restore(); }
   ctx.restore();
 }
 function renaissance(ctx, c, m, gun) {
@@ -266,9 +313,18 @@ function fieldCannon(ctx, c, m) {
   muzzle(ctx, 51 - r, -35, m, false, true);
 }
 function modernInfantry(ctx, c, m, rifle) {
+  const attack = getMeleeMotion('commando', m);
   const crouch = rifle && !m.moving ? 7 : 0;
-  legs(ctx, m, MATERIAL.olive, MATERIAL.leather, crouch);
-  ctx.save(); ctx.translate(m.strike * (rifle ? -1 : 7), crouch - Math.abs(m.gait));
+  if (rifle || m.moving) legs(ctx, m, MATERIAL.olive, MATERIAL.leather, crouch);
+  else for (const side of [-1, 1]) {
+    // The rear leg drives the torso forward without sliding either boot.
+    const hip = [side * 5 + attack.body.x, -24 + attack.body.y];
+    const ankle = [side < 0 ? -9 : 14, -5];
+    const knee = solveJoint(hip, ankle, 14, 13, -1);
+    limb(ctx, [hip, knee, ankle], side < 0 ? MATERIAL.oliveDark : MATERIAL.olive, 5);
+    limb(ctx, [[ankle[0] - 2, -3], [ankle[0] + 5, -2]], MATERIAL.leather, 4);
+  }
+  ctx.save(); ctx.translate(rifle ? -m.strike : attack.body.x, (rifle ? crouch : attack.body.y) - Math.abs(m.gait));
   shape(ctx, [[-12, -44], [7, -46], [12, -25], [5, -20], [-13, -22]], MATERIAL.olive);
   shape(ctx, [[-16, -43], [-9, -45], [-10, -25], [-18, -27]], MATERIAL.oliveDark);
   stroke(ctx, [[-7, -43], [-6, -26]], MATERIAL.hide, 2);
@@ -278,18 +334,29 @@ function modernInfantry(ctx, c, m, rifle) {
   shape(ctx, [[-8, -54], [-8, -60], [-4, -65], [3, -65], [7, -61], [8, -56], [10, -54]], MATERIAL.oliveDark);
   shape(ctx, [[-4, -64], [3, -64], [7, -60], [7, -57], [1, -58]], MATERIAL.olive);
   stroke(ctx, [[-8, -54], [-3, -46], [6, -50]], MATERIAL.leather, 1);
-  const reach = rifle ? -m.kick * 3 : m.strike * 11;
-  limb(ctx, [[2, -41], [11, -31], [23 + reach, -38]], c.skin, 4);
-  limb(ctx, [[-5, -39], [3, -31], [11 + reach, -36]], MATERIAL.olive, 5);
-  shape(ctx, [[-1 + reach, -39], [31 + reach, -41], [31 + reach, -35], [10 + reach, -34], [1 + reach, -30]], rifle ? MATERIAL.inset : MATERIAL.wood);
-  stroke(ctx, [[23 + reach, -41], [44 + reach, -41]], MATERIAL.steel, 3);
   if (rifle) {
+    const reach = -m.kick * 3;
+    limb(ctx, [[2, -41], [11, -31], [23 + reach, -38]], c.skin, 4);
+    limb(ctx, [[-5, -39], [3, -31], [11 + reach, -36]], MATERIAL.olive, 5);
+    shape(ctx, [[-1 + reach, -39], [31 + reach, -41], [31 + reach, -35], [10 + reach, -34], [1 + reach, -30]], MATERIAL.inset);
+    stroke(ctx, [[23 + reach, -41], [44 + reach, -41]], MATERIAL.steel, 3);
     shape(ctx, [[17 + reach, -35], [24 + reach, -35], [22 + reach, -24], [17 + reach, -25]], MATERIAL.inset);
     stroke(ctx, [[12 + reach, -43], [18 + reach, -43]], MATERIAL.steelDark, 2);
     muzzle(ctx, 45 + reach, -41, m);
   } else {
-    shape(ctx, [[43 + reach, -43], [63 + reach, -42], [44 + reach, -38]], MATERIAL.steelLight);
-    stroke(ctx, [[-11, -23], [-11, -15]], MATERIAL.bronze, 4);
+    stroke(ctx, [[-10, -23], [-14, -14]], MATERIAL.leather, 4);
+    const shoulder = [5, -40], elbow = solveJoint(shoulder, attack.hand, 16, 15, 1);
+    limb(ctx, [[-7, -40], [-17, -29], attack.guard], MATERIAL.oliveDark, 4);
+    oval(ctx, ...attack.guard, 2.2, 2.2, c.skin);
+    limb(ctx, [shoulder, elbow], MATERIAL.olive, 5);
+    limb(ctx, [elbow, attack.hand], c.skin, 4);
+    // A compact forward grip: blade, guard and handle rotate as one piece.
+    ctx.save(); ctx.translate(...attack.hand); ctx.rotate(attack.knifeAngle);
+    stroke(ctx, [[-4, 0], [4, 0]], MATERIAL.leather, 3);
+    stroke(ctx, [[4, -3], [4, 3]], MATERIAL.steelDark, 1.5);
+    shape(ctx, [[5, -2], [15, -2], [20, 0], [5, 2]], MATERIAL.steelLight);
+    stroke(ctx, [[5, 1], [17, 0]], MATERIAL.steel, 0.8);
+    ctx.restore();
   }
   ctx.restore();
 }
@@ -385,7 +452,7 @@ export function drawUnit(ctx, unit, time, scale = 1, reducedMotion = false) {
   const stride = distance / (stats.footprint ? 13 : 6) + unit.id * 1.7;
   const m = { moving, distance: reducedMotion ? 0 : distance, stride, gait: moving ? Math.sin(stride) : 0,
     clock: reducedMotion ? 0 : time, breathe: reducedMotion ? 0 : Math.sin(time * 2 + unit.id), reduced: reducedMotion, mountOffset: (unit.id * 0.17) % 1,
-    remaining, progress, age: progress * duration, kick: reducedMotion ? 0 : (1 - progress) ** 2,
+    remaining, duration, cooldown: unit.attackCooldown ?? 0, approach: unit.attackApproach ?? 0, progress, age: progress * duration, kick: reducedMotion ? 0 : (1 - progress) ** 2,
     strike: reducedMotion || !remaining ? 0 : Math.max(0, Math.sin(Math.PI * Math.min(1, progress * 1.3 + 0.15))),
     windup: !reducedMotion && !moving && unit.attackCooldown > 0 && unit.attackCooldown < 0.18 ? 1 - unit.attackCooldown / 0.18 : 0 };
   const player = unit.team === 'player';

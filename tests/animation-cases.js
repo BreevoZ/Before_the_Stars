@@ -231,7 +231,8 @@ export function registerAnimationTests(test, assert, near) {
         charged ||= source.lastAttackCharged || source.chargeRemaining > 0;
         burst ||= source.burstRemaining > 0;
       }
-      if (stats.projectile) assert(shots.has(stats.projectile), `${clip.id}: missing real projectile`);
+      if (clip.melee) assert(shots.size === 0 && sample(0.4).game.units[0].attackStyle === 'melee', `${clip.id}: close combat must use a punch without projectiles`);
+      else if (stats.projectile) assert(shots.has(stats.projectile), `${clip.id}: missing real projectile`);
       assert(impacts.size > 0, `${clip.id}: missing impact`);
       if (stats.field) assert(fields, `${clip.id}: missing ground field`);
       if (stats.chargeTime || stats.chargeDamage) assert(charged, `${clip.id}: missing charge`);
@@ -268,7 +269,7 @@ export function registerAnimationTests(test, assert, near) {
       const event = (id, value, type = 'change') => { el(id).value = value; el(id).dispatchEvent(new frame.contentWindow.Event(type)); };
       assert(page.querySelectorAll('.clip').length === ANIMATION_CLIPS.length);
       page.querySelector('[data-category="unit"]').click();
-      assert(page.querySelectorAll('.clip:not([hidden])').length === 15);
+      assert(page.querySelectorAll('.clip:not([hidden])').length === Object.keys(UNITS).length);
       event('search', '恐龙', 'input'); assert(page.querySelectorAll('.clip:not([hidden])').length === 1);
       event('era', '5'); assert(!el('empty').hidden);
       event('era', 'all'); event('search', '', 'input');

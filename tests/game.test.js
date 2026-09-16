@@ -1,4 +1,4 @@
-import { RULES, UNITS, AGES, TURRETS, ABILITIES, createGame, getRecruitState, recruit, cancelTraining, getEvolutionState, evolve, getTurretState, buildTurret, getExpansionState, expandTurretSlots, sellTurret, getTurretPosition, getTurretMuzzle, getAbilityRadius, getAbilityImpactX, castAbility, updateGame } from '../src/game.js';
+import { RULES, UNITS, AGES, TURRETS, ABILITIES, getAgeUnits, createGame, getRecruitState, recruit, cancelTraining, getEvolutionState, evolve, getTurretState, buildTurret, getExpansionState, expandTurretSlots, sellTurret, getTurretPosition, getTurretMuzzle, getAbilityRadius, getAbilityImpactX, castAbility, updateGame } from '../src/game.js';
 import { createRenderer } from '../src/render.js';
 import { drawUnit } from '../src/units.js';
 import { drawTurret } from '../src/turrets.js';
@@ -1167,7 +1167,9 @@ test('Browser UI: purchase, queue/refund, tower, meteor targeting, keyboard, tra
   assert(el('ability').getAttribute('aria-pressed') === 'true' && !el('target-banner').hidden);
   const cancelSpace = new frame.contentWindow.KeyboardEvent('keydown', { code: 'Space', bubbles: true, cancelable: true });
   el('cancel-target').dispatchEvent(cancelSpace);
-  assert(!cancelSpace.defaultPrevented && !el('ability').disabled, 'Space on the cancel button must retain native activation, not cast the spell');
+  assert(cancelSpace.defaultPrevented && !el('ability').disabled && el('phase').textContent === '已暂停', 'Space while aiming must pause without casting or native activation');
+  key('Space', true); assert(el('phase').textContent === '已暂停');
+  key('Space'); assert(el('phase').textContent === '交战中' && !el('target-banner').hidden);
   key('Escape');
   assert(el('target-banner').hidden && !el('ability').disabled);
   key('KeyQ'); key('ArrowRight'); key('Enter');
@@ -1179,7 +1181,7 @@ test('Browser UI: purchase, queue/refund, tower, meteor targeting, keyboard, tra
   el('battlefield').dispatchEvent(new frame.contentWindow.MouseEvent('click', { bubbles: true, clientX: bounds.x + bounds.width * 0.7, clientY: bounds.y + bounds.height / 2 }));
   assert(el('ability').disabled && el('target-banner').hidden);
   el('restart').click();
-  key('Space'); key('Digit2'); key('Digit3', true);
+  key('Digit1'); key('Digit2'); key('Digit3', true);
   assert(el('queue-count').textContent === '2 / 5');
   await new Promise(resolve => setTimeout(resolve, 1850));
   assert(el('player-count').textContent === '1', 'A real browser frame loop must finish training');
@@ -1210,7 +1212,7 @@ test('Browser UI: earn experience, evolve independently, replace cards and short
   const rotation = [2, 1, 0, 1, 0];
   let order = 0;
   for (let i = 0; i < 3000 && el('evolve').disabled && el('result').hidden; i++) {
-    const card = page.querySelectorAll('[data-unit]')[rotation[order % rotation.length]];
+    const card = page.querySelectorAll('[data-unit]:not([hidden])')[rotation[order % rotation.length]];
     if (parseInt(el('queue-count').textContent, 10) < 2 && !card.disabled) { card.click(); order++; }
     if (time > 14000 && Number(el('enemy-count').textContent) >= 2 && !el('ability').disabled) {
       key('KeyQ'); key('Enter');
@@ -1226,7 +1228,7 @@ test('Browser UI: earn experience, evolve independently, replace cards and short
   assert(el('player-age').textContent.includes('中世纪') && el('enemy-age').textContent === enemyAge);
   assert(el('player-health-bar').max === AGES[2].baseHealth && el('evolve').disabled);
   assert(el('gold').textContent === gold && [...page.querySelectorAll('.queue-name')].map(element => element.textContent).join() === queue);
-  assert([...page.querySelectorAll('[data-unit]')].map(card => card.dataset.unit).join() === AGES[2].units.join());
+  assert([...page.querySelectorAll('[data-unit]:not([hidden])')].map(card => card.dataset.unit).join() === AGES[2].units.join());
   assert(el('recruit-heavy').querySelector('strong').textContent === '重甲骑士');
   assert([...page.querySelectorAll('[data-turret]')].map(card => card.dataset.turret).join() === AGES[2].turrets.join());
   assert(el('ability-name').textContent === ABILITIES.volley.name && el('ability').dataset.ability === 'volley');
@@ -1317,15 +1319,19 @@ test('Browser UI: all five rosters, era progress, income, support targeting and 
     assert(page.body.dataset.age === String(age) && el('player-age').textContent.includes(config.name));
     assert(el('enemy-age').textContent.includes(AGES[1].name) && el('income-rate').textContent === `+${config.income}/s`);
     assert(page.querySelectorAll('#era-track li').length === 5 && page.querySelector('#era-track [aria-current]').textContent.includes(config.shortName));
-    assert([...page.querySelectorAll('[data-unit]')].map(card => card.dataset.unit).join() === config.units.join());
+    assert([...page.querySelectorAll('[data-unit]:not([hidden])')].map(card => card.dataset.unit).join() === getAgeUnits(age).join());
     assert([...page.querySelectorAll('[data-turret]')].map(card => card.dataset.turret).join() === config.turrets.join());
     assert(el('ability-name').textContent === ABILITIES[config.ability].name);
     assert(el('player-era').textContent === config.numeral);
-    const roster = [...config.units.map(type => UNITS[type]), ...config.turrets.map(type => TURRETS[type])];
-    assert([...page.querySelectorAll('[data-unit], [data-turret]')].every((card, index) =>
+    const roster = [...getAgeUnits(age).map(type => UNITS[type]), ...config.turrets.map(type => TURRETS[type])];
+    assert([...page.querySelectorAll('[data-unit]:not([hidden]), [data-turret]')].every((card, index) =>
       card.querySelector('svg') && card.getAttribute('aria-label').includes(roster[index].name) && card.title.includes(roster[index].name)),
       'Icon actions must keep accessible names and inspectable descriptions in every age');
     assert(roster.every(stats => el('help-roster').textContent.includes(stats.name)), 'The manual must follow the current age');
+    if (age === 5) {
+      key('Digit4'); assert(page.querySelector('.queue-name').textContent === UNITS.superSoldier.name);
+      page.querySelector('.queue-slot').click();
+    } else { key('Digit4'); assert(el('queue-count').textContent === '0 / 5'); }
     for (const code of ['Digit1', 'Digit2', 'Digit3']) key(code);
     assert([...page.querySelectorAll('.queue-name')].slice(0, 3).map(name => name.textContent).join() === config.units.map(type => UNITS[type].name).join());
     page.querySelectorAll('.queue-slot').forEach(() => page.querySelector('.queue-slot').click());
@@ -1539,7 +1545,61 @@ test('A burst cancels when its target dies or leaves range without transferring 
   }
 });
 
-test('All fifteen articulated models render distinctly, animate, and respect reduced motion', () => {
+test('Super soldier is a paid future-only manual unit with normal training, refunds and population limits', () => {
+  const game = isolatedGame(); game.gold.player = 20000;
+  assert(getRecruitState(game, 'superSoldier') === 'locked');
+  evolveTo(game, 5); evolveTo(game, 5, 'enemy'); game.gold.enemy = 20000;
+  assert(getRecruitState(game, 'superSoldier', 'enemy') === 'player-only');
+  assert(!recruit(game, 'superSoldier', 'enemy') && !AGES[5].units.includes('superSoldier'));
+  assert(getAgeUnits(5).length === 4 && getAgeUnits(4).length === 3);
+  game.gold.player = UNITS.superSoldier.cost - 1;
+  assert(!recruit(game, 'superSoldier'));
+  game.gold.player++;
+  assert(recruit(game, 'superSoldier') && game.gold.player === 0 && !game.units.length);
+  const order = game.queues.player[0];
+  assert(cancelTraining(game, order.id) && !cancelTraining(game, order.id));
+  near(game.gold.player, UNITS.superSoldier.cost);
+  recruit(game, 'superSoldier'); advance(game, UNITS.superSoldier.trainTime);
+  assert(game.units.length === 1 && game.units[0].type === 'superSoldier');
+  near(game.units[0].hp, UNITS.superSoldier.health);
+  game.gold.player = 20000;
+  for (let i = 0; i < RULES.queueLimit; i++) assert(recruit(game, 'superSoldier'));
+  assert(getRecruitState(game, 'superSoldier') === 'queue-full');
+  game.queues.player = [];
+  game.units = Array.from({ length: RULES.armyLimit }, (_, i) => soldier('player', 200 + i * 40));
+  assert(getRecruitState(game, 'superSoldier') === 'army-full');
+});
+
+test('Super soldier switches from armor-piercing shots to contact punches without firing a second attack', () => {
+  const attacker = soldier('player', 500, 'superSoldier'), target = soldier('enemy', 780, 'warMachine');
+  target.attackCooldown = 1000;
+  const game = isolatedGame([attacker, target]);
+  updateGame(game, RULES.fixedStep);
+  assert(attacker.attackStyle === 'ranged' && game.projectiles.length === 1);
+  attacker.attackCooldown = 1000; advance(game, 0.5);
+  near(target.hp, UNITS.warMachine.health - UNITS.superSoldier.damage);
+  target.x = 550; attacker.attackCooldown = 0;
+  updateGame(game, RULES.fixedStep);
+  assert(attacker.attackStyle === 'melee' && game.projectiles.length === 0);
+  near(target.hp, UNITS.warMachine.health - UNITS.superSoldier.damage - UNITS.superSoldier.meleeDamage);
+  const after = target.hp; advance(game, 0.3); near(target.hp, after);
+});
+
+test('A normally trained super soldier breaks a defended future position against active AI', () => {
+  const game = createGame(); evolveTo(game, 5); evolveTo(game, 5, 'enemy');
+  game.gold.player = UNITS.superSoldier.cost; game.gold.enemy = 20000;
+  while (game.turrets.enemy.length < RULES.maxTurretSlots) expandTurretSlots(game, 'enemy');
+  for (let i = 0; i < RULES.maxTurretSlots; i++) buildTurret(game, 'enemy', 'ion', i);
+  // Start with an established defending line; the enemy keeps recruiting during the siege.
+  game.units = [soldier('enemy', 970, 'warMachine'), soldier('enemy', 1030, 'blaster'), soldier('enemy', 890, 'blade')];
+  game.nextUnitId = fixtureId;
+  assert(recruit(game, 'superSoldier'));
+  advance(game, 150);
+  assert(game.status === 'won', `Expected breakthrough, got ${game.status}; enemy HP ${game.bases.enemy.hp}`);
+  assert(!game.units.some(unit => unit.team === 'enemy' && unit.type === 'superSoldier'));
+});
+
+test('All articulated models render distinctly, animate, and respect reduced motion', () => {
   const canvas = document.createElement('canvas'); canvas.width = 480; canvas.height = 230;
   const ctx = canvas.getContext('2d'), silhouettes = new Set();
   for (const type of Object.keys(UNITS)) {
@@ -1555,7 +1615,7 @@ test('All fifteen articulated models render distinctly, animate, and respect red
     unit.moving = false; unit.attackAnimation = UNITS[type].attackDuration;
     assert(paint(0) !== idle, `${type}: attack must have its own pose`);
   }
-  assert(silhouettes.size === 15, 'Each unit needs its own silhouette');
+  assert(silhouettes.size === Object.keys(UNITS).length, 'Each unit needs its own silhouette');
 });
 
 function towerFixture(type, team = 'player') {

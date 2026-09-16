@@ -325,7 +325,7 @@ export function registerProgressionTests(test, assert, near) {
     el('ability').click(); const canvas = el('battlefield'), bounds = canvas.getBoundingClientRect();
     canvas.dispatchEvent(new frame.contentWindow.MouseEvent('click', { bubbles: true, clientX: bounds.x + bounds.width * RULES.enemyBaseX / RULES.width, clientY: bounds.y + bounds.height / 2 }));
     tick(1);
-    assert(el('result-title').textContent === '战役胜利' && el('play-again').textContent === '继续文明进程');
+    assert(el('archives').hidden && el('result-title').textContent === '战役胜利' && el('play-again').textContent === '继续文明进程');
     let saved = parseSession(frame.contentWindow.__storage.getItem(SAVE_KEY));
     assert(saved.run.phase === 'victory' && !saved.permanent.legacy);
     frame.remove(); frame = await mount(serializeSession(saved)); time = 0; frame.contentWindow.__testFrame(0);
@@ -343,7 +343,7 @@ export function registerProgressionTests(test, assert, near) {
     saved = parseSession(frame.contentWindow.__storage.getItem(SAVE_KEY));
     assert(saved.permanent.legacy === 1 && saved.run.settled);
     frame.remove(); frame = await mount(serializeSession(saved)); time = 0; frame.contentWindow.__testFrame(0);
-    el('play-again').click(); assert(el('archives-dialog').open && el('legacy').textContent === '1');
+    el('play-again').click(); assert(!el('archives').hidden && el('archives-dialog').open && el('legacy').textContent === '1');
     el('buy-production').click(); el('buy-production').click();
     assert(el('legacy').textContent === '0' && el('buy-production').disabled && !el('auto-enabled').checked);
     el('auto-enabled').click(); el('auto-target').value = 'ranged'; el('auto-target').dispatchEvent(new Event('change'));
@@ -358,6 +358,7 @@ export function registerProgressionTests(test, assert, near) {
     el('archives').click(); const pausedGold = el('gold').textContent; tick(20); assert(el('gold').textContent === pausedGold);
     page().body.dispatchEvent(new frame.contentWindow.KeyboardEvent('keydown', { code: 'Digit1', bubbles: true }));
     assert(el('queue-count').textContent === '1 / 5', 'Archive modal must block battle hotkeys');
+    el('archive-save').click(); assert(el('save-dialog').open);
     el('manual-save').click(); assert(el('save-warning').hidden);
     const preserved = frame.contentWindow.__storage.getItem(SAVE_KEY);
     el('save-data').value = '{broken'; el('import-save').click(); assert(frame.contentWindow.__storage.getItem(SAVE_KEY) === preserved);
@@ -366,14 +367,77 @@ export function registerProgressionTests(test, assert, near) {
     assert(page().documentElement.scrollWidth <= frame.clientWidth);
     frame.style.width = '360px';
     assert(page().documentElement.scrollWidth <= frame.clientWidth, 'Incremental archive must fit narrow screens');
-    el('close-archives').click(); el('restart').click();
+    el('close-save').click(); el('close-archives').click(); el('restart').click();
     assert(frame.contentWindow.__confirmMessages.at(-1).includes('放弃当前文明'));
     assert(frame.contentWindow.__storage.getItem(SAVE_KEY) === preserved, 'Cancel restart preserves the active save');
-    el('archives').click(); el('save-data').value = serializeSession(seed);
+    el('archives').click(); el('archive-save').click(); el('save-data').value = serializeSession(seed);
     frame.contentWindow.__confirm = true; el('import-save').click();
     assert(el('legacy').textContent === '0' && el('income-rate').textContent === '+7/s');
+    assert(el('archives').hidden && !el('archives-dialog').open && el('save-dialog').open, 'Importing an unfinished first run hides and closes archives');
     assert(parseSession(frame.contentWindow.__storage.getItem(SAVE_KEY)).run.runId === seed.run.runId);
     frame.remove();
+  });
+  test('Archives unlock only after a completed cycle, survive reload, and first defeat can restart without archives', async () => {
+    for (const status of ['lost', 'draw']) {
+      const seed = createProgression(); finish(seed, status);
+      const frame = await mountFixture(serializeSession(seed)), page = frame.contentDocument;
+      const el = id => page.getElementById(id);
+      assert(el('archives').hidden && el('play-again').textContent === '从原始时代重试');
+      el('archives').click(); assert(!el('archives-dialog').open);
+      el('play-again').click(); el('play-again').click();
+      const saved = parseSession(frame.contentWindow.__storage.getItem(SAVE_KEY));
+      assert(saved.run.phase === 'battle' && !saved.permanent.completedCycles && saved.run.runId !== seed.run.runId);
+      assert(el('archives').hidden && !el('archives-dialog').open);
+      frame.remove();
+    }
+    const seed = createProgression(); finish(seed);
+    for (const rebuild of [false, true]) {
+      if (rebuild) rebuildCivilization(seed, seed.run.runId);
+      const frame = await mountFixture(serializeSession(seed));
+      assert(!frame.contentDocument.getElementById('archives').hidden);
+      frame.remove();
+    }
+  });
+  test('Space pauses every mode, ignores key repeat, and leaves native modal/input editing alone', async () => {
+    for (const mode of ['classic', 'incremental', 'debug']) {
+      const frame = await mountFixture(null, false, mode), page = frame.contentDocument;
+      const el = id => page.getElementById(id);
+      const key = (target, repeat = false) => {
+        const event = new frame.contentWindow.KeyboardEvent('keydown', { code: 'Space', bubbles: true, cancelable: true, repeat });
+        target.dispatchEvent(event); return event;
+      };
+      let time = 0;
+      const tick = () => { for (let i = 0; i < 120; i++) frame.contentWindow.__testFrame(time += 1000 / 60); };
+      frame.contentWindow.__testFrame(0);
+      assert(key(el('recruit')).defaultPrevented && el('pause-battle').getAttribute('aria-pressed') === 'true');
+      key(page.body, true); const gold = el('gold').textContent; tick();
+      assert(el('gold').textContent === gold && el('clock').textContent === '00:00' && el('queue-count').textContent === '0 / 5');
+      key(el('pause-battle')); tick(); assert(Number(el('gold').textContent) > Number(gold));
+      el('help').click(); assert(!key(el('close-help')).defaultPrevented);
+      el('close-help').click();
+      assert(el('pause-battle').getAttribute('aria-pressed') === 'false');
+      if (mode !== 'classic') {
+        el('save-menu').click();
+        assert(!key(el('save-data')).defaultPrevented && !key(el('manual-save')).defaultPrevented);
+        const frozen = el('gold').textContent; tick(); assert(el('gold').textContent === frozen);
+        el('close-save').click();
+      }
+      frame.remove();
+    }
+  });
+  test('Super soldier training and both attack poses survive full save round trips', () => {
+    const seed = createProgression(); seed.game.ai.enabled = false; ageTo(seed.game, 5);
+    seed.game.gold.player = UNITS.superSoldier.cost;
+    assert(recruit(seed.game, 'superSoldier'));
+    let saved = parseSession(serializeSession(seed));
+    assert(saved.game.queues.player[0].paid === UNITS.superSoldier.cost);
+    advance(saved, UNITS.superSoldier.trainTime);
+    for (const style of ['melee', 'ranged']) {
+      saved.game.units[0].attackStyle = style;
+      const restored = parseSession(serializeSession(saved));
+      assert(restored.game.units[0].type === 'superSoldier' && restored.game.units[0].attackStyle === style);
+    }
+    saved.game.units[0].attackStyle = 'invalid'; throws(() => serializeSession(saved));
   });
   test('M1 browser: corrupt saves stay protected and unavailable storage shows a warning without breaking play', async () => {
     for (const unavailable of [false, true]) {
@@ -381,15 +445,15 @@ export function registerProgressionTests(test, assert, near) {
       const el = id => page.getElementById(id);
       assert(!el('save-warning').hidden && el('save-warning').textContent.includes('存档提示'));
       el('recruit').click(); assert(el('queue-count').textContent === '1 / 5');
-      el('archives').click(); el('manual-save').click();
-      assert(!el('save-warning').hidden && el('archives-dialog').open);
+      el('save-menu').click(); el('manual-save').click();
+      assert(!el('save-warning').hidden && el('save-dialog').open);
       if (!unavailable) assert(frame.contentWindow.__storage.getItem(SAVE_KEY) === '{broken');
       frame.remove();
     }
   });
   test('Modes browser: bare URL opens normal civilization and keeps secondary modes below the battlefield', async () => {
     const frame = await mountFixture(null, false, ''), page = frame.contentDocument;
-    assert(page.body.dataset.mode === 'incremental' && !page.getElementById('archives').hidden);
+    assert(page.body.dataset.mode === 'incremental' && page.getElementById('archives').hidden && !page.getElementById('save-menu').hidden);
     assert(page.getElementById('debug-tools').hidden && page.getElementById('gold').textContent === '180');
     assert(page.querySelector('.mode-links #mode-link').getAttribute('href') === '?mode=classic');
     assert(page.querySelector('.mode-links #debug-link').getAttribute('href') === '?mode=debug');
@@ -405,17 +469,17 @@ export function registerProgressionTests(test, assert, near) {
     assert(page().body.dataset.mode === 'debug' && !el('debug-tools').hidden && el('debug-speed').value === '10');
     assert(el('gold').textContent === String(RULES.startingGold + DEBUG_GOLD));
     frame.contentWindow.__testFrame(0); tick(1);
-    el('archives').click(); el('manual-save').click();
+    el('save-menu').click(); el('manual-save').click();
     let saved = parseSession(frame.contentWindow.__storage.getItem(DEBUG_SAVE_KEY));
     assert(Math.abs(saved.game.elapsed - 10) < 0.1, '10x speed must run 600 ordinary simulation steps per real second');
     const elapsed = saved.game.elapsed; tick(5); el('manual-save').click();
     saved = parseSession(frame.contentWindow.__storage.getItem(DEBUG_SAVE_KEY)); near(saved.game.elapsed, elapsed);
-    el('close-archives').click(); el('pause-battle').click(); tick(5);
+    el('close-save').click(); el('pause-battle').click(); tick(5);
     el('pause-battle').click(); el('debug-speed').value = '20'; el('debug-speed').dispatchEvent(new Event('change'));
-    tick(0.5); el('archives').click(); el('manual-save').click();
+    tick(0.5); el('save-menu').click(); el('manual-save').click();
     saved = parseSession(frame.contentWindow.__storage.getItem(DEBUG_SAVE_KEY));
     assert(saved.game.elapsed - elapsed > 9 && saved.game.elapsed - elapsed < 10.1);
-    el('close-archives').click(); command('victory');
+    el('close-save').click(); command('victory');
     assert(el('result-title').textContent === '战役胜利'); el('play-again').click();
     assert(el('enemy-era').textContent === 'II');
     command('finale'); assert(el('result-title').textContent === '文明未能幸存');

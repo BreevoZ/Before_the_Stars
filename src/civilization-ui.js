@@ -13,18 +13,24 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   const loaded = store.load();
   const freshSession = () => debug ? createDebugProgression() : createProgression();
   let session = loaded.session ?? freshSession();
-  let saveElapsed = 0, manualPause = false;
-  const dialog = el('archives-dialog');
+  let saveElapsed = 0;
+  const dialog = el('archives-dialog'), saveDialog = el('save-dialog');
   function report(result, success = '已保存完整文明进度。') {
     text('save-status', result.ok ? success : result.error);
     el('save-warning').hidden = Boolean(result.ok);
-    if (!result.ok) text('save-warning', `存档提示：${result.error} 当前可继续试玩并导出进度；请在「文明档案 → 存档与恢复」处理。`);
+    if (!result.ok) text('save-warning', `存档提示：${result.error} 当前可继续试玩并导出进度；请在「存档」处理。`);
     return result.ok;
   }
   function save() { saveElapsed = 0; return report(store.save(session)); }
   function changed(resetBattle = false) { sync(); onChange(resetBattle); }
-  function open() { if (!dialog.open) dialog.showModal(); changed(); }
-  function replace(next) { session = next; saveElapsed = 0; changed(true); }
+  function open() {
+    if (!session.permanent.completedCycles) return;
+    if (!dialog.open) dialog.showModal(); changed();
+  }
+  function openSave() { if (!saveDialog.open) saveDialog.showModal(); changed(); }
+  function replace(next) { session = next; saveElapsed = 0;
+    if (!session.permanent.completedCycles) dialog.close();
+    changed(true); }
   function transition(action) {
     const runId = session.run.runId;
     if (!action()) return;
@@ -33,11 +39,14 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   }
   el('restart').title = '重开本轮文明 · 永久进度保留';
   el('restart').setAttribute('aria-label', '重开本轮文明');
-  el('archives').hidden = false; el('pause-battle').hidden = false;
+  el('save-menu').hidden = false;
+  el('save-menu').addEventListener('click', openSave);
+  el('archive-save').addEventListener('click', openSave);
+  el('close-save').addEventListener('click', () => saveDialog.close());
+  saveDialog.addEventListener('close', () => changed());
   el('archives').addEventListener('click', open);
   el('close-archives').addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => changed());
-  el('pause-battle').addEventListener('click', () => { manualPause = !manualPause; changed(); });
   if (debug) {
     el('debug-tools').hidden = false;
     el('clear-progress').textContent = '清空调试进度';
@@ -100,7 +109,7 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   el('clear-progress').addEventListener('click', () => {
     if (!window.confirm(debug ? '清空调试进度及调试备份？正式增量存档保持不变。' : '清空全部增量进度及本地备份？这会永久删除循环次数、遗产、升级和当前文明，无法撤销。建议先导出存档。')) return;
     const next = freshSession();
-    if (report(store.clear(next), '全部进度已清空。')) { replace(next); dialog.close(); }
+    if (report(store.clear(next), '全部进度已清空。')) { replace(next); dialog.close(); saveDialog.close(); }
   });
 
   function sync() {
@@ -130,8 +139,7 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     text('automation-hint', p.automation.unlocked ? '每 0.25 秒尝试一次正常付费招募；进化后跟随对应兵种位置。暂停、隐藏页面或结算时停止。' : '首次有效循环后永久免费解锁，默认关闭。');
     el('auto-enabled').disabled = !p.automation.unlocked; el('auto-target').disabled = !p.automation.unlocked;
     el('auto-enabled').checked = p.automation.enabled; el('auto-target').value = p.automation.target;
-    text('pause-battle', manualPause ? '继续' : '暂停');
-    el('pause-battle').setAttribute('aria-pressed', String(manualPause));
+    el('archives').hidden = p.completedCycles === 0;
     text('archives', `档案 · ${p.legacy}`);
     el('archives').setAttribute('aria-label', `文明档案，${p.legacy} 文明遗产`);
     el('result').classList.toggle('destruction', run.phase === 'destruction');
@@ -139,7 +147,7 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
       text('result-title', run.phase === 'destruction' ? '文明未能幸存' : run.phase === 'victory' ? '战役胜利' : game.status === 'draw' ? '平局' : '战败');
       text('result-detail', run.phase === 'destruction' ? `你赢得了战争，却没能保住文明。+${run.earnedLegacy} 文明遗产已计入本轮结算。` :
         run.phase === 'victory' ? `敌方${AGES[game.ages.enemy].name}基地已被摧毁。资产保留，下一场冲突等待着你。` : '本轮没有遗产奖励。永久进度仍然保留。');
-      text('play-again', run.phase === 'victory' ? '继续文明进程' : run.phase === 'destruction' ? '查看遗产与重建' : '查看档案与重试');
+      text('play-again', run.phase === 'victory' ? '继续文明进程' : run.phase === 'destruction' ? '查看遗产与重建' : p.completedCycles ? '查看档案与重试' : '从原始时代重试');
       el('result-hint').hidden = false;
       text('result-hint', run.phase === 'destruction' ? '可立即跳过演出 · 遗产已经入账' : run.phase === 'victory' ? '未完成订单按支付价格退款 · 基地恢复满血' : '从原始时代重新尝试');
     }
@@ -149,8 +157,8 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   else text('save-status', '已恢复上次保存的完整进度，没有离线推进。');
   return {
     get session() { return session; },
-    get paused() { return manualPause || dialog.open; },
-    get modalOpen() { return dialog.open; },
+    get paused() { return dialog.open || saveDialog.open; },
+    get modalOpen() { return dialog.open || saveDialog.open; },
     get timeScale() { return debug ? session.debugSpeed : 1; },
     sync, save, open,
     step(dt) {
@@ -162,10 +170,12 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
       if (session.run.phase === 'victory') {
         const battleId = session.run.battleId;
         transition(() => continueCivilization(session, battleId));
+      } else if (session.run.phase === 'defeat' && !session.permanent.completedCycles) {
+        transition(() => rebuildCivilization(session, session.run.runId));
       } else open();
     },
     restart() {
-      if (['destruction', 'defeat'].includes(session.run.phase)) return open();
+      if (['destruction', 'defeat'].includes(session.run.phase)) return this.resultAction();
       const runId = session.run.runId;
       if (!window.confirm('放弃当前文明并从原始时代重开？本轮金币、经验、部队和防御将清除，不发放遗产；已有永久进度保留。')) return;
       transition(() => abandonCivilization(session, runId));

@@ -69,6 +69,7 @@
                 <button class="unit-card" id="recruit" data-unit="melee" type="button"><span class="unit-icon"></span><kbd>1</kbd><strong class="sr-only unit-name">棍棒人</strong><span class="sr-only unit-role"></span><span class="price"><span data-icon="coin"></span><span data-cost></span></span><span class="sr-only" data-training></span><span class="sr-only" data-state></span></button>
                 <button class="unit-card" id="recruit-archer" data-unit="archer" type="button"><span class="unit-icon"></span><kbd>2</kbd><strong class="sr-only unit-name">弹弓手</strong><span class="sr-only unit-role"></span><span class="price"><span data-icon="coin"></span><span data-cost></span></span><span class="sr-only" data-training></span><span class="sr-only" data-state></span></button>
                 <button class="unit-card" id="recruit-heavy" data-unit="heavy" type="button"><span class="unit-icon"></span><kbd>3</kbd><strong class="sr-only unit-name">恐龙骑兵</strong><span class="sr-only unit-role"></span><span class="price"><span data-icon="coin"></span><span data-cost></span></span><span class="sr-only" data-training></span><span class="sr-only" data-state></span></button>
+                <button class="unit-card special-unit" id="recruit-special" data-unit="superSoldier" hidden type="button"><span class="unit-icon"></span><kbd>4</kbd><strong class="sr-only unit-name">超级士兵</strong><span class="sr-only unit-role"></span><span class="price"><span data-icon="coin"></span><span data-cost></span></span><span class="sr-only" data-training></span><span class="sr-only" data-state></span></button>
               </div>
               <div class="training-queue" id="training-queue" aria-label="训练队列；点击订单取消并退款"></div>
             </div>
@@ -88,7 +89,7 @@
           </div>
         </section>
       </section>
-      <nav class="mode-links" aria-label="其他模式"><a id="mode-link" href="?mode=classic">经典模式</a><a id="debug-link" href="?mode=debug">快速调试</a></nav>
+      <nav class="mode-links" aria-label="存档与模式"><button id="save-menu" type="button" hidden>存档</button><a id="mode-link" href="?mode=classic">经典模式</a><a id="debug-link" href="?mode=debug">快速调试</a></nav>
       <p class="sr-only" id="announcement" role="status" aria-live="polite"></p>
       <noscript><p>请启用 JavaScript 后开始游戏。</p></noscript>
     </main>
@@ -102,15 +103,19 @@
         <section aria-labelledby="upgrades-title"><h3 id="upgrades-title">永久档案</h3><p class="archive-note">仅两轮之间购买，新文明开始时生效。每种最多 5 级。</p><div id="upgrade-list"></div><p class="archive-note" id="active-bonuses"></p></section>
         <section aria-labelledby="automation-title"><h3 id="automation-title">自动招募</h3><p id="automation-hint"></p><div class="automation-controls"><label><input type="checkbox" id="auto-enabled"> 启用</label><label>目标 <select id="auto-target"><option value="front">前排</option><option value="ranged">远程</option><option value="heavy">重型</option></select></label></div></section>
         <button class="primary-button" id="rebuild-civilization" type="button" hidden>重建文明</button>
-        <details class="save-tools"><summary>存档与恢复</summary><p class="archive-note">每 10 秒及关键操作自动保存。离开期间不推进战斗、没有离线收益。刷新恢复上次保存的完整战场。</p><p id="save-status" role="status"></p><div class="save-actions"><button id="manual-save" type="button">手动保存</button><button id="export-save" type="button">导出存档</button><button id="recover-save" type="button">恢复备份</button></div><label class="import-file">选择存档文件 <input id="import-file" type="file" accept=".json,application/json"></label><label for="save-data">或粘贴存档内容</label><textarea id="save-data" rows="4" spellcheck="false" placeholder="导入前会校验完整存档；确认后替换当前增量进度。"></textarea><div class="save-actions"><button id="import-save" type="button">校验并导入</button><button id="clear-progress" class="danger-button" type="button">清空全部进度</button></div></details>
+        <button id="archive-save" type="button">存档与恢复</button>
       </div>
+    </dialog>
+    <dialog id="save-dialog" aria-labelledby="save-title">
+      <header class="help-heading"><h2 id="save-title">存档与恢复</h2><button id="close-save" class="icon-button" type="button" data-icon="close" aria-label="关闭存档"></button></header>
+        <div class="archive-body save-tools"><p class="archive-note">每 10 秒及关键操作自动保存。离开期间不推进战斗、没有离线收益。刷新恢复上次保存的完整战场。</p><p id="save-status" role="status"></p><div class="save-actions"><button id="manual-save" type="button">手动保存</button><button id="export-save" type="button">导出存档</button><button id="recover-save" type="button">恢复备份</button></div><label class="import-file">选择存档文件 <input id="import-file" type="file" accept=".json,application/json"></label><label for="save-data">或粘贴存档内容</label><textarea id="save-data" rows="4" spellcheck="false" placeholder="导入前会校验完整存档；确认后替换当前增量进度。"></textarea><div class="save-actions"><button id="import-save" type="button">校验并导入</button><button id="clear-progress" class="danger-button" type="button">清空全部进度</button></div></div>
     </dialog>
     <dialog id="help-dialog" aria-labelledby="help-title">
       <header class="help-heading"><h2 id="help-title">指挥手册</h2><button class="icon-button" id="close-help" type="button" data-icon="close" aria-label="关闭帮助"></button></header>
       <div class="help-body">
         <div class="help-legend"><span><i data-icon="coin"></i>金币</span><span><i data-icon="star"></i>经验</span><span><i data-icon="plus"></i>扩容</span><span><i data-icon="trash"></i>拆塔退款</span></div>
         <p>点击兵种图标训练，点击炮塔图标在选中炮位建造。悬停可查看名称与属性；手机可在下方查看当前时代的资料。阅读手册时战斗暂停。</p>
-        <p><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> 出兵 · <kbd>空格</kbd> 前排兵 · <kbd>T</kbd> 第一种炮塔 · <kbd>E</kbd> 进化 · <kbd>Q</kbd> 大招</p>
+        <p><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> 出兵 · <kbd>4</kbd> 未来超级士兵 · <kbd>空格</kbd> 暂停／继续 · <kbd>T</kbd> 第一种炮塔 · <kbd>E</kbd> 进化 · <kbd>Q</kbd> 大招</p>
         <p id="spell-hint"></p><p id="recruit-rule"></p>
         <details open><summary id="roster-age">当前时代</summary><div id="help-roster" class="help-roster"></div></details>
         <details><summary>大招与进化</summary><p id="ability-description"></p><h3 id="evolution-title"></h3><p id="evolution-hint"></p><p id="evolution-unlocks"></p><p id="evolution-benefit"></p><p>击杀获得完整经验，己方阵亡获得 75% 经验。进化保留旧部队、训练订单、炮塔与大招冷却。</p></details>

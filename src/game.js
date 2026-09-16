@@ -17,6 +17,7 @@ export const UNITS = Object.freeze({
   tank: Object.freeze({ name: '主战坦克', age: 4, role: 'heavy', projectile: 'shell', splash: 70, cost: 350, trainTime: 5.6, health: 720, damage: 145, armor: 14, speed: 26, range: 200, baseRange: 420, attackInterval: 1.9, bounty: 120, experience: 180, lane: 'front', description: '履带装甲 · 远距攻城 / 70 范围炮击', footprint: 47, attackDuration: 0.6, muzzleX: 67, muzzleY: -44, height: 63 }),
   blade: Object.freeze({ name: '光刃战士', age: 5, role: 'melee', ignoreArmor: true, cost: 220, trainTime: 2.6, health: 550, damage: 90, armor: 10, speed: 82, range: 40, attackInterval: 0.6, bounty: 70, experience: 140, lane: 'front', description: '光刃突进 · 近战完全无视护甲', attackDuration: 0.3, height: 73 }),
   blaster: Object.freeze({ name: '等离子射手', age: 5, role: 'archer', projectile: 'plasma', cost: 300, trainTime: 3.6, health: 300, damage: 85, armor: 5, speed: 56, range: 300, attackInterval: 0.65, bounty: 100, experience: 180, lane: 'back', description: '能量火力 · 300 射程 / 忽略 8 点护甲', armorPierce: 8, attackDuration: 0.38, muzzleX: 44, muzzleY: -43, height: 74 }),
+  superSoldier: Object.freeze({ name: '超级士兵', age: 5, role: 'heavy', playerOnly: true, projectile: 'plasma', ignoreArmor: true, cost: 3000, trainTime: 12, health: 6000, damage: 320, meleeDamage: 440, meleeRange: 60, armor: 32, speed: 48, range: 340, baseRange: 540, attackInterval: 0.55, bounty: 600, experience: 800, lane: 'front', description: '独行精锐 · 贴身轻甲，320 能量穿甲点射 / 近身 440 短打', attackDuration: 0.4, muzzleX: 35, muzzleY: -43, height: 68 }),
   warMachine: Object.freeze({ name: '悬浮战争机器', age: 5, role: 'heavy', projectile: 'plasma-orb', splash: 90, cost: 580, trainTime: 6, health: 1200, damage: 235, armor: 22, speed: 23, range: 220, baseRange: 500, attackInterval: 1.8, bounty: 200, experience: 300, lane: 'front', description: '悬浮重炮 · 远距攻城 / 90 范围能量爆破', footprint: 48, attackDuration: 0.6, muzzleX: 55, muzzleY: -46, height: 74 }),
 });
 
@@ -62,8 +63,11 @@ export const AGES = Object.freeze({
   2: Object.freeze({ name: '中世纪', shortName: '中世纪', numeral: 'II', units: Object.freeze(['swordsman', 'crossbow', 'knight']), turrets: Object.freeze(['catapult', 'fireCatapult', 'oil']), ability: 'volley', experienceRequired: 160, baseHealth: 900, income: 10, unitIcons: Object.freeze(['⚔', '⌁', '♜']), turretIcons: Object.freeze(['⌖', '⋙', '●']) }),
   3: Object.freeze({ name: '文艺复兴时代', shortName: '文艺复兴', numeral: 'III', units: Object.freeze(['duelist', 'musketeer', 'cannoneer']), turrets: Object.freeze(['smallCannon', 'largeCannon', 'explosiveCannon']), ability: 'renewal', experienceRequired: 480, baseHealth: 1500, income: 16, unitIcons: Object.freeze(['⚔', '⌐', '◉']), turretIcons: Object.freeze(['●', '⋙', '◒']) }),
   4: Object.freeze({ name: '现代时代', shortName: '现代', numeral: 'IV', units: Object.freeze(['commando', 'rifleman', 'tank']), turrets: Object.freeze(['singleTurret', 'doubleTurret', 'rocket']), ability: 'airstrike', experienceRequired: 1100, baseHealth: 2400, income: 24, unitIcons: Object.freeze(['⚔', '⌁', '▰']), turretIcons: Object.freeze(['⋙', '═', '➚']) }),
-  5: Object.freeze({ name: '未来时代', shortName: '未来', numeral: 'V', units: Object.freeze(['blade', 'blaster', 'warMachine']), turrets: Object.freeze(['titanium', 'laser', 'ion']), ability: 'orbital', experienceRequired: 2200, baseHealth: 3800, income: 36, unitIcons: Object.freeze(['ϟ', '⊙', '♜']), turretIcons: Object.freeze(['⊙', 'ϟ', '⊕']) }),
+  5: Object.freeze({ name: '未来时代', shortName: '未来', numeral: 'V', units: Object.freeze(['blade', 'blaster', 'warMachine']), specialUnits: Object.freeze(['superSoldier']), turrets: Object.freeze(['titanium', 'laser', 'ion']), ability: 'orbital', experienceRequired: 2200, baseHealth: 3800, income: 36, unitIcons: Object.freeze(['ϟ', '⊙', '♜']), turretIcons: Object.freeze(['⊙', 'ϟ', '⊕']) }),
 });
+
+// Keep the three automation/AI positions stable; special units are manual choices.
+export function getAgeUnits(age) { return [...AGES[age].units, ...(AGES[age].specialUnits ?? [])]; }
 
 const TEAMS = ['player', 'enemy'];
 const EPSILON = 0.000001;
@@ -129,6 +133,7 @@ export function evolve(game, team = 'player') {
 export function getRecruitState(game, type = 'melee', team = 'player') {
   if (!validTeam(team) || !validType(type)) return 'invalid';
   if (game.status !== 'playing') return 'finished';
+  if (UNITS[type].playerOnly && team !== 'player') return 'player-only';
   if (UNITS[type].age > game.ages[team]) return 'locked';
   if (UNITS[type].age < game.ages[team]) return 'outdated';
   if (game.queues[team].length >= RULES.queueLimit) return 'queue-full';
@@ -484,7 +489,9 @@ function updateUnits(game, dt, hits) {
     }
     if (target) {
       if (unit.attackCooldown === 0) {
-        if (stats.projectile) {
+        const closeCombat = stats.meleeRange && Math.abs(target.x - origin) - (target.type ? 0 : RULES.baseHalfWidth) <= stats.meleeRange;
+        if (stats.meleeRange) unit.attackStyle = closeCombat ? 'melee' : 'ranged';
+        if (stats.projectile && !closeCombat) {
           fire(target);
           if (stats.burst) {
             unit.burstRemaining = stats.burst - 1;
@@ -494,7 +501,7 @@ function updateUnits(game, dt, hits) {
           }
         } else {
           unit.lastAttackCharged = Boolean(stats.chargeDamage && (unit.chargeTravel ?? 0) >= stats.chargeDistance);
-          hits.push({ target, damage: stats.damage + (unit.lastAttackCharged ? stats.chargeDamage : 0), team: unit.team, ignoreArmor: stats.ignoreArmor, armorPierce: stats.armorPierce, attacker: unit.type });
+          hits.push({ target, damage: (closeCombat ? stats.meleeDamage : stats.damage) + (unit.lastAttackCharged ? stats.chargeDamage : 0), team: unit.team, ignoreArmor: stats.ignoreArmor, armorPierce: stats.armorPierce, attacker: unit.type });
           if (stats.cleaveRadius && target.type) {
             const secondary = game.units.filter(other => other !== target && other.team !== unit.team &&
               (positions.get(other.id) - origin) * direction >= 0 && Math.abs(positions.get(other.id) - positions.get(target.id)) <= stats.cleaveRadius)

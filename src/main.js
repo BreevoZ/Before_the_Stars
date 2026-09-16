@@ -1,4 +1,4 @@
-import { RULES, UNITS, AGES, TURRETS, ABILITIES, createGame, getIncomeRate, getRecruitState, recruit, cancelTraining, getEvolutionState, evolve, getTurretState, buildTurret, getExpansionState, expandTurretSlots, sellTurret, castAbility, updateGame } from './game.js';
+import { RULES, UNITS, AGES, TURRETS, ABILITIES, getAgeUnits, createGame, getIncomeRate, getRecruitState, recruit, cancelTraining, getEvolutionState, evolve, getTurretState, buildTurret, getExpansionState, expandTurretSlots, sellTurret, castAbility, updateGame } from './game.js';
 import { createCivilizationUI, formatMultiplier } from './civilization-ui.js';
 import { getGameMode } from './debug.js';
 import { createRenderer } from './render.js';
@@ -69,6 +69,7 @@ const civilization = incremental ? createCivilizationUI(resetBattle => {
   if (resetBattle && !civilization.modalOpen && game.status === 'playing') byId('recruit').focus({ preventScroll: true });
 }, { debug: mode === 'debug' }) : null;
 let game = civilization?.session.game ?? createGame();
+let manualPaused = false;
 let lastTime = null;
 let accumulator = 0;
 let announcedResult = false;
@@ -95,7 +96,9 @@ function syncRoster() {
   const age = AGES[displayedAge];
   document.body.dataset.age = String(displayedAge);
   cards.forEach((card, index) => {
-    const type = age.units[index];
+    const type = getAgeUnits(displayedAge)[index];
+    card.hidden = !type;
+    if (!type) { card.disabled = true; return; }
     const stats = UNITS[type];
     card.dataset.unit = type;
     card.dataset.age = String(displayedAge);
@@ -146,7 +149,7 @@ function syncRoster() {
   byId('help-roster').innerHTML = [
     { title: '部队', controls: cards, icons: unitIcons, key: 'unit' },
     { title: '炮塔', controls: towerCards, icons: turretIcons, key: 'turret' },
-  ].map(group => `<h3>${group.title}</h3>${group.controls.map(card => {
+  ].map(group => `<h3>${group.title}</h3>${group.controls.filter(card => !card.hidden).map(card => {
     const [heading, ...details] = card.dataset.description.split('\n');
     return `<div class="help-unit"><span class="help-unit-icon">${icon(group.icons[card.dataset[group.key]])}</span><div><strong>${heading}</strong><p>${details.join(' · ')}</p></div></div>`;
   }).join('')}`).join('');
@@ -212,7 +215,7 @@ function syncEvolution() {
   byId('evolve').classList.toggle('ready', state === 'ready');
   setText('evolve-label', state === 'finished' ? '战斗已结束' : nextAge ? `进化至${nextAge.name}` : '已达最高时代');
   setText('evolution-hint', !nextAge ? '五个时代已全部解锁 · 摧毁敌方基地取得胜利' : state === 'ready' ? '经验已达标 · 点击进化或按 E · 不消耗金币' : `击杀经验 + 阵亡75%经验 · 还差 ${nextAge.experienceRequired - experience} 经验`);
-  setText('evolution-unlocks', `${nextAge ? '下个时代' : '已解锁'}：${(nextAge ?? age).units.map(type => UNITS[type].name).join(' · ')}`);
+  setText('evolution-unlocks', `${nextAge ? '下个时代' : '已解锁'}：${getAgeUnits(game.ages.player + (nextAge ? 1 : 0)).map(type => UNITS[type].name).join(' · ')}`);
   setText('evolution-benefit', nextAge ? `生命 +${nextAge.baseHealth - age.baseHealth} · 收入 ${formatMultiplier(nextAge.income * (game.modifiers?.income ?? 1))}/秒 · ${ABILITIES[nextAge.ability].name} · 三种新炮塔` : '未来要塞 · 离子科技 · 轨道打击');
   byId('evolve').title = `${byId('evolve-label').textContent} · E\n${byId('evolution-hint').textContent}\n${byId('evolution-benefit').textContent}`;
   byId('evolve').setAttribute('aria-label', byId('evolve-label').textContent);
@@ -244,12 +247,13 @@ function syncUI() {
   setText('gold', Math.floor(game.gold.player + 0.000001));
   setText('income-rate', `+${formatMultiplier(getIncomeRate(game))}/s`);
   byId('income-rate').title = civilization ? `${AGES[game.ages.player].income} 基础收入 × ${formatMultiplier(game.modifiers.income)} 生产档案；仅增加被动金币` : `每秒收入 ${getIncomeRate(game)} 金币`;
-  if (civilization) byId('experience-bar').closest('.evolution-progress').title = `战争档案 ×${formatMultiplier(game.modifiers.experience)}；击杀经验、按 75% 向下取整的阵亡经验，再乘倍率逐笔向下取整。详情见文明档案。`;
+  if (civilization) byId('experience-bar').closest('.evolution-progress').title = `战争档案 ×${formatMultiplier(game.modifiers.experience)}；击杀经验、按 75% 向下取整的阵亡经验，再乘倍率逐笔向下取整。首次终局胜利后可在文明档案查看。`;
   setText('clock', formatTime(game.elapsed));
   setText('enemy-strategy', game.ai.strategy === 'siege' ? '敌军战术 · 重装攻城' : '敌军战术 · 混合推进');
   setIcon(byId('enemy-strategy-icon'), game.ai.strategy === 'siege' ? 'cannon' : 'sword');
   byId('enemy-strategy-icon').title = byId('enemy-strategy').textContent;
   for (const card of cards) {
+    if (card.hidden) continue;
     const state = getRecruitState(game, card.dataset.unit);
     card.disabled = state !== 'ready';
     const label = { ready: '加入队列', gold: '金币不足', 'queue-full': '队列已满', 'army-full': '兵力已满', locked: '时代未解锁', outdated: '已被新兵种替代', finished: '战斗已结束' }[state];
@@ -282,7 +286,11 @@ function syncUI() {
   byId('ability').setAttribute('aria-label', byId('ability-name').textContent);
   byId('target-banner').hidden = !targeting;
   canvas.classList.toggle('targeting', targeting);
-  const paused = document.hidden || helpDialog.open || civilization?.paused;
+  const paused = manualPaused || document.hidden || helpDialog.open || civilization?.paused;
+  setText('pause-battle', manualPaused ? '继续' : '暂停');
+  byId('pause-battle').disabled = finished;
+  byId('pause-battle').setAttribute('aria-pressed', String(manualPaused));
+  byId('pause-battle').title = `${manualPaused ? '继续' : '暂停'} · 空格`;
   setText('phase', finished ? '战斗结束' : paused ? '已暂停' : '交战中');
   setIcon(byId('phase-icon'), finished ? 'check' : paused ? 'pause' : 'play');
   byId('phase-icon').title = byId('phase').textContent;
@@ -364,6 +372,7 @@ function restart() {
 }
 
 function resetBattleView() {
+  manualPaused = false;
   accumulator = 0;
   lastTime = null;
   announcedResult = false;
@@ -388,6 +397,14 @@ function closeHelp() {
   syncUI();
 }
 
+function togglePause() {
+  if (game.status !== 'playing') return;
+  manualPaused = !manualPaused;
+  accumulator = 0; lastTime = null;
+  syncUI();
+}
+byId('pause-battle').hidden = false;
+byId('pause-battle').addEventListener('click', togglePause);
 byId('help').addEventListener('click', openHelp);
 byId('close-help').addEventListener('click', closeHelp);
 helpDialog.addEventListener('cancel', event => {
@@ -432,9 +449,15 @@ window.addEventListener('keydown', event => {
     if (!event.repeat) openHelp();
     return;
   }
-  // Native activation must also work for the cancel-target button while aiming.
-  if (['Space', 'Enter'].includes(event.code) && event.target.closest('button')) return;
-  if (targeting && ['ArrowLeft', 'ArrowRight', 'Enter', 'Space', 'Escape'].includes(event.code)) {
+  // Space is always pause in the battlefield, including focused buttons and aiming.
+  // Inputs and modal dialogs above retain their native keyboard behavior.
+  if (event.code === 'Space') {
+    event.preventDefault();
+    if (!event.repeat) togglePause();
+    return;
+  }
+  if (event.code === 'Enter' && event.target.closest('button')) return;
+  if (targeting && ['ArrowLeft', 'ArrowRight', 'Enter', 'Escape'].includes(event.code)) {
     event.preventDefault();
     if (event.repeat && !event.code.startsWith('Arrow')) return;
     if (event.code === 'Escape') { targeting = false; syncUI(); }
@@ -442,8 +465,8 @@ window.addEventListener('keydown', event => {
     else releaseAbility();
     return;
   }
-  const roster = AGES[game.ages.player].units;
-  const actions = { Digit1: () => train(roster[0]), Digit2: () => train(roster[1]), Digit3: () => train(roster[2]), Space: () => train(roster[0]), KeyE: evolvePlayer, KeyT: constructTurret, KeyQ: toggleAbility };
+  const roster = getAgeUnits(game.ages.player);
+  const actions = { Digit1: () => train(roster[0]), Digit2: () => train(roster[1]), Digit3: () => train(roster[2]), Digit4: () => { if (roster[3]) train(roster[3]); }, KeyE: evolvePlayer, KeyT: constructTurret, KeyQ: toggleAbility };
   if (actions[event.code]) {
     event.preventDefault();
     if (!event.repeat) actions[event.code]();
@@ -460,7 +483,7 @@ byId('mode-link').addEventListener('click', () => civilization?.save());
 byId('debug-link').addEventListener('click', () => civilization?.save());
 
 function frame(timestamp) {
-  if (lastTime !== null && !document.hidden && !helpDialog.open && !civilization?.paused && game.status === 'playing') {
+  if (lastTime !== null && !manualPaused && !document.hidden && !helpDialog.open && !civilization?.paused && game.status === 'playing') {
     accumulator += Math.min((timestamp - lastTime) / 1000, 0.1) * (civilization?.timeScale ?? 1);
     while (accumulator >= RULES.fixedStep && game.status === 'playing') {
       if (civilization) civilization.step(RULES.fixedStep);

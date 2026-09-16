@@ -1,4 +1,4 @@
-import { AGES, UNITS, TURRETS, createGame, buildTurret, getTurretPosition, updateGame } from './game.js';
+import { AGES, UNITS, TURRETS, getAgeUnits, createGame, buildTurret, getTurretPosition, updateGame } from './game.js';
 import { drawUnit } from './units.js';
 import { drawTurret } from './turrets.js';
 const root = document.getElementById('roster');
@@ -23,7 +23,7 @@ function turretPreview(type, side) {
 for (const [index, age] of Object.values(AGES).entries()) {
   const section = document.createElement('section');
   section.innerHTML = `<h2><span>${age.numeral}</span>${age.name}<small class="age-note">${themes[index]}</small></h2><div class="cards"></div>`;
-  for (const type of isTurret ? age.turrets : age.units) {
+  for (const type of isTurret ? age.turrets : getAgeUnits(index + 1)) {
     const stats = (isTurret ? TURRETS : UNITS)[type];
     const card = document.createElement('article'); card.className = 'unit';
     const damage = `${stats.damage}${stats.burst ? ` × ${stats.burst}` : ''} ${isTurret ? '单轮伤害' : '伤害'}`;

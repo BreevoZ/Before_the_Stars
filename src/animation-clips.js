@@ -21,6 +21,7 @@ export const ANIMATION_CLIPS = [
     id: `combat-${source}-${type}`, category: 'combat', kind: 'combat', source, type, age: stats.age,
     name: `${stats.name} · ${stats.projectile ? '弹道' : '命中'}`, note: stats.description,
   }))),
+  { id: 'combat-unit-superSoldier-melee', category: 'combat', kind: 'combat', source: 'unit', type: 'superSoldier', age: 5, melee: true, name: '超级士兵 · 近身短打', note: '目标进入 60 距离时收枪短打 · 前送、接触、迅速收回 · 完全穿甲' },
   ...Object.entries(AGES).map(([age, stats]) => ({ id: `ability-${stats.ability}`, category: 'ability', kind: 'ability', type: stats.ability, age: +age, name: ABILITIES[stats.ability].name, note: ABILITIES[stats.ability].description })),
   ...['fire', 'oil'].map(type => ({ id: `field-${type}`, category: 'ability', kind: 'field', type, age: 2, name: type === 'fire' ? '燃烧区域' : '沸油与蒸汽', note: '落地后持续 2.4 秒 · 末段消散' })),
   ...Object.entries(AGES).map(([age, stats]) => ({ id: `base-${age}`, category: 'scene', kind: 'base', age: +age, name: `${stats.shortName}基地 · ${BASE_DESIGNS[age].name}`, note: `${BASE_DESIGNS[age].description} 预览扩容、受损与废墟。` })),
@@ -64,7 +65,7 @@ export function createClipSampler(clip, team) {
     const stats = UNITS[clip.type]; sourceId = 1;
     const x = team === 'player' ? 500 : 780;
     game.units.push(soldier(sourceId, clip.type, team, x));
-    game.units.push(soldier(2, 'swordsman', opponent, x + direction * Math.min(220, stats.range * 0.9)));
+    game.units.push(soldier(2, 'swordsman', opponent, x + direction * (clip.melee ? stats.meleeRange * 0.8 : Math.min(220, stats.range * 0.9))));
   }
   for (const unit of game.units) held.set(unit.id, unit.x);
   const checkpoints = new Map([[0, structuredClone(game)]]);

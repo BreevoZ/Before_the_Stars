@@ -20,6 +20,7 @@ const paths = {
   cannon: '<path d="M3 15h13l-4-5m-5 3 1-7 13-3 1 5-14 4"/><circle cx="7" cy="18" r="3"/><circle cx="17" cy="18" r="3"/>',
   blade: '<path d="m4 20 5-5m-4-2 6 6m-3-5 8-11h5L10 17M16 3l-1 6 5-1"/>',
   blaster: '<path d="M3 10h15v6H8l-4 5V10Zm15 2h4m-10 4 1 4m0-14v1"/><circle cx="12" cy="13" r="1.5"/>',
+  sidearm: '<path d="M4 8h15l2 3v3H10l-3 7H3l3-10H4V8Zm6 6 2 3h3l1-3M8 6h7"/>',
   mech: '<path d="m7 4 5-2 5 2 2 8-4 4H9l-4-4 2-8Zm1 2h8M8 15l-4 6H2m14-6 4 6h2M5 9H2v6m17-6h3v6M9 10h6"/>',
   stone: '<path d="m5 21 6-13 6 13M3 21h17M6 5l12 9M5 3l3-1"/><circle cx="18" cy="7" r="3"/>',
   spears: '<path d="M4 20 18 6M2 15 14 3M9 22 21 10m-5-9 1 5-5-1m8-1 1 5-5-1m6 3 1 5-5-1"/>',
@@ -55,6 +56,7 @@ export function icon(name) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] ?? paths.shield}</svg>`;
 }
 export const unitIcons = {
+  superSoldier: 'sidearm',
   melee: 'club', archer: 'sling', heavy: 'dino', swordsman: 'shield', crossbow: 'bow', knight: 'knight',
   duelist: 'rapier', musketeer: 'musket', cannoneer: 'cannon', commando: 'knife', rifleman: 'rifle', tank: 'tank',
   blade: 'blade', blaster: 'blaster', warMachine: 'hover',

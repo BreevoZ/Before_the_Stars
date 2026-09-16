@@ -442,6 +442,70 @@ function hoverMachine(ctx, c, m) {
   ctx.restore();
 }
 
+// A compact future infantry silhouette: a fitted undersuit, thin ceramic plates,
+// a narrow visor and a small energy weapon. Armor follows the joints instead of
+// enlarging them; the veteran's relaxed pose and short attacks keep his identity.
+function superSoldier(ctx, c, m, unit) {
+  const punch = unit.attackStyle === 'melee';
+  const drive = punch ? getMeleeMotion('commando', m).drive : 0;
+  const suit = '#52645d', plate = unit.hitFlash > 0 ? '#ded0ac' : MATERIAL.armor;
+  const bodyX = drive * 14, bodyY = Math.abs(drive) - Math.abs(m.gait) * 0.5;
+  const along = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  for (const side of [-1, 1]) {
+    const gait = m.gait * side;
+    const hip = [side * 4 + bodyX * 0.6, -26 + bodyY];
+    const ankle = m.moving ? [side * 6 + gait * 6.5, -4 - Math.max(0, gait) * 3.5] : [side < 0 ? -8 : 11, -4];
+    const knee = solveJoint(hip, ankle, 12.5, 12, -1);
+    const armor = side < 0 ? MATERIAL.armorDark : plate;
+    limb(ctx, [hip, knee, ankle], side < 0 ? shade(suit) : suit, 4.5);
+    limb(ctx, [along(hip, knee, 0.15), along(hip, knee, 0.62)], armor, 5);
+    limb(ctx, [along(knee, ankle, 0.2), along(knee, ankle, 0.8)], armor, 5);
+    oval(ctx, ...knee, 2.8, 2.2, side < 0 ? MATERIAL.inset : c.cloth);
+    limb(ctx, [[ankle[0] - 2, ankle[1] + 1], [ankle[0] + 4, ankle[1] + 2]], MATERIAL.armorDark, 3.5);
+  }
+  ctx.save(); ctx.translate(bodyX, bodyY);
+  const guard = [-3 - drive * 4, -28 - drive * 9];
+  limb(ctx, [[-6, -42], [-12, -31], guard], shade(suit), 4);
+  limb(ctx, [[-11, -31], along([-12, -31], guard, 0.7)], MATERIAL.armorDark, 4.5);
+  shape(ctx, [[-7, -45], [4, -46], [8, -39], [7, -24], [2, -22], [-7, -24]], suit);
+  // Two fitted chest planes leave a flexible abdomen and a narrow waist.
+  shape(ctx, [[-7, -44], [0, -46], [8, -42], [7, -33], [1, -29], [-8, -34]], plate);
+  shape(ctx, [[-7, -44], [-3, -43], [-2, -32], [-8, -34]], MATERIAL.armorDark);
+  shape(ctx, [[0, -42], [5, -41], [5, -36], [1, -33], [-1, -36]], MATERIAL.inset);
+  stroke(ctx, [[1, -40], [4, -39]], c.energy, 1.2);
+  stroke(ctx, [[-5, -28], [5, -27]], MATERIAL.armorDark, 2);
+  shape(ctx, [[-9, -45], [-3, -46], [-2, -41], [-9, -40]], shade(c.cloth));
+  shape(ctx, [[4, -46], [10, -43], [10, -39], [5, -40]], plate);
+  // A half helmet and visor keep an exposed jaw and ordinary human proportions.
+  face(ctx, 0, -54, c, false);
+  shape(ctx, [[-6, -54], [-8, -60], [-4, -66], [3, -65], [7, -61], [5, -58], [0, -61], [-4, -57]], plate);
+  shape(ctx, [[-8, -60], [-4, -66], [-3, -61], [-5, -55], [-6, -54]], MATERIAL.armorDark);
+  shape(ctx, [[-2, -59], [7, -58], [8, -54], [0, -54]], MATERIAL.inset);
+  stroke(ctx, [[0, -57], [6, -56]], c.energy, 1.5);
+  shape(ctx, [[-6, -48], [-5, -51], [0, -48], [5, -49], [5, -46], [-2, -44]], MATERIAL.armorDark);
+  const aim = punch ? 0 : m.remaining > 0 ? Math.min(1, (1 - m.progress) * 4) : m.windup;
+  const recoil = punch ? 0 : m.kick;
+  const hand = punch ? [16 + drive * 18, -31 - drive * 7] : [9 + aim * 13 - recoil * 2, -24 - aim * 16];
+  const shoulder = [5, -42], elbow = solveJoint(shoulder, hand, 17, 15, 1);
+  limb(ctx, [shoulder, elbow, hand], suit, 4);
+  limb(ctx, [shoulder, along(shoulder, elbow, 0.55)], plate, 5);
+  limb(ctx, [along(elbow, hand, 0.35), along(elbow, hand, 0.8)], plate, 4.5);
+  oval(ctx, ...hand, 2.5, 2, MATERIAL.armorDark);
+  if (punch) {
+    stroke(ctx, [[4, -24], [6, -18]], MATERIAL.inset, 2.5);
+    if (!m.reduced && m.remaining && m.age < 0.08) stroke(ctx, [[hand[0], hand[1] - 2], [hand[0] + 2, hand[1]]], c.energy, 1.2);
+  } else {
+    ctx.save(); ctx.translate(...hand); ctx.rotate((1 - aim) * 0.65 - recoil * 0.08);
+    shape(ctx, [[-4, -5], [10, -5], [14, -3], [14, 0], [2, 0], [-1, 4], [-4, 3]], MATERIAL.inset);
+    shape(ctx, [[-3, -5], [8, -5], [10, -3], [-2, -3]], plate);
+    stroke(ctx, [[8, -4], [15, -3]], MATERIAL.armorDark, 2);
+    stroke(ctx, [[3, -2], [6, -2]], c.energy, 1.1);
+    muzzle(ctx, 15, -3, m, true);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
 export function drawUnit(ctx, unit, time, scale = 1, reducedMotion = false) {
   const stats = UNITS[unit.type];
   const remaining = Math.max(0, unit.attackAnimation ?? 0);
@@ -478,6 +542,7 @@ export function drawUnit(ctx, unit, time, scale = 1, reducedMotion = false) {
     case 'tank': tank(ctx, c, m); break;
     case 'blade': futureInfantry(ctx, c, m, false); break;
     case 'blaster': futureInfantry(ctx, c, m, true); break;
+    case 'superSoldier': superSoldier(ctx, c, m, unit); break;
     case 'warMachine': hoverMachine(ctx, c, m); break;
   }
   ctx.restore();

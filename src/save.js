@@ -112,6 +112,7 @@ export function validateSession(session) {
     unitIds.add(unit.id);
     check(UNITS[unit.type].age <= g.ages[unit.team] && num(unit.hp, Number.MIN_VALUE, UNITS[unit.type].health) && num(unit.x, 0, RULES.width) && bool(unit.moving), '部队属性');
     numbers(unit, ['attackCooldown', 'attackAnimation', 'hitFlash'], ['distanceTravelled', 'chargeTravel', 'guardFlash', 'attackApproach', 'moveMultiplier', 'burstRemaining', 'burstCooldown'], -1);
+    if (unit.attackStyle !== undefined) check(['melee', 'ranged'].includes(unit.attackStyle), '攻击姿态');
     if (unit.lastAttackCharged !== undefined) check(bool(unit.lastAttackCharged), '冲锋');
     if (unit.burstTargetId != null) check(int(unit.burstTargetId, 1, g.nextUnitId - 1), '连发目标');
     if (unit.burstTargetBase != null) check(teams.includes(unit.burstTargetBase), '连发基地');

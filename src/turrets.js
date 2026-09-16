@@ -15,10 +15,25 @@ function line(ctx, points, color, width = 2) {
 function oval(ctx, x, y, rx, ry, color) {
   ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
 }
-function flash(ctx, x, y, m, energy = false) {
+function flash(ctx, x, y, m, mode = 'automatic') {
   if (!m.firing) return;
-  ctx.save(); ctx.globalAlpha = m.kick * 0.7;
-  polygon(ctx, [[x, y - 2], [x + 10, y], [x, y + 2]], energy ? m.energy : M.fire);
+  ctx.save();
+  if (mode === 'powder') {
+    ctx.globalAlpha = m.kick * 0.2;
+    for (let i = 0; i < 3; i++) {
+      const age = m.flashAge;
+      oval(ctx, x + 3 + age * (18 + i * 16), y - age * (10 + i * 12), 2 + age * 10, 2 + age * 8, '#c2c4ad');
+    }
+  }
+  ctx.globalAlpha = m.kick * 0.85;
+  if (['rail', 'laser', 'ion'].includes(mode)) {
+    if (m.flashAge < 0.1) {
+      oval(ctx, x, y, mode === 'ion' ? 3 : 1.7, 2, m.energy);
+      if (mode === 'rail') line(ctx, [[x - 6, y], [x + 8, y]], m.energy, 1.2);
+    }
+  } else if (m.flashAge < 0.065) {
+    polygon(ctx, [[x, y - 2], [x + 5, y - 1], [x + 11, y], [x + 4, y + 2], [x, y + 1]], M.fire);
+  }
   ctx.restore();
 }
 function wheel(ctx, x, y, radius) {
@@ -93,7 +108,7 @@ function cannon(ctx, m, type) {
   polygon(ctx, [[-13 - r, -radius], [length - r, -radius + 1], [length - r, -1], [-13 - r, -2]], explosive ? M.lightSteel : M.lightWood);
   line(ctx, [[length - r, -radius], [length - r, radius]], M.dark, 3);
   if (heavy) for (const x of [2, 21]) line(ctx, [[x - r, -radius], [x - r, radius]], M.darkWood, 2);
-  flash(ctx, length - r + 2, 0, m); ctx.restore();
+  flash(ctx, length - r + 2, 0, m, 'powder'); ctx.restore();
   wheel(ctx, -11, -5, heavy ? 7 : 6); wheel(ctx, 11, -5, heavy ? 7 : 6);
   polygon(ctx, [[-5, -12], [3, -12], [3, -6], [-5, -6]], m.cloth);
 }
@@ -110,6 +125,11 @@ function gun(ctx, m, twin) {
     if (m.barrel === i) flash(ctx, 33 - r, y, m);
   }
   polygon(ctx, [[-14, -3], [-7, -3], [-7, 4], [-14, 4]], m.cloth);
+  if (m.firing && m.flashAge < 0.3) {
+    const t = m.flashAge;
+    ctx.save(); ctx.translate(-15 - t * 32, -8 - t * 30 + t * t * 150); ctx.rotate(t * 12);
+    line(ctx, [[-2, 0], [2, 0]], M.bronze, 1.5); ctx.restore();
+  }
   ctx.restore();
 }
 function rocket(ctx, m) {
@@ -137,13 +157,13 @@ function future(ctx, m, type) {
     for (const y of [-7, -1]) line(ctx, [[-2, y], [32 - m.kick * 3, y]], M.lightSteel, 3);
     line(ctx, [[7, -4], [32, -4]], m.energy, 1.5);
     for (const x of [1, 9, 17]) line(ctx, [[x, -10], [x + 3, 2]], M.darkSteel, 2);
-    flash(ctx, 33, -4, m, true);
+    flash(ctx, 33, -4, m, 'rail');
   } else if (type === 'laser') {
     polygon(ctx, [[-18, -8], [-9, -15], [20, -12], [28, -5], [20, 4], [-9, 5]], M.darkSteel);
     polygon(ctx, [[-9, -15], [20, -12], [24, -8], [-11, -9]], M.lightSteel);
     line(ctx, [[-6, -5], [31, -5]], m.energy, 2);
     for (const x of [11, 22]) polygon(ctx, [[x, -13], [x + 3, -12], [x + 3, 3], [x, 4]], M.steel);
-    flash(ctx, 31, -5, m, true);
+    flash(ctx, 31, -5, m, 'laser');
   } else {
     const open = m.charge * 4;
     polygon(ctx, [[-18, -6], [-10, -18 - open], [11, -17 - open], [25, -9 - open], [10, -11], [-5, -10], [-8, 1]], M.steel);
@@ -151,7 +171,7 @@ function future(ctx, m, type) {
     oval(ctx, -2, -5, 6, 6, M.dark);
     oval(ctx, -2, -5, 2 + m.charge * 4, 2 + m.charge * 4, m.energy);
     if (m.charge > 0) { ctx.save(); ctx.globalAlpha = m.charge * 0.2; oval(ctx, 5, -5, 13, 9, m.energy); ctx.restore(); }
-    flash(ctx, 25, -5, m, true);
+    flash(ctx, 25, -5, m, 'ion');
   }
   polygon(ctx, [[-16, -5], [-10, -5], [-9, 1], [-15, 1]], m.cloth);
   ctx.restore();
@@ -161,6 +181,7 @@ export function drawTurret(ctx, turret, time = 0, scale = 1, reducedMotion = fal
   const stats = TURRETS[turret.type];
   const kick = reducedMotion ? 0 : Math.max(0, (turret.flash ?? 0) / (turret.flashDuration || 0.45));
   const m = { kick, firing: kick > 0, loaded: !turret.cooldown || turret.cooldown < stats.interval * 0.55,
+    flashAge: (turret.flashDuration || 0.45) - (turret.flash ?? 0),
     aim: turret.aim ?? 0, barrel: turret.lastBarrel ?? 0,
     charge: !reducedMotion && turret.chargeRemaining > 0 ? 1 - turret.chargeRemaining / stats.chargeTime : 0,
     pulse: reducedMotion ? 0 : Math.sin(time * 5) * 1.2,

@@ -56,7 +56,10 @@ function feather(ctx, x, y, c, flutter) {
 function muzzle(ctx, x, y, m, energy = false, smoke = false) {
   if (m.reduced || m.remaining <= 0) return;
   if (m.age < 0.1) {
-    shape(ctx, [[x, y - 2], [x + 12, y], [x, y + 2]], energy ? '#c5dfc9' : '#ddc48c');
+    if (energy) {
+      oval(ctx, x, y, 2.5, 2, '#c5dfc9');
+      stroke(ctx, [[x - 5, y], [x + 4, y]], '#a6c8b5', 1.2);
+    } else if (m.age < 0.065) shape(ctx, [[x, y - 2], [x + 12, y], [x, y + 2]], '#ddc48c');
   }
   if (smoke) {
     ctx.save(); ctx.globalAlpha = (1 - m.progress) * 0.2;

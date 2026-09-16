@@ -1,4 +1,5 @@
 import { BASE_MOUNTS } from './base-layouts.js';
+import { createProjectileImpact } from './projectiles.js';
 
 // Pure simulation. Timings are seconds; positions are in battlefield coordinates.
 export const UNITS = Object.freeze({
@@ -322,6 +323,7 @@ function addProjectile(game, team, kind, x, target, damage, options = {}) {
     team, kind, fromX: x, toX: target.x,
     fromY: options.fromY ?? -36, fromUnitX: options.fromUnitX, fromTurretX: options.fromTurretX, fromBaseX: options.fromBaseX,
     toY: target.type ? -(UNITS[target.type].height ?? 60) * 0.52 - (UNITS[target.type].lane === 'back' ? 7 : 0) : -45,
+    toOffsetX: target.type ? 0 : (team === 'player' ? -1 : 1) * RULES.baseHalfWidth,
     targetId: target.id ?? null, targetBase: target.id == null ? target.team : null,
     damage, duration, remaining: duration, splash: options.splash ?? 0, ignoreArmor: options.ignoreArmor ?? false, armorPierce: options.armorPierce ?? 0,
     arc: options.arc, turretType: options.turretType,
@@ -340,13 +342,13 @@ function updateProjectiles(game, dt, hits) {
         // Area shots detonate at their last tracked position even if the target has died.
         for (const victim of game.units) {
           if (victim.team !== shot.team && Math.abs(victim.x - shot.toX) <= shot.splash) {
-            hits.push({ target: victim, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce });
+            hits.push({ target: victim, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce, visual: false });
           }
         }
         // Siege units can hit a base directly; blast radius never adds extra base damage.
-        if (shot.targetBase && target?.hp > 0) hits.push({ target, damage: shot.damage, team: shot.team });
-        game.effects.push({ kind: 'blast', x: shot.toX, radius: shot.splash, life: 0.4, duration: 0.4 });
-      } else if (target?.hp > 0) hits.push({ target, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce, ranged: true });
+        if (shot.targetBase && target?.hp > 0) hits.push({ target, damage: shot.damage, team: shot.team, visual: false });
+      } else if (target?.hp > 0) hits.push({ target, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce, ranged: true, visual: false });
+      if (shot.splash > 0 || target?.hp > 0) game.effects.push(createProjectileImpact(shot, impactSurface(game, target)));
       if (shot.pierce) {
         const direction = shot.team === 'player' ? 1 : -1;
         const victims = game.units.filter(unit => unit.team !== shot.team && unit.id !== shot.targetId && unit.hp > 0
@@ -354,8 +356,9 @@ function updateProjectiles(game, dt, hits) {
           && Math.abs(unit.x - shot.originX) <= shot.maxRange)
           .sort((a, b) => (a.x - b.x) * direction).slice(0, shot.pierce);
         for (const victim of victims) hits.push({ target: victim, damage: shot.damage * shot.pierceFactor, team: shot.team,
-          ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce, ranged: true });
-        if (victims.length) game.effects.push({ kind: 'pierce', x: shot.toX, toX: victims.at(-1).x, y: shot.toY, team: shot.team, life: 0.16, duration: 0.16 });
+          ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce, ranged: true, visual: false });
+        if (victims.length) game.effects.push({ kind: 'pierce', weapon: shot.kind, x: shot.toX, toX: victims.at(-1).x, y: shot.toY, team: shot.team, life: 0.16, duration: 0.16 });
+        for (const victim of victims) game.effects.push(createProjectileImpact({ ...shot, toX: victim.x, targetId: victim.id }, impactSurface(game, victim)));
       }
       const stats = TURRETS[shot.turretType];
       if (stats?.field) game.fields.push({ kind: stats.field, team: shot.team, x: shot.toX, radius: stats.fieldRadius,
@@ -375,7 +378,7 @@ function updateFields(game, dt, hits) {
     field.remaining = Math.max(0, field.remaining - active);
     field.tickCooldown -= active;
     while (field.tickCooldown <= EPSILON) {
-      for (const unit of victims) hits.push({ target: unit, damage: field.damage, team: field.team, ignoreArmor: true });
+      for (const unit of victims) hits.push({ target: unit, damage: field.damage, team: field.team, ignoreArmor: true, visual: false });
       field.tickCooldown += field.tickInterval;
     }
   }
@@ -401,11 +404,11 @@ function updateAbility(game, dt, hits) {
   const x = getAbilityImpactX(ability);
   for (const target of game.units) {
     if (target.team === 'enemy' && Math.abs(target.x - x) <= stats.radius) {
-      hits.push({ target, damage: stats.damage, team: 'player', ignoreArmor: stats.ignoreArmor });
+      hits.push({ target, damage: stats.damage, team: 'player', ignoreArmor: stats.ignoreArmor, visual: false });
     }
   }
   if (Math.abs(game.bases.enemy.x - x) <= stats.radius + RULES.baseHalfWidth) {
-    hits.push({ target: game.bases.enemy, damage: stats.baseDamage, team: 'player', ignoreArmor: true });
+    hits.push({ target: game.bases.enemy, damage: stats.baseDamage, team: 'player', ignoreArmor: true, visual: false });
   }
   game.effects.push({ kind: ability.type, x, radius: stats.radius, life: 0.75, duration: 0.75 });
   ability.wavesLeft--;
@@ -475,12 +478,12 @@ function updateUnits(game, dt, hits) {
           }
         } else {
           unit.lastAttackCharged = Boolean(stats.chargeDamage && (unit.chargeTravel ?? 0) >= stats.chargeDistance);
-          hits.push({ target, damage: stats.damage + (unit.lastAttackCharged ? stats.chargeDamage : 0), team: unit.team, ignoreArmor: stats.ignoreArmor, armorPierce: stats.armorPierce });
+          hits.push({ target, damage: stats.damage + (unit.lastAttackCharged ? stats.chargeDamage : 0), team: unit.team, ignoreArmor: stats.ignoreArmor, armorPierce: stats.armorPierce, attacker: unit.type });
           if (stats.cleaveRadius && target.type) {
             const secondary = game.units.filter(other => other !== target && other.team !== unit.team &&
               (positions.get(other.id) - origin) * direction >= 0 && Math.abs(positions.get(other.id) - positions.get(target.id)) <= stats.cleaveRadius)
               .sort((a, b) => Math.abs(positions.get(a.id) - origin) - Math.abs(positions.get(b.id) - origin))[0];
-            if (secondary) hits.push({ target: secondary, damage: stats.damage * stats.cleaveFactor, team: unit.team });
+            if (secondary) hits.push({ target: secondary, damage: stats.damage * stats.cleaveFactor, team: unit.team, attacker: unit.type });
           }
         }
         unit.chargeTravel = 0;
@@ -551,6 +554,13 @@ function updateTurrets(game, dt) {
   }
 }
 
+function impactSurface(game, target) {
+  if (!target) return 'stone';
+  if (!target.type) return game.ages[target.team] === 5 ? 'metal' : 'stone';
+  const stats = UNITS[target.type];
+  return stats.age >= 2 && stats.armor > 0 ? 'metal' : 'soft';
+}
+
 function resolveHits(game, hits) {
   // Resolve all damage before removing casualties; rewards are paid once per death.
   for (const hit of hits) {
@@ -560,7 +570,13 @@ function resolveHits(game, hits) {
     hit.target.hp = Math.max(0, hit.target.hp - Math.max(1, (hit.damage - armor) * (1 - guard)));
     if (guard) hit.target.guardFlash = 0.18;
     hit.target.hitFlash = 0.14;
-    game.effects.push({ kind: 'hit', x: hit.target.x, life: 0.22, duration: 0.22 });
+    if (hit.visual !== false) {
+      const direction = hit.team === 'player' ? 1 : -1;
+      const style = { melee: 'blunt', heavy: 'bite', swordsman: 'slash', knight: 'thrust', duelist: 'thrust', commando: 'thrust', blade: 'blade' }[hit.attacker] ?? 'blunt';
+      game.effects.push({ kind: 'impact', style, x: hit.target.x - (stats ? 0 : direction * RULES.baseHalfWidth),
+        anchorX: stats ? undefined : hit.target.x, y: stats ? -stats.height * 0.52 - (stats.lane === 'back' ? 7 : 0) : -45,
+        angle: direction > 0 ? 0 : Math.PI, team: hit.team, surface: impactSurface(game, hit.target), life: 0.22, duration: 0.22 });
+    }
   }
   for (const unit of game.units) {
     if (unit.hp <= 0) {

@@ -3,6 +3,8 @@ import { createRenderer } from '../src/render.js';
 import { drawUnit } from '../src/units.js';
 import { drawTurret } from '../src/turrets.js';
 import { drawBase } from '../src/bases.js';
+import { getProjectilePose, getProjectileProfile, createProjectileImpact } from '../src/projectiles.js';
+import { drawProjectile, drawImpact, drawFields, drawAbilityImpact } from '../src/combat-effects.js';
 
 const tests = [];
 const test = (name, run) => tests.push({ name, run });
@@ -1654,6 +1656,96 @@ test('Browser UI: turret gallery exposes fifteen matching models, controls and n
   const team = page.querySelector('#team'); team.value = 'enemy'; team.dispatchEvent(new Event('change'));
   const action = page.querySelector('#action'); action.value = 'idle'; action.dispatchEvent(new Event('change'));
   assert(team.value === 'enemy' && action.value === 'idle'); frame.remove();
+});
+
+test('Direct weapons stay on the muzzle-to-target line; gravity rotates arrows and accelerates falling oil', () => {
+  const shot = { kind: 'bullet', team: 'player', fromX: 150, fromY: -100, toX: 350, toY: -30, duration: 1, remaining: 1 };
+  for (const kind of ['bullet', 'cannon', 'shell', 'plasma', 'plasma-orb', 'rail', 'laser', 'ion']) {
+    for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+      const pose = getProjectilePose({ ...shot, kind }, 1, t);
+      near(pose.x, 150 + 200 * t); near(pose.y, -100 + 70 * t, kind);
+    }
+  }
+  const arrow = { ...shot, kind: 'arrow', fromY: -30 };
+  assert(getProjectilePose(arrow, 1, 0).angle < 0 && getProjectilePose(arrow, 1, 1).angle > 0);
+  near(getProjectilePose(arrow, 1, 0.5).y, -40);
+  const mortar = { ...shot, kind: 'shell', arc: 65 };
+  assert(getProjectilePose(mortar, 1, 0.5).y < getProjectilePose(shot, 1, 0.5).y - 50);
+  for (const kind of ['boulder', 'rocket']) {
+    assert(getProjectilePose({ ...shot, kind, fromY: -180, toX: 180 }, 1, 0).angle < 0,
+      `${kind}: a close target below a high emplacement still needs an upward launch`);
+  }
+  const oil = { ...shot, kind: 'oil' };
+  near(getProjectilePose(oil, 1, 1).y, -3);
+  assert(getProjectilePose(oil, 1, 0.5).y - shot.fromY < (getProjectilePose(oil, 1, 1).y - shot.fromY) * 0.3);
+  const rocket = { ...shot, kind: 'rocket' };
+  assert(getProjectilePose(rocket, 1, 0.5).x < 250, 'A powered rocket should accelerate instead of moving like a thrown rock');
+});
+
+test('All projectile paths preserve mirrored, scaled muzzle endpoints and hit base surfaces', () => {
+  const kinds = [...new Set([...Object.values(UNITS), ...Object.values(TURRETS)].map(stats => stats.projectile).filter(Boolean))];
+  for (const kind of kinds) for (const scale of [1, 1.35]) {
+    const left = { kind, team: 'player', fromBaseX: 108, fromX: 169, fromY: -137, toX: 1172, toOffsetX: -54, toY: -45, duration: 1, remaining: 1 };
+    const right = { ...left, team: 'enemy', fromBaseX: 1172, fromX: 1111, toX: 108, toOffsetX: 54 };
+    for (const t of [0, 0.25, 0.5, 1]) {
+      const a = getProjectilePose(left, scale, t), b = getProjectilePose(right, scale, t);
+      near(a.x + b.x, 1280); near(a.y, b.y); assert(Number.isFinite(a.angle) && Number.isFinite(b.angle));
+    }
+    near(getProjectilePose(left, scale, 0).x, 108 + 61 * scale);
+    near(getProjectilePose(left, scale, 0).y, -137 * scale);
+    near(getProjectilePose(left, scale, 1).x, 1172 - 54 * scale);
+    near(getProjectilePose(left, scale, 1).y, (getProjectileProfile(left).ground ? -3 : -45) * scale);
+  }
+});
+
+test('Real shots produce one material-specific impact instead of generic blasts or duplicate hit stars', () => {
+  for (const [type, style] of [['egg', 'egg'], ['primitiveCatapult', 'rubble'], ['fireCatapult', 'fire'], ['oil', 'oil'],
+    ['smallCannon', 'solid'], ['explosiveCannon', 'explosion'], ['singleTurret', 'bullet'], ['rocket', 'explosion'], ['laser', 'laser']]) {
+    const { game, target, tower, x } = towerFixture(type);
+    updateGame(game, RULES.fixedStep); const shot = game.projectiles[0];
+    assert(shot && !game.effects.some(effect => effect.kind === 'impact'), 'Impacts cannot precede damage');
+    tower.cooldown = 1000;
+    advance(game, shot.duration + RULES.fixedStep, () => { target.x = x; target.attackCooldown = 1000; });
+    const impacts = game.effects.filter(effect => effect.kind === 'impact');
+    assert(impacts.length === 1 && impacts[0].style === style, `${type}: correct impact identity`);
+    assert(!game.effects.some(effect => ['hit', 'blast'].includes(effect.kind)));
+    near(impacts[0].y, getProjectilePose(shot, 1, 1).y);
+    if (type === 'oil' || type === 'fireCatapult') {
+      assert(impacts[0].y === -3 && game.fields.length === 1);
+      const effectCount = game.effects.length;
+      advance(game, 0.4, () => { target.x = x; target.attackCooldown = 1000; });
+      assert(game.effects.length <= effectCount, 'Field ticks must not emit generic sparks');
+    }
+  }
+});
+
+test('Weapon impacts and abilities render distinctly, animate, and restore canvas state', () => {
+  const canvas = document.createElement('canvas'); canvas.width = 320; canvas.height = 240;
+  const ctx = canvas.getContext('2d'), images = new Set();
+  const paint = draw => {
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, 320, 240); ctx.translate(0, 190);
+    ctx.globalAlpha = 0.8; draw(); near(ctx.globalAlpha, 0.8); near(ctx.getTransform().f, 190);
+    return canvas.toDataURL();
+  };
+  for (const kind of ['arrow', 'boulder', 'egg', 'oil', 'fireball', 'bullet', 'shell', 'plasma', 'rail', 'laser', 'ion']) {
+    const shot = { kind, team: 'player', fromX: 20, toX: 160, fromY: -120, toY: -35, duration: 1, remaining: 0.5, splash: kind === 'shell' ? 55 : 0 };
+    const effect = createProjectileImpact(shot, 'metal'); effect.life = effect.duration * 0.85;
+    const early = paint(() => drawImpact(ctx, effect, 1.5)); images.add(early);
+    effect.life = effect.duration * 0.5;
+    assert(early !== paint(() => drawImpact(ctx, effect, 1.5)), `${kind}: impact must progress`);
+    paint(() => drawProjectile(ctx, shot, 1.35));
+  }
+  assert(images.size === 11);
+  const abilities = new Set();
+  for (const kind of ['volley', 'meteor', 'airstrike', 'orbital']) {
+    abilities.add(paint(() => drawAbilityImpact(ctx, { kind, x: 160, radius: 90, life: 0.65, duration: 0.75 }, 1, 190)));
+  }
+  assert(abilities.size === 4);
+  const game = { fields: [{ kind: 'oil', x: 160, radius: 45, remaining: 1 }] };
+  const oil = paint(() => drawFields(ctx, game, 0, 1, true));
+  assert(oil === paint(() => drawFields(ctx, game, 0.7, 1, true)), 'Reduced-motion oil must be static');
+  game.fields[0].kind = 'fire';
+  assert(oil !== paint(() => drawFields(ctx, game, 0, 1, true)), 'Boiling oil must not look like burning ground');
 });
 
 let failures = 0;

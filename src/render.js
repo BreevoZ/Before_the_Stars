@@ -2,6 +2,7 @@ import { drawTurret } from './turrets.js';
 import { RULES, UNITS, AGES, ABILITIES, getTurretPosition, getAbilityRadius, getAbilityImpactX } from './game.js';
 import { drawUnit } from './units.js';
 import { drawBase } from './bases.js';
+import { drawProjectile, drawImpact, drawFields, drawAbilityImpact, drawArrow } from './combat-effects.js';
 
 const PALETTES = {
   player: { light: '#b7d4b5', flag: '#bbd9b2' },
@@ -173,60 +174,6 @@ function drawTarget(ctx, x, radius, opacity = 1) {
   ctx.restore();
 }
 
-function drawFields(ctx, game, time, scale, reducedMotion) {
-  for (const field of game.fields ?? []) {
-    ctx.save(); ctx.translate(field.x, 0);
-    ctx.globalAlpha = Math.min(0.7, field.remaining / 0.5);
-    ctx.fillStyle = field.kind === 'oil' ? '#766345' : '#997144';
-    ctx.beginPath(); ctx.ellipse(0, -2, field.radius, 3 * scale, 0, 0, Math.PI * 2); ctx.fill();
-    for (let i = 0; i < 7; i++) {
-      const x = (i / 6 - 0.5) * field.radius * 1.7;
-      const lift = reducedMotion ? 7 : 6 + Math.sin(time * 6 + i * 2) * 3;
-      polygon(ctx, [[x - 3, -3], [x + 1, -lift * scale], [x + 3, -3]], field.kind === 'oil' ? '#b49a65' : '#d2b379');
-    }
-    ctx.restore();
-  }
-}
-
-function drawProjectile(ctx, shot, scale) {
-  const progress = Math.max(0, Math.min(1, 1 - shot.remaining / shot.duration));
-  const origin = shot.fromBaseX ?? shot.fromUnitX ?? shot.fromTurretX;
-  const fromX = origin === undefined ? shot.fromX : origin + (shot.fromX - origin) * scale;
-  const x = fromX + (shot.toX - fromX) * progress;
-  const cannon = ['sling', 'cannon', 'stone', 'boulder', 'fireball', 'egg', 'oil', 'shell', 'plasma-orb'].includes(shot.kind);
-  const fromY = shot.fromY * scale;
-  const y = fromY * (1 - progress) + (shot.toY ?? -30) * scale * progress - Math.sin(progress * Math.PI) * (shot.arc ?? (shot.kind === 'sling' ? 65 : cannon ? 45 : shot.kind === 'bullet' ? 0 : 18));
-  if (['laser', 'ion'].includes(shot.kind)) {
-    ctx.save(); ctx.globalAlpha = 0.4 + (1 - progress) * 0.5;
-    line(ctx, [[fromX, fromY], [shot.toX, (shot.toY ?? -30) * scale]], shot.team === 'player' ? '#b0d5bd' : '#ddbd94', shot.kind === 'ion' ? 4 : 1.5);
-    ctx.restore();
-  } else if (shot.kind === 'rail') {
-    const facing = shot.toX > fromX ? 1 : -1;
-    line(ctx, [[x - 19 * facing, y], [x + 4 * facing, y]], '#becbb4', 2);
-  } else if (['plasma', 'plasma-orb'].includes(shot.kind)) {
-    const color = shot.team === 'player' ? '#a2fff0' : '#ffd0a1';
-    const facing = shot.toX > shot.fromX ? 1 : -1;
-    line(ctx, [[x - (shot.kind === 'laser' ? 34 : 15) * facing, y], [x, y]], color, shot.kind === 'plasma-orb' ? 9 : 3);
-    ctx.fillStyle = '#effff1'; ctx.beginPath(); ctx.arc(x, y, shot.kind === 'plasma-orb' ? 6 : 3, 0, Math.PI * 2); ctx.fill();
-  } else if (shot.kind === 'rocket') {
-    const facing = shot.toX > shot.fromX ? 1 : -1;
-    polygon(ctx, [[x - 19 * facing, y - 4], [x - 34 * facing, y], [x - 19 * facing, y + 4]], '#e6a465');
-    line(ctx, [[x - 17 * facing, y], [x, y]], '#cdd6bd', 6);
-    polygon(ctx, [[x, y - 5], [x + 7 * facing, y], [x, y + 5]], '#e7b274');
-  } else if (shot.kind === 'bullet') {
-    const facing = shot.toX > shot.fromX ? 1 : -1;
-    line(ctx, [[x - 9 * facing, y], [x + 3 * facing, y]], '#f1d9a1', 2);
-  } else if (cannon) {
-    ctx.fillStyle = ['fireball', 'oil'].includes(shot.kind) ? '#d1aa68' : ['sling', 'stone', 'boulder'].includes(shot.kind) ? '#aeb59f' : shot.kind === 'egg' ? '#d0c5a7' : '#b29f78';
-    ctx.beginPath(); ctx.ellipse(x, y, (['sling', 'egg', 'oil'].includes(shot.kind) ? 3 : 5) * scale, (shot.kind === 'egg' ? 4 : shot.kind === 'oil' ? 6 : 5) * scale, 0, 0, Math.PI * 2); ctx.fill();
-    if (shot.kind === 'fireball') polygon(ctx, [[x - 4, y], [x - 10, y - 13], [x + 3, y - 4]], '#dabb79');
-  } else {
-    const facing = shot.toX > shot.fromX ? 1 : -1;
-    line(ctx, [[x - (shot.kind === 'bolt' ? 9 : 13) * facing, y], [x + 4 * facing, y]], shot.kind === 'bolt' ? '#e5cb91' : PALETTES[shot.team].light, shot.kind === 'bolt' ? 3 : 2);
-    polygon(ctx, [[x + 6 * facing, y], [x, y - 3], [x, y + 3]], '#e2d8b3');
-  }
-}
-
 export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('当前浏览器不支持 Canvas 2D。');
@@ -261,7 +208,7 @@ export function createRenderer(canvas) {
     for (const lane of ['back', 'front']) {
       for (const unit of game.units) if (UNITS[unit.type].lane === lane) drawUnit(ctx, unit, game.elapsed, entityScale, reducedMotion.matches);
     }
-    for (const shot of game.projectiles) drawProjectile(ctx, shot, entityScale);
+    for (const shot of game.projectiles) drawProjectile(ctx, shot, entityScale, reducedMotion.matches);
     if (targeting) drawTarget(ctx, targetX, getAbilityRadius(AGES[game.ages.player].ability));
     if (game.ability) {
       const ability = game.ability;
@@ -280,7 +227,7 @@ export function createRenderer(canvas) {
         if (stats.sweep) drawTarget(ctx, impactX, stats.radius, 0.8);
         const interval = ability.wavesLeft === stats.waves ? stats.delay : stats.waveInterval;
         const progress = Math.max(0, Math.min(1, 1 - ability.remaining / interval));
-        const y = -ground * (1 - progress);
+        const y = -ground * (1 - progress * progress);
         if (!reducedMotion.matches && ability.type === 'meteor') {
           const x = impactX - 140 * (1 - progress);
           polygon(ctx, [[x - 45, y - 85], [x + 15, y], [x - 14, y + 9]], '#e59b5899');
@@ -288,17 +235,33 @@ export function createRenderer(canvas) {
         } else if (!reducedMotion.matches && ability.type === 'volley') {
           for (let i = 0; i < 13; i++) {
             const arrowX = impactX - stats.radius + i * stats.radius / 6;
-            line(ctx, [[arrowX - 14, y - 26], [arrowX, y]], '#e0d9a8', 2);
-            polygon(ctx, [[arrowX, y + 6], [arrowX - 5, y - 2], [arrowX + 2, y - 4]], '#f0d393');
+            ctx.save(); ctx.translate(arrowX - 60 * (1 - progress), y);
+            ctx.rotate(Math.atan2(ground * 2 * progress, 60)); ctx.scale(entityScale, entityScale);
+            drawArrow(ctx); ctx.restore();
           }
         } else if (!reducedMotion.matches && ability.type === 'airstrike') {
-          const flight = 1 - (ability.remaining + (ability.wavesLeft - 1) * stats.waveInterval) / (stats.delay + (stats.waves - 1) * stats.waveInterval);
-          const planeX = ability.x - 350 + flight * 700;
+          // All three bombs share one fall time and inherit the aircraft's
+          // horizontal motion; later bombs are already falling before the first hits.
+          const elapsed = stats.delay + (stats.waves - 1) * stats.waveInterval -
+            (ability.remaining + (ability.wavesLeft - 1) * stats.waveInterval);
+          const speed = stats.sweep / stats.waveInterval;
+          const planeStart = ability.x - stats.sweep - speed * stats.delay;
+          const planeX = planeStart + elapsed * speed;
           ctx.save(); ctx.translate(planeX, -ground * 0.78);
-          polygon(ctx, [[-37, 0], [-12, -7], [-19, -30], [-7, -30], [10, -6], [34, -3], [42, 1], [10, 5], [-8, 25], [-20, 25], [-12, 5], [-35, 7]], '#b5c1ac');
-          line(ctx, [[-48, 1], [-38, 1]], '#d5b68b', 3); ctx.restore();
-          ctx.fillStyle = '#e6c58d'; ctx.beginPath(); ctx.ellipse(impactX, y, 6, 13, -0.2, 0, Math.PI * 2); ctx.fill();
-          polygon(ctx, [[impactX - 7, y - 13], [impactX, y - 7], [impactX + 7, y - 13]], '#bc985e');
+          polygon(ctx, [[-37, 0], [-12, -7], [-19, -30], [-7, -30], [10, -6], [34, -3], [42, 1], [10, 5], [-8, 25], [-20, 25], [-12, 5], [-35, 7]], '#a5b5a0');
+          line(ctx, [[-48, 1], [-38, 1]], '#d5b68b', 2); ctx.restore();
+          for (let i = 0; i < stats.waves; i++) {
+            const t = (elapsed - i * stats.waveInterval) / stats.delay;
+            if (t < 0 || t >= 1) continue;
+            const destination = Math.max(0, Math.min(RULES.width, ability.x + stats.sweep * (i - 1)));
+            const releaseX = planeStart + i * stats.sweep;
+            const bombX = releaseX + (destination - releaseX) * t;
+            const bombY = -ground * 0.78 * (1 - t * t);
+            ctx.save(); ctx.translate(bombX, bombY);
+            ctx.rotate(Math.atan2(ground * 1.56 * t, destination - releaseX));
+            polygon(ctx, [[-10, -5], [-5, -3], [5, -3], [9, 0], [5, 3], [-5, 3], [-10, 5]], '#a6b09c');
+            line(ctx, [[1, -3], [1, 3]], '#c4b281', 2); ctx.restore();
+          }
         } else if (ability.type === 'orbital') {
           const radius = stats.radius * (1 - progress * 0.8);
           ctx.strokeStyle = '#99efdf'; ctx.lineWidth = 2;
@@ -315,7 +278,7 @@ export function createRenderer(canvas) {
       for (const effect of game.effects) {
         ctx.globalAlpha = effect.life / effect.duration;
         if (effect.kind === 'pierce') {
-          line(ctx, [[effect.x, effect.y * entityScale], [effect.toX, effect.y * entityScale]], PALETTES[effect.team].light, 2);
+          line(ctx, [[effect.x, effect.y * entityScale], [effect.toX, effect.y * entityScale]], PALETTES[effect.team].light, effect.weapon === 'ion' ? 2.5 : 1.2);
           continue;
         }
         if (effect.kind === 'evolve') {
@@ -325,21 +288,11 @@ export function createRenderer(canvas) {
           ctx.beginPath(); ctx.ellipse(effect.x, -10, radius, radius * 0.3, 0, 0, Math.PI * 2); ctx.stroke();
           continue;
         }
-        if (['meteor', 'blast', 'volley', 'airstrike', 'orbital'].includes(effect.kind)) {
-          const radius = effect.radius * (1 - effect.life / effect.duration);
-          ctx.strokeStyle = effect.kind === 'orbital' ? '#a5ffee' : '#edb46d'; ctx.lineWidth = 5;
-          if (effect.kind === 'orbital') {
-            ctx.fillStyle = '#acffdf77'; ctx.fillRect(effect.x - 26, -ground, 52, ground);
-            ctx.fillStyle = '#effff0'; ctx.fillRect(effect.x - 5, -ground, 10, ground);
-          }
-          ctx.beginPath(); ctx.ellipse(effect.x, -12, radius, radius * 0.4, 0, 0, Math.PI * 2); ctx.stroke();
-          continue;
-        }
-        const radius = 4 + (1 - effect.life / 0.22) * 12;
-        for (let i = 0; i < 5; i++) {
-          const angle = i * Math.PI * 2 / 5;
-          line(ctx, [[effect.x + Math.cos(angle) * radius, -30 + Math.sin(angle) * radius],
-            [effect.x + Math.cos(angle) * (radius + 4), -30 + Math.sin(angle) * (radius + 4)]], '#f0dbab');
+        if (effect.kind === 'impact') {
+          const target = effect.followTargetId == null ? null : game.units.find(unit => unit.id === effect.followTargetId);
+          drawImpact(ctx, effect, entityScale, target?.x ?? effect.x);
+        } else if (['meteor', 'volley', 'airstrike', 'orbital'].includes(effect.kind)) {
+          drawAbilityImpact(ctx, effect, entityScale, ground);
         }
       }
     }

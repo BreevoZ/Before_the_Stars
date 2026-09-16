@@ -24,10 +24,23 @@ function funded(cycles = 40) {
 function start(session) { rebuildCivilization(session, session.run.runId); session.game.ai.enabled = false; return session; }
 function attempt(session, options) { for (let i = 0; i < 5; i++) updateAutomation(session, 0.05, options); }
 function ageTo(game, age) { game.experience.player = AGES[age].experienceRequired; while (game.ages.player < age) evolve(game); }
-function v1(session) {
+function v1(session, settings = {}) {
   const old = JSON.parse(serializeSession(session)), auto = old.permanent.automation;
+  delete old.permanent.talentGrants;
   old.version = 1; delete old.permanent.totalLegacy; delete old.permanent.talents; delete old.run.talents; delete old.run.autoTurn; delete old.game.modifiers.bounty;
-  old.permanent.automation = { unlocked: auto.unlocked, enabled: auto.enabled, target: auto.target };
+  old.permanent.automation = { unlocked: session.permanent.completedCycles > 0, enabled: auto.enabled, target: auto.target, ...settings };
+  return JSON.stringify(old);
+}
+
+function v2(session) {
+  const old = JSON.parse(serializeSession(session)), p = old.permanent;
+  old.version = 2;
+  for (const key of ['autobuyer', 'logistics']) {
+    if (!p.talentGrants.includes(key)) p.legacy += p.talents[key];
+    delete p.talents[key]; delete old.run.talents[key];
+  }
+  delete p.talentGrants;
+  p.automation.unlocked = p.completedCycles > 0;
   return JSON.stringify(old);
 }
 
@@ -39,8 +52,13 @@ export function registerTalentTests(test, assert, near) {
     assert(!purchaseUpgrade(s, 'production') && !configureAutomation(s, { enabled: true }));
     start(s); finish(s);
     assert(getTalentState(s, 'evolution') === 'prerequisite');
-    assert(purchaseTalent(s, 'formation') && s.permanent.legacy === 0 && !purchaseTalent(s, 'formation'));
+    assert(!s.permanent.automation.unlocked && !configureAutomation(s, { enabled: true }));
+    assert(getTalentState(s, 'formation') === 'prerequisite');
+    assert(purchaseTalent(s, 'autobuyer') && s.permanent.legacy === 0 && !purchaseTalent(s, 'autobuyer'));
     assert(!s.permanent.automation.enabled && s.permanent.automation.mode === 'single');
+    assert(!configureAutomation(s, { mode: 'balanced' }) && !configureAutomation(s, { reserve: 1 }) && !configureAutomation(s, { queueLimit: 1 }) && !configureAutomation(s, { recruitEnabled: false }));
+    assert(configureAutomation(s, { enabled: true, target: 'heavy' }));
+    start(s); finish(s); assert(purchaseTalent(s, 'formation'));
     assert(configureAutomation(s, { mode: 'balanced' }) && !configureAutomation(s, { evolve: true }));
     assert(!s.run.talents.formation); start(s); assert(s.run.talents.formation === 1);
     assert(getTalentState(s, 'defense') === 'during-run');
@@ -94,7 +112,7 @@ export function registerTalentTests(test, assert, near) {
     start(s); finish(s); assert(s.run.earnedLegacy === 6);
   });
   test('Autobuyer: reserve, custom queue limit, army cap and manual override all use normal payment', () => {
-    const s = start(funded(1)); configureAutomation(s, { enabled: true, target: 'heavy', reserve: 150, queueLimit: 1 });
+    const s = funded(2); purchaseTalent(s, 'autobuyer'); purchaseTalent(s, 'logistics'); start(s); configureAutomation(s, { enabled: true, target: 'heavy', reserve: 150, queueLimit: 1 });
     attempt(s); assert(!s.game.queues.player.length && getAutomationPlan(s).action.state === 'budget');
     s.game.gold.player = 235; attempt(s); assert(s.game.gold.player === 150 && s.game.queues.player[0].paid === 85);
     s.game.gold.player = 10000; attempt(s); assert(s.game.queues.player.length === 1);
@@ -107,7 +125,7 @@ export function registerTalentTests(test, assert, near) {
     assert(serializeSession(s) === raw);
   });
   test('Autobuyer: balanced recruitment counts pending and old-era troops and waits for the chosen expensive role', () => {
-    const s = funded(); purchaseTalent(s, 'formation'); start(s); s.game.gold.player = 10000;
+    const s = funded(); purchaseTalent(s, 'autobuyer'); purchaseTalent(s, 'logistics'); purchaseTalent(s, 'formation'); start(s); s.game.gold.player = 10000;
     configureAutomation(s, { enabled: true, mode: 'balanced', weights: [2, 2, 1] });
     for (let i = 0; i < 5; i++) attempt(s);
     assert(JSON.stringify(s.game.queues.player.map(order => order.type)) === JSON.stringify(['melee', 'archer', 'heavy', 'melee', 'archer']));
@@ -118,7 +136,7 @@ export function registerTalentTests(test, assert, near) {
     s.game.gold.player = 130; attempt(s); assert(s.game.queues.player[0].type === 'knight' && s.game.gold.player === 0);
   });
   test('Autobuyer: evolution follows experience, resolves new-era targets and stops at the surface endpoint', () => {
-    const s = funded(); purchaseTalent(s, 'formation'); purchaseTalent(s, 'evolution'); start(s);
+    const s = funded(); purchaseTalent(s, 'autobuyer'); purchaseTalent(s, 'logistics'); purchaseTalent(s, 'formation'); purchaseTalent(s, 'evolution'); start(s);
     configureAutomation(s, { enabled: true, evolve: true, target: 'heavy' }); s.game.gold.player = 10000;
     attempt(s); assert(s.game.ages.player === 1);
     s.game.experience.player = AGES[5].experienceRequired;
@@ -128,7 +146,7 @@ export function registerTalentTests(test, assert, near) {
     attempt(s); assert(s.game.ages.player === 5);
   });
   test('Autobuyer: defense funds complete expansion/replacement transactions, preserving old towers until affordable', () => {
-    const s = funded(); purchaseTalent(s, 'formation'); purchaseTalent(s, 'defense'); purchaseTalent(s, 'defense'); start(s);
+    const s = funded(); purchaseTalent(s, 'autobuyer'); purchaseTalent(s, 'logistics'); purchaseTalent(s, 'formation'); purchaseTalent(s, 'defense'); purchaseTalent(s, 'defense'); start(s);
     configureAutomation(s, { enabled: true, recruitEnabled: false, defense: true, expand: true, maxTurrets: 2, reserve: 100 });
     s.game.gold.player = 440; attempt(s); assert(s.game.gold.player === 320 && s.game.turrets.player[0].type === 'rockSling');
     s.game.gold.player = 319; attempt(s); assert(s.game.turrets.player.length === 1);
@@ -143,7 +161,7 @@ export function registerTalentTests(test, assert, near) {
     parseSession(serializeSession(s));
   });
   test('Autobuyer: fair scheduling gives defense a turn; a saving target cannot be starved by cheaper purchases', () => {
-    const s = funded(); purchaseTalent(s, 'formation'); purchaseTalent(s, 'defense'); start(s);
+    const s = funded(); purchaseTalent(s, 'autobuyer'); purchaseTalent(s, 'logistics'); purchaseTalent(s, 'formation'); purchaseTalent(s, 'defense'); start(s);
     configureAutomation(s, { enabled: true, defense: true }); s.game.gold.player = 250;
     attempt(s); assert(s.game.queues.player.length === 1 && !s.game.turrets.player[0]);
     const resumed = parseSession(serializeSession(s)); attempt(resumed);
@@ -152,7 +170,7 @@ export function registerTalentTests(test, assert, near) {
     assert(s.game.gold.player === 100 && s.game.queues.player.length === 1);
   });
   test('Autobuyer: elite recruitment is unlocked, future-only, fully paid and counts queued soldiers toward its target', () => {
-    const s = funded(); for (const key of ['formation', 'evolution', 'elite']) purchaseTalent(s, key); start(s);
+    const s = funded(); for (const key of ['autobuyer', 'formation', 'evolution', 'elite']) purchaseTalent(s, key); start(s);
     configureAutomation(s, { enabled: true, elite: true, eliteLimit: 2 }); s.game.gold.player = 10000; attempt(s);
     assert(s.game.queues.player[0].type === 'melee'); s.game.queues.player = []; ageTo(s.game, 5);
     s.game.gold.player = 6000; attempt(s); attempt(s);
@@ -161,7 +179,7 @@ export function registerTalentTests(test, assert, near) {
     parseSession(serializeSession(s));
   });
   test('Autobuyer: every action stops during pause, hidden pages, disabled master control and civilization settlement', () => {
-    const s = funded(); for (const key of ['formation', 'evolution', 'defense']) purchaseTalent(s, key); start(s);
+    const s = funded(); for (const key of ['autobuyer', 'formation', 'evolution', 'defense']) purchaseTalent(s, key); start(s);
     configureAutomation(s, { enabled: true, evolve: true, defense: true }); s.game.gold.player = 10000; s.game.experience.player = 2200;
     for (const options of [{ paused: true }, { hidden: true }]) { const before = serializeSession(s); attempt(s, options); assert(serializeSession(s) === before); }
     configureAutomation(s, { enabled: false }); const before = serializeSession(s); attempt(s); assert(serializeSession(s) === before);
@@ -182,23 +200,23 @@ export function registerTalentTests(test, assert, near) {
     }
     assert(s.run.phase === 'destruction' && s.run.earnedLegacy === 8 && s.permanent.completedCycles === 201);
   });
-  test('Save v2: valid v1 battle, victory, settlement and rebuilt progress migrate without awards, resource grants or setting loss', () => {
+  test('Save v3: valid v1 battle, victory, settlement and rebuilt progress migrate without awards, resource grants or setting loss', () => {
     for (const phase of ['battle', 'victory', 'destruction', 'rebuilt']) {
       const s = phase === 'battle' ? createProgression() : funded(3);
       if (phase === 'victory') { start(s); finish(s, 1); }
-      if (phase === 'rebuilt') { purchaseUpgrade(s, 'production'); configureAutomation(s, { enabled: true, target: 'heavy' }); start(s); }
-      const restored = parseSession(v1(s));
-      assert(restored.version === 2 && restored.run.runId === s.run.runId && restored.run.phase === s.run.phase);
+      if (phase === 'rebuilt') { purchaseUpgrade(s, 'production'); start(s); }
+      const restored = parseSession(v1(s, phase === 'rebuilt' ? { enabled: true, target: 'heavy' } : {}));
+      assert(restored.version === 3 && restored.run.runId === s.run.runId && restored.run.phase === s.run.phase);
       assert(restored.permanent.legacy === s.permanent.legacy && restored.permanent.totalLegacy === s.permanent.completedCycles);
       assert(restored.game.gold.player === s.game.gold.player && restored.run.earnedLegacy === s.run.earnedLegacy);
       assert(restored.permanent.upgrades.production === s.permanent.upgrades.production);
-      assert(restored.permanent.automation.enabled === s.permanent.automation.enabled && restored.permanent.automation.target === s.permanent.automation.target);
+      assert(restored.permanent.automation.enabled === (phase === 'rebuilt') && restored.permanent.automation.target === (phase === 'rebuilt' ? 'heavy' : 'front'));
       assert(!restored.permanent.automation.evolve && restored.game.modifiers.bounty === 1);
       assert(serializeSession(parseSession(serializeSession(restored))) === serializeSession(restored));
     }
   });
-  test('Save v2: validates talent dependencies, ledger, settings and reward snapshots; migration retains a valid v1 backup', () => {
-    const s = funded(); purchaseTalent(s, 'formation');
+  test('Save v3: validates talent dependencies, ledger, settings and reward snapshots; migration retains a valid v1 backup', () => {
+    const s = funded(); purchaseTalent(s, 'autobuyer'); purchaseTalent(s, 'logistics'); purchaseTalent(s, 'formation');
     for (const mutate of [x => x.permanent.totalLegacy++, x => x.permanent.talents.formation = 2,
       x => x.permanent.automation.evolve = true, x => x.permanent.automation.weights = [0, 0, 0],
       x => x.run.earnedLegacy++, x => x.run.autoTurn = 'unknown', x => x.game.modifiers.bounty = 2,
@@ -210,23 +228,25 @@ export function registerTalentTests(test, assert, near) {
     const storage = { getItem: key => entries.get(key) ?? null, setItem: (key, value) => entries.set(key, value), removeItem: key => entries.delete(key) };
     const store = createSaveStore(() => storage), loaded = store.load();
     assert(loaded.ok && loaded.migrated && store.save(loaded.session).ok && entries.get(BACKUP_KEY) === old);
-    assert(JSON.parse(entries.get(SAVE_KEY)).version === 2);
+    assert(JSON.parse(entries.get(SAVE_KEY)).version === 3);
   });
   test('Talents browser: purchase prerequisites, configure autobuyer, rebuild, reload and fit the full tree on a phone', async () => {
     let frame = await mountFixture(serializeSession(funded(30)));
     const page = () => frame.contentDocument, el = id => page().getElementById(id);
     el('archives').click(); assert(el('archives-dialog').open && !el('talents-panel').hidden);
-    assert(el('buy-evolution').disabled); el('buy-formation').click(); el('buy-formation').click();
-    assert(el('legacy').textContent === '29' && !el('buy-evolution').disabled);
-    el('buy-evolution').click(); el('buy-defense').click(); el('buy-conservation').click();
+    assert(el('buy-evolution').disabled); el('buy-autobuyer').click(); el('node-logistics').click(); el('buy-logistics').click();
+    el('node-formation').click(); el('buy-formation').click(); el('buy-formation').click();
+    assert(el('legacy').textContent === '27' && !el('buy-evolution').disabled);
+    el('node-evolution').click(); el('buy-evolution').click(); el('node-defense').click(); el('buy-defense').click();
+    page().querySelector('[data-talent-branch=legacy]').click(); el('buy-conservation').click();
     assert(el('talent-legacy-preview').textContent.includes('本轮终局 +1 · 下轮终局 +2'));
-    page().querySelector('[data-archive-page="automation"]').click(); assert(!el('automation-panel').hidden);
+    el('close-archives').click(); el('autobuyer-menu').click(); assert(el('automation-dialog').open && !el('archives-dialog').open);
     el('auto-enabled').click(); el('auto-evolve').click(); el('auto-defense').click();
     const setting = (id, value) => { el(id).value = value; el(id).dispatchEvent(new frame.contentWindow.Event('change')); };
     setting('auto-mode', 'balanced'); setting('auto-reserve', '100'); setting('auto-queue', '2');
     setting('auto-weight-front', '3'); assert(!el('auto-weights').hidden);
     setting('auto-reserve', '-1'); assert(el('auto-reserve').value === '100' && el('automation-error').textContent.includes('未保存'));
-    el('rebuild-civilization').click();
+    el('automation-to-talents').click(); el('rebuild-civilization').click();
     const saved = parseSession(frame.contentWindow.__storage.getItem(SAVE_KEY));
     assert(saved.run.talents.formation && saved.run.talents.conservation && saved.permanent.automation.reserve === 100);
     assert(saved.permanent.automation.mode === 'balanced' && saved.permanent.automation.evolve && saved.permanent.automation.defense);
@@ -234,21 +254,114 @@ export function registerTalentTests(test, assert, near) {
     el('archives').click(); assert(el('auto-evolve').checked && el('auto-weight-front').value === '3' && el('buy-conservation').disabled);
     frame.style.width = '320px'; assert(page().documentElement.scrollWidth <= frame.clientWidth, 'Talent tree must fit a phone');
     assert(el('archives-dialog').scrollWidth <= el('archives-dialog').clientWidth, 'Tree must not overflow inside its dialog');
-    page().querySelector('[data-archive-page="automation"]').click();
+    el('close-archives').click(); el('autobuyer-menu').click();
     assert(page().documentElement.scrollWidth <= frame.clientWidth, 'Automation controls must fit a phone');
-    assert(el('archives-dialog').scrollWidth <= el('archives-dialog').clientWidth, 'Automation must not overflow inside its dialog');
+    assert(el('automation-dialog').scrollWidth <= el('automation-dialog').clientWidth, 'Automation must not overflow inside its dialog');
     frame.remove();
   });
   test('Talents browser: an existing v1 settlement migrates once, keeps its original backup and exposes the new tree', async () => {
-    const seed = funded(3); purchaseUpgrade(seed, 'production'); configureAutomation(seed, { enabled: true, target: 'ranged' });
-    const raw = v1(seed), frame = await mountFixture(raw), page = frame.contentDocument;
+    const seed = funded(3); purchaseUpgrade(seed, 'production');
+    const raw = v1(seed, { enabled: true, target: 'ranged' }), frame = await mountFixture(raw), page = frame.contentDocument;
     const storage = frame.contentWindow.__storage, restored = parseSession(storage.getItem(SAVE_KEY));
-    assert(JSON.parse(storage.getItem(SAVE_KEY)).version === 2 && storage.getItem(BACKUP_KEY) === raw);
+    assert(JSON.parse(storage.getItem(SAVE_KEY)).version === 3 && storage.getItem(BACKUP_KEY) === raw);
     assert(restored.permanent.legacy === 2 && restored.run.earnedLegacy === 1 && restored.permanent.upgrades.production === 1);
     assert(page.getElementById('save-status').textContent.includes('旧存档已升级'));
-    page.getElementById('play-again').click();
+    page.getElementById('archives').click();
     assert(page.getElementById('archives-dialog').open && page.getElementById('auto-enabled').checked);
     assert(page.getElementById('auto-target').value === 'ranged' && !page.getElementById('buy-formation').disabled);
     frame.remove();
   });
+  test('Save v3: v2 saves retain former free features, purchased paths, exact wallets and active settings across every phase', () => {
+    for (const phase of ['fresh', 'first-settlement', 'battle', 'victory', 'destruction', 'defeat']) {
+      const s = phase === 'fresh' ? createProgression() : funded(phase === 'first-settlement' ? 1 : 40);
+      if (!['fresh', 'first-settlement'].includes(phase)) {
+        for (const key of ['autobuyer', 'logistics', 'formation', 'evolution', 'defense', 'defense', 'elite']) assert(purchaseTalent(s, key));
+        assert(configureAutomation(s, { enabled: true, mode: 'balanced', weights: [1, 2, 3], reserve: 100, queueLimit: 2,
+          recruitEnabled: false, priority: 'defense', evolve: true, defense: true, expand: true, replace: true, elite: true }));
+        start(s);
+        if (phase !== 'battle') finish(s, phase === 'victory' ? 1 : 5, phase === 'defeat' ? 'lost' : 'won');
+      }
+      const raw = v2(s), old = JSON.parse(raw), restored = parseSession(raw), p = restored.permanent;
+      assert(restored.version === 3 && p.legacy === old.permanent.legacy && p.totalLegacy === old.permanent.totalLegacy);
+      assert(JSON.stringify(p.automation) === JSON.stringify(old.permanent.automation));
+      assert(p.talentGrants.join(',') === (phase === 'fresh' ? '' : 'autobuyer,logistics'));
+      assert(restored.run.phase === s.run.phase && restored.run.runId === s.run.runId && restored.run.earnedLegacy === s.run.earnedLegacy);
+      assert(restored.game.gold.player === s.game.gold.player && !resolveBattle(restored));
+      const saved = serializeSession(restored); assert(serializeSession(parseSession(saved)) === saved);
+    }
+  });
+  test('Save v3: malformed grants, missing new talents, inconsistent unlocks and unpurchased budget settings are rejected', () => {
+    const s = funded(3); assert(purchaseTalent(s, 'autobuyer'));
+    for (const mutate of [x => x.permanent.automation.unlocked = false,
+      x => x.permanent.talentGrants = ['autobuyer', 'autobuyer'], x => x.permanent.talentGrants = ['formation'],
+      x => delete x.permanent.talents.logistics, x => x.permanent.automation.reserve = 20,
+      x => x.permanent.automation.queueLimit = 1, x => x.permanent.automation.priority = 'defense',
+      x => x.permanent.talentGrants = ['logistics']]) {
+      const record = JSON.parse(serializeSession(s)); mutate(record); rejects(() => parseSession(JSON.stringify(record)));
+    }
+    const broken = JSON.parse(v2(funded(3))); broken.permanent.talents.formation = 1;
+    rejects(() => parseSession(JSON.stringify(broken)));
+    const unsupported = JSON.parse(serializeSession(s)); unsupported.version = 999;
+    rejects(() => parseSession(JSON.stringify(unsupported)));
+  });
+  test('Progressive autobuyer browser: first legacy is visible, base talent is required and only purchased settings appear', async () => {
+    let frame = await mountFixture(serializeSession(funded(1)));
+    const page = () => frame.contentDocument, el = id => page().getElementById(id);
+    assert(!el('civilization-bar').hidden && el('legacy-balance').textContent === '1');
+    assert(el('play-again').textContent === '查看遗产与天赋' && el('result-talents').hidden);
+    el('autobuyer-menu').click(); assert(el('automation-dialog').open && el('automation-settings').hidden);
+    assert(!el('auto-enabled').checked && el('auto-enabled').disabled);
+    el('automation-to-talents').click(); assert(!el('automation-dialog').open && el('archives-dialog').open);
+    assert(!el('buy-autobuyer').disabled && el('buy-formation').disabled);
+    el('buy-autobuyer').click(); assert(el('legacy-balance').textContent === '0');
+    el('close-archives').click(); el('autobuyer-menu').click();
+    assert(!el('automation-settings').hidden && !el('auto-target-field').hidden && el('auto-mode').disabled);
+    for (const group of page().querySelectorAll('[data-auto-talent]')) assert(group.hidden, `${group.dataset.autoTalent} must stay hidden`);
+    el('auto-enabled').click(); el('auto-target').value = 'heavy'; el('auto-target').dispatchEvent(new frame.contentWindow.Event('change'));
+    el('automation-to-talents').click(); el('rebuild-civilization').click();
+    let saved = parseSession(frame.contentWindow.__storage.getItem(SAVE_KEY));
+    assert(saved.run.talents.autobuyer === 1 && saved.permanent.automation.enabled && !saved.permanent.talents.logistics);
+    frame.remove(); frame = await mountFixture(serializeSession(saved));
+    assert(el('legacy-balance').textContent === '0' && !el('civilization-bar').hidden);
+    let time = 0; frame.contentWindow.__testFrame(0);
+    const tick = () => { for (let i = 0; i < 60; i++) frame.contentWindow.__testFrame(time += 1000 / 60); };
+    el('autobuyer-menu').click(); const gold = el('gold').textContent; tick();
+    page().body.dispatchEvent(new frame.contentWindow.KeyboardEvent('keydown', { code: 'Digit1', bubbles: true }));
+    assert(el('gold').textContent === gold && el('queue-count').textContent === '0 / 5', 'Independent automation modal pauses simulation and shortcuts');
+    el('close-automation').click(); tick(); assert(el('queue-count').textContent !== '0 / 5');
+    frame.remove();
+  });
+  test('Rebuild browser: later finales rebuild directly, repeated clicks cannot award or restart again, optional talents stay accessible', async () => {
+    let frame = await mountFixture(serializeSession(funded(2)));
+    const page = () => frame.contentDocument, el = id => page().getElementById(id);
+    assert(el('play-again').textContent === '重建文明' && !el('result-talents').hidden);
+    el('result-talents').click(); assert(el('archives-dialog').open); el('close-archives').click();
+    const before = parseSession(frame.contentWindow.__storage.getItem(SAVE_KEY));
+    el('play-again').click(); el('play-again').click();
+    const after = parseSession(frame.contentWindow.__storage.getItem(SAVE_KEY));
+    assert(!el('archives-dialog').open && !el('automation-dialog').open && after.run.phase === 'battle');
+    assert(after.run.runId !== before.run.runId && after.permanent.legacy === 2 && after.permanent.completedCycles === 2);
+    assert(!after.run.settled && !after.run.earnedLegacy && !after.permanent.automation.unlocked);
+    frame.remove(); frame = await mountFixture(serializeSession(after));
+    assert(el('legacy-balance').textContent === '2' && !el('civilization-bar').hidden && el('result').hidden);
+    frame.remove();
+  });
+  test('Talent tree browser: real parent branches carry required ranks and selecting a node shows only its detail', async () => {
+    const frame = await mountFixture(serializeSession(funded(1))), page = frame.contentDocument;
+    const el = id => page.getElementById(id); el('archives').click();
+    for (const [key, config] of Object.entries(TALENTS)) for (const [parent, rank] of Object.entries(config.requires)) {
+      const item = page.querySelector(`[data-talent="${key}"]`);
+      assert(item.dataset.parent === parent && Number(item.dataset.requiredLevel) === rank);
+      assert(item.parentElement.parentElement.dataset.talent === parent, `${key} must connect to its actual parent`);
+    }
+    el('node-evolution').click();
+    assert(!el('talent-evolution').hidden && el('talent-autobuyer').hidden && el('node-evolution').getAttribute('aria-pressed') === 'true');
+    page.querySelector('[data-talent-branch="legacy"]').click();
+    assert(!el('branch-legacy').hidden && el('branch-automation').hidden && !el('talent-conservation').hidden);
+    el('node-continuity').click(); assert(el('talent-continuity').textContent.includes('遗产保存 2 级'));
+    frame.style.width = '320px';
+    assert(page.documentElement.scrollWidth <= frame.clientWidth && el('archives-dialog').scrollWidth <= el('archives-dialog').clientWidth);
+    frame.remove();
+  });
+
 }

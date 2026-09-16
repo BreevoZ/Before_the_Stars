@@ -13,9 +13,13 @@
     <main class="game-shell">
       <header class="masthead">
         <div class="wordmark"><span class="brand-mark" aria-hidden="true">✳</span> BEFORE THE STARS</div>
-        <div class="masthead-actions"><button class="text-button" id="archives" type="button" hidden>文明档案</button><button class="text-button" id="pause-battle" type="button" hidden aria-pressed="false">暂停</button><a class="animation-link" href="./animations.html" title="无需开局，查看所有动画">动画</a>
+        <div class="masthead-actions"><button class="text-button" id="pause-battle" type="button" hidden aria-pressed="false">暂停</button><a class="animation-link" href="./animations.html" title="无需开局，查看所有动画">动画</a>
         <button class="icon-button" id="help" type="button" data-icon="help" aria-label="帮助与单位资料" title="帮助与单位资料 · ?"></button></div>
       </header>
+      <nav id="civilization-bar" class="civilization-bar" aria-label="文明进度" hidden>
+        <div class="legacy-wallet" title="文明遗产，用于购买永久天赋"><span aria-hidden="true">✧</span><strong id="legacy-balance">0</strong><span>Legacy<small>文明遗产</small></span></div>
+        <div class="civilization-actions"><button id="archives" type="button" hidden>天赋树 <span aria-hidden="true">↗</span></button><button id="autobuyer-menu" type="button" hidden>自动购买 <small id="autobuyer-label">未解锁</small></button></div>
+      </nav>
       <p id="save-warning" class="save-warning" role="status" hidden></p>
       <section id="debug-tools" class="debug-tools" aria-label="快速调试" hidden>
         <span class="debug-label">调试 · 独立存档</span>
@@ -43,7 +47,7 @@
           <canvas id="battlefield" width="1280" height="480" tabindex="0" role="img" aria-describedby="spell-hint" aria-label="左侧青色为我方，右侧橙色为敌方。士兵自动前进并攻击。"></canvas>
           <div class="target-banner" id="target-banner" hidden><span data-icon="orbital"></span><span id="target-text">选择落点</span><button class="icon-button" id="cancel-target" type="button" data-icon="close" aria-label="取消瞄准" title="取消 · Esc"></button></div>
           <div class="result-overlay" id="result" hidden>
-            <div class="result-card"><h1 id="result-title"></h1><p id="result-detail"></p><button class="primary-button" id="play-again" type="button"><span data-icon="restart"></span>再战一局</button><small id="result-hint" hidden></small></div>
+            <div class="result-card"><h1 id="result-title"></h1><p id="result-detail"></p><button class="primary-button" id="play-again" type="button"><span data-icon="restart"></span>再战一局</button><button id="result-talents" class="text-button" type="button" hidden>查看天赋树</button><small id="result-hint" hidden></small></div>
           </div>
         </div>
         <section class="command-panel" aria-label="作战指令">
@@ -94,47 +98,52 @@
       <noscript><p>请启用 JavaScript 后开始游戏。</p></noscript>
     </main>
     <dialog id="archives-dialog" aria-labelledby="archives-title">
-      <header class="help-heading"><h2 id="archives-title">文明档案</h2><button class="icon-button" id="close-archives" type="button" data-icon="close" aria-label="关闭文明档案"></button></header>
+      <header class="help-heading"><h2 id="archives-title">文明天赋</h2><button class="icon-button" id="close-archives" type="button" data-icon="close" aria-label="关闭天赋树"></button></header>
       <div class="archive-body">
-        <p class="archive-eyebrow" id="archive-run"></p>
         <div class="legacy-summary"><span><strong id="cycles">0</strong> 有效循环</span><span><strong id="legacy">0</strong> 文明遗产</span></div>
         <p id="cycle-outcome"></p>
-        <p id="rebuild-rules" hidden>重建清空本轮资源、时代与战场；保留有效循环、遗产、天赋和自动购买设置。</p>
-        <nav class="archive-nav" aria-label="文明档案页面"><button type="button" data-archive-page="talents" aria-pressed="true" aria-controls="talents-panel">天赋树</button><button type="button" data-archive-page="automation" aria-pressed="false" aria-controls="automation-panel">自动购买</button></nav>
         <section id="talents-panel" aria-labelledby="upgrades-title">
-          <h3 id="upgrades-title">文明天赋</h3><p class="archive-note">首次通关后解锁。仅两轮之间购买，新文明开始时生效；所有价格使用文明遗产。</p>
-          <div class="talent-root"><strong>文明记忆</strong><span>基础自动招募 · 永久免费</span><small id="talent-legacy-preview"></small></div>
-          <div id="talent-tree" class="talent-tree"></div>
+          <h3 id="upgrades-title" class="sr-only">文明天赋</h3><p class="archive-note" id="talent-guide">沿连线从上往下解锁，点击节点查看效果。仅两轮之间购买，新文明开始时生效。</p>
+          <nav class="talent-branches" aria-label="天赋分支"><button type="button" data-talent-branch="automation" aria-pressed="true" aria-controls="branch-automation">自动化</button><button type="button" data-talent-branch="growth" aria-pressed="false" aria-controls="branch-growth">文明增益</button><button type="button" data-talent-branch="legacy" aria-pressed="false" aria-controls="branch-legacy">遗产收益</button></nav>
+          <div class="talent-layout"><div id="talent-tree" class="talent-tree"></div><div id="talent-details" class="talent-details" aria-label="所选天赋详情"></div></div>
+          <p class="archive-note" id="talent-legacy-preview"></p>
         </section>
-        <section id="automation-panel" aria-labelledby="automation-title" hidden>
-          <h3 id="automation-title">自动购买 · Autobuyer</h3><p id="automation-hint" class="archive-note"></p>
+        <details class="bonus-details"><summary>本轮加成与收益</summary><p class="archive-eyebrow" id="archive-run"></p><p class="archive-note" id="active-bonuses"></p></details>
+
+        <button id="archive-save" type="button">存档与恢复</button>
+      </div>
+      <footer class="archive-footer" id="archive-footer" hidden><p id="rebuild-rules" hidden>重建清空本轮资源、时代与战场；保留有效循环、遗产、天赋和自动购买设置。</p><button class="primary-button" id="rebuild-civilization" type="button" hidden>重建文明</button></footer>
+    </dialog>
+    <dialog id="automation-dialog" aria-labelledby="automation-title">
+      <header class="help-heading"><h2 id="automation-title">自动购买</h2><button id="close-automation" class="icon-button" type="button" data-icon="close" aria-label="关闭自动购买"></button></header>
+      <div class="archive-body">
+        <section id="automation-panel" aria-labelledby="automation-title">
+          <p id="automation-locked" class="archive-note" hidden>尚未解锁。首次通关后，在天赋树购买「自动招募」（1 Legacy），即可选择一种部队自动招募。</p><button id="automation-to-talents" type="button" class="secondary-button">前往天赋树</button><div id="automation-settings"><p id="automation-hint" class="archive-note"></p>
           <div class="automation-controls"><label><input type="checkbox" id="auto-enabled"> 启用自动购买</label></div>
           <p id="automation-status" class="automation-status"></p><p id="automation-error" class="archive-note" role="status"></p>
-          <fieldset class="auto-group"><legend>预算与调度</legend><div class="auto-fields">
+          <fieldset class="auto-group" data-auto-talent="logistics"><legend>预算与调度</legend><div class="auto-fields">
             <label>预留金币<input id="auto-reserve" type="number" min="0" max="1000000000" step="10" inputmode="numeric" value="0"></label>
             <label>购买优先级<select id="auto-priority"><option value="balanced">部队与防御交替</option><option value="recruit">部队优先</option><option value="defense">防御优先</option></select></label>
           </div><p class="archive-note">只使用预留金额之外的金币。当前目标买不起时先存钱；队列或兵力已满时，仍可处理防御。手动操作不受此预算限制。</p></fieldset>
           <fieldset class="auto-group"><legend>部队</legend>
-            <label class="auto-check"><input type="checkbox" id="auto-recruit"> 自动招募</label>
-            <div class="auto-fields"><label>训练队列上限<select id="auto-queue"><option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option></select></label>
-            <label>招募方式<select id="auto-mode"><option value="single">单一兵种</option><option value="balanced">编队比例 · 需编队协议</option></select></label>
+            <label class="auto-check" data-auto-talent="logistics"><input type="checkbox" id="auto-recruit"> 自动招募</label>
+            <div class="auto-fields"><label data-auto-talent="logistics">训练队列上限<select id="auto-queue"><option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option></select></label>
+            <label data-auto-talent="formation">招募方式<select id="auto-mode"><option value="single">单一兵种</option><option value="balanced">编队比例</option></select></label>
             <label id="auto-target-field">目标 <select id="auto-target"><option value="front">前排</option><option value="ranged">远程</option><option value="heavy">重型</option></select></label></div>
             <div id="auto-weights" class="auto-fields weights" hidden><label>前排比例<input id="auto-weight-front" type="number" min="0" max="10" step="1" value="2" inputmode="numeric"></label><label>远程比例<input id="auto-weight-ranged" type="number" min="0" max="10" step="1" value="2" inputmode="numeric"></label><label>重型比例<input id="auto-weight-heavy" type="number" min="0" max="10" step="1" value="1" inputmode="numeric"></label></div>
             <p class="archive-note" id="auto-roster-hint"></p>
-            <label class="auto-check"><input id="auto-elite" type="checkbox"> 维持超级士兵数量 <span id="auto-elite-lock"></span></label>
+            <div data-auto-talent="elite"><label class="auto-check"><input id="auto-elite" type="checkbox"> 维持超级士兵数量 <span id="auto-elite-lock"></span></label>
             <label>精锐目标数量<select id="auto-elite-limit"><option>1</option><option>2</option><option>3</option></select></label>
-            <p class="archive-note">仅未来时代生效，优先存钱补足精锐；已出场与训练中的精锐一起计数，占用正常兵力。</p>
+            <p class="archive-note">仅未来时代生效，优先存钱补足精锐；已出场与训练中的精锐一起计数，占用正常兵力。</p></div>
           </fieldset>
-          <fieldset class="auto-group"><legend>文明发展</legend><label class="auto-check"><input type="checkbox" id="auto-evolve"> 自动进化 <span id="auto-evolve-lock"></span></label><p class="archive-note">经验达标时依次进化；不自动继续战役或重建。</p></fieldset>
-          <fieldset class="auto-group"><legend>防御</legend><label class="auto-check"><input type="checkbox" id="auto-defense"> 自动建塔 <span id="auto-defense-lock"></span></label>
+          <fieldset class="auto-group" data-auto-talent="evolution"><legend>文明发展</legend><label class="auto-check"><input type="checkbox" id="auto-evolve"> 自动进化 <span id="auto-evolve-lock"></span></label><p class="archive-note">经验达标时依次进化；不自动继续战役或重建。</p></fieldset>
+          <fieldset class="auto-group" data-auto-talent="defense"><legend>防御</legend><label class="auto-check"><input type="checkbox" id="auto-defense"> 自动建塔 <span id="auto-defense-lock"></span></label>
             <div class="auto-fields"><label>炮塔类型<select id="auto-turret"><option value="0">第一种</option><option value="1">第二种</option><option value="2">第三种</option></select></label><label>目标炮位数<select id="auto-max-turrets"><option>1</option><option>2</option><option>3</option><option>4</option></select></label></div>
-            <label class="auto-check"><input type="checkbox" id="auto-expand"> 自动扩容炮位</label><label class="auto-check"><input type="checkbox" id="auto-replace"> 替换旧时代炮塔 <span id="auto-replace-lock"></span></label>
+            <label class="auto-check"><input type="checkbox" id="auto-expand"> 自动扩容炮位</label><label class="auto-check" data-auto-talent="defense" data-auto-level="2"><input type="checkbox" id="auto-replace"> 替换旧时代炮塔 <span id="auto-replace-lock"></span></label>
             <p class="archive-note" id="auto-defense-hint"></p>
           </fieldset>
+          <p class="archive-note">更多功能随天赋解锁后出现。</p></div>
         </section>
-        <details class="bonus-details"><summary>本轮加成与收益</summary><p class="archive-note" id="active-bonuses"></p></details>
-        <button class="primary-button" id="rebuild-civilization" type="button" hidden>重建文明</button>
-        <button id="archive-save" type="button">存档与恢复</button>
       </div>
     </dialog>
     <dialog id="save-dialog" aria-labelledby="save-title">

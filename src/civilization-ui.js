@@ -16,7 +16,7 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   const freshSession = () => debug ? createDebugProgression() : createProgression();
   let session = loaded.session ?? freshSession();
   let saveElapsed = 0;
-  const dialog = el('archives-dialog'), saveDialog = el('save-dialog');
+  const dialog = el('archives-dialog'), saveDialog = el('save-dialog'), autoDialog = el('automation-dialog');
   function report(result, success = '已保存完整文明进度。') {
     text('save-status', result.ok ? success : result.error);
     el('save-warning').hidden = Boolean(result.ok);
@@ -27,17 +27,23 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   function changed(resetBattle = false) { sync(); onChange(resetBattle); }
   function open() {
     if (!session.permanent.completedCycles) return;
+    autoDialog.close();
     if (!dialog.open) dialog.showModal(); changed();
+  }
+  function openAutomation() {
+    if (!session.permanent.completedCycles) return;
+    dialog.close();
+    if (!autoDialog.open) autoDialog.showModal(); changed();
   }
   function openSave() { if (!saveDialog.open) saveDialog.showModal(); changed(); }
   function replace(next) { session = next; saveElapsed = 0;
-    if (!session.permanent.completedCycles) dialog.close();
+    dialog.close(); autoDialog.close();
     changed(true); }
   function transition(action) {
     const runId = session.run.runId;
     if (!action()) return;
     if (debug && session.run.runId !== runId) supplyDebugRun(session);
-    save(); dialog.close(); changed(true);
+    save(); dialog.close(); autoDialog.close(); changed(true);
   }
   el('restart').title = '重开本轮文明 · 永久进度保留';
   el('restart').setAttribute('aria-label', '重开本轮文明');
@@ -47,6 +53,11 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   el('close-save').addEventListener('click', () => saveDialog.close());
   saveDialog.addEventListener('close', () => changed());
   el('archives').addEventListener('click', open);
+  el('result-talents').addEventListener('click', open);
+  el('autobuyer-menu').addEventListener('click', openAutomation);
+  el('automation-to-talents').addEventListener('click', open);
+  el('close-automation').addEventListener('click', () => autoDialog.close());
+  autoDialog.addEventListener('close', () => changed());
   el('close-archives').addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => changed());
   if (debug) {
@@ -112,27 +123,34 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
       el('debug-speed').value = String(session.debugSpeed);
       document.querySelectorAll('[data-debug-command]').forEach(button => { button.disabled = run.phase !== 'battle'; });
     }
-    text('archives-title', run.phase === 'destruction' ? '文明毁灭 · 遗产' : '文明档案');
+    text('archives-title', '文明天赋');
     text('archive-run', `地表文明 · 第 ${run.battleNumber} 场冲突 · 本轮 ${Math.floor(run.elapsed / 60)} 分 ${Math.floor(run.elapsed % 60)} 秒`);
     text('cycles', p.completedCycles); text('legacy', p.legacy);
     text('cycle-outcome', run.phase === 'destruction' ? `战争胜利，高科技失控与内战却终结了文明。本轮 +${run.earnedLegacy} 文明遗产，已入账。` :
       run.phase === 'defeat' ? '本轮未完成终局，无遗产奖励。已有永久档案仍然保留。' : '击败未来时代的敌方基地，完成地表文明循环；仅进化至未来并不算通关。');
+    el('archive-footer').hidden = !between;
+    el('cycle-outcome').hidden = run.phase === 'battle' || run.phase === 'victory';
     el('rebuild-rules').hidden = !between; el('rebuild-civilization').hidden = !between;
     text('rebuild-civilization', run.phase === 'defeat' ? '从原始时代重试' : '重建文明');
     talentControls.sync();
     const growth = getTalentBonuses(run.talents);
     text('active-bonuses', `本轮：生产档案 ${run.upgrades.production} 级，${AGES[game.ages.player].income} × ${formatMultiplier(game.modifiers.income)} = ${formatMultiplier(getIncomeRate(game))} 金币/秒；战争档案 ${run.upgrades.warfare} 级，经验 ×${formatMultiplier(game.modifiers.experience)}。阵亡先按原规则向下取整，再乘倍率逐笔向下取整。重建储备提供起始金币 +${growth.startingGold}；战利品回收使击杀金币 ×${growth.bounty}，逐笔向下取整。终局遗产：(${SURFACE.legacyPerCycle} + ${run.talents.conservation}) × ${1 + run.talents.continuity * TALENT_VALUES.legacyMultiplierPerLevel}，向下取整 = ${getLegacyReward(run.talents)}。`);
     el('archives').hidden = p.completedCycles === 0;
-    text('archives', `档案 · ${p.legacy}`);
-    el('archives').setAttribute('aria-label', `文明档案，${p.legacy} 文明遗产`);
+    el('civilization-bar').hidden = p.completedCycles === 0;
+    el('autobuyer-menu').hidden = p.completedCycles === 0;
+    text('legacy-balance', p.legacy);
+    text('autobuyer-label', !p.automation.unlocked ? '未解锁' : p.automation.enabled ? '已开启' : '已关闭');
+    el('autobuyer-menu').dataset.enabled = String(p.automation.enabled);
+    el('archives').setAttribute('aria-label', `天赋树，${p.legacy} 文明遗产`);
+    el('result-talents').hidden = run.phase !== 'destruction' || p.completedCycles < 2;
     el('result').classList.toggle('destruction', run.phase === 'destruction');
     if (run.phase !== 'battle') {
       text('result-title', run.phase === 'destruction' ? '文明未能幸存' : run.phase === 'victory' ? '战役胜利' : game.status === 'draw' ? '平局' : '战败');
       text('result-detail', run.phase === 'destruction' ? `你赢得了战争，却没能保住文明。+${run.earnedLegacy} 文明遗产已计入本轮结算。` :
         run.phase === 'victory' ? `敌方${AGES[game.ages.enemy].name}基地已被摧毁。资产保留，下一场冲突等待着你。` : '本轮没有遗产奖励。永久进度仍然保留。');
-      text('play-again', run.phase === 'victory' ? '继续文明进程' : run.phase === 'destruction' ? '查看遗产与重建' : p.completedCycles ? '查看档案与重试' : '从原始时代重试');
+      text('play-again', run.phase === 'victory' ? '继续文明进程' : run.phase === 'destruction' ? (p.completedCycles === 1 ? '查看遗产与天赋' : '重建文明') : p.completedCycles ? '查看档案与重试' : '从原始时代重试');
       el('result-hint').hidden = false;
-      text('result-hint', run.phase === 'destruction' ? '可立即跳过演出 · 遗产已经入账' : run.phase === 'victory' ? '未完成订单按支付价格退款 · 基地恢复满血' : '从原始时代重新尝试');
+      text('result-hint', run.phase === 'destruction' ? (p.completedCycles === 1 ? '第一份文明遗产 · 解锁你的第一个天赋' : '重建清空本轮资源与战场 · 保留遗产、天赋与自动购买设置') : run.phase === 'victory' ? '未完成订单按支付价格退款 · 基地恢复满血' : '从原始时代重新尝试');
     }
   }
   if (!loaded.ok) report(loaded);
@@ -141,8 +159,8 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   else text('save-status', '已恢复上次保存的完整进度，没有离线推进。');
   return {
     get session() { return session; },
-    get paused() { return dialog.open || saveDialog.open; },
-    get modalOpen() { return dialog.open || saveDialog.open; },
+    get paused() { return dialog.open || saveDialog.open || autoDialog.open; },
+    get modalOpen() { return dialog.open || saveDialog.open || autoDialog.open; },
     get timeScale() { return debug ? session.debugSpeed : 1; },
     sync, save, open,
     step(dt) {
@@ -154,9 +172,10 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
       if (session.run.phase === 'victory') {
         const battleId = session.run.battleId;
         transition(() => continueCivilization(session, battleId));
-      } else if (session.run.phase === 'defeat' && !session.permanent.completedCycles) {
+      } else if ((session.run.phase === 'destruction' && session.permanent.completedCycles > 1) ||
+          (session.run.phase === 'defeat' && !session.permanent.completedCycles)) {
         transition(() => rebuildCivilization(session, session.run.runId));
-      } else open();
+      } else if (['destruction', 'defeat'].includes(session.run.phase)) open();
     },
     restart() {
       if (['destruction', 'defeat'].includes(session.run.phase)) return this.resultAction();

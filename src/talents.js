@@ -4,7 +4,11 @@ export const TALENT_VALUES = Object.freeze({ startingGold: 150, bountyPerLevel: 
 // All talents are bought between runs and snapshotted when a civilization starts.
 // Historical prices participate in the save ledger; repricing needs a migration.
 export const TALENTS = Object.freeze({
-  formation: { name: '编队协议', branch: 'automation', costs: [1], requires: {},
+  autobuyer: { name: '自动招募', branch: 'automation', costs: [1], requires: {},
+    effects: ['手动招募', '解锁开关与单一兵种自动招募'] },
+  logistics: { name: '后勤调度', branch: 'automation', costs: [1], requires: { autobuyer: 1 },
+    effects: ['使用默认预算与队列', '自定义预留金币、队列上限与购买优先级'] },
+  formation: { name: '编队协议', branch: 'automation', costs: [1], requires: { autobuyer: 1 },
     effects: ['单一兵种', '按前排／远程／重型比例补员'] },
   evolution: { name: '技术托管', branch: 'automation', costs: [2], requires: { formation: 1 },
     effects: ['手动进化', '经验达标时自动进化'] },
@@ -39,6 +43,7 @@ export function purchaseTalent(session, key) {
   if (getTalentState(session, key) !== 'ready') return false;
   session.permanent.legacy -= TALENTS[key].costs[session.permanent.talents[key]];
   session.permanent.talents[key]++;
+  if (key === 'autobuyer') session.permanent.automation.unlocked = true;
   return true;
 }
 export function getTalentBonuses(talents) {
@@ -49,7 +54,7 @@ export function getLegacyReward(talents) {
   return Math.floor((SURFACE.legacyPerCycle + talents.conservation) *
     (1 + talents.continuity * TALENT_VALUES.legacyMultiplierPerLevel));
 }
-export function getTalentSpending(talents) {
+export function getTalentSpending(talents, grants = []) {
   return Object.entries(TALENTS).reduce((sum, [key, config]) =>
-    sum + config.costs.slice(0, talents[key]).reduce((total, cost) => total + cost, 0), 0);
+    sum + (grants.includes(key) ? 0 : config.costs.slice(0, talents[key]).reduce((total, cost) => total + cost, 0)), 0);
 }

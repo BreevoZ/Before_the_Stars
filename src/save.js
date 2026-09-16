@@ -28,9 +28,10 @@ function levels(value) {
   check(object(value) && Object.keys(value).length === 2, '升级等级');
   for (const key of ['production', 'warfare']) check(int(value[key], 0, UPGRADE_COSTS.length), key);
 }
-function talentLevels(value, upgrades) {
-  check(object(value) && Object.keys(value).length === Object.keys(TALENTS).length, '天赋等级');
-  for (const [key, config] of Object.entries(TALENTS)) {
+const V2_TALENTS = Object.fromEntries(Object.entries(TALENTS).filter(([key]) => !['autobuyer', 'logistics'].includes(key)).map(([key, config]) => [key, key === 'formation' ? { ...config, requires: {} } : config]));
+function talentLevels(value, upgrades, configs = TALENTS) {
+  check(object(value) && Object.keys(value).length === Object.keys(configs).length, '天赋等级');
+  for (const [key, config] of Object.entries(configs)) {
     check(int(value[key], 0, config.costs.length), `天赋 ${key}`);
     if (value[key]) for (const [parent, required] of Object.entries(config.requires)) {
       check((value[parent] ?? upgrades[parent]) >= required, '天赋前置条件');
@@ -55,9 +56,11 @@ function safeTree(value, depth = 0, key = '') {
   } else check(value === null || bool(value), '数据类型');
 }
 
-function validateRecord(session, oldVersion = false) {
+function validateRecord(session, version = SAVE_VERSION) {
+  const oldVersion = version === 1, previousVersion = version < 3;
+  const configs = version === 2 ? V2_TALENTS : TALENTS;
   check(object(session), '根记录');
-  check(session.version === (oldVersion ? 1 : SAVE_VERSION), '不支持的存档版本');
+  check(session.version === version, '不支持的存档版本');
   check(session.debug === undefined || session.debug === true, '调试标记');
   check(session.debug === true ? DEBUG_SPEEDS.includes(session.debugSpeed) : session.debugSpeed === undefined, '调试速度');
   safeTree(session);
@@ -65,17 +68,22 @@ function validateRecord(session, oldVersion = false) {
   check(object(p) && object(run) && object(g), '缺少永久、文明或战斗状态');
   check(int(p.completedCycles) && int(p.legacy), '遗产或循环数');
   levels(p.upgrades); levels(run.upgrades);
-  if (!oldVersion) { talentLevels(p.talents, p.upgrades); talentLevels(run.talents, run.upgrades); }
+  if (!oldVersion) { talentLevels(p.talents, p.upgrades, configs); talentLevels(run.talents, run.upgrades, configs); }
   const totalLegacy = oldVersion ? p.completedCycles * SURFACE.legacyPerCycle : p.totalLegacy;
   const maxReward = oldVersion ? SURFACE.legacyPerCycle : getLegacyReward(Object.fromEntries(Object.entries(TALENTS).map(([key, config]) => [key, config.costs.length])));
   check(int(totalLegacy, p.completedCycles * SURFACE.legacyPerCycle, Math.min(limit, p.completedCycles * maxReward)), '累计遗产');
+  if (!previousVersion) {
+    list(p.talentGrants, 2, '旧版功能保留');
+    check(new Set(p.talentGrants).size === p.talentGrants.length && p.talentGrants.every(key =>
+      ['autobuyer', 'logistics'].includes(key) && p.talents[key] === 1 && p.completedCycles > 0), '旧版功能保留');
+  }
   const spent = Object.values(p.upgrades).reduce((sum, level) => sum + UPGRADE_COSTS.slice(0, level).reduce((a, b) => a + b, 0), 0)
-    + (oldVersion ? 0 : getTalentSpending(p.talents));
+    + (oldVersion ? 0 : getTalentSpending({ ...emptyTalents(), ...p.talents }, previousVersion ? [] : p.talentGrants));
   check(p.legacy + spent === totalLegacy, '遗产收支不一致');
   const auto = p.automation;
   check(object(auto) && bool(auto.unlocked) && bool(auto.enabled) && AUTOMATION_TARGETS.includes(auto.target), '自动招募设置');
-  check(auto.unlocked === (p.completedCycles > 0) && (auto.unlocked || !auto.enabled), '自动招募解锁');
-  if (!oldVersion) check(validAutomation(auto, p.talents), '自动购买设置或解锁条件');
+  check(auto.unlocked === (previousVersion ? p.completedCycles > 0 : p.talents.autobuyer > 0) && (auto.unlocked || !auto.enabled), '自动招募解锁');
+  if (!oldVersion) check(validAutomation(auto, p.talents, previousVersion), '自动购买设置或解锁条件');
   check(id(run.runId) && int(run.battleNumber, 1, SURFACE.finalEnemyAge) && run.battleId === `${run.runId}:${run.battleNumber}`, '文明或战斗标识');
   check(run.processedBattleId === null || (id(run.processedBattleId) && run.processedBattleId.startsWith(`${run.runId}:`)), '胜利处理标记');
   check(['battle', 'victory', 'destruction', 'defeat'].includes(run.phase) && bool(run.settled), '流程阶段');
@@ -91,7 +99,7 @@ function validateRecord(session, oldVersion = false) {
   if (run.phase === 'battle' || run.phase === 'victory') {
     check(run.upgrades.production === p.upgrades.production && run.upgrades.warfare === p.upgrades.warfare, '战斗中升级');
   }
-  if (!oldVersion) for (const key of Object.keys(TALENTS)) {
+  if (!oldVersion) for (const key of Object.keys(configs)) {
     check(run.talents[key] <= p.talents[key], '本轮天赋快照');
     if (['battle', 'victory'].includes(run.phase)) check(run.talents[key] === p.talents[key], '战斗中购买天赋');
   }
@@ -198,12 +206,24 @@ export function parseSession(text) {
   if (session?.version === 1) {
     // Validate the complete old record before introducing any defaults. Never
     // rerun settlement or starting-resource grants while upgrading a save.
-    validateRecord(session, true);
+    validateRecord(session, 1);
     const auto = session.permanent.automation;
     session.permanent.automation = { ...createAutomation(), unlocked: auto.unlocked, enabled: auto.enabled, target: auto.target };
     session.permanent.totalLegacy = session.permanent.completedCycles * SURFACE.legacyPerCycle;
-    session.permanent.talents = emptyTalents(); session.run.talents = emptyTalents();
+    session.permanent.talents = Object.fromEntries(Object.keys(V2_TALENTS).map(key => [key, 0]));
+    session.run.talents = { ...session.permanent.talents };
     session.run.autoTurn = 'recruit'; session.game.modifiers.bounty = 1;
+    session.version = 2;
+  }
+  if (session?.version === 2) {
+    validateRecord(session, 2);
+    const p = session.permanent;
+    // Preserve formerly free recruitment and budget controls without inventing
+    // earned currency or retroactively charging the player's balance.
+    p.talentGrants = p.automation.unlocked ? ['autobuyer', 'logistics'] : [];
+    const retained = { autobuyer: Number(p.automation.unlocked), logistics: Number(p.automation.unlocked) };
+    p.talents = { ...retained, ...p.talents };
+    session.run.talents = { ...retained, ...session.run.talents };
     session.version = SAVE_VERSION;
   }
   return validateSession(session);

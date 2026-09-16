@@ -1,3 +1,4 @@
+import { purchaseTalent } from '../src/talents.js';
 import { RULES, AGES, UNITS, TURRETS, ABILITIES, createGame, getIncomeRate, getExperienceReward, recruit, evolve, buildTurret, expandTurretSlots, castAbility } from '../src/game.js';
 import { SURFACE } from '../src/progression-config.js';
 import { createProgression, resolveBattle, updateProgression, continueCivilization, rebuildCivilization, abandonCivilization, purchaseUpgrade, setAutomation } from '../src/progression.js';
@@ -113,7 +114,7 @@ export function registerProgressionTests(test, assert, near) {
     s.game.bases.enemy.hp = 1; s.game.ai.enabled = false;
     castAbility(s.game, RULES.enemyBaseX); advance(s, 2);
     assert(s.run.phase === 'destruction' && s.run.settled && s.run.earnedLegacy === 1);
-    assert(s.permanent.completedCycles === 1 && s.permanent.legacy === 1 && s.permanent.automation.unlocked && !s.permanent.automation.enabled);
+    assert(s.permanent.completedCycles === 1 && s.permanent.legacy === 1 && !s.permanent.automation.unlocked && !s.permanent.automation.enabled);
     const before = serializeSession(s);
     for (let i = 0; i < 20; i++) { resolveBattle(s); updateProgression(s, 0.05); }
     assert(serializeSession(s) === before);
@@ -168,9 +169,9 @@ export function registerProgressionTests(test, assert, near) {
       near(g.gold[winner], gold + getIncomeRate(g, winner) * RULES.fixedStep + 25);
     }
   });
-  test('M1: free automation unlock is opt-in, pays normal prices, respects queue/army limits and changes era target', () => {
+  test('M1: talent automation unlock is opt-in, pays normal prices, respects queue/army limits and changes era target', () => {
     const s = createProgression(); assert(!setAutomation(s, true, 'front'));
-    finish(s); assert(!s.permanent.automation.enabled); setAutomation(s, true, 'heavy'); rebuildCivilization(s, s.run.runId);
+    finish(s); assert(!s.permanent.automation.unlocked && !s.permanent.automation.enabled); purchaseTalent(s, 'autobuyer'); setAutomation(s, true, 'heavy'); rebuildCivilization(s, s.run.runId);
     s.game.ai.enabled = false;
     advance(s, 0.25); assert(s.game.queues.player[0].type === 'heavy');
     near(s.game.gold.player, 180 + 7 * 0.25 - 85);
@@ -186,7 +187,7 @@ export function registerProgressionTests(test, assert, near) {
     advance(s, 0.25); assert(s.game.queues.player.length === 0);
   });
   test('M1: pause, hidden page, disabled automation and ended battle cannot recruit or bank attempts', () => {
-    const s = createProgression(); finish(s); setAutomation(s, true, 'ranged'); rebuildCivilization(s, s.run.runId);
+    const s = createProgression(); finish(s); purchaseTalent(s, 'autobuyer'); setAutomation(s, true, 'ranged'); rebuildCivilization(s, s.run.runId);
     for (const options of [{ paused: true }, { hidden: true }]) {
       const before = serializeSession(s); advance(s, 20, options); assert(serializeSession(s) === before);
     }
@@ -199,10 +200,11 @@ export function registerProgressionTests(test, assert, near) {
     assert(continueCivilization(s, battleId) && !continueCivilization(s, battleId));
     finish(s); s = parseSession(serializeSession(s));
     assert(!resolveBattle(s) && s.permanent.legacy === 1);
-    purchaseUpgrade(s, 'production'); setAutomation(s, true, 'ranged');
+    purchaseUpgrade(s, 'production'); rebuildCivilization(s, s.run.runId); finish(s);
+    purchaseTalent(s, 'autobuyer'); setAutomation(s, true, 'ranged');
     const old = s.run.runId; assert(rebuildCivilization(s, old) && !rebuildCivilization(s, old));
     for (let i = 0; i < 5; i++) s = parseSession(serializeSession(s));
-    assert(s.permanent.completedCycles === 1 && s.permanent.legacy === 0 && s.game.modifiers.income === 1.5);
+    assert(s.permanent.completedCycles === 2 && s.permanent.legacy === 0 && s.game.modifiers.income === 1.5);
     assert(s.permanent.automation.enabled && s.permanent.automation.target === 'ranged');
     assert(s.run.phase === 'battle' && !s.run.settled && !s.run.earnedLegacy);
   });
@@ -344,14 +346,17 @@ export function registerProgressionTests(test, assert, near) {
     assert(saved.permanent.legacy === 1 && saved.run.settled);
     frame.remove(); frame = await mount(serializeSession(saved)); time = 0; frame.contentWindow.__testFrame(0);
     el('play-again').click(); assert(!el('archives').hidden && el('archives-dialog').open && el('legacy').textContent === '1');
-    el('buy-production').click(); el('buy-production').click();
-    assert(el('legacy').textContent === '0' && el('buy-production').disabled && !el('auto-enabled').checked);
+    el('buy-autobuyer').click(); el('buy-autobuyer').click();
+    assert(el('legacy').textContent === '0' && el('buy-autobuyer').disabled && !el('auto-enabled').checked);
+    el('close-archives').click(); el('autobuyer-menu').click();
+    assert(el('automation-dialog').open && !el('archives-dialog').open);
     el('auto-enabled').click(); el('auto-target').value = 'ranged'; el('auto-target').dispatchEvent(new Event('change'));
+    el('automation-to-talents').click();
     el('rebuild-civilization').click(); el('rebuild-civilization').click();
     saved = parseSession(frame.contentWindow.__storage.getItem(SAVE_KEY));
-    assert(saved.run.phase === 'battle' && saved.permanent.completedCycles === 1 && saved.game.modifiers.income === 1.5);
+    assert(saved.run.phase === 'battle' && saved.permanent.completedCycles === 1 && saved.run.talents.autobuyer === 1 && saved.game.modifiers.income === 1);
     frame.remove(); frame = await mount(serializeSession(saved)); time = 0; frame.contentWindow.__testFrame(0);
-    assert(el('income-rate').textContent === '+10.5/s');
+    assert(el('income-rate').textContent === '+7/s');
     el('pause-battle').click(); const gold = el('gold').textContent; tick(20);
     assert(el('gold').textContent === gold && el('queue-count').textContent === '0 / 5');
     el('pause-battle').click(); tick(0.3); assert(el('queue-count').textContent === '1 / 5');

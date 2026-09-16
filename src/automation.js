@@ -10,7 +10,7 @@ export function createAutomation() {
     maxTurrets: 1, expand: false, replace: false, elite: false, eliteLimit: 1 };
 }
 const integer = (value, min, max) => Number.isInteger(value) && value >= min && value <= max;
-export function validAutomation(auto, talents) {
+export function validAutomation(auto, talents, previousVersion = false) {
   if (!auto || typeof auto !== 'object' || Array.isArray(auto)) return false;
   if (Object.keys(auto).length !== Object.keys(createAutomation()).length) return false;
   if (!['unlocked', 'enabled', 'recruitEnabled', 'evolve', 'defense', 'expand', 'replace', 'elite']
@@ -21,7 +21,10 @@ export function validAutomation(auto, talents) {
     !integer(auto.turretTarget, 0, 2) || !integer(auto.maxTurrets, 1, RULES.maxTurretSlots) || !integer(auto.eliteLimit, 1, 3)) return false;
   if (!Array.isArray(auto.weights) || auto.weights.length !== 3 || !auto.weights.every(weight => integer(weight, 0, 10)) ||
     !auto.weights.some(weight => weight > 0)) return false;
-  return (auto.unlocked || !auto.enabled) && (auto.mode !== 'balanced' || talents.formation > 0) &&
+  const logistics = talents.logistics > 0 || previousVersion;
+  return (previousVersion || auto.unlocked === (talents.autobuyer > 0)) &&
+    (logistics || (auto.reserve === 0 && auto.queueLimit === RULES.queueLimit && auto.priority === 'balanced' && auto.recruitEnabled)) &&
+    (auto.unlocked || !auto.enabled) && (auto.mode !== 'balanced' || talents.formation > 0) &&
     (!auto.evolve || talents.evolution > 0) && (!auto.defense || talents.defense > 0) &&
     (!auto.expand || talents.defense > 0) && (!auto.replace || talents.defense > 1) && (!auto.elite || talents.elite > 0);
 }
@@ -90,9 +93,9 @@ function defensePlan(session) {
 // Shared read-only planning keeps the controls' explanation in sync with spending.
 export function getAutomationPlan(session) {
   const auto = session.permanent.automation;
-  if (!auto.unlocked) return { status: '首次通关后解锁', action: null };
+  if (!auto.unlocked) return { status: '在天赋树中解锁「自动招募」', action: null };
   if (!auto.enabled) return { status: '自动购买已关闭', action: null };
-  if (session.run.phase !== 'battle' || session.game.status !== 'playing') return { status: '下一轮开始后执行', action: null };
+  if (!session.run.talents.autobuyer || session.run.phase !== 'battle' || session.game.status !== 'playing') return { status: '下一轮开始后执行', action: null };
   const plans = { recruit: recruitPlan(session), defense: defensePlan(session) };
   const first = auto.priority === 'balanced' ? session.run.autoTurn : auto.priority;
   const second = first === 'recruit' ? 'defense' : 'recruit';
@@ -105,7 +108,7 @@ export function getAutomationPlan(session) {
 export function updateAutomation(session, dt, { paused = false, hidden = false } = {}) {
   const { permanent, run, game } = session, auto = permanent.automation;
   if (paused || hidden || run.phase !== 'battle' || game.status !== 'playing' ||
-      !auto.unlocked || !auto.enabled || !Number.isFinite(dt) || dt <= 0) return;
+      !auto.unlocked || !run.talents.autobuyer || !auto.enabled || !Number.isFinite(dt) || dt <= 0) return;
   run.autoElapsed += Math.min(dt, 0.05);
   if (run.autoElapsed + 1e-9 < AUTOMATION_INTERVAL) return;
   run.autoElapsed = Math.max(0, run.autoElapsed - AUTOMATION_INTERVAL);

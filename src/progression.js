@@ -19,7 +19,7 @@ function startRun(session) {
 
 export function createProgression() {
   const session = { version: SAVE_VERSION, permanent: { completedCycles: 0, legacy: 0, totalLegacy: 0,
-    upgrades: { production: 0, warfare: 0 }, talents: emptyTalents(), automation: createAutomation() } };
+    upgrades: { production: 0, warfare: 0 }, talents: emptyTalents(), talentGrants: [], automation: createAutomation() } };
   startRun(session);
   return session;
 }
@@ -39,8 +39,6 @@ export function resolveBattle(session) {
       permanent.completedCycles++;
       permanent.legacy += run.earnedLegacy;
       permanent.totalLegacy += run.earnedLegacy;
-      // First unlock is free and opt-in; subsequent cycles preserve preferences.
-      permanent.automation.unlocked = true;
     }
   }
   return true;

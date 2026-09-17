@@ -28,7 +28,8 @@ function levels(value) {
   check(object(value) && Object.keys(value).length === 2, '升级等级');
   for (const key of ['production', 'warfare']) check(int(value[key], 0, UPGRADE_COSTS.length), key);
 }
-const V2_TALENTS = Object.fromEntries(Object.entries(TALENTS).filter(([key]) => !['autobuyer', 'logistics'].includes(key)).map(([key, config]) => [key, key === 'formation' ? { ...config, requires: {} } : config]));
+const V3_TALENTS = { ...TALENTS, conservation: { ...TALENTS.conservation, requires: {} } };
+const V2_TALENTS = Object.fromEntries(Object.entries(V3_TALENTS).filter(([key]) => !['autobuyer', 'logistics'].includes(key)).map(([key, config]) => [key, key === 'formation' ? { ...config, requires: {} } : config]));
 function talentLevels(value, upgrades, configs = TALENTS) {
   check(object(value) && Object.keys(value).length === Object.keys(configs).length, '天赋等级');
   for (const [key, config] of Object.entries(configs)) {
@@ -58,7 +59,7 @@ function safeTree(value, depth = 0, key = '') {
 
 function validateRecord(session, version = SAVE_VERSION) {
   const oldVersion = version === 1, previousVersion = version < 3;
-  const configs = version === 2 ? V2_TALENTS : TALENTS;
+  const configs = version === 2 ? V2_TALENTS : version === 3 ? V3_TALENTS : TALENTS;
   check(object(session), '根记录');
   check(session.version === version, '不支持的存档版本');
   check(session.debug === undefined || session.debug === true, '调试标记');
@@ -69,6 +70,9 @@ function validateRecord(session, version = SAVE_VERSION) {
   check(int(p.completedCycles) && int(p.legacy), '遗产或循环数');
   levels(p.upgrades); levels(run.upgrades);
   if (!oldVersion) { talentLevels(p.talents, p.upgrades, configs); talentLevels(run.talents, run.upgrades, configs); }
+  if (version >= 4) for (const state of [p, run]) {
+    check(!Object.values(state.upgrades).some(level => level > 0) || state.talents.autobuyer === 1, '档案需要根天赋');
+  }
   const totalLegacy = oldVersion ? p.completedCycles * SURFACE.legacyPerCycle : p.totalLegacy;
   const maxReward = oldVersion ? SURFACE.legacyPerCycle : getLegacyReward(Object.fromEntries(Object.entries(TALENTS).map(([key, config]) => [key, config.costs.length])));
   check(int(totalLegacy, p.completedCycles * SURFACE.legacyPerCycle, Math.min(limit, p.completedCycles * maxReward)), '累计遗产');
@@ -224,6 +228,18 @@ export function parseSession(text) {
     const retained = { autobuyer: Number(p.automation.unlocked), logistics: Number(p.automation.unlocked) };
     p.talents = { ...retained, ...p.talents };
     session.run.talents = { ...retained, ...session.run.talents };
+    session.version = 3;
+  }
+  if (session?.version === 3) {
+    validateRecord(session, 3);
+    const p = session.permanent;
+    // Old players could buy growth/legacy talents without Autobuyer. Preserve
+    // these purchases and their balance by granting the newly required root.
+    if (!p.talents.autobuyer && (Object.values(p.upgrades).some(level => level > 0) || Object.values(p.talents).some(level => level > 0))) {
+      p.talents.autobuyer = session.run.talents.autobuyer = 1;
+      p.talentGrants.push('autobuyer');
+      p.automation.unlocked = true; // Remains off unless the player enables it.
+    }
     session.version = SAVE_VERSION;
   }
   return validateSession(session);

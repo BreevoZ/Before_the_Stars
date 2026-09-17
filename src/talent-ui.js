@@ -1,7 +1,7 @@
 import { AGES, UNITS, TURRETS } from './game.js';
-import { UPGRADES, UPGRADE_COSTS, AUTOMATION_TARGETS } from './progression-config.js';
+import { UPGRADES, AUTOMATION_TARGETS } from './progression-config.js';
 import { getUpgradeState, purchaseUpgrade } from './progression.js';
-import { TALENTS, getTalentState, purchaseTalent, getLegacyReward } from './talents.js';
+import { TALENT_TREE, TALENT_BRANCHES, getTalentState, purchaseTalent, getLegacyReward } from './talents.js';
 import { configureAutomation, getAutomationPlan } from './automation.js';
 
 const el = id => document.getElementById(id);
@@ -10,56 +10,53 @@ const reasons = { locked: '首次通关后解锁', 'during-run': '两轮之间�
 
 export function createTalentUI(getSession, changed) {
   let treeKey = '', controlsKey = '';
-  const configs = { ...Object.fromEntries(Object.entries(UPGRADES).map(([key, config]) => [key, { ...config, branch: 'growth', costs: UPGRADE_COSTS, requires: {},
-    effects: Array.from({ length: UPGRADE_COSTS.length + 1 }, (_, level) => `${config.description} ×${config.base ** level}`) }])), ...TALENTS };
-  let selected = 'autobuyer';
+  const configs = TALENT_TREE;
   function select(key, reveal = false) {
-    selected = key;
-    const branch = configs[key].branch;
-    document.querySelectorAll('[data-talent-branch]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.talentBranch === branch)));
-    document.querySelectorAll('.talent-branch').forEach(column => { column.hidden = column.dataset.branch !== branch; });
     for (const node of Object.keys(configs)) {
       el(`node-${node}`).setAttribute('aria-pressed', String(node === key));
       el(`talent-${node}`).hidden = node !== key;
     }
-    if (reveal && window.matchMedia('(max-width: 740px)').matches) {
+    if (reveal && window.matchMedia('(max-width: 1000px)').matches) {
       el('talent-details').scrollIntoView({ block: 'nearest', behavior: 'instant' });
     }
   }
-  function addNode(key, list) {
+  function addNode(key, list, descend = true) {
     const config = configs[key], item = document.createElement('li');
     const parent = Object.entries(config.requires)[0];
     item.dataset.talent = key;
     if (parent) { item.dataset.parent = parent[0]; item.dataset.requiredLevel = parent[1]; }
-    item.innerHTML = `${parent ? `<span class="talent-edge">${configs[parent[0]].name} ${parent[1]} 级后</span>` : ''}<button class="talent-node" id="node-${key}" type="button" aria-pressed="false" aria-controls="talent-${key}"><span class="node-mark" id="mark-${key}" aria-hidden="true"></span><span>${config.name}</span><small id="level-${key}"></small></button>`;
+    item.innerHTML = `${parent ? `<span class="talent-edge">${configs[parent[0]].name} ${parent[1]} 级后</span>` : ''}<button class="talent-node" id="node-${key}" type="button" aria-pressed="false" aria-controls="talent-${key}"><span class="node-mark" id="mark-${key}" aria-hidden="true"></span><span class="node-name">${config.name}</span><small id="level-${key}"></small>${key === 'autobuyer' ? '<span class="root-caption" id="root-caption"></span>' : ''}</button>`;
     list.append(item);
     const children = Object.keys(configs).filter(child => Object.hasOwn(configs[child].requires, key));
-    if (children.length) {
+    if (descend && children.length) {
       const nested = document.createElement('ul'); nested.className = 'talent-children'; item.append(nested);
       children.forEach(child => addNode(child, nested));
     }
     el(`node-${key}`).addEventListener('click', () => select(key, true));
+    return item;
   }
-  for (const [branch, name] of Object.entries({ automation: '自动化', growth: '文明增益', legacy: '遗产收益' })) {
-    const column = document.createElement('div'); column.className = 'talent-branch'; column.id = `branch-${branch}`; column.dataset.branch = branch;
+  const roots = document.createElement('ul'); roots.className = 'tree-roots'; el('talent-tree').append(roots);
+  const root = addNode('autobuyer', roots, false); root.className = 'talent-origin';
+  const routes = document.createElement('div'); routes.className = 'talent-routes'; root.append(routes);
+  for (const [branch, name] of Object.entries(TALENT_BRANCHES)) {
+    const column = document.createElement('div'); column.className = 'talent-branch'; column.id = `branch-${branch}`;
+    column.dataset.branch = branch; column.dataset.parent = 'autobuyer';
     column.setAttribute('aria-label', `${name}天赋路径`);
-    const list = document.createElement('ul'); list.className = 'branch-nodes'; column.append(list); el('talent-tree').append(column);
-    Object.keys(configs).filter(key => configs[key].branch === branch && !Object.keys(configs[key].requires).length).forEach(key => addNode(key, list));
+    const heading = document.createElement('h4'); heading.className = 'branch-title'; heading.textContent = name;
+    const list = document.createElement('ul'); list.className = 'talent-children branch-nodes';
+    column.append(heading, list); routes.append(column);
+    Object.keys(configs).filter(key => configs[key].branch === branch && Object.hasOwn(configs[key].requires, 'autobuyer')).forEach(key => addNode(key, list));
   }
   for (const [key, config] of Object.entries(configs)) {
     const card = document.createElement('article'); card.className = 'talent-detail'; card.id = `talent-${key}`;
     const parents = Object.entries(config.requires).map(([parent, level]) => `${configs[parent].name} ${level} 级`).join('、');
-    card.innerHTML = `<p class="talent-requires">${parents ? `前置：${parents}` : '起点 · 首次通关后可购买'}</p><h4>${config.name}</h4><p id="effect-${key}"></p><p class="archive-note" id="grant-${key}" hidden>旧版已开放的功能，已免费保留。</p><button id="buy-${key}" type="button" aria-describedby="effect-${key} state-${key}"></button><small id="state-${key}"></small>`;
+    card.innerHTML = `<p class="talent-requires">${parents ? `前置：${parents}` : '起点 · 首次通关后可购买'}</p><h4>${config.name}</h4><p id="effect-${key}"></p><p class="archive-note" id="grant-${key}" hidden>兼容旧版进度，已免费保留此前置天赋。</p><button id="buy-${key}" type="button" aria-describedby="effect-${key} state-${key}"></button><small id="state-${key}"></small>`;
     el('talent-details').append(card);
     el(`buy-${key}`).addEventListener('click', () => {
       if ((Object.hasOwn(UPGRADES, key) ? purchaseUpgrade : purchaseTalent)(getSession(), key)) changed();
     });
   }
-  document.querySelectorAll('[data-talent-branch]').forEach(button => button.addEventListener('click', () => {
-    const branch = button.dataset.talentBranch;
-    select(configs[selected].branch === branch ? selected : Object.keys(configs).find(key => configs[key].branch === branch));
-  }));
-  select(selected);
+  select('autobuyer');
   const fields = {
     'auto-enabled': ['enabled', 'checked'], 'auto-recruit': ['recruitEnabled', 'checked'], 'auto-target': ['target', 'value'],
     'auto-reserve': ['reserve', 'number'], 'auto-queue': ['queueLimit', 'number'], 'auto-priority': ['priority', 'value'], 'auto-mode': ['mode', 'value'],
@@ -101,7 +98,8 @@ export function createTalentUI(getSession, changed) {
       }
     }
     text('talent-legacy-preview', `本轮终局 +${getLegacyReward(run.talents)} · 下轮终局 +${getLegacyReward(p.talents)} · 累计获得 ${p.totalLegacy} 遗产`);
-    text('talent-guide', p.completedCycles === 1 && !p.talents.autobuyer ? '第一份遗产可以解锁「自动招募」。沿连线逐步解锁更多功能；购买后重建生效，也可先积攒遗产。' : '沿连线从上往下解锁，点击节点查看效果。仅两轮之间购买，新文明开始时生效。');
+    text('root-caption', p.talents.autobuyer ? '已解锁 · 三条路线已开启' : `${configs.autobuyer.costs[0]} Legacy · 解锁自动购买`);
+    text('talent-guide', !p.talents.autobuyer ? '先解锁根节点，再沿三条路线成长。点击节点查看与购买。' : '沿连线解锁天赋。两轮之间购买，重建后生效。');
     const auto = p.automation, nextControlsKey = JSON.stringify([auto, p.talents, game.ages.player]);
     if (nextControlsKey !== controlsKey) {
       controlsKey = nextControlsKey;

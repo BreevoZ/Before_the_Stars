@@ -1,7 +1,7 @@
 import { AGES, createGame, updateGame } from './game.js';
 import { updateAutomation, createAutomation, configureAutomation } from './automation.js';
 import { SURFACE, UPGRADES, UPGRADE_COSTS, SAVE_VERSION, getBonuses } from './progression-config.js';
-import { emptyTalents, getTalentBonuses, getLegacyReward } from './talents.js';
+import { emptyTalents, getTalentBonuses, getLegacyReward, talentLevel } from './talents.js';
 
 function uniqueId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
@@ -99,6 +99,7 @@ export function getUpgradeState(session, key) {
   if (!['destruction', 'defeat'].includes(session.run.phase)) return 'during-run';
   const level = session.permanent.upgrades[key];
   if (level >= UPGRADE_COSTS.length) return 'max';
+  if (Object.entries(UPGRADES[key].requires).some(([parent, required]) => talentLevel(session, parent) < required)) return 'prerequisite';
   return session.permanent.legacy >= UPGRADE_COSTS[level] ? 'ready' : 'legacy';
 }
 

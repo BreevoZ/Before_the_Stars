@@ -1,6 +1,6 @@
 import { AGES, UNITS, TURRETS, RULES, createGame, evolve, getIncomeRate, getBountyReward, recruit } from '../src/game.js';
-import { createProgression, resolveBattle, rebuildCivilization, continueCivilization, abandonCivilization, updateProgression, purchaseUpgrade } from '../src/progression.js';
-import { TALENTS, purchaseTalent, getTalentState, getLegacyReward, getTalentSpending } from '../src/talents.js';
+import { createProgression, resolveBattle, rebuildCivilization, continueCivilization, abandonCivilization, updateProgression, purchaseUpgrade, getUpgradeState } from '../src/progression.js';
+import { TALENTS, TALENT_TREE, purchaseTalent, getTalentState, getLegacyReward, getTalentSpending } from '../src/talents.js';
 import { configureAutomation, getAutomationPlan, updateAutomation } from '../src/automation.js';
 import { parseSession, serializeSession, createSaveStore, SAVE_KEY, BACKUP_KEY } from '../src/save.js';
 import { mountFixture } from './progression-cases.js';
@@ -25,7 +25,7 @@ function start(session) { rebuildCivilization(session, session.run.runId); sessi
 function attempt(session, options) { for (let i = 0; i < 5; i++) updateAutomation(session, 0.05, options); }
 function ageTo(game, age) { game.experience.player = AGES[age].experienceRequired; while (game.ages.player < age) evolve(game); }
 function v1(session, settings = {}) {
-  const old = JSON.parse(serializeSession(session)), auto = old.permanent.automation;
+  const old = JSON.parse(v2(session)), auto = old.permanent.automation;
   delete old.permanent.talentGrants;
   old.version = 1; delete old.permanent.totalLegacy; delete old.permanent.talents; delete old.run.talents; delete old.run.autoTurn; delete old.game.modifiers.bounty;
   old.permanent.automation = { unlocked: session.permanent.completedCycles > 0, enabled: auto.enabled, target: auto.target, ...settings };
@@ -41,6 +41,18 @@ function v2(session) {
   }
   delete p.talentGrants;
   p.automation.unlocked = p.completedCycles > 0;
+  return JSON.stringify(old);
+}
+
+function v3(session, removeRoot = false) {
+  const old = JSON.parse(serializeSession(session)), p = old.permanent;
+  old.version = 3;
+  if (removeRoot) {
+    if (!p.talentGrants.includes('autobuyer')) p.legacy += p.talents.autobuyer;
+    p.talentGrants = p.talentGrants.filter(key => key !== 'autobuyer');
+    p.talents.autobuyer = old.run.talents.autobuyer = 0;
+    p.automation.unlocked = p.automation.enabled = false;
+  }
   return JSON.stringify(old);
 }
 
@@ -65,8 +77,10 @@ export function registerTalentTests(test, assert, near) {
   });
   test('Talents: all costs and prerequisite paths can be purchased, capped and saved without sharing configuration', () => {
     const s = funded(200), original = JSON.stringify({ AGES, UNITS, TURRETS });
+    assert(purchaseTalent(s, 'autobuyer'));
     for (const key of ['production', 'warfare']) for (let i = 0; i < 5; i++) assert(purchaseUpgrade(s, key));
     for (const [key, config] of Object.entries(TALENTS)) {
+      if (key === 'autobuyer') continue;
       for (const cost of config.costs) {
         const before = s.permanent.legacy; assert(purchaseTalent(s, key)); near(s.permanent.legacy, before - cost);
       }
@@ -81,7 +95,7 @@ export function registerTalentTests(test, assert, near) {
     assert(JSON.stringify({ AGES, UNITS, TURRETS }) === original);
   });
   test('Talents: starting resources apply once per rebuild, not per conflict, purchase or reload', () => {
-    const s = funded(4); purchaseUpgrade(s, 'production'); purchaseTalent(s, 'supply');
+    const s = funded(4); purchaseTalent(s, 'autobuyer'); purchaseUpgrade(s, 'production'); purchaseTalent(s, 'supply');
     assert(s.game.gold.player === 180); start(s); assert(s.game.gold.player === 330);
     s.game.gold.player = 200; recruit(s.game, 'melee'); finish(s, 1);
     continueCivilization(s, s.run.battleId); assert(s.game.gold.player === 200, 'Only refund the pending order');
@@ -91,7 +105,7 @@ export function registerTalentTests(test, assert, near) {
   });
   test('Talents: salvage changes only player kill gold with one final rounding; actual casualty payouts use it', () => {
     for (const victim of ['player', 'enemy']) {
-      const s = funded(4); purchaseUpgrade(s, 'warfare'); purchaseTalent(s, 'salvage'); start(s);
+      const s = funded(4); purchaseTalent(s, 'autobuyer'); purchaseUpgrade(s, 'warfare'); purchaseTalent(s, 'salvage'); start(s);
       const g = s.game, winner = victim === 'player' ? 'enemy' : 'player';
       g.units.push({ id: g.nextUnitId++, type: 'melee', team: victim, x: 640, hp: 0, moving: false, attackCooldown: 0, attackAnimation: 0, hitFlash: 0 });
       const before = g.gold[winner]; updateProgression(s, RULES.fixedStep);
@@ -100,7 +114,7 @@ export function registerTalentTests(test, assert, near) {
     }
   });
   test('Talents: legacy scales from run snapshots, rounds once and settles exactly once across refresh/purchase/rebuild', () => {
-    let s = funded(30); purchaseTalent(s, 'conservation'); purchaseTalent(s, 'conservation'); purchaseTalent(s, 'continuity');
+    let s = funded(30); purchaseTalent(s, 'autobuyer'); purchaseTalent(s, 'conservation'); purchaseTalent(s, 'conservation'); purchaseTalent(s, 'continuity');
     assert(s.run.earnedLegacy === 1 && getLegacyReward(s.permanent.talents) === 4);
     const before = s.permanent.totalLegacy; start(s); finish(s);
     assert(s.run.earnedLegacy === 4 && s.permanent.totalLegacy === before + 4);
@@ -187,6 +201,7 @@ export function registerTalentTests(test, assert, near) {
   });
   test('Autobuyer full civilization: purchased talents, normal paid armies and defense reach the finale without manual combat commands', () => {
     const s = funded(200);
+    assert(purchaseTalent(s, 'autobuyer'));
     for (const key of ['production', 'warfare']) for (let i = 0; i < 5; i++) purchaseUpgrade(s, key);
     for (const [key, config] of Object.entries(TALENTS)) for (const cost of config.costs) purchaseTalent(s, key);
     rebuildCivilization(s, s.run.runId); // Keep the normal enemy AI enabled.
@@ -200,14 +215,14 @@ export function registerTalentTests(test, assert, near) {
     }
     assert(s.run.phase === 'destruction' && s.run.earnedLegacy === 8 && s.permanent.completedCycles === 201);
   });
-  test('Save v3: valid v1 battle, victory, settlement and rebuilt progress migrate without awards, resource grants or setting loss', () => {
+  test('Save v4: valid v1 battle, victory, settlement and rebuilt progress migrate without awards, resource grants or setting loss', () => {
     for (const phase of ['battle', 'victory', 'destruction', 'rebuilt']) {
       const s = phase === 'battle' ? createProgression() : funded(3);
       if (phase === 'victory') { start(s); finish(s, 1); }
-      if (phase === 'rebuilt') { purchaseUpgrade(s, 'production'); start(s); }
+      if (phase === 'rebuilt') { purchaseTalent(s, 'autobuyer'); purchaseUpgrade(s, 'production'); start(s); }
       const restored = parseSession(v1(s, phase === 'rebuilt' ? { enabled: true, target: 'heavy' } : {}));
-      assert(restored.version === 3 && restored.run.runId === s.run.runId && restored.run.phase === s.run.phase);
-      assert(restored.permanent.legacy === s.permanent.legacy && restored.permanent.totalLegacy === s.permanent.completedCycles);
+      assert(restored.version === 4 && restored.run.runId === s.run.runId && restored.run.phase === s.run.phase);
+      assert(restored.permanent.legacy === JSON.parse(v1(s)).permanent.legacy && restored.permanent.totalLegacy === s.permanent.completedCycles);
       assert(restored.game.gold.player === s.game.gold.player && restored.run.earnedLegacy === s.run.earnedLegacy);
       assert(restored.permanent.upgrades.production === s.permanent.upgrades.production);
       assert(restored.permanent.automation.enabled === (phase === 'rebuilt') && restored.permanent.automation.target === (phase === 'rebuilt' ? 'heavy' : 'front'));
@@ -215,7 +230,7 @@ export function registerTalentTests(test, assert, near) {
       assert(serializeSession(parseSession(serializeSession(restored))) === serializeSession(restored));
     }
   });
-  test('Save v3: validates talent dependencies, ledger, settings and reward snapshots; migration retains a valid v1 backup', () => {
+  test('Save v4: validates talent dependencies, ledger, settings and reward snapshots; migration retains a valid v1 backup', () => {
     const s = funded(); purchaseTalent(s, 'autobuyer'); purchaseTalent(s, 'logistics'); purchaseTalent(s, 'formation');
     for (const mutate of [x => x.permanent.totalLegacy++, x => x.permanent.talents.formation = 2,
       x => x.permanent.automation.evolve = true, x => x.permanent.automation.weights = [0, 0, 0],
@@ -228,7 +243,7 @@ export function registerTalentTests(test, assert, near) {
     const storage = { getItem: key => entries.get(key) ?? null, setItem: (key, value) => entries.set(key, value), removeItem: key => entries.delete(key) };
     const store = createSaveStore(() => storage), loaded = store.load();
     assert(loaded.ok && loaded.migrated && store.save(loaded.session).ok && entries.get(BACKUP_KEY) === old);
-    assert(JSON.parse(entries.get(SAVE_KEY)).version === 3);
+    assert(JSON.parse(entries.get(SAVE_KEY)).version === 4);
   });
   test('Talents browser: purchase prerequisites, configure autobuyer, rebuild, reload and fit the full tree on a phone', async () => {
     let frame = await mountFixture(serializeSession(funded(30)));
@@ -238,7 +253,7 @@ export function registerTalentTests(test, assert, near) {
     el('node-formation').click(); el('buy-formation').click(); el('buy-formation').click();
     assert(el('legacy').textContent === '27' && !el('buy-evolution').disabled);
     el('node-evolution').click(); el('buy-evolution').click(); el('node-defense').click(); el('buy-defense').click();
-    page().querySelector('[data-talent-branch=legacy]').click(); el('buy-conservation').click();
+    el('node-conservation').click(); el('buy-conservation').click();
     assert(el('talent-legacy-preview').textContent.includes('本轮终局 +1 · 下轮终局 +2'));
     el('close-archives').click(); el('autobuyer-menu').click(); assert(el('automation-dialog').open && !el('archives-dialog').open);
     el('auto-enabled').click(); el('auto-evolve').click(); el('auto-defense').click();
@@ -260,10 +275,10 @@ export function registerTalentTests(test, assert, near) {
     frame.remove();
   });
   test('Talents browser: an existing v1 settlement migrates once, keeps its original backup and exposes the new tree', async () => {
-    const seed = funded(3); purchaseUpgrade(seed, 'production');
+    const seed = funded(3); purchaseTalent(seed, 'autobuyer'); purchaseUpgrade(seed, 'production');
     const raw = v1(seed, { enabled: true, target: 'ranged' }), frame = await mountFixture(raw), page = frame.contentDocument;
     const storage = frame.contentWindow.__storage, restored = parseSession(storage.getItem(SAVE_KEY));
-    assert(JSON.parse(storage.getItem(SAVE_KEY)).version === 3 && storage.getItem(BACKUP_KEY) === raw);
+    assert(JSON.parse(storage.getItem(SAVE_KEY)).version === 4 && storage.getItem(BACKUP_KEY) === raw);
     assert(restored.permanent.legacy === 2 && restored.run.earnedLegacy === 1 && restored.permanent.upgrades.production === 1);
     assert(page.getElementById('save-status').textContent.includes('旧存档已升级'));
     page.getElementById('archives').click();
@@ -271,7 +286,7 @@ export function registerTalentTests(test, assert, near) {
     assert(page.getElementById('auto-target').value === 'ranged' && !page.getElementById('buy-formation').disabled);
     frame.remove();
   });
-  test('Save v3: v2 saves retain former free features, purchased paths, exact wallets and active settings across every phase', () => {
+  test('Save v4: v2 saves retain former free features, purchased paths, exact wallets and active settings across every phase', () => {
     for (const phase of ['fresh', 'first-settlement', 'battle', 'victory', 'destruction', 'defeat']) {
       const s = phase === 'fresh' ? createProgression() : funded(phase === 'first-settlement' ? 1 : 40);
       if (!['fresh', 'first-settlement'].includes(phase)) {
@@ -282,7 +297,7 @@ export function registerTalentTests(test, assert, near) {
         if (phase !== 'battle') finish(s, phase === 'victory' ? 1 : 5, phase === 'defeat' ? 'lost' : 'won');
       }
       const raw = v2(s), old = JSON.parse(raw), restored = parseSession(raw), p = restored.permanent;
-      assert(restored.version === 3 && p.legacy === old.permanent.legacy && p.totalLegacy === old.permanent.totalLegacy);
+      assert(restored.version === 4 && p.legacy === old.permanent.legacy && p.totalLegacy === old.permanent.totalLegacy);
       assert(JSON.stringify(p.automation) === JSON.stringify(old.permanent.automation));
       assert(p.talentGrants.join(',') === (phase === 'fresh' ? '' : 'autobuyer,logistics'));
       assert(restored.run.phase === s.run.phase && restored.run.runId === s.run.runId && restored.run.earnedLegacy === s.run.earnedLegacy);
@@ -290,7 +305,7 @@ export function registerTalentTests(test, assert, near) {
       const saved = serializeSession(restored); assert(serializeSession(parseSession(saved)) === saved);
     }
   });
-  test('Save v3: malformed grants, missing new talents, inconsistent unlocks and unpurchased budget settings are rejected', () => {
+  test('Save v4: malformed grants, missing new talents, inconsistent unlocks and unpurchased budget settings are rejected', () => {
     const s = funded(3); assert(purchaseTalent(s, 'autobuyer'));
     for (const mutate of [x => x.permanent.automation.unlocked = false,
       x => x.permanent.talentGrants = ['autobuyer', 'autobuyer'], x => x.permanent.talentGrants = ['formation'],
@@ -349,19 +364,79 @@ export function registerTalentTests(test, assert, near) {
   test('Talent tree browser: real parent branches carry required ranks and selecting a node shows only its detail', async () => {
     const frame = await mountFixture(serializeSession(funded(1))), page = frame.contentDocument;
     const el = id => page.getElementById(id); el('archives').click();
-    for (const [key, config] of Object.entries(TALENTS)) for (const [parent, rank] of Object.entries(config.requires)) {
+    for (const [key, config] of Object.entries(TALENT_TREE)) for (const [parent, rank] of Object.entries(config.requires)) {
       const item = page.querySelector(`[data-talent="${key}"]`);
       assert(item.dataset.parent === parent && Number(item.dataset.requiredLevel) === rank);
-      assert(item.parentElement.parentElement.dataset.talent === parent, `${key} must connect to its actual parent`);
+      assert(item.parentElement.closest('[data-talent]').dataset.talent === parent, `${key} must connect to its actual parent`);
     }
+    assert(el('root-caption').textContent.includes('1 Legacy'));
+    for (const key of ['production', 'warfare', 'conservation']) assert(el(`buy-${key}`).disabled);
     el('node-evolution').click();
     assert(!el('talent-evolution').hidden && el('talent-autobuyer').hidden && el('node-evolution').getAttribute('aria-pressed') === 'true');
-    page.querySelector('[data-talent-branch="legacy"]').click();
-    assert(!el('branch-legacy').hidden && el('branch-automation').hidden && !el('talent-conservation').hidden);
+    el('node-conservation').click();
+    assert(!el('branch-legacy').hidden && !el('branch-automation').hidden && !el('branch-growth').hidden && !el('talent-conservation').hidden);
+    assert(!page.querySelector('[data-talent-branch]'), 'All three routes belong to one tree, with no branch tabs');
     el('node-continuity').click(); assert(el('talent-continuity').textContent.includes('遗产保存 2 级'));
     frame.style.width = '320px';
     assert(page.documentElement.scrollWidth <= frame.clientWidth && el('archives-dialog').scrollWidth <= el('archives-dialog').clientWidth);
+    const rootRect = el('node-autobuyer').getBoundingClientRect();
+    const branches = ['automation', 'growth', 'legacy'].map(branch => el(`branch-${branch}`).getBoundingClientRect());
+    assert(branches[0].left < branches[1].left && branches[1].left < branches[2].left && branches.every(rect => rect.top > rootRect.bottom));
+    for (const button of page.querySelectorAll('.talent-node')) {
+      const rect = button.getBoundingClientRect(); assert(rect.width >= 44 && rect.height >= 44, 'Tree touch targets remain usable on 320px screens');
+    }
     frame.remove();
+  });
+
+  test('Single root: all three routes require the one-Legacy Autobuyer root and every node has one path back to it', () => {
+    const s = funded(30);
+    assert(Object.keys(TALENT_TREE).filter(key => !Object.keys(TALENT_TREE[key].requires).length).join(',') === 'autobuyer');
+    for (const key of Object.keys(TALENT_TREE)) {
+      const visited = new Set(); let current = key;
+      while (current !== 'autobuyer') {
+        assert(!visited.has(current), 'Prerequisite graph must be acyclic'); visited.add(current);
+        const parents = Object.keys(TALENT_TREE[current].requires);
+        assert(parents.length === 1 && TALENT_TREE[parents[0]], `${key} needs one connected parent`);
+        current = parents[0];
+      }
+      if (key === 'autobuyer') continue;
+      const upgrade = ['production', 'warfare'].includes(key);
+      assert((upgrade ? getUpgradeState : getTalentState)(s, key) === 'prerequisite');
+      assert(!(upgrade ? purchaseUpgrade : purchaseTalent)(s, key));
+    }
+    const before = s.permanent.legacy;
+    assert(purchaseTalent(s, 'autobuyer') && !purchaseTalent(s, 'autobuyer') && s.permanent.legacy === before - 1);
+    assert(!s.permanent.automation.enabled);
+    for (const key of ['formation', 'logistics', 'conservation']) assert(getTalentState(s, key) === 'ready');
+    for (const key of ['production', 'warfare']) assert(getUpgradeState(s, key) === 'ready');
+    assert(purchaseUpgrade(s, 'production') && getTalentState(s, 'supply') === 'ready');
+    assert(!purchaseTalent(s, 'continuity')); purchaseTalent(s, 'conservation');
+    assert(!purchaseTalent(s, 'continuity')); purchaseTalent(s, 'conservation'); assert(purchaseTalent(s, 'continuity'));
+  });
+  test('Save v4: v3 growth or legacy owners receive the required root without losing currency, replaying rewards or changing battle bonuses', () => {
+    for (const phase of ['fresh', 'no-upgrades', 'battle', 'victory', 'destruction', 'defeat']) {
+      const s = phase === 'fresh' ? createProgression() : funded(20);
+      const needsRoot = !['fresh', 'no-upgrades'].includes(phase);
+      if (needsRoot) {
+        purchaseTalent(s, 'autobuyer'); purchaseUpgrade(s, 'production'); purchaseTalent(s, 'conservation'); start(s);
+        if (phase !== 'battle') finish(s, phase === 'victory' ? 1 : 5, phase === 'defeat' ? 'lost' : 'won');
+      }
+      const raw = v3(s, needsRoot), old = JSON.parse(raw), restored = parseSession(raw);
+      assert(restored.version === 4 && restored.permanent.legacy === old.permanent.legacy && restored.permanent.totalLegacy === old.permanent.totalLegacy);
+      assert(restored.permanent.talents.autobuyer === Number(needsRoot) && restored.permanent.automation.unlocked === needsRoot);
+      assert(!restored.permanent.automation.enabled && !restored.permanent.talents.logistics);
+      assert(restored.permanent.talentGrants.join(',') === (needsRoot ? 'autobuyer' : ''));
+      assert(restored.run.runId === old.run.runId && restored.run.phase === phase.replace('no-upgrades', 'destruction').replace('fresh', 'battle'));
+      assert(restored.run.earnedLegacy === old.run.earnedLegacy && JSON.stringify(restored.game) === JSON.stringify(s.game));
+      assert(!resolveBattle(restored) && serializeSession(parseSession(serializeSession(restored))) === serializeSession(restored));
+      if (needsRoot) {
+        old.version = 4; rejects(() => parseSession(JSON.stringify(old)));
+        const entries = new Map([[SAVE_KEY, raw]]);
+        const storage = { getItem: key => entries.get(key) ?? null, setItem: (key, value) => entries.set(key, value) };
+        const store = createSaveStore(() => storage), loaded = store.load();
+        assert(loaded.migrated && store.save(loaded.session).ok && entries.get(BACKUP_KEY) === raw);
+      }
+    }
   });
 
 }

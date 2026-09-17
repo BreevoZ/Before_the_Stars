@@ -93,7 +93,7 @@ function defensePlan(session) {
 // Shared read-only planning keeps the controls' explanation in sync with spending.
 export function getAutomationPlan(session) {
   const auto = session.permanent.automation;
-  if (!auto.unlocked) return { status: '在天赋树中解锁「自动招募」', action: null };
+  if (!auto.unlocked) return { status: '在天赋树中解锁 Autobuyer 根节点', action: null };
   if (!auto.enabled) return { status: '自动购买已关闭', action: null };
   if (!session.run.talents.autobuyer || session.run.phase !== 'battle' || session.game.status !== 'playing') return { status: '下一轮开始后执行', action: null };
   const plans = { recruit: recruitPlan(session), defense: defensePlan(session) };

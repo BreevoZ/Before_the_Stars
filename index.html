@@ -104,8 +104,7 @@
         <p id="cycle-outcome"></p>
         <section id="talents-panel" aria-labelledby="upgrades-title">
           <h3 id="upgrades-title" class="sr-only">文明天赋</h3><p class="archive-note" id="talent-guide">沿连线从上往下解锁，点击节点查看效果。仅两轮之间购买，新文明开始时生效。</p>
-          <nav class="talent-branches" aria-label="天赋分支"><button type="button" data-talent-branch="automation" aria-pressed="true" aria-controls="branch-automation">自动化</button><button type="button" data-talent-branch="growth" aria-pressed="false" aria-controls="branch-growth">文明增益</button><button type="button" data-talent-branch="legacy" aria-pressed="false" aria-controls="branch-legacy">遗产收益</button></nav>
-          <div class="talent-layout"><div id="talent-tree" class="talent-tree"></div><div id="talent-details" class="talent-details" aria-label="所选天赋详情"></div></div>
+          <div class="talent-layout"><div id="talent-tree" class="talent-tree" aria-label="Autobuyer 根节点与三条天赋路线"></div><div id="talent-details" class="talent-details" aria-label="所选天赋详情"></div></div>
           <p class="archive-note" id="talent-legacy-preview"></p>
         </section>
         <details class="bonus-details"><summary>本轮加成与收益</summary><p class="archive-eyebrow" id="archive-run"></p><p class="archive-note" id="active-bonuses"></p></details>
@@ -118,7 +117,7 @@
       <header class="help-heading"><h2 id="automation-title">自动购买</h2><button id="close-automation" class="icon-button" type="button" data-icon="close" aria-label="关闭自动购买"></button></header>
       <div class="archive-body">
         <section id="automation-panel" aria-labelledby="automation-title">
-          <p id="automation-locked" class="archive-note" hidden>尚未解锁。首次通关后，在天赋树购买「自动招募」（1 Legacy），即可选择一种部队自动招募。</p><button id="automation-to-talents" type="button" class="secondary-button">前往天赋树</button><div id="automation-settings"><p id="automation-hint" class="archive-note"></p>
+          <p id="automation-locked" class="archive-note" hidden>在天赋树花 1 Legacy 解锁 Autobuyer 根节点，即可使用基础自动招募。</p><button id="automation-to-talents" type="button" class="secondary-button">前往天赋树</button><div id="automation-settings"><p id="automation-hint" class="archive-note"></p>
           <div class="automation-controls"><label><input type="checkbox" id="auto-enabled"> 启用自动购买</label></div>
           <p id="automation-status" class="automation-status"></p><p id="automation-error" class="archive-note" role="status"></p>
           <fieldset class="auto-group" data-auto-talent="logistics"><legend>预算与调度</legend><div class="auto-fields">

@@ -56,9 +56,11 @@ export function registerProgressionTests(test, assert, near) {
     continueCivilization(s, s.run.battleId);
     assert(runDebugCommand(s, 'finale') && s.run.phase === 'destruction' && s.permanent.legacy === 1);
     assert(!runDebugCommand(s, 'finale') && s.permanent.completedCycles === 1);
+    assert(purchaseTalent(s, 'autobuyer')); rebuildCivilization(s, s.run.runId);
+    assert(runDebugCommand(s, 'finale'));
     purchaseUpgrade(s, 'production'); rebuildCivilization(s, s.run.runId); supplyDebugRun(s);
     assert(s.debug && s.game.modifiers.income === 1.5 && s.game.gold.player === RULES.startingGold + DEBUG_GOLD);
-    assert(runDebugCommand(s, 'defeat') && s.run.phase === 'defeat' && s.permanent.completedCycles === 1);
+    assert(runDebugCommand(s, 'defeat') && s.run.phase === 'defeat' && s.permanent.completedCycles === 2);
     assert(serializeSession(parseSession(serializeSession(s))) === serializeSession(s));
   });
   test('Debug: save, backup, import and clear are isolated from production progress', () => {
@@ -136,7 +138,8 @@ export function registerProgressionTests(test, assert, near) {
     const s = createProgression(), base = JSON.stringify({ AGES, UNITS });
     assert(!purchaseUpgrade(s, 'production'));
     finish(s);
-    s.permanent.totalLegacy = s.permanent.completedCycles = s.permanent.legacy = 62;
+    s.permanent.totalLegacy = s.permanent.completedCycles = s.permanent.legacy = 63;
+    assert(purchaseTalent(s, 'autobuyer'));
     for (const key of ['production', 'warfare']) {
       for (const cost of [1, 2, 4, 8, 16]) {
         const balance = s.permanent.legacy;
@@ -158,7 +161,7 @@ export function registerProgressionTests(test, assert, near) {
   });
   test('M1: actual casualty payouts round base reward then multiplier, without multiplying kill gold', () => {
     for (const victimTeam of ['player', 'enemy']) {
-      const s = createProgression(); finish(s); purchaseUpgrade(s, 'warfare'); rebuildCivilization(s, s.run.runId);
+      const s = createProgression(); finish(s); purchaseTalent(s, 'autobuyer'); rebuildCivilization(s, s.run.runId); finish(s); purchaseUpgrade(s, 'warfare'); rebuildCivilization(s, s.run.runId);
       const g = s.game; g.ai.enabled = false;
       const winner = victimTeam === 'player' ? 'enemy' : 'player';
       g.units.push({ id: g.nextUnitId++, team: victimTeam, type: 'heavy', hp: 0, x: 640, moving: false, attackCooldown: 100, attackAnimation: 0, hitFlash: 0 });
@@ -200,8 +203,8 @@ export function registerProgressionTests(test, assert, near) {
     assert(continueCivilization(s, battleId) && !continueCivilization(s, battleId));
     finish(s); s = parseSession(serializeSession(s));
     assert(!resolveBattle(s) && s.permanent.legacy === 1);
-    purchaseUpgrade(s, 'production'); rebuildCivilization(s, s.run.runId); finish(s);
-    purchaseTalent(s, 'autobuyer'); setAutomation(s, true, 'ranged');
+    purchaseTalent(s, 'autobuyer'); rebuildCivilization(s, s.run.runId); finish(s);
+    purchaseUpgrade(s, 'production'); setAutomation(s, true, 'ranged');
     const old = s.run.runId; assert(rebuildCivilization(s, old) && !rebuildCivilization(s, old));
     for (let i = 0; i < 5; i++) s = parseSession(serializeSession(s));
     assert(s.permanent.completedCycles === 2 && s.permanent.legacy === 0 && s.game.modifiers.income === 1.5);
@@ -243,9 +246,9 @@ export function registerProgressionTests(test, assert, near) {
       if (i % 600 === 0) parseSession(serializeSession(s));
     }
     assert(s.run.phase === 'destruction' && s.permanent.completedCycles === 1, `Expected final victory, got ${s.run.phase}`);
-    assert(purchaseUpgrade(s, 'production'));
+    assert(purchaseTalent(s, 'autobuyer'));
     assert(rebuildCivilization(s, s.run.runId));
-    assert(s.game.ages.player === 1 && s.game.modifiers.income === 1.5 && !s.permanent.legacy);
+    assert(s.game.ages.player === 1 && s.run.talents.autobuyer === 1 && !s.permanent.legacy);
   });
   test('M1: all turret attacks, charging, bursts, ground fields and five abilities survive repeated save/resume', () => {
     const seen = new Set();
@@ -490,6 +493,8 @@ export function registerProgressionTests(test, assert, near) {
     command('finale'); assert(el('result-title').textContent === '文明未能幸存');
     command('finale'); el('play-again').click();
     assert(el('cycles').textContent === '1' && el('legacy').textContent === '1');
+    assert(el('buy-production').disabled); el('buy-autobuyer').click(); el('rebuild-civilization').click();
+    command('finale'); el('result-talents').click(); el('node-production').click();
     el('buy-production').click(); el('rebuild-civilization').click();
     assert(el('income-rate').textContent === '+10.5/s' && el('gold').textContent === String(RULES.startingGold + DEBUG_GOLD));
     saved = parseSession(frame.contentWindow.__storage.getItem(DEBUG_SAVE_KEY));
@@ -497,7 +502,7 @@ export function registerProgressionTests(test, assert, near) {
     frame = await mountFixture(serializeSession(saved), false, 'debug');
     assert(el('debug-speed').value === '20' && el('gold').textContent === String(saved.game.gold.player), 'Reload must not grant resources twice');
     assert(el('income-rate').textContent === '+10.5/s');
-    command('defeat'); el('play-again').click(); assert(el('cycles').textContent === '1' && el('legacy').textContent === '0');
+    command('defeat'); el('play-again').click(); assert(el('cycles').textContent === '2' && el('legacy').textContent === '0');
     frame.style.width = '360px'; assert(page().documentElement.scrollWidth <= frame.clientWidth);
     frame.remove();
   });

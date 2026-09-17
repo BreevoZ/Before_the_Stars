@@ -18,12 +18,12 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   let saveElapsed = 0;
   const dialog = el('archives-dialog'), saveDialog = el('save-dialog'), autoDialog = el('automation-dialog');
   const challengeDialog = el('challenge-dialog');
-  let offeredRunId = null;
+  let offeredRunId = null, challengeFromHome = false;
   const multiplier = value => `×${Number(value.toFixed(3))}`;
   function openChallenge() {
     const level = getNextChallengeLevel(session);
     if (level === null) return;
-    offeredRunId = session.run.runId;
+    offeredRunId = session.run.runId; challengeFromHome = dialog.open;
     const bonuses = getChallengeModifiers(level);
     text('challenge-title', `文明挑战 ${level}`);
     text('challenge-intro', `${session.run.phase === 'defeat' ? '重试当前难度' : '下一轮敌军将进一步强化'}。以下倍率均相对于常规文明（显示保留三位小数）。`);
@@ -45,10 +45,10 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   }
   function save() { saveElapsed = 0; return report(store.save(session)); }
   function changed(resetBattle = false) { sync(); onChange(resetBattle); }
-  function open() {
+  function open({ cinematic = false } = {}) {
     if (!session.permanent.completedCycles) return;
     autoDialog.close();
-    if (!dialog.open) dialog.showModal(); changed();
+    if (!dialog.open) dialog.showModal(); talentControls.open(cinematic); changed();
   }
   function openAutomation() {
     if (!session.permanent.completedCycles) return;
@@ -70,6 +70,7 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   el('save-menu').hidden = false;
   el('save-menu').addEventListener('click', openSave);
   el('archive-save').addEventListener('click', openSave);
+  el('home-automation').addEventListener('click', () => { if (!autoDialog.open) autoDialog.showModal(); changed(); });
   el('close-save').addEventListener('click', () => saveDialog.close());
   saveDialog.addEventListener('close', () => changed());
   el('archives').addEventListener('click', open);
@@ -83,7 +84,11 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   el('result-challenge').addEventListener('click', openChallenge);
   el('archive-challenge').addEventListener('click', openChallenge);
   el('close-challenge').addEventListener('click', () => challengeDialog.close());
-  challengeDialog.addEventListener('close', () => { offeredRunId = null; changed(); });
+  challengeDialog.addEventListener('close', () => {
+    const returnHome = offeredRunId !== null && challengeFromHome;
+    offeredRunId = null; challengeFromHome = false;
+    if (returnHome) open(); else changed();
+  });
   el('begin-challenge').addEventListener('click', () => {
     const runId = offeredRunId;
     transition(() => startChallenge(session, runId));
@@ -158,7 +163,8 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
       el('debug-speed').value = String(session.debugSpeed);
       document.querySelectorAll('[data-debug-command]').forEach(button => { button.disabled = run.phase !== 'battle'; });
     }
-    text('archives-title', '文明天赋');
+    text('archives-title', '文明星图');
+    text('home-heading', run.phase === 'destruction' ? '文明未能幸存，星火仍在。' : '每一次重建，都离群星更近。');
     text('archive-run', `地表文明 · 第 ${run.battleNumber} 场冲突 · 本轮 ${Math.floor(run.elapsed / 60)} 分 ${Math.floor(run.elapsed % 60)} 秒`);
     text('cycles', p.completedCycles); text('legacy', p.legacy);
     text('cycle-outcome', run.phase === 'destruction' ? `战争胜利，高科技失控与内战却终结了文明。本轮 +${run.earnedLegacy} 文明遗产，已入账。` :
@@ -198,8 +204,16 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   else if (loaded.migrated) report(store.save(session), '旧存档已升级，原有进度、档案等级和自动招募设置均已保留。');
   else if (!loaded.session) save();
   else text('save-status', '已恢复上次保存的完整进度，没有离线推进。');
+  let shownFinaleRunId = null;
+  const restoredFinale = loaded.session?.run.phase === 'destruction' ? loaded.session.run.runId : null;
   return {
+    presentEnd() {
+      if (session.run.phase !== 'destruction' || shownFinaleRunId === session.run.runId) return;
+      shownFinaleRunId = session.run.runId;
+      open({ cinematic: session.run.runId !== restoredFinale });
+    },
     get session() { return session; },
+    get homeOpen() { return dialog.open; },
     get paused() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open; },
     get modalOpen() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open; },
     get timeScale() { return debug ? session.debugSpeed : 1; },

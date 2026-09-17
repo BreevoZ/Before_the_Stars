@@ -23,9 +23,9 @@ function memoryStorage() {
   const entries = new Map();
   return { getItem: key => entries.get(key) ?? null, setItem: (key, value) => entries.set(key, value), removeItem: key => entries.delete(key) };
 }
-export async function mountFixture(raw, unavailable = false, mode = 'incremental') {
+export async function mountFixture(raw, unavailable = false, mode = 'incremental', { reducedMotion = false } = {}) {
   const frame = document.createElement('iframe'); frame.title = 'Incremental civilization integration test';
-  frame.name = JSON.stringify({ raw, unavailable }); frame.src = `./incremental-fixture.html${mode ? `?mode=${mode}` : ''}`;
+  frame.name = JSON.stringify({ raw, unavailable, reducedMotion }); frame.src = `./incremental-fixture.html${mode ? `?mode=${mode}` : ''}`;
   document.body.append(frame);
   await new Promise((resolve, reject) => {
     const start = performance.now();

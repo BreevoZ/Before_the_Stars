@@ -65,7 +65,7 @@ const civilization = incremental ? createCivilizationUI(resetBattle => {
   game = civilization.session.game;
   accumulator = 0; lastTime = null;
   if (resetBattle) resetBattleView();
-  syncUI(); render(game, { targeting, targetX });
+  syncUI(); if (!civilization.homeOpen) render(game, { targeting, targetX });
   if (resetBattle && !civilization.modalOpen && game.status === 'playing') byId('recruit').focus({ preventScroll: true });
 }, { debug: mode === 'debug' }) : null;
 let game = civilization?.session.game ?? createGame();
@@ -304,6 +304,7 @@ function syncUI() {
     civilization?.sync();
     announce(`${byId('result-title').textContent}。${byId('result-detail').textContent}`);
     byId('play-again').focus({ preventScroll: true });
+    civilization?.presentEnd();
   }
   civilization?.sync();
 }
@@ -493,7 +494,8 @@ function frame(timestamp) {
   }
   lastTime = timestamp;
   syncUI();
-  render(game, { targeting, targetX });
+  // The full-screen home has its own static scene; avoid painting the hidden battlefield.
+  if (!civilization?.homeOpen) render(game, { targeting, targetX });
   requestAnimationFrame(frame);
 }
 

@@ -373,7 +373,8 @@ export function registerTalentTests(test, assert, near) {
     for (const [key, config] of Object.entries(TALENT_TREE)) for (const [parent, rank] of Object.entries(config.requires)) {
       const item = page.querySelector(`[data-talent="${key}"]`);
       assert(item.dataset.parent === parent && Number(item.dataset.requiredLevel) === rank);
-      assert(item.parentElement.closest('[data-talent]').dataset.talent === parent, `${key} must connect to its actual parent`);
+      const link = el(`link-${key}`);
+      assert(link instanceof frame.contentWindow.SVGPathElement && link.dataset.parent === parent && link.dataset.child === key, `${key} must connect to its actual parent through SVG`);
     }
     assert(el('root-caption').textContent.includes('1 Legacy'));
     for (const key of ['production', 'warfare', 'conservation']) assert(el(`buy-${key}`).disabled);
@@ -387,9 +388,10 @@ export function registerTalentTests(test, assert, near) {
     assert(page.documentElement.scrollWidth <= frame.clientWidth && el('archives-dialog').scrollWidth <= el('archives-dialog').clientWidth);
     const rootRect = el('node-autobuyer').getBoundingClientRect();
     const branches = ['automation', 'growth', 'legacy'].map(branch => el(`branch-${branch}`).getBoundingClientRect());
-    assert(branches[0].left < branches[1].left && branches[1].left < branches[2].left && branches.every(rect => rect.top > rootRect.bottom));
+    assert(branches[0].left < branches[1].left && branches[1].left < branches[2].left);
+    assert(['formation', 'production', 'conservation'].every(key => el(`node-${key}`).getBoundingClientRect().top < rootRect.top), 'Three constellations radiate upwards from the root');
     for (const button of page.querySelectorAll('.talent-node')) {
-      const rect = button.getBoundingClientRect(); assert(rect.width >= 44 && rect.height >= 44, 'Tree touch targets remain usable on 320px screens');
+      const rect = button.getBoundingClientRect(); assert(rect.width >= 56 && rect.height >= 56, 'Tree touch targets remain usable on 320px screens');
     }
     frame.remove();
   });

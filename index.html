@@ -7,6 +7,7 @@
     <meta name="description" content="Before the Stars：出兵、进化、攻城。" />
     <title>Before the Stars</title>
     <link rel="stylesheet" href="./src/style.css" />
+    <link rel="stylesheet" href="./src/talent-map.css" />
     <script type="module" src="./src/main.js"></script>
   </head>
   <body>
@@ -98,21 +99,32 @@
       <p class="sr-only" id="announcement" role="status" aria-live="polite"></p>
       <noscript><p>请启用 JavaScript 后开始游戏。</p></noscript>
     </main>
-    <dialog id="archives-dialog" aria-labelledby="archives-title">
-      <header class="help-heading"><h2 id="archives-title">文明天赋</h2><button class="icon-button" id="close-archives" type="button" data-icon="close" aria-label="关闭天赋树"></button></header>
-      <div class="archive-body">
-        <div class="legacy-summary"><span><strong id="cycles">0</strong> 有效循环</span><span><strong id="legacy">0</strong> 文明遗产</span></div>
-        <p id="cycle-outcome"></p>
+    <dialog id="archives-dialog" class="civilization-home" aria-labelledby="archives-title">
+      <canvas id="home-sky" aria-hidden="true"></canvas>
+      <div class="home-curtain" aria-hidden="true"></div>
+      <header class="home-header">
+        <div class="home-wordmark"><span aria-hidden="true">✳</span><div><small>BEFORE THE STARS</small><h2 id="archives-title">文明星图</h2></div></div>
+        <div class="home-wallet"><span aria-hidden="true">✧</span><strong id="legacy">0</strong><span>Legacy<small>文明遗产</small></span></div>
+        <nav class="home-nav" aria-label="文明档案"><button id="home-automation" class="text-button" type="button">自动购买</button><button id="archive-save" class="text-button" type="button">存档</button><button class="icon-button" id="close-archives" type="button" data-icon="close" aria-label="返回战场"></button></nav>
+      </header>
+      <div class="home-scroll" id="home-scroll">
+        <section class="home-story" aria-labelledby="home-heading">
+          <p class="home-eyebrow"><span id="cycles">0</span> 次文明已留下回响 <span aria-hidden="true">/</span> 地表文明</p>
+          <h3 id="home-heading">文明未能幸存，星火仍在。</h3>
+          <p id="cycle-outcome"></p>
+          <button class="text-button" id="skip-home-intro" type="button" hidden>跳过演出 ↓</button>
+        </section>
         <section id="talents-panel" aria-labelledby="upgrades-title">
-          <h3 id="upgrades-title" class="sr-only">文明天赋</h3><p class="archive-note" id="talent-guide">沿连线从上往下解锁，点击节点查看效果。仅两轮之间购买，新文明开始时生效。</p>
-          <div class="talent-layout"><div id="talent-tree" class="talent-tree" aria-label="Autobuyer 根节点与三条天赋路线"></div><div id="talent-details" class="talent-details" aria-label="所选天赋详情"></div></div>
-          <p class="archive-note" id="talent-legacy-preview"></p>
+          <h3 id="upgrades-title" class="sr-only">文明天赋星图</h3>
+          <div id="talent-tree" class="talent-tree" aria-label="从 Autobuyer 根节点向外生长的三条天赋路线"></div>
+          <p id="talent-guide" class="map-guide"></p>
+          <p id="talent-legacy-preview" class="map-yield"></p>
         </section>
         <details class="bonus-details"><summary>本轮加成与收益</summary><p class="archive-eyebrow" id="archive-run"></p><p class="archive-note" id="active-bonuses"></p></details>
-
-        <button id="archive-save" type="button">存档与恢复</button>
       </div>
-      <footer class="archive-footer" id="archive-footer" hidden><p id="rebuild-rules" hidden>重建清空本轮资源、时代与战场；保留有效循环、遗产、天赋和自动购买设置。</p><button class="primary-button" id="rebuild-civilization" type="button" hidden>重建文明</button><button class="secondary-button" id="archive-challenge" type="button" hidden>挑战更强文明</button></footer>
+      <aside id="talent-details" class="talent-details" aria-label="所选天赋详情" hidden><button id="close-talent-detail" class="icon-button" type="button" aria-label="关闭天赋详情">×</button><div id="talent-detail-cards"></div></aside>
+      <footer class="archive-footer" id="archive-footer" hidden><p id="rebuild-rules" hidden>文明会消逝，遗产不会。重建清空本轮资源与战场，保留天赋和自动购买设置。</p><button class="primary-button" id="rebuild-civilization" type="button" hidden>重建文明</button><button class="secondary-button" id="archive-challenge" type="button" hidden>挑战更强文明</button></footer>
+      <p id="talent-feedback" role="status" aria-live="polite" class="talent-feedback"></p>
     </dialog>
     <dialog id="challenge-dialog" aria-labelledby="challenge-title">
       <header class="help-heading"><h2 id="challenge-title">文明挑战</h2><button id="close-challenge" class="icon-button" type="button" data-icon="close" aria-label="关闭挑战预览"></button></header>

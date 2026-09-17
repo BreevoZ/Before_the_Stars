@@ -319,7 +319,7 @@ export function registerProgressionTests(test, assert, near) {
     assert(storage.getItem(BACKUP_KEY) === '{broken');
   });
 
-  test('M1 browser: victory → next conflict → destruction → purchase → rebuild → refresh with real UI and isolated storage', async () => {
+  test.browser('M1 browser: victory → next conflict → destruction → purchase → rebuild → refresh with real UI and isolated storage', async () => {
     const seed = createProgression(); seed.game.ai.enabled = false; seed.game.bases.enemy.hp = 1;
     const mount = mountFixture;
     let frame = await mount(serializeSession(seed));
@@ -385,7 +385,7 @@ export function registerProgressionTests(test, assert, near) {
     assert(parseSession(frame.contentWindow.__storage.getItem(SAVE_KEY)).run.runId === seed.run.runId);
     frame.remove();
   });
-  test('Archives unlock only after a completed cycle, survive reload, and first defeat can restart without archives', async () => {
+  test.browser('Archives unlock only after a completed cycle, survive reload, and first defeat can restart without archives', async () => {
     for (const status of ['lost', 'draw']) {
       const seed = createProgression(); finish(seed, status);
       const frame = await mountFixture(serializeSession(seed)), page = frame.contentDocument;
@@ -406,7 +406,7 @@ export function registerProgressionTests(test, assert, near) {
       frame.remove();
     }
   });
-  test('Space pauses every mode, ignores key repeat, and leaves native modal/input editing alone', async () => {
+  test.browser('Space pauses every mode, ignores key repeat, and leaves native modal/input editing alone', async () => {
     for (const mode of ['classic', 'incremental', 'debug']) {
       const frame = await mountFixture(null, false, mode), page = frame.contentDocument;
       const el = id => page.getElementById(id);
@@ -447,7 +447,7 @@ export function registerProgressionTests(test, assert, near) {
     }
     saved.game.units[0].attackStyle = 'invalid'; throws(() => serializeSession(saved));
   });
-  test('M1 browser: corrupt saves stay protected and unavailable storage shows a warning without breaking play', async () => {
+  test.browser('M1 browser: corrupt saves stay protected and unavailable storage shows a warning without breaking play', async () => {
     for (const unavailable of [false, true]) {
       const frame = await mountFixture('{broken', unavailable), page = frame.contentDocument;
       const el = id => page.getElementById(id);
@@ -459,7 +459,7 @@ export function registerProgressionTests(test, assert, near) {
       frame.remove();
     }
   });
-  test('Modes browser: bare URL opens normal civilization and keeps secondary modes below the battlefield', async () => {
+  test.browser('Modes browser: bare URL opens normal civilization and keeps secondary modes below the battlefield', async () => {
     const frame = await mountFixture(null, false, ''), page = frame.contentDocument;
     assert(page.body.dataset.mode === 'incremental' && page.getElementById('archives').hidden && !page.getElementById('save-menu').hidden);
     assert(page.getElementById('debug-tools').hidden && page.getElementById('gold').textContent === '180');
@@ -468,7 +468,7 @@ export function registerProgressionTests(test, assert, near) {
     assert(frame.contentWindow.__storage.getItem(SAVE_KEY) && !frame.contentWindow.__storage.getItem(DEBUG_SAVE_KEY));
     frame.remove();
   });
-  test('Debug browser: fast fixed-step simulation pauses; ending, upgrading, rebuilding and reloading work in isolation', async () => {
+  test.browser('Debug browser: fast fixed-step simulation pauses; ending, upgrading, rebuilding and reloading work in isolation', async () => {
     let frame = await mountFixture(null, false, 'debug');
     const page = () => frame.contentDocument, el = id => page().getElementById(id);
     let time = 0;

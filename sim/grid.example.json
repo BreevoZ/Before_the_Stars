@@ -1,0 +1,20 @@
+{
+  "base": {
+    "talents": {
+      "autobuyer": 1, "logistics": 1, "formation": 1, "evolution": 1,
+      "defense": 2, "elite": 1, "production": 3, "warfare": 2,
+      "supply": 2, "salvage": 1, "conservation": 1, "challenge": 1
+    },
+    "automation": {
+      "enabled": true, "mode": "balanced", "weights": [2, 2, 1],
+      "queueLimit": 2, "evolve": true, "defense": true,
+      "expand": true, "replace": true, "maxTurrets": 2, "elite": true
+    },
+    "maxSeconds": 1800
+  },
+  "grid": {
+    "talents.production": [1, 3, 5],
+    "challengeLevel": [0, 1, 2],
+    "automation.weights": [[2, 2, 1], [1, 1, 3]]
+  }
+}

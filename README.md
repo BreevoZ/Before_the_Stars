@@ -2,7 +2,7 @@
 
 一款受《Age of War》启发的极简网页策略游戏。从原始时代推进到未来时代，训练部队、部署炮塔，摧毁敌方基地。
 
-原生 JavaScript、Canvas 2D 与 CSS，无需安装依赖或构建。场景、部队、炮塔与图标均由代码绘制。
+原生 JavaScript、Canvas 2D 与 CSS，游戏无需安装依赖或构建。场景、部队、炮塔与图标均由代码绘制。开发用无头模拟与纯逻辑测试使用 Node 24+，也没有第三方依赖。
 
 ## 本地运行
 
@@ -31,6 +31,42 @@ GitHub Pages 从 `main` 分支的根目录发布，`.nojekyll` 保证原生静�
 如需迁移其他静态托管，可运行 `python3 scripts/prepare-site.py`，仅将 Git 已跟踪的网页、`src/` 和浏览器测试复制到忽略的 `dist/`。本地开发仍直接从项目根目录启动。
 
 手机打开站点首页即可试玩，`/?mode=debug` 可快速测试进化和重建，底部保留经典模式与图鉴入口。建议分别检查竖屏与横屏的招募、炮位选择、大招瞄准、暂停、存档及结算对话框。手机与电脑的存档独立；需要迁移时通过「存档」导出／导入。
+
+### Node 测试与无头模拟
+
+安装 Node 24 或更高版本后，在项目根目录直接运行，无需 `npm install`：
+
+```bash
+npm test
+npm run sim
+mkdir -p sim/results
+npm run sim:batch -- --out sim/results/scan.csv
+```
+
+- `npm test`：Node 内置测试器运行共享的战斗、文明、自动化、存档、动画运动学用例，以及模拟器／CSV／命令行测试；失败时退出码为 1。
+- `npm run sim`：读取 [sim/example.json](sim/example.json)，输出一次完整文明模拟的 JSON。指定自己的配置：`node sim/run.js path/to/run.json`。
+- `npm run sim:batch`：读取 [sim/grid.example.json](sim/grid.example.json)，扫描生产等级 × 挑战等级 × 编队比例的 18 种组合。指定网格：`node sim/batch.js path/to/grid.json --out sim/results/scan.csv`。
+- 不传 `--out` 时 CSV 写到标准输出，进度写到标准错误；可用 `node sim/batch.js > sim/results/scan.csv` 重定向。`sim/results/` 已忽略，不上传批量结果。
+- 浏览器回归仍在 `/tests/`，运行同一批纯逻辑用例及 Canvas、UI、键盘、响应式和刷新恢复测试。Node 不模拟 DOM，也不代替视觉验证。
+
+模块入口是 [sim/simulate.js](sim/simulate.js) 的 `simulateRun({ talents, challengeLevel, automation, maxSeconds })`，同步返回：
+
+| 字段 | 含义 |
+| --- | --- |
+| `outcome` | `won` 通关、`lost` 战败、`draw` 平局、`timeout` 超时未完成 |
+| `duration` | 本轮所有冲突的总模拟秒数，不是电脑执行耗时 |
+| `battles` | 每场的 `number`、`duration`、`outcome`、敌方起始／结束时代和玩家结束时代；包含超时的未结束战斗 |
+| `peakGold` | 我方金币余额峰值，包含起始资源与转场退款，按每帧及转场后采样 |
+| `totalExperience` | 我方本轮累计获得的击杀与阵亡经验，包含战争档案增益 |
+| `legacy` | 本轮终局实际结算所得；普通胜利、战败、平局和超时不发奖 |
+
+`talents` 使用 [src/talents.js](src/talents.js) 中的节点 ID → 等级，包含 `production` 和 `warfare`；省略的节点为 0。这是一套用于数值实验的已购天赋配置，不扣浏览器存档中的遗产。节点等级和前置必须有效，`challengeLevel > 0` 需要 `challenge` 天赋。难度范围 0–10。
+
+`automation` 接受游戏现有设置，例如 `enabled`、`target`、`mode`、`weights`、`evolve`、`defense`、`elite`；省略项沿用游戏默认值，**默认关闭**，功能必须已由天赋解锁。`unlocked` 从根节点推导，不能手填。调用 `simulateRun()` 不传配置，表示新文明无人操作，通常会战败；可从示例配置开始调整。
+
+模拟固定使用游戏的 1/60 秒步长，复用真实 AI、付费招募、自动购买和文明结算。普通胜利自动继续同一文明，未来敌军基地被摧毁后结束。不自动重建，不额外施放技能或代替未解锁的自动进化；因此结果衡量配置的无人值守表现，不代表手动操作的胜率。默认时限为整轮 1800 模拟秒，可设 `maxSeconds`，最大 86400 秒，向下对齐完整帧。相同代码版本和配置会得到相同结果，随机 runId 不参与战斗或统计。
+
+批量配置由 `base`（共用配置）和 `grid`（参数路径 → 候选值数组）组成，取笛卡尔积。例如 `"challengeLevel": [0, 1, 2]`、`"talents.production": [1, 3, 5]`、`"automation.weights": [[2, 2, 1], [1, 1, 3]]`。每个组合先校验，缺前置或非法设置会报出行号，不静默修正；单批最多 10000 组。CSV 包含扫描参数、胜负、总时长、逐场时长、金币峰值、经验、遗产及完整配置 JSON，便于筛选与复现。所有组合验证和运行成功后才写入 `--out` 文件；该文件存在时会替换它。
 
 ## 玩法
 
@@ -266,7 +302,12 @@ src/roster.js       两类图鉴、炮塔实战时序预览与暂停控制
 src/style.css       战场界面样式
 src/roster.css      图鉴响应式样式
 src/icons.js        操作与装备图标
-tests/              无依赖浏览器回归测试
+sim/                无头文明模拟、参数网格、CSV 与示例配置
+tests/cases.js      浏览器与 Node 共用的用例注册入口
+tests/game-cases.js 战斗用例；Canvas/UI 用例显式标记为 browser
+tests/game.test.js  浏览器测试报告入口，保留 /tests/index.html
+tests/node.test.js  Node 纯逻辑测试入口
+tests/sim.test.js   无头模拟、参数校验与 CSV/CLI 回归
 ```
 
 数值集中在 `src/game.js` 的 `RULES`、`UNITS`、`AGES`、`TURRETS` 和 `ABILITIES`。运行服务器后访问 `/tests/`，检查机制、完整对局、界面和渲染回归结果。测试包含三模式空格暂停、首次通关档案解锁／刷新保留、超级士兵正常训练／双攻击模式／未来防线突破／存档往返，以及购买和退款、经验和进化、友军免伤、伤害结算、连射与充能中断、地面效果到期、贯穿范围、图鉴和减少动态效果。

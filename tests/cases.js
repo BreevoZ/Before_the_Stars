@@ -1,0 +1,23 @@
+import { registerGameTests } from './game-cases.js';
+import { registerAnimationTests } from './animation-cases.js';
+import { registerProgressionTests } from './progression-cases.js';
+import { registerTalentTests } from './talent-cases.js';
+import { registerChallengeTests } from './challenge-cases.js';
+import { registerTalentHomeTests } from './talent-home-cases.js';
+
+function assert(condition, message = 'Assertion failed') { if (!condition) throw new Error(message); }
+function near(actual, expected, message = '') {
+  assert(Math.abs(actual - expected) < 0.001, `${message} Expected ${expected}, got ${actual}`);
+}
+
+// Canvas/UI cases explicitly use test.browser; async logic cases remain eligible
+// for Node. Both runners execute the same assertions without DOM mocks.
+export function collectCases({ browser = false } = {}) {
+  const cases = [];
+  const test = (name, run) => cases.push({ name, run });
+  test.browser = browser ? test : () => {};
+  for (const register of [registerGameTests, registerAnimationTests, registerProgressionTests,
+    registerTalentTests, registerChallengeTests]) register(test, assert, near);
+  if (browser) registerTalentHomeTests(test, assert, near);
+  return cases;
+}

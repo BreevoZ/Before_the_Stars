@@ -201,7 +201,7 @@ export function registerChallengeTests(test, assert, near) {
       assert(rejected, 'Invalid challenge save must be rejected');
     }
   });
-  test('Challenge browser: purchase → preview → start → refresh → win → stronger civilization → defeat/retry → normal rebuild', async () => {
+  test.browser('Challenge browser: purchase → preview → start → refresh → win → stronger civilization → defeat/retry → normal rebuild', async () => {
     const seed = challengeSeed(false); seed.debug = true; seed.debugSpeed = 1;
     let frame = await mountFixture(serializeSession(seed), false, 'debug');
     const el = id => frame.contentDocument.getElementById(id);
@@ -233,7 +233,7 @@ export function registerChallengeTests(test, assert, near) {
       assert(el('challenge-status').hidden && el('save-warning').hidden);
     } finally { frame.remove(); }
   });
-  test('Challenge browser: 320px result, legacy subtree and preview fit; modal keyboard cancel leaves settled save intact', async () => {
+  test.browser('Challenge browser: 320px result, legacy subtree and preview fit; modal keyboard cancel leaves settled save intact', async () => {
     const s = challengeSeed(); startChallenge(s, s.run.runId); finish(s);
     const frame = await mountFixture(serializeSession(s)), page = frame.contentDocument, el = id => page.getElementById(id);
     try {

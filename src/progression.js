@@ -7,14 +7,21 @@ function uniqueId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
 }
 
-function startRun(session, challengeLevel = 0) {
+// Shared fresh-run factory for the game and headless balance simulations.
+// Callers provide a validated loadout; this does not award or spend Legacy.
+export function createCivilizationRun(permanent, challengeLevel = 0) {
   const runId = uniqueId();
-  const upgrades = { ...session.permanent.upgrades };
-  const talents = { ...session.permanent.talents }, bonuses = getTalentBonuses(talents);
-  session.run = { runId, challengeLevel, battleNumber: 1, battleId: `${runId}:1`, phase: 'battle',
+  const upgrades = { ...permanent.upgrades };
+  const talents = { ...permanent.talents }, bonuses = getTalentBonuses(talents);
+  const run = { runId, challengeLevel, battleNumber: 1, battleId: `${runId}:1`, phase: 'battle',
     processedBattleId: null, settled: false, earnedLegacy: 0, upgrades, talents, autoElapsed: 0, autoTurn: 'recruit', elapsed: 0 };
-  session.game = createGame({ mode: 'incremental', modifiers: { ...getBonuses(upgrades), bounty: bonuses.bounty }, enemyModifiers: getChallengeModifiers(challengeLevel) });
-  session.game.gold.player += bonuses.startingGold;
+  const game = createGame({ mode: 'incremental', modifiers: { ...getBonuses(upgrades), bounty: bonuses.bounty }, enemyModifiers: getChallengeModifiers(challengeLevel) });
+  game.gold.player += bonuses.startingGold;
+  return { run, game };
+}
+
+function startRun(session, challengeLevel = 0) {
+  Object.assign(session, createCivilizationRun(session.permanent, challengeLevel));
 }
 
 export function createProgression() {

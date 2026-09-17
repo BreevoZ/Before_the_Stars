@@ -22,7 +22,7 @@ function sampleSky(width, height, ratio = 1, time = 83) {
 }
 
 export function registerAnimationTests(test, assert, near) {
-  test('Star positions stay scattered and stable across phone, desktop, zoom and pixel ratios', () => {
+  test.browser('Star positions stay scattered and stable across phone, desktop, zoom and pixel ratios', () => {
     const reference = sampleSky(1280, 370);
     // The old modulo distribution collapsed to three rows at this sky height.
     const resonantHeight = 47 * 3 / (0.62 * 0.738);
@@ -43,7 +43,7 @@ export function registerAnimationTests(test, assert, near) {
     }
   });
 
-  test('Stars twinkle independently without drifting, replay exactly, and disappear in daylight', () => {
+  test.browser('Stars twinkle independently without drifting, replay exactly, and disappear in daylight', () => {
     const initial = sampleSky(390, 220, 2, 83), later = sampleSky(390, 220, 2, 83.5);
     assert(JSON.stringify(initial) === JSON.stringify(sampleSky(390, 220, 2, 83)), 'Paused and replayed sky must be deterministic');
     let brighter = 0, dimmer = 0;
@@ -295,7 +295,7 @@ export function registerAnimationTests(test, assert, near) {
     assert(renewal(2).game.units[0].hp > hp);
   });
 
-  test('Every animation card paints at both sizes and teams, including backward seeks and all unit actions', () => {
+  test.browser('Every animation card paints at both sizes and teams, including backward seeks and all unit actions', () => {
     const canvas = document.createElement('canvas'); document.body.append(canvas);
     try {
       for (const width of [320, 800]) {
@@ -312,7 +312,7 @@ export function registerAnimationTests(test, assert, near) {
     } finally { canvas.remove(); }
   });
 
-  test('Animation workshop filters, pauses, steps, scrubs and synchronizes its enlarged viewer without a match', async () => {
+  test.browser('Animation workshop filters, pauses, steps, scrubs and synchronizes its enlarged viewer without a match', async () => {
     const frame = document.createElement('iframe'); frame.title = 'Animation workshop integration test';
     const loaded = new Promise(resolve => frame.addEventListener('load', resolve, { once: true }));
     frame.src = '../animations.html'; document.body.append(frame); await loaded;

@@ -251,7 +251,7 @@ export function registerTalentTests(test, assert, near) {
     assert(loaded.ok && loaded.migrated && store.save(loaded.session).ok && entries.get(BACKUP_KEY) === old);
     assert(JSON.parse(entries.get(SAVE_KEY)).version === SAVE_VERSION);
   });
-  test('Talents browser: purchase prerequisites, configure autobuyer, rebuild, reload and fit the full tree on a phone', async () => {
+  test.browser('Talents browser: purchase prerequisites, configure autobuyer, rebuild, reload and fit the full tree on a phone', async () => {
     let frame = await mountFixture(serializeSession(funded(30)));
     const page = () => frame.contentDocument, el = id => page().getElementById(id);
     el('archives').click(); assert(el('archives-dialog').open && !el('talents-panel').hidden);
@@ -280,7 +280,7 @@ export function registerTalentTests(test, assert, near) {
     assert(el('automation-dialog').scrollWidth <= el('automation-dialog').clientWidth, 'Automation must not overflow inside its dialog');
     frame.remove();
   });
-  test('Talents browser: an existing v1 settlement migrates once, keeps its original backup and exposes the new tree', async () => {
+  test.browser('Talents browser: an existing v1 settlement migrates once, keeps its original backup and exposes the new tree', async () => {
     const seed = funded(3); purchaseTalent(seed, 'autobuyer'); purchaseUpgrade(seed, 'production');
     const raw = v1(seed, { enabled: true, target: 'ranged' }), frame = await mountFixture(raw), page = frame.contentDocument;
     const storage = frame.contentWindow.__storage, restored = parseSession(storage.getItem(SAVE_KEY));
@@ -325,7 +325,7 @@ export function registerTalentTests(test, assert, near) {
     const unsupported = JSON.parse(serializeSession(s)); unsupported.version = 999;
     rejects(() => parseSession(JSON.stringify(unsupported)));
   });
-  test('Progressive autobuyer browser: first legacy is visible, base talent is required and only purchased settings appear', async () => {
+  test.browser('Progressive autobuyer browser: first legacy is visible, base talent is required and only purchased settings appear', async () => {
     let frame = await mountFixture(serializeSession(funded(1)));
     const page = () => frame.contentDocument, el = id => page().getElementById(id);
     assert(!el('civilization-bar').hidden && el('legacy-balance').textContent === '1');
@@ -352,7 +352,7 @@ export function registerTalentTests(test, assert, near) {
     el('close-automation').click(); tick(); assert(el('queue-count').textContent !== '0 / 5');
     frame.remove();
   });
-  test('Rebuild browser: later finales rebuild directly, repeated clicks cannot award or restart again, optional talents stay accessible', async () => {
+  test.browser('Rebuild browser: later finales rebuild directly, repeated clicks cannot award or restart again, optional talents stay accessible', async () => {
     let frame = await mountFixture(serializeSession(funded(2)));
     const page = () => frame.contentDocument, el = id => page().getElementById(id);
     assert(el('play-again').textContent === '重建文明' && !el('result-talents').hidden);
@@ -367,7 +367,7 @@ export function registerTalentTests(test, assert, near) {
     assert(el('legacy-balance').textContent === '2' && !el('civilization-bar').hidden && el('result').hidden);
     frame.remove();
   });
-  test('Talent tree browser: real parent branches carry required ranks and selecting a node shows only its detail', async () => {
+  test.browser('Talent tree browser: real parent branches carry required ranks and selecting a node shows only its detail', async () => {
     const frame = await mountFixture(serializeSession(funded(1))), page = frame.contentDocument;
     const el = id => page.getElementById(id); el('archives').click();
     for (const [key, config] of Object.entries(TALENT_TREE)) for (const [parent, rank] of Object.entries(config.requires)) {

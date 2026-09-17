@@ -1,3 +1,4 @@
+import { statMultiplier, v5Record } from './legacy-fixtures.js';
 import { AGES, UNITS, TURRETS, RULES, createGame, evolve, getIncomeRate, getBountyReward, recruit } from '../src/game.js';
 import { createProgression, resolveBattle, rebuildCivilization, continueCivilization, abandonCivilization, updateProgression, purchaseUpgrade, getUpgradeState } from '../src/progression.js';
 import { TALENTS, TALENT_TREE, purchaseTalent, getTalentState, getLegacyReward, getTalentSpending } from '../src/talents.js';
@@ -39,7 +40,7 @@ function stripChallenge(old) {
   delete old.run.challengeLevel; delete old.game.enemyModifiers;
 }
 function v2(session) {
-  const old = JSON.parse(serializeSession(session)), p = old.permanent;
+  const old = v5Record(session), p = old.permanent;
   old.version = 2; stripChallenge(old);
   for (const key of ['autobuyer', 'logistics']) {
     if (!p.talentGrants.includes(key)) p.legacy += p.talents[key];
@@ -51,7 +52,7 @@ function v2(session) {
 }
 
 function v3(session, removeRoot = false) {
-  const old = JSON.parse(serializeSession(session)), p = old.permanent;
+  const old = v5Record(session), p = old.permanent;
   old.version = 3; stripChallenge(old);
   if (removeRoot) {
     if (!p.talentGrants.includes('autobuyer')) p.legacy += p.talents.autobuyer;
@@ -116,7 +117,7 @@ export function registerTalentTests(test, assert, near) {
       g.units.push({ id: g.nextUnitId++, type: 'melee', team: victim, x: 640, hp: 0, moving: false, attackCooldown: 0, attackAnimation: 0, hitFlash: 0 });
       const before = g.gold[winner]; updateProgression(s, RULES.fixedStep);
       near(g.gold[winner] - before, getIncomeRate(g, winner) * RULES.fixedStep + (winner === 'player' ? 12 : 10));
-      assert(parseSession(serializeSession(s)).game.modifiers.bounty === 1.25);
+      assert(statMultiplier(parseSession(serializeSession(s)).game, 'bounty') === 1.25);
     }
   });
   test('Talents: legacy scales from run snapshots, rounds once and settles exactly once across refresh/purchase/rebuild', () => {
@@ -141,7 +142,7 @@ export function registerTalentTests(test, assert, near) {
     s.game.units = Array.from({ length: 16 }, () => ({ id: s.game.nextUnitId++, type: 'melee', team: 'player', hp: 70, x: 100, moving: false, attackCooldown: 0, attackAnimation: 0, hitFlash: 0 }));
     attempt(s); assert(!s.game.queues.player.length);
     const raw = serializeSession(s);
-    for (const patch of [{ reserve: -1 }, { reserve: NaN }, { queueLimit: 6 }, { weights: [0, 0, 0] }, { mode: 'balanced' }, { priority: 'unknown' }, { unlocked: true }]) assert(!configureAutomation(s, patch));
+    for (const patch of [{ reserve: -1 }, { reserve: NaN }, { queueLimit: 65 }, { weights: [0, 0, 0] }, { mode: 'balanced' }, { priority: 'unknown' }, { unlocked: true }]) assert(!configureAutomation(s, patch));
     assert(serializeSession(s) === raw);
   });
   test('Autobuyer: balanced recruitment counts pending and old-era troops and waits for the chosen expensive role', () => {
@@ -232,7 +233,7 @@ export function registerTalentTests(test, assert, near) {
       assert(restored.game.gold.player === s.game.gold.player && restored.run.earnedLegacy === s.run.earnedLegacy);
       assert(restored.permanent.upgrades.production === s.permanent.upgrades.production);
       assert(restored.permanent.automation.enabled === (phase === 'rebuilt') && restored.permanent.automation.target === (phase === 'rebuilt' ? 'heavy' : 'front'));
-      assert(!restored.permanent.automation.evolve && restored.game.modifiers.bounty === 1);
+      assert(!restored.permanent.automation.evolve && statMultiplier(restored.game, 'bounty') === 1);
       assert(serializeSession(parseSession(serializeSession(restored))) === serializeSession(restored));
     }
   });
@@ -240,7 +241,7 @@ export function registerTalentTests(test, assert, near) {
     const s = funded(); purchaseTalent(s, 'autobuyer'); purchaseTalent(s, 'logistics'); purchaseTalent(s, 'formation');
     for (const mutate of [x => x.permanent.totalLegacy++, x => x.permanent.talents.formation = 2,
       x => x.permanent.automation.evolve = true, x => x.permanent.automation.weights = [0, 0, 0],
-      x => x.run.earnedLegacy++, x => x.run.autoTurn = 'unknown', x => x.game.modifiers.bounty = 2,
+      x => x.run.earnedLegacy++, x => x.run.autoTurn = 'unknown', x => x.game.bonuses.find(effect => effect.source.id === 'salvage').value = 2,
       x => { x.permanent.talents.supply = 1; x.permanent.legacy--; }]) {
       const data = JSON.parse(serializeSession(s)); mutate(data); rejects(() => parseSession(JSON.stringify(data)));
     }

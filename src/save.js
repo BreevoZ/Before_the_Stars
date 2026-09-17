@@ -1,7 +1,9 @@
-import { RULES, AGES, UNITS, TURRETS, ABILITIES, getBaseHealth, getUnitHealth } from './game.js';
+import { RULES, AGES, UNITS, TURRETS, ABILITIES, getBaseHealth, getUnitHealth, projectileField } from './game.js';
 import { SAVE_VERSION, SURFACE, UPGRADE_COSTS, AUTOMATION_TARGETS, AUTOMATION_INTERVAL, CHALLENGE, getChallengeModifiers, getBonuses } from './progression-config.js';
 import { DEBUG_SPEEDS } from './debug.js';
 import { TALENTS, emptyTalents, getTalentBonuses, getTalentSpending, getLegacyReward } from './talents.js';
+import { stat, attributes, createBonusStack, legacyBonuses, STAT_DEFINITIONS } from './stats.js';
+import { getRunBonuses } from './progression-bonuses.js';
 import { createAutomation, validAutomation } from './automation.js';
 
 // Keep the original storage keys so existing players are migrated in place.
@@ -77,9 +79,18 @@ function validateRecord(session, version = SAVE_VERSION) {
   if (version >= 4) for (const state of [p, run]) {
     check(!Object.values(state.upgrades).some(level => level > 0) || state.talents.autobuyer === 1, '档案需要根天赋');
   }
+  if (version >= 6) {
+    check(g.mode === 'incremental' && Array.isArray(g.bonuses) && !g.modifiers && !g.enemyModifiers, '属性管线');
+    check(run.extraBonuses === undefined || Array.isArray(run.extraBonuses), '额外属性来源');
+    createBonusStack(run.extraBonuses ?? []);
+    check(JSON.stringify(createBonusStack(g.bonuses)) === JSON.stringify(getRunBonuses(run)), '属性栈与本轮来源不一致');
+  }
+  const combat = version >= 6 ? g : { ...g, bonuses: legacyBonuses(g.modifiers, g.enemyModifiers) };
   const totalLegacy = oldVersion ? p.completedCycles * SURFACE.legacyPerCycle : p.totalLegacy;
-  const maxReward = oldVersion ? SURFACE.legacyPerCycle : getLegacyReward(Object.fromEntries(Object.entries(TALENTS).map(([key, config]) => [key, config.costs.length])), version >= 5 ? CHALLENGE.maxLevel : 0);
-  check(int(totalLegacy, p.completedCycles * SURFACE.legacyPerCycle, Math.min(limit, p.completedCycles * maxReward)), '累计遗产');
+  // Past runs may have had different depth/milestone sources. Validate the
+  // ledger and schema bounds, not the current run's possible reward ceiling.
+  const maxReward = version >= 6 ? STAT_DEFINITIONS.legacy.max : oldVersion ? SURFACE.legacyPerCycle : getLegacyReward(Object.fromEntries(Object.entries(TALENTS).map(([key, config]) => [key, config.costs.length])), version >= 5 ? CHALLENGE.maxLevel : 0);
+  check(int(totalLegacy, version >= 6 ? 0 : p.completedCycles * SURFACE.legacyPerCycle, Math.min(limit, p.completedCycles * maxReward)), '累计遗产');
   if (!previousVersion) {
     list(p.talentGrants, 2, '旧版功能保留');
     check(new Set(p.talentGrants).size === p.talentGrants.length && p.talentGrants.every(key =>
@@ -95,7 +106,7 @@ function validateRecord(session, version = SAVE_VERSION) {
   check(id(run.runId) && int(run.battleNumber, 1, SURFACE.finalEnemyAge) && run.battleId === `${run.runId}:${run.battleNumber}`, '文明或战斗标识');
   check(run.processedBattleId === null || (id(run.processedBattleId) && run.processedBattleId.startsWith(`${run.runId}:`)), '胜利处理标记');
   check(['battle', 'victory', 'destruction', 'defeat'].includes(run.phase) && bool(run.settled), '流程阶段');
-  const reward = oldVersion ? SURFACE.legacyPerCycle : getLegacyReward(run.talents, challengeLevel);
+  const reward = version >= 6 ? stat(g, { kind: 'civilization' }, 'legacy') : oldVersion ? SURFACE.legacyPerCycle : getLegacyReward(run.talents, challengeLevel);
   check(int(run.earnedLegacy, 0, reward), '本轮遗产');
   numbers(run, ['elapsed', 'autoElapsed']);
   check(run.autoElapsed < AUTOMATION_INTERVAL + 1e-8, '自动招募时钟');
@@ -111,14 +122,16 @@ function validateRecord(session, version = SAVE_VERSION) {
     check(run.talents[key] <= p.talents[key], '本轮天赋快照');
     if (['battle', 'victory'].includes(run.phase)) check(run.talents[key] === p.talents[key], '战斗中购买天赋');
   }
-  check(g.mode === 'incremental' && object(g.modifiers), '战斗模式');
-  const bonuses = getBonuses(run.upgrades);
-  check(g.modifiers.income === bonuses.income && g.modifiers.experience === bonuses.experience, '本轮倍率');
-  if (!oldVersion) check(g.modifiers.bounty === getTalentBonuses(run.talents).bounty, '本轮战利品倍率');
-  if (version >= 5) {
-    const expected = getChallengeModifiers(challengeLevel);
-    check(object(g.enemyModifiers) && Object.keys(g.enemyModifiers).length === Object.keys(expected).length &&
-      Object.entries(expected).every(([key, value]) => g.enemyModifiers[key] === value), '敌军挑战倍率');
+  if (version < 6) {
+    check(g.mode === 'incremental' && object(g.modifiers), '战斗模式');
+    const bonuses = getBonuses(run.upgrades);
+    check(g.modifiers.income === bonuses.income && g.modifiers.experience === bonuses.experience, '本轮倍率');
+    if (!oldVersion) check(g.modifiers.bounty === getTalentBonuses(run.talents).bounty, '本轮战利品倍率');
+    if (version >= 5) {
+      const expected = getChallengeModifiers(challengeLevel);
+      check(object(g.enemyModifiers) && Object.keys(g.enemyModifiers).length === Object.keys(expected).length &&
+        Object.entries(expected).every(([key, value]) => g.enemyModifiers[key] === value), '敌军挑战倍率');
+    }
   }
   check(['playing', 'won', 'lost', 'draw'].includes(g.status), '战斗状态');
   check((run.phase === 'battle' && g.status === 'playing') ||
@@ -133,18 +146,20 @@ function validateRecord(session, version = SAVE_VERSION) {
     check(int(g.ages[team], 1, SURFACE.finalEnemyAge) && num(g.gold[team]) && int(g.experience[team]), '时代或资源');
     const base = g.bases[team];
     check(object(base) && base.team === team && base.x === (team === 'player' ? RULES.playerBaseX : RULES.enemyBaseX), '基地');
-    check(base.maxHp === (version >= 5 ? getBaseHealth(g, team) : AGES[g.ages[team]].baseHealth) && num(base.hp, 0, base.maxHp) && num(base.hitFlash), '基地生命');
-    list(g.queues[team], RULES.queueLimit, '训练队列');
+    check(base.maxHp === (version >= 5 ? getBaseHealth(combat, team) : AGES[g.ages[team]].baseHealth) && num(base.hp, 0, base.maxHp) && num(base.hitFlash), '基地生命');
+    list(g.queues[team], version >= 6 ? STAT_DEFINITIONS.queueLimit.max : RULES.queueLimit, '训练队列');
     for (const order of g.queues[team]) {
       check(object(order) && member(order.type, UNITS) && int(order.id, 1, g.nextOrderId - 1) && !orderIds.has(order.id), '训练订单');
       orderIds.add(order.id);
-      check(UNITS[order.type].age <= g.ages[team] && num(order.remaining, 0, UNITS[order.type].trainTime) && num(order.paid, 0, 10000), '订单进度或支付价格');
+      if (version >= 6) check(num(order.duration, RULES.fixedStep, 3600), '训练订单快照');
+      check(UNITS[order.type].age <= g.ages[team] && num(order.remaining, 0, version >= 6 ? order.duration : UNITS[order.type].trainTime) && num(order.paid, 0, version >= 6 ? 1e9 : 10000), '订单进度或支付价格');
     }
     list(g.turrets[team], RULES.maxTurretSlots, '炮位');
-    check(g.turrets[team].length >= 1, '缺少初始炮位');
+    if (version < 6) check(g.turrets[team].length >= 1, '缺少初始炮位');
     g.turrets[team].forEach((turret, slot) => {
       if (turret === null) return;
       check(object(turret) && member(turret.type, TURRETS) && turret.team === team && turret.slot === slot && TURRETS[turret.type].age <= g.ages[team], '炮塔');
+      if (version >= 6) check(num(turret.paid, 0, 1e9), '炮塔支付快照');
       numbers(turret, ['cooldown', 'flash', 'shotSerial', 'aim', 'burstRemaining', 'chargeRemaining'], ['burstCooldown', 'flashDuration', 'lastBarrel'], -1, limit);
       for (const key of ['chargeTargetId', 'burstTargetId']) if (turret[key] != null) check(int(turret[key], 1, g.nextUnitId - 1), '炮塔目标');
     });
@@ -153,18 +168,21 @@ function validateRecord(session, version = SAVE_VERSION) {
   check(g.status === (lost && won ? 'draw' : lost ? 'lost' : won ? 'won' : 'playing'), '基地与胜负不一致');
   if (run.phase === 'destruction') check(g.ages.enemy === SURFACE.finalEnemyAge, '终局敌人');
   if (run.phase === 'victory') check(g.ages.enemy < SURFACE.finalEnemyAge, '普通战役终点');
-  list(g.units, RULES.armyLimit * 2, '部队');
+  list(g.units, (version >= 6 ? STAT_DEFINITIONS.armyLimit.max : RULES.armyLimit) * 2, '部队');
   for (const unit of g.units) {
     check(object(unit) && member(unit.type, UNITS) && teams.includes(unit.team) && int(unit.id, 1, g.nextUnitId - 1) && !unitIds.has(unit.id), '部队实体');
     unitIds.add(unit.id);
-    check(UNITS[unit.type].age <= g.ages[unit.team] && num(unit.hp, Number.MIN_VALUE, version >= 5 ? getUnitHealth(g, unit.type, unit.team) : UNITS[unit.type].health) && num(unit.x, 0, RULES.width) && bool(unit.moving), '部队属性');
+    check(UNITS[unit.type].age <= g.ages[unit.team] && num(unit.hp, Number.MIN_VALUE, version >= 5 ? getUnitHealth(combat, unit.type, unit.team) : UNITS[unit.type].health) && num(unit.x, 0, RULES.width) && bool(unit.moving), '部队属性');
     numbers(unit, ['attackCooldown', 'attackAnimation', 'hitFlash'], ['distanceTravelled', 'chargeTravel', 'guardFlash', 'attackApproach', 'moveMultiplier', 'burstRemaining', 'burstCooldown'], -1);
     if (unit.attackStyle !== undefined) check(['melee', 'ranged'].includes(unit.attackStyle), '攻击姿态');
     if (unit.lastAttackCharged !== undefined) check(bool(unit.lastAttackCharged), '冲锋');
     if (unit.burstTargetId != null) check(int(unit.burstTargetId, 1, g.nextUnitId - 1), '连发目标');
     if (unit.burstTargetBase != null) check(teams.includes(unit.burstTargetBase), '连发基地');
   }
-  for (const team of teams) check(g.units.filter(unit => unit.team === team).length + g.queues[team].length <= RULES.armyLimit, '兵力上限');
+  for (const team of teams) {
+    const alive = g.units.filter(unit => unit.team === team).length;
+    check(version >= 6 ? alive <= STAT_DEFINITIONS.armyLimit.max : alive + g.queues[team].length <= RULES.armyLimit, '兵力上限');
+  }
   list(g.projectiles, 512, '弹药');
   for (const shot of g.projectiles) {
     check(object(shot) && teams.includes(shot.team) && ['sling','stone','boulder','arrow','bolt','egg','fireball','oil','bullet','cannon','shell','rocket','plasma','plasma-orb','rail','laser','ion'].includes(shot.kind), '弹药类型');
@@ -173,6 +191,12 @@ function validateRecord(session, version = SAVE_VERSION) {
     check(shot.duration > 0 && shot.remaining > 0 && shot.remaining <= shot.duration && bool(shot.ignoreArmor), '弹药进度');
     check((shot.targetId === null || int(shot.targetId, 1, g.nextUnitId - 1)) && (shot.targetBase === null || teams.includes(shot.targetBase)), '弹药目标');
     check(shot.maxRange === Infinity || num(shot.maxRange), '弹药射程');
+    if (version >= 6 && shot.field != null) {
+      const field = shot.field;
+      check(object(field) && ['fire', 'oil'].includes(field.kind), '弹药地面效果');
+      numbers(field, ['radius', 'remaining', 'duration', 'tickCooldown', 'tickInterval', 'damage', 'slow']);
+      check(num(field.tickInterval, RULES.fixedStep, 10) && num(field.duration, RULES.fixedStep, 60) && field.remaining <= field.duration && field.slow > 0 && field.slow <= 1, '弹药地面效果进度');
+    }
     if (shot.turretType !== undefined) check(member(shot.turretType, TURRETS), '弹药来源');
   }
   list(g.fields, 128, '地面效果');
@@ -199,6 +223,15 @@ function validateRecord(session, version = SAVE_VERSION) {
   check(g.ability === null || object(g.ability), '技能');
   if (g.ability) {
     check(member(g.ability.type, ABILITIES), '技能类型');
+    if (version >= 6) {
+      const expected = attributes(g, { kind: 'ability', type: g.ability.type, team: 'player' });
+      const snapshot = g.ability.stats;
+      check(object(snapshot) && Object.keys(snapshot).length === Object.keys(expected).length, '技能属性快照');
+      for (const [key, base] of Object.entries(expected)) {
+        const definition = STAT_DEFINITIONS[key];
+        check(definition ? definition.boolean ? bool(snapshot[key]) : num(snapshot[key], definition.min, definition.max) : snapshot[key] === base, '技能快照属性');
+      }
+    }
     numbers(g.ability, ['remaining', 'wavesLeft', 'x']);
     check(g.ability.x <= RULES.width && int(g.ability.wavesLeft, 0, 4), '技能进度');
   }
@@ -256,9 +289,31 @@ export function parseSession(text) {
     session.permanent.talents.challenge = session.run.talents.challenge = 0;
     session.run.challengeLevel = 0;
     session.game.enemyModifiers = getChallengeModifiers(0);
+    session.version = 5;
+  }
+  if (session?.version === 5) {
+    validateRecord(session, 5);
+    const g = session.game;
+    g.bonuses = getRunBonuses(session.run);
+    // v5 stored raw outgoing damage and multiplied it on impact. v6 snapshots
+    // the resolved attack at launch; convert in-flight payloads exactly once.
+    for (const shot of g.projectiles) {
+      shot.damage *= shot.team === 'enemy' ? g.enemyModifiers.damage : 1;
+      if (shot.turretType) shot.field = projectileField(attributes(g, { type: shot.turretType, team: shot.team }));
+    }
+    for (const field of g.fields) field.damage *= field.team === 'enemy' ? g.enemyModifiers.damage : 1;
+    for (const team of teams) {
+      for (const order of g.queues[team]) order.duration = UNITS[order.type].trainTime;
+      for (const turret of g.turrets[team]) if (turret) turret.paid = TURRETS[turret.type].cost;
+    }
+    if (g.ability) g.ability.stats = { ...attributes(g, { kind: 'ability', type: g.ability.type, team: 'player' }) };
+    delete g.modifiers; delete g.enemyModifiers;
     session.version = SAVE_VERSION;
   }
-  return validateSession(session);
+  validateSession(session);
+  session.game.bonuses = createBonusStack(session.game.bonuses);
+  if (session.run.extraBonuses) session.run.extraBonuses = createBonusStack(session.run.extraBonuses);
+  return session;
 }
 
 // Both permanent rewards and the settlement marker are committed in ONE record.

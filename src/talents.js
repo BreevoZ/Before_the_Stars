@@ -1,4 +1,5 @@
 import { SURFACE, UPGRADES, UPGRADE_COSTS, CHALLENGE } from './progression-config.js';
+import { resolveStatValue, STAT_DEFINITIONS } from './stats.js';
 
 export const TALENT_VALUES = Object.freeze({ startingGold: 150, bountyPerLevel: 0.25, legacyMultiplierPerLevel: 0.5 });
 // All talents are bought between runs and snapshotted when a civilization starts.
@@ -59,9 +60,15 @@ export function getTalentBonuses(talents) {
   return { startingGold: talents.supply * TALENT_VALUES.startingGold,
     bounty: 1 + talents.salvage * TALENT_VALUES.bountyPerLevel };
 }
+export function getLegacyBonuses(talents, challengeLevel = 0) {
+  return [
+    ['conservation', '遗产保存', 'doctrine', 'add', talents.conservation],
+    ['continuity', '文明传承', 'doctrine', 'multiply', 1 + talents.continuity * TALENT_VALUES.legacyMultiplierPerLevel],
+    ['challenge:legacy', '挑战遗产', 'challenge', 'multiply', challengeLevel + 1],
+  ].map(([id, label, kind, type, value]) => ({ target: { stat: 'legacy', kind: 'civilization' }, type, value, source: { id, label, kind } }));
+}
 export function getLegacyReward(talents, challengeLevel = 0) {
-  return Math.floor((SURFACE.legacyPerCycle + talents.conservation) *
-    (1 + talents.continuity * TALENT_VALUES.legacyMultiplierPerLevel) * (challengeLevel + 1));
+  return resolveStatValue(SURFACE.legacyPerCycle, getLegacyBonuses(talents, challengeLevel), STAT_DEFINITIONS.legacy);
 }
 export function getTalentSpending(talents, grants = []) {
   return Object.entries(TALENTS).reduce((sum, [key, config]) =>

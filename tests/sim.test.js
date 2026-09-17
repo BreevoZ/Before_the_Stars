@@ -106,7 +106,7 @@ test('Simulation: rejects misspelled keys, invalid types/ranges, unmet prerequis
     { automation: { unlocked: true } }, { automation: { enabled: true } },
     { talents: { autobuyer: 1 }, automation: { evolve: true } },
     { ...example, automation: { weights: [0, 0, 0] } }, { ...example, automation: { reserve: -1 } },
-    { ...example, automation: { queueLimit: 6 } }, { ...example, automation: { eliteLimit: 4 } },
+    { ...example, automation: { queueLimit: 65 } }, { ...example, automation: { eliteLimit: 4 } },
     { maxSeconds: 0 }, { maxSeconds: Infinity }, { maxSeconds: 86401 }];
   for (const options of invalid) assert.throws(() => simulateRun(options), undefined, JSON.stringify(options));
   assert.equal(normalizeRunOptions().automation.enabled, false);

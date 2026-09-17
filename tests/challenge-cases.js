@@ -1,3 +1,5 @@
+import { stat } from '../src/stats.js';
+import { statMultiplier, v5Record } from './legacy-fixtures.js';
 import { AGES, UNITS, RULES, createGame, recruit, evolve, updateGame, getIncomeRate, getExperienceReward, getUnitHealth, getBaseHealth, buildTurret } from '../src/game.js';
 import { createProgression, resolveBattle, continueCivilization, rebuildCivilization, abandonCivilization, startChallenge, getNextChallengeLevel, purchaseUpgrade, updateProgression } from '../src/progression.js';
 import { CHALLENGE, SAVE_VERSION, SURFACE, getChallengeModifiers } from '../src/progression-config.js';
@@ -72,7 +74,7 @@ export function registerChallengeTests(test, assert, near) {
     }
     assert(getNextChallengeLevel(s) === null && !startChallenge(s, s.run.runId));
     assert(rebuildCivilization(s, s.run.runId) && s.run.challengeLevel === 0);
-    assert(s.game.enemyModifiers.damage === 1 && s.game.bases.enemy.maxHp === AGES[1].baseHealth);
+    assert(statMultiplier(s.game, 'damage', 'enemy') === 1 && s.game.bases.enemy.maxHp === AGES[1].baseHealth);
   });
   test('Challenge: loss/draw/abandon pay nothing, retry preserves level and normal rebuild clears it', () => {
     for (const status of ['lost', 'draw']) {
@@ -109,7 +111,7 @@ export function registerChallengeTests(test, assert, near) {
     const s = challengeSeed(); startChallenge(s, s.run.runId); const g = s.game; g.ai.enabled = false;
     ageTo(g, 4, 'player'); ageTo(g, 5);
     g.gold.player = g.gold.enemy = 1000; const target = spawn(g, 'tank', 'player'); target.x = 500; target.attackCooldown = 10;
-    g.fields.push({ kind: 'fire', team: 'enemy', x: 500, radius: 50, remaining: 2, duration: 2, tickCooldown: 0, tickInterval: 0.4, damage: 6, slow: 1 });
+    g.fields.push({ kind: 'fire', team: 'enemy', x: 500, radius: 50, remaining: 2, duration: 2, tickCooldown: 0, tickInterval: 0.4, damage: stat(g, { type: 'fireCatapult', team: 'enemy' }, 'tickDamage'), slow: 1 });
     const before = target.hp; updateGame(g, RULES.fixedStep); near(target.hp, before - 6 * 1.25);
     g.fields = [];
     const enemy = spawn(g, 'blaster', 'enemy'); enemy.x = 650; enemy.attackCooldown = 0;
@@ -172,14 +174,14 @@ export function registerChallengeTests(test, assert, near) {
     s = roundtrip(s); assert(!resolveBattle(s) && s.run.earnedLegacy === reward && s.permanent.totalLegacy === total);
     assert(startChallenge(s, s.run.runId)); const raw = serializeSession(s);
     assert(serializeSession(roundtrip(s)) === raw && s.run.challengeLevel === 2);
-    assert(s.game.enemyModifiers.health === 1.25 ** 2 && getLegacyReward(s.run.talents, 2) === 9);
+    assert(statMultiplier(s.game, 'health', 'enemy') === 1.25 ** 2 && getLegacyReward(s.run.talents, 2) === 9);
   });
   test('Save v5: all v4 phases migrate to normal challenge with no resource, reward, or upgrade changes; backup preserved', () => {
     for (const phase of ['battle', 'victory', 'destruction', 'defeat']) {
       const s = challengeSeed(false); if (phase !== 'destruction') rebuildCivilization(s, s.run.runId);
       if (phase === 'victory') finish(s, 1);
       if (phase === 'defeat') finish(s, 1, 'lost');
-      const old = JSON.parse(serializeSession(s)); old.version = 4;
+      const old = v5Record(s); old.version = 4;
       delete old.run.challengeLevel; delete old.run.talents.challenge; delete old.permanent.talents.challenge; delete old.game.enemyModifiers;
       const raw = JSON.stringify(old), entries = new Map([[SAVE_KEY, raw]]);
       const storage = { getItem: key => entries.get(key) ?? null, setItem: (key, value) => entries.set(key, value), removeItem: key => entries.delete(key) };
@@ -193,8 +195,8 @@ export function registerChallengeTests(test, assert, near) {
   test('Challenge saves reject invalid difficulty, missing fields, inconsistent unlocks, enemy modifiers and health', () => {
     const s = challengeSeed(); startChallenge(s, s.run.runId);
     for (const mutate of [s => delete s.run.challengeLevel, s => s.run.challengeLevel = -1, s => s.run.challengeLevel = .5,
-      s => s.run.challengeLevel = 11, s => s.run.talents.challenge = 0, s => s.game.enemyModifiers.damage *= 2,
-      s => delete s.game.enemyModifiers, s => s.game.bases.enemy.maxHp++, s => s.permanent.totalLegacy++,
+      s => s.run.challengeLevel = 11, s => s.run.talents.challenge = 0, s => s.game.bonuses.find(effect => effect.target.stat === 'damage').value *= 2,
+      s => delete s.game.bonuses, s => s.game.bases.enemy.maxHp++, s => s.permanent.totalLegacy++,
       s => s.run.earnedLegacy = 4]) {
       const record = JSON.parse(serializeSession(s)); mutate(record);
       let rejected = false; try { parseSession(JSON.stringify(record)); } catch { rejected = true; }
@@ -229,7 +231,7 @@ export function registerChallengeTests(test, assert, near) {
       assert(el('result-challenge').textContent.includes('重试挑战 2') && saved().permanent.legacy === 7);
       el('result-challenge').click(); el('begin-challenge').click(); assert(saved().run.challengeLevel === 2);
       frame.contentDocument.querySelector('[data-debug-command="defeat"]').click(); el('play-again').click(); el('play-again').click();
-      next = saved(); assert(next.run.challengeLevel === 0 && next.permanent.legacy === 7 && next.game.enemyModifiers.health === 1);
+      next = saved(); assert(next.run.challengeLevel === 0 && next.permanent.legacy === 7 && statMultiplier(next.game, 'health', 'enemy') === 1);
       assert(el('challenge-status').hidden && el('save-warning').hidden);
     } finally { frame.remove(); }
   });

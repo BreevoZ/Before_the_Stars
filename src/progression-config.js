@@ -1,7 +1,8 @@
+import { AGES } from './game-config.js';
 // M1 covers only surface civilization. Later layers must not change this endpoint.
 export const SURFACE = Object.freeze({
   finalEnemyAge: 5, legacyPerCycle: 1,
-  enemyStartingGold: Object.freeze({ 1: 180, 2: 300, 3: 480, 4: 720, 5: 1080 }),
+  enemyStartingGold: Object.freeze(Object.fromEntries(Object.entries(AGES).map(([id, age]) => [id, age.startingGold]))),
 });
 export const UPGRADES = Object.freeze({
   production: Object.freeze({ name: '生产档案', base: 1.5, description: '被动金币收入', requires: { autobuyer: 1 } }),
@@ -17,7 +18,7 @@ export function getChallengeModifiers(level = 0) {
   return Object.fromEntries(Object.entries(CHALLENGE).filter(([key]) => key !== 'maxLevel')
     .map(([key, base]) => [key, base ** level]));
 }
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 export const SAVE_INTERVAL = 10;
 export function getBonuses(levels) {
   return { income: UPGRADES.production.base ** levels.production, experience: UPGRADES.warfare.base ** levels.warfare };

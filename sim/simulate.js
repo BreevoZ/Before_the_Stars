@@ -3,6 +3,7 @@ import { createProgression, createCivilizationRun, updateProgression, continueCi
 import { CHALLENGE, UPGRADES } from '../src/progression-config.js';
 import { TALENT_TREE } from '../src/talents.js';
 import { createAutomation, validAutomation } from '../src/automation.js';
+import { createBonusStack } from '../src/stats.js';
 
 export const DEFAULT_MAX_SECONDS = 1800;
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -11,8 +12,8 @@ const round = value => Math.round(value * 1e6) / 1e6;
 // A hypothetical purchased loadout, never a browser save or a grant of resources.
 // Requiring dependencies prevents scans from accidentally using impossible builds.
 export function normalizeRunOptions(options = {}) {
-  if (!record(options) || Object.keys(options).some(key => !['talents', 'challengeLevel', 'automation', 'maxSeconds'].includes(key))) {
-    throw new TypeError('Expected { talents, challengeLevel, automation, maxSeconds }; unknown option');
+  if (!record(options) || Object.keys(options).some(key => !['talents', 'challengeLevel', 'automation', 'maxSeconds', 'bonuses'].includes(key))) {
+    throw new TypeError('Expected { talents, challengeLevel, automation, maxSeconds, bonuses }; unknown option');
   }
   const { talents = {}, challengeLevel = 0, automation = {}, maxSeconds = DEFAULT_MAX_SECONDS } = options;
   if (!record(talents) || Object.keys(talents).some(key => !Object.hasOwn(TALENT_TREE, key))) throw new TypeError('Unknown talent ID');
@@ -35,7 +36,8 @@ export function normalizeRunOptions(options = {}) {
   if (!Number.isFinite(maxSeconds) || maxSeconds < RULES.fixedStep || maxSeconds > 86400) {
     throw new RangeError('maxSeconds must be between one simulation frame and 86400 seconds');
   }
-  return { talents: levels, challengeLevel, automation: auto, maxSeconds };
+  if (options.bonuses !== undefined && !Array.isArray(options.bonuses)) throw new TypeError('bonuses must be an array');
+  return { talents: levels, challengeLevel, automation: auto, maxSeconds, bonuses: createBonusStack(options.bonuses ?? []) };
 }
 
 /** Simulate one civilization using the actual fixed-step game and Autobuyer.
@@ -49,7 +51,7 @@ export function simulateRun(options = {}) {
     (Object.hasOwn(UPGRADES, key) ? permanent.upgrades : permanent.talents)[key] = level;
   }
   permanent.automation = config.automation;
-  Object.assign(session, createCivilizationRun(permanent, config.challengeLevel));
+  Object.assign(session, createCivilizationRun(permanent, config.challengeLevel, config.bonuses));
   const battles = [];
   let peakGold = session.game.gold.player, ticks = 0, battleStart = 0;
   let enemyStartAge = session.game.ages.enemy;

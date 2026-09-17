@@ -1,3 +1,4 @@
+import { statMultiplier, v5Record } from './legacy-fixtures.js';
 import { purchaseTalent } from '../src/talents.js';
 import { RULES, AGES, UNITS, TURRETS, ABILITIES, createGame, getIncomeRate, getExperienceReward, recruit, evolve, buildTurret, expandTurretSlots, castAbility } from '../src/game.js';
 import { SURFACE } from '../src/progression-config.js';
@@ -59,7 +60,7 @@ export function registerProgressionTests(test, assert, near) {
     assert(purchaseTalent(s, 'autobuyer')); rebuildCivilization(s, s.run.runId);
     assert(runDebugCommand(s, 'finale'));
     purchaseUpgrade(s, 'production'); rebuildCivilization(s, s.run.runId); supplyDebugRun(s);
-    assert(s.debug && s.game.modifiers.income === 1.5 && s.game.gold.player === RULES.startingGold + DEBUG_GOLD);
+    assert(s.debug && statMultiplier(s.game, 'income') === 1.5 && s.game.gold.player === RULES.startingGold + DEBUG_GOLD);
     assert(runDebugCommand(s, 'defeat') && s.run.phase === 'defeat' && s.permanent.completedCycles === 2);
     assert(serializeSession(parseSession(serializeSession(s))) === serializeSession(s));
   });
@@ -148,14 +149,14 @@ export function registerProgressionTests(test, assert, near) {
       assert(!purchaseUpgrade(s, key));
     }
     assert(s.permanent.legacy === 0 && !purchaseUpgrade(s, 'unknown'));
-    assert(s.game.modifiers.income === 1, 'Pending upgrades must not mutate the just-ended run');
+    assert(statMultiplier(s.game, 'income') === 1, 'Pending upgrades must not mutate the just-ended run');
     rebuildCivilization(s, s.run.runId);
     near(getIncomeRate(s.game), 7 * 1.5 ** 5); near(getIncomeRate(s.game, 'enemy'), 7);
     assert(getExperienceReward(s.game, 20) === Math.floor(20 * 1.25 ** 5));
     assert(getExperienceReward(s.game, 20, 'enemy') === 20 && getIncomeRate(createGame()) === 7);
     assert(JSON.stringify({ AGES, UNITS }) === base);
     const restored = parseSession(serializeSession(s));
-    near(restored.game.modifiers.income, 1.5 ** 5);
+    near(statMultiplier(restored.game, 'income'), 1.5 ** 5);
     restored.game.ai.enabled = false; const wallet = restored.game.gold.player;
     advance(restored, 1); near(restored.game.gold.player - wallet, getIncomeRate(restored.game));
   });
@@ -207,7 +208,7 @@ export function registerProgressionTests(test, assert, near) {
     purchaseUpgrade(s, 'production'); setAutomation(s, true, 'ranged');
     const old = s.run.runId; assert(rebuildCivilization(s, old) && !rebuildCivilization(s, old));
     for (let i = 0; i < 5; i++) s = parseSession(serializeSession(s));
-    assert(s.permanent.completedCycles === 2 && s.permanent.legacy === 0 && s.game.modifiers.income === 1.5);
+    assert(s.permanent.completedCycles === 2 && s.permanent.legacy === 0 && statMultiplier(s.game, 'income') === 1.5);
     assert(s.permanent.automation.enabled && s.permanent.automation.target === 'ranged');
     assert(s.run.phase === 'battle' && !s.run.settled && !s.run.earnedLegacy);
   });
@@ -278,7 +279,7 @@ export function registerProgressionTests(test, assert, near) {
     for (const mutate of [s => s.version++, s => delete s.game.queues, s => s.permanent.legacy = -1,
       s => s.permanent.completedCycles = '1', s => s.permanent.upgrades.production = 6,
       s => s.permanent.automation.target = 'dragon', s => s.run.phase = 'orbital', s => s.run.settled = true,
-      s => s.game.bases.player.hp = 601, s => s.game.gold.player = 1e100, s => s.game.modifiers.income = 999,
+      s => s.game.bases.player.hp = 601, s => s.game.gold.player = 1e100, s => s.game.bonuses.find(effect => effect.source.id === 'production').value = 999,
       s => s.game.units.push({}), s => s.game.fields.push({ kind: 'oil', tickInterval: 0 }), s => delete s.run.runId]) {
       const s = JSON.parse(raw); mutate(s); throws(() => parseSession(JSON.stringify(s)));
     }
@@ -357,7 +358,7 @@ export function registerProgressionTests(test, assert, near) {
     el('automation-to-talents').click();
     el('rebuild-civilization').click(); el('rebuild-civilization').click();
     saved = parseSession(frame.contentWindow.__storage.getItem(SAVE_KEY));
-    assert(saved.run.phase === 'battle' && saved.permanent.completedCycles === 1 && saved.run.talents.autobuyer === 1 && saved.game.modifiers.income === 1);
+    assert(saved.run.phase === 'battle' && saved.permanent.completedCycles === 1 && saved.run.talents.autobuyer === 1 && statMultiplier(saved.game, 'income') === 1);
     frame.remove(); frame = await mount(serializeSession(saved)); time = 0; frame.contentWindow.__testFrame(0);
     assert(el('income-rate').textContent === '+7/s');
     el('pause-battle').click(); const gold = el('gold').textContent; tick(20);

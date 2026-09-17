@@ -1,3 +1,6 @@
+import { stat, attributes } from './stats.js';
+import { describeStat } from './stat-text.js';
+import { getExpansionCost, getTurretRefund } from './game.js';
 import { RULES, UNITS, AGES, TURRETS, ABILITIES, getAgeUnits, createGame, getIncomeRate, getRecruitState, recruit, cancelTraining, getEvolutionState, evolve, getTurretState, buildTurret, getExpansionState, expandTurretSlots, sellTurret, castAbility, updateGame } from './game.js';
 import { createCivilizationUI, formatMultiplier } from './civilization-ui.js';
 import { getGameMode } from './debug.js';
@@ -34,21 +37,26 @@ const towerSlots = Array.from({ length: RULES.maxTurretSlots }, (_, index) => {
   byId('turret-slots').append(button);
   return button;
 });
-const queueSlots = Array.from({ length: RULES.queueLimit }, (_, index) => {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'queue-slot';
-  button.innerHTML = '<span class="queue-fill" aria-hidden="true"></span><span class="queue-icon" aria-hidden="true"></span><span class="queue-name sr-only"></span><span class="queue-time"></span>';
-  button.addEventListener('click', () => {
-    const order = game.queues.player[index];
-    if (order && cancelTraining(game, order.id)) {
-      announce(`已取消${UNITS[order.type].name}，退还 ${order.paid ?? UNITS[order.type].cost} 金币。`);
-      syncUI();
-    }
-  });
-  byId('training-queue').append(button);
-  return button;
-});
+const queueSlots = [];
+function ensureQueueSlots(count) {
+  while (queueSlots.length < count) {
+    const index = queueSlots.length;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'queue-slot';
+    button.innerHTML = '<span class="queue-fill" aria-hidden="true"></span><span class="queue-icon" aria-hidden="true"></span><span class="queue-name sr-only"></span><span class="queue-time"></span>';
+    button.addEventListener('click', () => {
+      const order = game.queues.player[index];
+      if (order && cancelTraining(game, order.id)) {
+        announce(`已取消${UNITS[order.type].name}，退还 ${order.paid ?? UNITS[order.type].cost} 金币。`);
+        syncUI();
+      }
+    });
+    byId('training-queue').append(button);
+    queueSlots.push(button);
+  }
+}
+ensureQueueSlots(RULES.queueLimit);
 const mode = getGameMode(location.search);
 const incremental = mode !== 'classic';
 document.body.dataset.mode = mode;
@@ -76,6 +84,7 @@ let announcedResult = false;
 let targeting = false;
 let targetX = RULES.width / 2;
 let displayedAge = 0;
+let displayedBonuses = null;
 let announcedAges = { player: 1, enemy: 1 };
 let selectedSlot = 0;
 
@@ -91,7 +100,8 @@ for (const card of cards) card.addEventListener('click', () => train(card.datase
 for (const card of towerCards) card.addEventListener('click', () => constructTurret(card.dataset.turret));
 
 function syncRoster() {
-  if (displayedAge === game.ages.player) return;
+  if (displayedAge === game.ages.player && displayedBonuses === game.bonuses) return;
+  displayedBonuses = game.bonuses;
   displayedAge = game.ages.player;
   const age = AGES[displayedAge];
   document.body.dataset.age = String(displayedAge);
@@ -99,7 +109,7 @@ function syncRoster() {
     const type = getAgeUnits(displayedAge)[index];
     card.hidden = !type;
     if (!type) { card.disabled = true; return; }
-    const stats = UNITS[type];
+    const stats = attributes(game, { type, team: 'player' });
     card.dataset.unit = type;
     card.dataset.age = String(displayedAge);
     card.querySelector('strong').textContent = stats.name;
@@ -121,7 +131,7 @@ function syncRoster() {
   setText('roster-age', `${age.numeral} · ${age.name}`);
   towerCards.forEach((card, index) => {
     const type = age.turrets[index];
-    const stats = TURRETS[type];
+    const stats = attributes(game, { type, team: 'player' });
     card.dataset.turret = type;
     card.querySelector('strong').textContent = stats.name;
     setIcon(card.querySelector('.turret-icon'), turretIcons[type]);
@@ -135,7 +145,7 @@ function syncRoster() {
     card.dataset.description = `${stats.name} · ${stats.cost} 金币\n${stats.damage}${stats.burst ? ` × ${stats.burst}` : ''} 攻击 / ${stats.interval} 秒间隔 / ${stats.range} 射程${stats.splash ? ` / ${stats.splash} 爆炸半径` : ''}${stats.chargeTime ? ` / ${stats.chargeTime} 秒充能` : ''}\n${stats.description}`;
     card.setAttribute('aria-label', `建造${stats.name}，${stats.cost} 金币，${stats.description}`);
   });
-  const ability = ABILITIES[age.ability];
+  const ability = attributes(game, { kind: 'ability', type: age.ability, team: 'player' });
   setText('ability-name', ability.name);
   setIcon(byId('ability-icon'), abilityIcons[age.ability]);
   setText('ability-description', ability.targeting === 'allies'
@@ -166,6 +176,7 @@ function syncDefenses() {
   setText('turret-capacity', `${slots.filter(Boolean).length} / ${slots.length}`);
   byId('turret-capacity').title = `已建造 ${slots.filter(Boolean).length} 座 · 已解锁 ${slots.length} 个炮位`;
   towerSlots.forEach((button, index) => {
+    button.hidden = index >= Math.max(slots.length, stat(game, 'player', 'maxTurretSlots'));
     const locked = index >= slots.length;
     const turret = slots[index];
     button.disabled = locked || game.status !== 'playing';
@@ -181,22 +192,23 @@ function syncDefenses() {
   byId('sell-turret').hidden = !selected;
   byId('sell-turret').disabled = game.status !== 'playing';
   if (selected) {
-    const refund = Math.floor(TURRETS[selected.type].cost / 2);
+    const refund = getTurretRefund(game, selected);
     setText('sale-refund', `+${refund}`);
     byId('sell-turret').title = `拆除${TURRETS[selected.type].name} · 返还 ${refund} 金币`;
     byId('sell-turret').setAttribute('aria-label', byId('sell-turret').title);
   }
   const expansion = getExpansionState(game);
-  const price = RULES.turretExpansionCosts[slots.length - 1];
+  const limit = stat(game, 'player', 'maxTurretSlots');
+  const price = slots.length < limit ? getExpansionCost(game) : undefined;
   byId('expand-turrets').disabled = expansion !== 'ready';
-  setText('expansion-price', price ?? `${RULES.maxTurretSlots}/${RULES.maxTurretSlots}`);
+  setText('expansion-price', price ?? `${limit}/${limit}`);
   setIcon(byId('expand-turrets').querySelector('[data-icon]'), price === undefined ? 'check' : 'plus');
-  byId('expand-turrets').title = expansion === 'max-slots' ? '已达 4 个炮位' : expansion === 'finished' ? '战斗已结束' : `扩容 +1 · ${price} 金币${expansion === 'gold' ? '（不足）' : ''}`;
+  byId('expand-turrets').title = expansion === 'max-slots' ? `已达 ${limit} 个炮位` : expansion === 'disabled' ? '本轮禁止扩容' : expansion === 'finished' ? '战斗已结束' : `扩容 +1 · ${price} 金币${expansion === 'gold' ? '（不足）' : ''}`;
   byId('expand-turrets').setAttribute('aria-label', byId('expand-turrets').title);
   for (const card of towerCards) {
     const state = getTurretState(game, 'player', card.dataset.turret, selectedSlot);
     card.disabled = state !== 'ready';
-    card.querySelector('[data-turret-state]').textContent = { ready: '在选中位置建造', gold: '金币不足', occupied: '炮位已占用', full: '请先扩容', finished: '战斗已结束', locked: '时代未解锁', outdated: '已被新炮塔替代' }[state] ?? '位置未解锁';
+    card.querySelector('[data-turret-state]').textContent = { disabled: '本轮禁止建造', ready: '在选中位置建造', gold: '金币不足', occupied: '炮位已占用', full: '请先扩容', finished: '战斗已结束', locked: '时代未解锁', outdated: '已被新炮塔替代' }[state] ?? '位置未解锁';
     card.title = `${card.dataset.description}\n${card.querySelector('[data-turret-state]').textContent}`;
   }
 }
@@ -213,10 +225,10 @@ function syncEvolution() {
   byId('experience-bar').value = Math.min(experience, byId('experience-bar').max);
   byId('evolve').disabled = state !== 'ready';
   byId('evolve').classList.toggle('ready', state === 'ready');
-  setText('evolve-label', state === 'finished' ? '战斗已结束' : nextAge ? `进化至${nextAge.name}` : '已达最高时代');
+  setText('evolve-label', state === 'disabled' ? '本轮禁止进化' : state === 'finished' ? '战斗已结束' : nextAge ? `进化至${nextAge.name}` : '已达最高时代');
   setText('evolution-hint', !nextAge ? '五个时代已全部解锁 · 摧毁敌方基地取得胜利' : state === 'ready' ? '经验已达标 · 点击进化或按 E · 不消耗金币' : `击杀经验 + 阵亡75%经验 · 还差 ${nextAge.experienceRequired - experience} 经验`);
   setText('evolution-unlocks', `${nextAge ? '下个时代' : '已解锁'}：${getAgeUnits(game.ages.player + (nextAge ? 1 : 0)).map(type => UNITS[type].name).join(' · ')}`);
-  setText('evolution-benefit', nextAge ? `生命 +${nextAge.baseHealth - age.baseHealth} · 收入 ${formatMultiplier(nextAge.income * (game.modifiers?.income ?? 1))}/秒 · ${ABILITIES[nextAge.ability].name} · 三种新炮塔` : '未来要塞 · 离子科技 · 轨道打击');
+  setText('evolution-benefit', nextAge ? `生命 +${stat(game, { team: 'player', age: game.ages.player + 1 }, 'baseHealth') - stat(game, 'player', 'baseHealth')} · 收入 ${formatMultiplier(stat(game, { team: 'player', age: game.ages.player + 1 }, 'income'))}/秒 · ${ABILITIES[nextAge.ability].name} · 三种新炮塔` : '未来要塞 · 离子科技 · 轨道打击');
   byId('evolve').title = `${byId('evolve-label').textContent} · E\n${byId('evolution-hint').textContent}\n${byId('evolution-benefit').textContent}`;
   byId('evolve').setAttribute('aria-label', byId('evolve-label').textContent);
 }
@@ -246,8 +258,8 @@ function syncUI() {
   if (ageAnnouncements.length) announce(ageAnnouncements.join(''));
   setText('gold', Math.floor(game.gold.player + 0.000001));
   setText('income-rate', `+${formatMultiplier(getIncomeRate(game))}/s`);
-  byId('income-rate').title = civilization ? `${AGES[game.ages.player].income} 基础收入 × ${formatMultiplier(game.modifiers.income)} 生产档案；击杀金币另由战利品回收 ×${game.modifiers.bounty} 加成并向下取整` : `每秒收入 ${getIncomeRate(game)} 金币`;
-  if (civilization) byId('experience-bar').closest('.evolution-progress').title = `战争档案 ×${formatMultiplier(game.modifiers.experience)}；击杀经验、按 75% 向下取整的阵亡经验，再乘倍率逐笔向下取整。首次终局胜利后可在天赋树查看本轮加成。`;
+  byId('income-rate').title = describeStat(game, 'player', 'income');
+  byId('experience-bar').closest('.evolution-progress').title = `以 100 点击杀经验为例：${describeStat(game, { kind: 'reward', team: 'player' }, 'experience', 100)}。阵亡经验先按 75% 向下取整，再结算加成并逐笔向下取整。`;
   setText('clock', formatTime(game.elapsed));
   setText('enemy-strategy', game.ai.strategy === 'siege' ? '敌军战术 · 重装攻城' : '敌军战术 · 混合推进');
   setIcon(byId('enemy-strategy-icon'), game.ai.strategy === 'siege' ? 'cannon' : 'sword');
@@ -256,13 +268,17 @@ function syncUI() {
     if (card.hidden) continue;
     const state = getRecruitState(game, card.dataset.unit);
     card.disabled = state !== 'ready';
-    const label = { ready: '加入队列', gold: '金币不足', 'queue-full': '队列已满', 'army-full': '兵力已满', locked: '时代未解锁', outdated: '已被新兵种替代', finished: '战斗已结束' }[state];
+    const label = { disabled: '本轮禁止招募', ready: '加入队列', gold: '金币不足', 'queue-full': '队列已满', 'army-full': '兵力已满', locked: '时代未解锁', outdated: '已被新兵种替代', finished: '战斗已结束' }[state];
     const status = card.querySelector('[data-state]');
     if (status.textContent !== label) status.textContent = label;
     card.title = `${card.dataset.description}\n${label}`;
   }
-  setText('queue-count', `${game.queues.player.length} / ${RULES.queueLimit}`);
+  const queueLimit = stat(game, 'player', 'queueLimit');
+  ensureQueueSlots(Math.max(queueLimit, game.queues.player.length));
+  setText('recruit-rule', `队列 ${queueLimit} 位 · 兵力上限 ${stat(game, 'player', 'armyLimit')}（含训练中）`);
+  setText('queue-count', `${game.queues.player.length} / ${queueLimit}`);
   queueSlots.forEach((slot, index) => {
+    slot.hidden = index >= Math.max(queueLimit, game.queues.player.length);
     const order = game.queues.player[index];
     const name = order ? UNITS[order.type].name : String(index + 1).padStart(2, '0');
     const time = !order ? '空位' : index > 0 ? '等待中' : order.remaining <= 0.000001 ? '等待出口' : `${order.remaining.toFixed(1)}s`;
@@ -272,15 +288,16 @@ function syncUI() {
     slot.querySelector('.queue-name').textContent = name;
     setIcon(slot.querySelector('.queue-icon'), order ? unitIcons[order.type] : '');
     slot.querySelector('.queue-time').textContent = !order ? '·' : index > 0 ? '' : order.remaining <= 0.000001 ? '…' : time;
-    slot.querySelector('.queue-fill').style.transform = `scaleX(${order && index === 0 ? 1 - order.remaining / UNITS[order.type].trainTime : 0})`;
+    slot.querySelector('.queue-fill').style.transform = `scaleX(${order && index === 0 ? 1 - order.remaining / (order.duration ?? UNITS[order.type].trainTime) : 0})`;
     slot.setAttribute('aria-label', order ? `取消${name}，退还 ${order.paid ?? UNITS[order.type].cost} 金币` : `空队列位 ${index + 1}`);
     slot.title = order ? `${name} · ${time}\n点击取消，退还 ${order.paid ?? UNITS[order.type].cost} 金币` : `空队列位 ${index + 1}`;
   });
   const finished = game.status !== 'playing';
   if (finished) targeting = false;
-  byId('ability').disabled = finished || game.abilityCooldown > 0;
+  const abilityDisabled = !stat(game, 'player', 'canCast') || !stat(game, { kind: 'ability', type: AGES[game.ages.player].ability }, 'enabled');
+  byId('ability').disabled = finished || abilityDisabled || game.abilityCooldown > 0;
   byId('ability').setAttribute('aria-pressed', String(targeting));
-  setText('ability-state', finished ? '战斗已结束' : game.ability?.type === 'renewal' ? `治疗中 · ${Math.ceil(game.ability.remaining)} 秒 · 冷却 ${Math.ceil(game.abilityCooldown)} 秒` : game.abilityCooldown > 0 ? `冷却中 · ${Math.ceil(game.abilityCooldown)} 秒` : targeting ? '等待落点 · 再次点击取消' : ABILITIES[AGES[game.ages.player].ability].targeting === 'allies' ? '立即治疗 · 已就绪' : '选择落点 · 已就绪');
+  setText('ability-state', abilityDisabled ? '本轮禁止大招' : finished ? '战斗已结束' : game.ability?.type === 'renewal' ? `治疗中 · ${Math.ceil(game.ability.remaining)} 秒 · 冷却 ${Math.ceil(game.abilityCooldown)} 秒` : game.abilityCooldown > 0 ? `冷却中 · ${Math.ceil(game.abilityCooldown)} 秒` : targeting ? '等待落点 · 再次点击取消' : ABILITIES[AGES[game.ages.player].ability].targeting === 'allies' ? '立即治疗 · 已就绪' : '选择落点 · 已就绪');
   setText('ability-timer', finished ? '—' : game.abilityCooldown > 0 ? `${Math.ceil(game.abilityCooldown)}s` : targeting ? '◎' : '✓');
   byId('ability').title = `${byId('ability-description').textContent}\n${byId('ability-state').textContent} · Q`;
   byId('ability').setAttribute('aria-label', byId('ability-name').textContent);
@@ -335,7 +352,7 @@ function evolvePlayer() {
 }
 
 function toggleAbility() {
-  if (game.status !== 'playing' || game.abilityCooldown > 0) return;
+  if (game.status !== 'playing' || game.abilityCooldown > 0 || !stat(game, 'player', 'canCast') || !stat(game, { kind: 'ability', type: AGES[game.ages.player].ability }, 'enabled')) return;
   if (ABILITIES[AGES[game.ages.player].ability].targeting === 'allies') {
     if (castAbility(game)) {
       announce('复苏之光已释放，全场友军持续恢复生命。');

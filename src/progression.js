@@ -1,7 +1,9 @@
-import { AGES, createGame, updateGame, getBaseHealth } from './game.js';
+import { createGame, updateGame } from './game.js';
 import { updateAutomation, createAutomation, configureAutomation } from './automation.js';
-import { SURFACE, UPGRADES, UPGRADE_COSTS, SAVE_VERSION, CHALLENGE, getChallengeModifiers, getBonuses } from './progression-config.js';
-import { emptyTalents, getTalentBonuses, getLegacyReward, talentLevel } from './talents.js';
+import { SURFACE, UPGRADES, UPGRADE_COSTS, SAVE_VERSION, CHALLENGE } from './progression-config.js';
+import { emptyTalents, talentLevel } from './talents.js';
+import { getRunBonuses } from './progression-bonuses.js';
+import { createBonusStack, stat } from './stats.js';
 
 function uniqueId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
@@ -9,19 +11,23 @@ function uniqueId() {
 
 // Shared fresh-run factory for the game and headless balance simulations.
 // Callers provide a validated loadout; this does not award or spend Legacy.
-export function createCivilizationRun(permanent, challengeLevel = 0) {
+export function createCivilizationRun(permanent, challengeLevel = 0, extraBonuses = []) {
   const runId = uniqueId();
   const upgrades = { ...permanent.upgrades };
-  const talents = { ...permanent.talents }, bonuses = getTalentBonuses(talents);
+  const talents = { ...permanent.talents };
   const run = { runId, challengeLevel, battleNumber: 1, battleId: `${runId}:1`, phase: 'battle',
     processedBattleId: null, settled: false, earnedLegacy: 0, upgrades, talents, autoElapsed: 0, autoTurn: 'recruit', elapsed: 0 };
-  const game = createGame({ mode: 'incremental', modifiers: { ...getBonuses(upgrades), bounty: bonuses.bounty }, enemyModifiers: getChallengeModifiers(challengeLevel) });
-  game.gold.player += bonuses.startingGold;
+  if (extraBonuses.length) run.extraBonuses = createBonusStack(extraBonuses);
+  const game = createConflict(run);
   return { run, game };
 }
 
-function startRun(session, challengeLevel = 0) {
-  Object.assign(session, createCivilizationRun(session.permanent, challengeLevel));
+function createConflict(run, ages = { player: 1, enemy: 1 }) {
+  return createGame({ mode: 'incremental', ages, bonuses: getRunBonuses(run) });
+}
+
+function startRun(session, challengeLevel = 0, extraBonuses = []) {
+  Object.assign(session, createCivilizationRun(session.permanent, challengeLevel, extraBonuses));
 }
 
 export function createProgression() {
@@ -42,7 +48,7 @@ export function resolveBattle(session) {
     run.phase = 'destruction';
     if (!run.settled) {
       run.settled = true;
-      run.earnedLegacy = getLegacyReward(run.talents, run.challengeLevel);
+      run.earnedLegacy = stat(game, { kind: 'civilization' }, 'legacy');
       permanent.completedCycles++;
       permanent.legacy += run.earnedLegacy;
       permanent.totalLegacy += run.earnedLegacy;
@@ -66,18 +72,12 @@ export function continueCivilization(session, battleId) {
   const { game, run } = session;
   if (run.phase !== 'victory' || battleId !== run.battleId || game.status !== 'won' || game.ages.enemy >= SURFACE.finalEnemyAge) return false;
   const nextAge = game.ages.enemy + 1;
-  const next = createGame({ mode: 'incremental', modifiers: { ...getBonuses(run.upgrades), bounty: getTalentBonuses(run.talents).bounty }, enemyModifiers: getChallengeModifiers(run.challengeLevel) });
-  next.ages.player = game.ages.player;
+  const next = createConflict(run, { player: game.ages.player, enemy: nextAge });
   next.experience.player = game.experience.player;
   next.gold.player = game.gold.player + game.queues.player.reduce((sum, order) => sum + order.paid, 0);
-  next.bases.player.hp = next.bases.player.maxHp = AGES[next.ages.player].baseHealth;
   next.turrets.player = game.turrets.player.map(turret => turret ? { ...turret,
     burstRemaining: 0, chargeRemaining: 0, chargeTargetId: null, burstTargetId: null, flash: 0 } : null);
   next.abilityCooldown = game.abilityCooldown;
-  next.ages.enemy = nextAge;
-  next.experience.enemy = AGES[nextAge].experienceRequired;
-  next.gold.enemy = Math.floor(SURFACE.enemyStartingGold[nextAge] * next.enemyModifiers.gold);
-  next.bases.enemy.hp = next.bases.enemy.maxHp = getBaseHealth(next, 'enemy');
   run.battleNumber++;
   run.battleId = `${run.runId}:${run.battleNumber}`;
   run.phase = 'battle';
@@ -112,7 +112,7 @@ export function startChallenge(session, runId) {
 // The UI must confirm abandoning an unfinished civilization before calling this.
 export function abandonCivilization(session, runId) {
   if (session.run.runId !== runId || !['battle', 'victory'].includes(session.run.phase)) return false;
-  startRun(session, session.run.challengeLevel);
+  startRun(session, session.run.challengeLevel, session.run.extraBonuses ?? []);
   return true;
 }
 

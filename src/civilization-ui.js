@@ -1,7 +1,8 @@
-import { getIncomeRate, AGES } from './game.js';
+import { describeStat } from './stat-text.js';
+import { AGES } from './game.js';
 import { createProgression, updateProgression, continueCivilization, rebuildCivilization, abandonCivilization, startChallenge, getNextChallengeLevel } from './progression.js';
 import { SAVE_INTERVAL, SURFACE, CHALLENGE, getChallengeModifiers } from './progression-config.js';
-import { getTalentBonuses, getLegacyReward, TALENT_VALUES } from './talents.js';
+import { getLegacyReward } from './talents.js';
 import { createTalentUI } from './talent-ui.js';
 import { createSaveStore, serializeSession, parseSession, MAX_SAVE_BYTES } from './save.js';
 import { createDebugProgression, supplyDebugRun, runDebugCommand, DEBUG_SPEEDS } from './debug.js';
@@ -174,12 +175,8 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     el('rebuild-rules').hidden = !between; el('rebuild-civilization').hidden = !between;
     text('rebuild-civilization', run.challengeLevel ? '结束挑战 · 常规重建' : run.phase === 'defeat' ? '从原始时代重试' : '重建文明');
     talentControls.sync();
-    const growth = getTalentBonuses(run.talents);
-    let activeBonuses = `本轮：生产档案 ${run.upgrades.production} 级，${AGES[game.ages.player].income} × ${formatMultiplier(game.modifiers.income)} = ${formatMultiplier(getIncomeRate(game))} 金币/秒；战争档案 ${run.upgrades.warfare} 级，经验 ×${formatMultiplier(game.modifiers.experience)}。阵亡先按原规则向下取整，再乘倍率逐笔向下取整。重建储备提供起始金币 +${growth.startingGold}；战利品回收使击杀金币 ×${growth.bounty}，逐笔向下取整。终局遗产：(${SURFACE.legacyPerCycle} + ${run.talents.conservation}) × ${1 + run.talents.continuity * TALENT_VALUES.legacyMultiplierPerLevel} × ${run.challengeLevel + 1}（挑战倍率），最终向下取整 = ${getLegacyReward(run.talents, run.challengeLevel)}。`;
-    if (run.challengeLevel) {
-      const enemy = game.enemyModifiers;
-      activeBonuses += ` 挑战 ${run.challengeLevel}：敌军起始金币与收入 ${multiplier(enemy.income)}，战斗经验 ${multiplier(enemy.experience)}，部队生命与全部伤害 ${multiplier(enemy.health)}，基地生命 ${multiplier(enemy.baseHealth)}（倍率显示保留三位小数）。击杀金币不因挑战增加。`;
-    }
+    let activeBonuses = `本轮收入：${describeStat(game, 'player', 'income')}；击杀经验（基础 100）：${describeStat(game, { kind: 'reward' }, 'experience', 100)}；击杀金币（基础 100）：${describeStat(game, { kind: 'reward' }, 'bounty', 100)}；起始金币：${describeStat(game, 'player', 'startingGold')}；终局遗产：${describeStat(game, { kind: 'civilization' }, 'legacy')}。阵亡经验先按 75% 向下取整，再结算加成并逐笔向下取整。`;
+    if (run.challengeLevel) activeBonuses += ` 敌军收入：${describeStat(game, 'enemy', 'income')}；基地生命：${describeStat(game, 'enemy', 'baseHealth')}。`;
     text('active-bonuses', activeBonuses);
     el('archives').hidden = p.completedCycles === 0;
     el('civilization-bar').hidden = p.completedCycles === 0;

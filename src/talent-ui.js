@@ -1,3 +1,4 @@
+import { stat } from './stats.js';
 import { AGES, UNITS, TURRETS } from './game.js';
 import { AUTOMATION_TARGETS } from './progression-config.js';
 import { getLegacyReward } from './talents.js';
@@ -33,9 +34,9 @@ export function createTalentUI(getSession, changed) {
   function sync() {
     const session = getSession(), { permanent: p, run, game } = session;
     map.sync();
-    text('talent-legacy-preview', `本轮终局 +${getLegacyReward(run.talents, run.challengeLevel)} · 常规重建终局 +${getLegacyReward(p.talents)} · 累计 ${p.totalLegacy} Legacy`);
+    text('talent-legacy-preview', `本轮终局 +${stat(game, { kind: 'civilization' }, 'legacy')} · 常规重建终局 +${getLegacyReward(p.talents)} · 累计 ${p.totalLegacy} Legacy`);
     text('talent-guide', !p.talents.autobuyer ? '从根节点点亮第一颗星。花 1 Legacy 解锁 Autobuyer，再沿三条路线成长。' : window.innerWidth <= 740 ? '沿星路向上探索 · 点击节点查看与购买' : '微光指引可购买的天赋 · 悬停或点击查看 · 方向键探索星图');
-    const auto = p.automation, nextControlsKey = JSON.stringify([auto, p.talents, game.ages.player]);
+    const auto = p.automation, nextControlsKey = JSON.stringify([auto, p.talents, game.ages.player, stat(game, 'player', 'queueLimit')]);
     if (nextControlsKey !== controlsKey) {
       controlsKey = nextControlsKey;
       el('automation-locked').hidden = auto.unlocked;
@@ -43,6 +44,10 @@ export function createTalentUI(getSession, changed) {
       document.querySelectorAll('[data-auto-talent]').forEach(group => {
         group.hidden = p.talents[group.dataset.autoTalent] < Number(group.dataset.autoLevel || 1);
       });
+      el('auto-queue').replaceChildren(...Array.from({ length: Math.max(auto.queueLimit, stat(game, 'player', 'queueLimit'), 5) }, (_, i) => {
+        const option = document.createElement('option'); option.value = String(i + 1); option.textContent = String(i + 1); return option;
+      }));
+      el('auto-queue').title = `实际训练队列最多 ${stat(game, 'player', 'queueLimit')} 位；自动购买还受此上限约束。`;
       for (const [id, [key, type]] of Object.entries(fields)) {
         el(id)[type === 'checked' ? 'checked' : 'value'] = auto[key]; el(id).disabled = !auto.unlocked;
       }
@@ -59,7 +64,7 @@ export function createTalentUI(getSession, changed) {
       const roster = AGES[game.ages.player].units;
       AGES[game.ages.player].turrets.forEach((type, i) => { el('auto-turret').options[i].textContent = TURRETS[type].name; });
       text('auto-roster-hint', `当前：${roster.map(type => UNITS[type].name).join('／')}。进化后自动切换为对应兵种。${p.talents.formation ? '编队比例计入旧时代部队与订单；填 0 可排除某类。' : ''}`);
-      text('auto-defense-hint', `进化后跟随同一位置的炮塔类型。扩容会先存够炮位与炮塔的全部费用；替换只处理旧时代炮塔，存够净支出后才拆塔，新建费用按原价、旧塔返还一半。`);
+      text('auto-defense-hint', `进化后跟随同一位置的炮塔类型。扩容会先存够炮位与炮塔的全部费用；替换只处理旧时代炮塔，存够净支出后才拆塔，新塔使用当前造价、旧塔返还实际支付价格的一半。`);
     }
     text('automation-hint', '每 0.25 秒模拟时间检查一次。通过天赋解锁功能，再自行启用；暂停、隐藏页面和结算时停止。');
     text('automation-status', getAutomationPlan(session).status);

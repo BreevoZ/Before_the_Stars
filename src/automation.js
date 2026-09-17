@@ -1,5 +1,7 @@
 import { AGES, UNITS, TURRETS, RULES, getRecruitState, recruit, getEvolutionState, evolve,
   getTurretState, buildTurret, getExpansionState, expandTurretSlots, sellTurret } from './game.js';
+import { stat, STAT_DEFINITIONS } from './stats.js';
+import { getExpansionCost, getTurretRefund } from './game.js';
 import { AUTOMATION_INTERVAL, AUTOMATION_TARGETS, SURFACE } from './progression-config.js';
 
 export const AUTOMATION_MAX_RESERVE = 1_000_000_000;
@@ -17,7 +19,7 @@ export function validAutomation(auto, talents, previousVersion = false) {
     .every(key => typeof auto[key] === 'boolean')) return false;
   if (!AUTOMATION_TARGETS.includes(auto.target) || !['single', 'balanced'].includes(auto.mode) ||
     !['balanced', 'recruit', 'defense'].includes(auto.priority)) return false;
-  if (!integer(auto.reserve, 0, AUTOMATION_MAX_RESERVE) || !integer(auto.queueLimit, 1, RULES.queueLimit) ||
+  if (!integer(auto.reserve, 0, AUTOMATION_MAX_RESERVE) || !integer(auto.queueLimit, 1, STAT_DEFINITIONS.queueLimit.max) ||
     !integer(auto.turretTarget, 0, 2) || !integer(auto.maxTurrets, 1, RULES.maxTurretSlots) || !integer(auto.eliteLimit, 1, 3)) return false;
   if (!Array.isArray(auto.weights) || auto.weights.length !== 3 || !auto.weights.every(weight => integer(weight, 0, 10)) ||
     !auto.weights.some(weight => weight > 0)) return false;
@@ -48,11 +50,11 @@ function budget(session, plan) {
 function recruitPlan(session) {
   const { game, run, permanent: { automation: auto } } = session;
   if (!auto.recruitEnabled) return inactive('off', '招募已关闭');
-  if (game.queues.player.length >= auto.queueLimit) return inactive('blocked', '等待训练队列腾出位置');
+  if (game.queues.player.length >= Math.min(auto.queueLimit, stat(game, 'player', 'queueLimit'))) return inactive('blocked', '等待训练队列腾出位置');
   const army = [...game.units.filter(unit => unit.team === 'player'), ...game.queues.player];
-  if (army.length >= RULES.armyLimit) return inactive('blocked', '已达兵力上限');
+  if (army.length >= stat(game, 'player', 'armyLimit')) return inactive('blocked', '已达兵力上限');
   let type;
-  if (auto.elite && run.talents.elite && game.ages.player === SURFACE.finalEnemyAge &&
+  if (auto.elite && run.talents.elite && game.ages.player === SURFACE.finalEnemyAge && stat(game, { type: 'superSoldier', team: 'player' }, 'enabled') &&
     army.filter(unit => unit.type === 'superSoldier').length < auto.eliteLimit) type = 'superSoldier';
   else {
     let index = AUTOMATION_TARGETS.indexOf(auto.target);
@@ -61,31 +63,34 @@ function recruitPlan(session) {
       const counts = ['melee', 'archer', 'heavy'].map(role => army.filter(unit =>
         !UNITS[unit.type].playerOnly && UNITS[unit.type].role === role).length);
       const total = counts.reduce((a, b) => a + b, 0), weight = auto.weights.reduce((a, b) => a + b, 0);
-      const deficits = auto.weights.map((value, i) => value ? (total + 1) * value / weight - counts[i] : -Infinity);
+      const deficits = auto.weights.map((value, i) => value && stat(game, { type: AGES[game.ages.player].units[i], team: 'player' }, 'enabled')
+        ? (total + 1) * value / weight - counts[i] : -Infinity);
+      if (deficits.every(value => value === -Infinity)) return inactive('blocked', '编队兵种在本轮被禁用');
       index = deficits.indexOf(Math.max(...deficits));
     }
     type = AGES[game.ages.player].units[index];
   }
   const state = getRecruitState(game, type);
   if (!['ready', 'gold'].includes(state)) return inactive('blocked', '等待可招募条件');
-  return budget(session, { kind: 'recruit', type, cost: UNITS[type].cost, label: UNITS[type].name });
+  return budget(session, { kind: 'recruit', type, cost: stat(game, { type, team: 'player' }, 'cost'), label: UNITS[type].name });
 }
 function defensePlan(session) {
   const { game, run, permanent: { automation: auto } } = session;
   if (!auto.defense || !run.talents.defense) return inactive('off', '建塔已关闭');
+  if (!stat(game, 'player', 'canBuild')) return inactive('blocked', '本轮禁止建塔');
   const towers = game.turrets.player, type = AGES[game.ages.player].turrets[auto.turretTarget];
-  const slot = towers.findIndex((tower, i) => !tower && i < auto.maxTurrets);
+  const slot = towers.findIndex((tower, i) => !tower && i < Math.min(auto.maxTurrets, stat(game, 'player', 'maxTurretSlots')));
   if (slot !== -1 && ['ready', 'gold'].includes(getTurretState(game, 'player', type, slot))) {
-    return budget(session, { kind: 'build', type, slot, cost: TURRETS[type].cost, label: `炮位 ${slot + 1} · ${TURRETS[type].name}` });
+    return budget(session, { kind: 'build', type, slot, cost: stat(game, { type, team: 'player' }, 'cost'), label: `炮位 ${slot + 1} · ${TURRETS[type].name}` });
   }
-  if (auto.expand && towers.length < auto.maxTurrets && ['ready', 'gold'].includes(getExpansionState(game))) {
+  if (auto.expand && stat(game, { type, team: 'player' }, 'enabled') && towers.length < auto.maxTurrets && ['ready', 'gold'].includes(getExpansionState(game))) {
     return budget(session, { kind: 'expand', type, slot: towers.length,
-      cost: RULES.turretExpansionCosts[towers.length - 1] + TURRETS[type].cost, label: `扩容并建造${TURRETS[type].name}` });
+      cost: getExpansionCost(game) + stat(game, { type, team: 'player' }, 'cost'), label: `扩容并建造${TURRETS[type].name}` });
   }
   if (auto.replace && run.talents.defense >= 2) {
-    const outdated = towers.findIndex((tower, i) => i < auto.maxTurrets && tower && TURRETS[tower.type].age < game.ages.player);
-    if (outdated !== -1) return budget(session, { kind: 'replace', type, slot: outdated,
-      cost: TURRETS[type].cost - Math.floor(TURRETS[towers[outdated].type].cost / 2), label: `替换炮位 ${outdated + 1} · ${TURRETS[type].name}（净支出）` });
+    const outdated = towers.findIndex((tower, i) => i < Math.min(auto.maxTurrets, stat(game, 'player', 'maxTurretSlots')) && tower && TURRETS[tower.type].age < game.ages.player);
+    if (outdated !== -1 && stat(game, { type, team: 'player' }, 'enabled')) return budget(session, { kind: 'replace', type, slot: outdated,
+      cost: stat(game, { type, team: 'player' }, 'cost') - getTurretRefund(game, towers[outdated]), label: `替换炮位 ${outdated + 1} · ${TURRETS[type].name}（净支出）` });
   }
   return inactive('complete', '防御目标已满足');
 }

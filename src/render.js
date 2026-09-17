@@ -222,7 +222,7 @@ export function createRenderer(canvas) {
       for (const unit of game.units) if (UNITS[unit.type].lane === lane) drawUnit(ctx, unit, game.elapsed, entityScale, reducedMotion.matches, getUnitHealth(game, unit.type, unit.team));
     }
     for (const shot of game.projectiles) drawProjectile(ctx, shot, entityScale, reducedMotion.matches);
-    if (targeting) drawTarget(ctx, targetX, getAbilityRadius(AGES[game.ages.player].ability));
+    if (targeting) drawTarget(ctx, targetX, getAbilityRadius(AGES[game.ages.player].ability, game));
     drawBattleEffects(ctx, game, entityScale, reducedMotion.matches, ground);
     ctx.restore();
   };
@@ -233,7 +233,7 @@ export function drawBattleEffects(ctx, game, entityScale = 1, reducedMotion = fa
   ctx.save();
   if (game.ability) {
     const ability = game.ability;
-    const stats = ABILITIES[ability.type];
+    const stats = ability.stats ?? ABILITIES[ability.type];
     if (stats.targeting === 'allies') {
       for (const unit of game.units.filter(unit => unit.team === 'player')) {
         ctx.strokeStyle = '#a8e4a0'; ctx.lineWidth = 2;
@@ -243,7 +243,7 @@ export function drawBattleEffects(ctx, game, entityScale = 1, reducedMotion = fa
         line(ctx, [[unit.x, -80 - lift], [unit.x, -70 - lift]], '#b5efac', 3);
       }
     } else {
-      drawTarget(ctx, ability.x, getAbilityRadius(ability.type), 0.5);
+      drawTarget(ctx, ability.x, (stats.radius ?? 0) + (stats.sweep ?? 0) * (stats.waves - 1 || 0) / 2, 0.5);
       const impactX = getAbilityImpactX(ability);
       if (stats.sweep) drawTarget(ctx, impactX, stats.radius, 0.8);
       const interval = ability.wavesLeft === stats.waves ? stats.delay : stats.waveInterval;

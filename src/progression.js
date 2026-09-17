@@ -1,19 +1,19 @@
-import { AGES, createGame, updateGame } from './game.js';
+import { AGES, createGame, updateGame, getBaseHealth } from './game.js';
 import { updateAutomation, createAutomation, configureAutomation } from './automation.js';
-import { SURFACE, UPGRADES, UPGRADE_COSTS, SAVE_VERSION, getBonuses } from './progression-config.js';
+import { SURFACE, UPGRADES, UPGRADE_COSTS, SAVE_VERSION, CHALLENGE, getChallengeModifiers, getBonuses } from './progression-config.js';
 import { emptyTalents, getTalentBonuses, getLegacyReward, talentLevel } from './talents.js';
 
 function uniqueId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
 }
 
-function startRun(session) {
+function startRun(session, challengeLevel = 0) {
   const runId = uniqueId();
   const upgrades = { ...session.permanent.upgrades };
   const talents = { ...session.permanent.talents }, bonuses = getTalentBonuses(talents);
-  session.run = { runId, battleNumber: 1, battleId: `${runId}:1`, phase: 'battle',
+  session.run = { runId, challengeLevel, battleNumber: 1, battleId: `${runId}:1`, phase: 'battle',
     processedBattleId: null, settled: false, earnedLegacy: 0, upgrades, talents, autoElapsed: 0, autoTurn: 'recruit', elapsed: 0 };
-  session.game = createGame({ mode: 'incremental', modifiers: { ...getBonuses(upgrades), bounty: bonuses.bounty } });
+  session.game = createGame({ mode: 'incremental', modifiers: { ...getBonuses(upgrades), bounty: bonuses.bounty }, enemyModifiers: getChallengeModifiers(challengeLevel) });
   session.game.gold.player += bonuses.startingGold;
 }
 
@@ -35,7 +35,7 @@ export function resolveBattle(session) {
     run.phase = 'destruction';
     if (!run.settled) {
       run.settled = true;
-      run.earnedLegacy = getLegacyReward(run.talents);
+      run.earnedLegacy = getLegacyReward(run.talents, run.challengeLevel);
       permanent.completedCycles++;
       permanent.legacy += run.earnedLegacy;
       permanent.totalLegacy += run.earnedLegacy;
@@ -59,7 +59,7 @@ export function continueCivilization(session, battleId) {
   const { game, run } = session;
   if (run.phase !== 'victory' || battleId !== run.battleId || game.status !== 'won' || game.ages.enemy >= SURFACE.finalEnemyAge) return false;
   const nextAge = game.ages.enemy + 1;
-  const next = createGame({ mode: 'incremental', modifiers: { ...getBonuses(run.upgrades), bounty: getTalentBonuses(run.talents).bounty } });
+  const next = createGame({ mode: 'incremental', modifiers: { ...getBonuses(run.upgrades), bounty: getTalentBonuses(run.talents).bounty }, enemyModifiers: getChallengeModifiers(run.challengeLevel) });
   next.ages.player = game.ages.player;
   next.experience.player = game.experience.player;
   next.gold.player = game.gold.player + game.queues.player.reduce((sum, order) => sum + order.paid, 0);
@@ -69,8 +69,8 @@ export function continueCivilization(session, battleId) {
   next.abilityCooldown = game.abilityCooldown;
   next.ages.enemy = nextAge;
   next.experience.enemy = AGES[nextAge].experienceRequired;
-  next.gold.enemy = SURFACE.enemyStartingGold[nextAge];
-  next.bases.enemy.hp = next.bases.enemy.maxHp = AGES[nextAge].baseHealth;
+  next.gold.enemy = Math.floor(SURFACE.enemyStartingGold[nextAge] * next.enemyModifiers.gold);
+  next.bases.enemy.hp = next.bases.enemy.maxHp = getBaseHealth(next, 'enemy');
   run.battleNumber++;
   run.battleId = `${run.runId}:${run.battleNumber}`;
   run.phase = 'battle';
@@ -86,10 +86,26 @@ export function rebuildCivilization(session, runId) {
   return true;
 }
 
+// Only a completed civilization can unlock the next difficulty. The run ID
+// makes stale/double clicks harmless, including after a reload or import.
+export function getNextChallengeLevel(session) {
+  const { run, permanent } = session;
+  if (!permanent.talents.challenge) return null;
+  if (run.phase === 'destruction' && run.settled && run.challengeLevel < CHALLENGE.maxLevel) return run.challengeLevel + 1;
+  if (run.phase === 'defeat' && run.challengeLevel > 0) return run.challengeLevel;
+  return null;
+}
+export function startChallenge(session, runId) {
+  const level = getNextChallengeLevel(session);
+  if (session.run.runId !== runId || level === null) return false;
+  startRun(session, level);
+  return true;
+}
+
 // The UI must confirm abandoning an unfinished civilization before calling this.
 export function abandonCivilization(session, runId) {
   if (session.run.runId !== runId || !['battle', 'victory'].includes(session.run.phase)) return false;
-  startRun(session);
+  startRun(session, session.run.challengeLevel);
   return true;
 }
 

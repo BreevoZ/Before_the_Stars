@@ -3,6 +3,7 @@ import { createProgression, resolveBattle, rebuildCivilization, continueCiviliza
 import { TALENTS, TALENT_TREE, purchaseTalent, getTalentState, getLegacyReward, getTalentSpending } from '../src/talents.js';
 import { configureAutomation, getAutomationPlan, updateAutomation } from '../src/automation.js';
 import { parseSession, serializeSession, createSaveStore, SAVE_KEY, BACKUP_KEY } from '../src/save.js';
+import { SAVE_VERSION } from '../src/progression-config.js';
 import { mountFixture } from './progression-cases.js';
 
 function finish(session, age = 5, status = 'won') {
@@ -32,9 +33,14 @@ function v1(session, settings = {}) {
   return JSON.stringify(old);
 }
 
+function stripChallenge(old) {
+  old.permanent.legacy += old.permanent.talents.challenge * TALENTS.challenge.costs[0];
+  delete old.permanent.talents.challenge; delete old.run.talents.challenge;
+  delete old.run.challengeLevel; delete old.game.enemyModifiers;
+}
 function v2(session) {
   const old = JSON.parse(serializeSession(session)), p = old.permanent;
-  old.version = 2;
+  old.version = 2; stripChallenge(old);
   for (const key of ['autobuyer', 'logistics']) {
     if (!p.talentGrants.includes(key)) p.legacy += p.talents[key];
     delete p.talents[key]; delete old.run.talents[key];
@@ -46,7 +52,7 @@ function v2(session) {
 
 function v3(session, removeRoot = false) {
   const old = JSON.parse(serializeSession(session)), p = old.permanent;
-  old.version = 3;
+  old.version = 3; stripChallenge(old);
   if (removeRoot) {
     if (!p.talentGrants.includes('autobuyer')) p.legacy += p.talents.autobuyer;
     p.talentGrants = p.talentGrants.filter(key => key !== 'autobuyer');
@@ -221,7 +227,7 @@ export function registerTalentTests(test, assert, near) {
       if (phase === 'victory') { start(s); finish(s, 1); }
       if (phase === 'rebuilt') { purchaseTalent(s, 'autobuyer'); purchaseUpgrade(s, 'production'); start(s); }
       const restored = parseSession(v1(s, phase === 'rebuilt' ? { enabled: true, target: 'heavy' } : {}));
-      assert(restored.version === 4 && restored.run.runId === s.run.runId && restored.run.phase === s.run.phase);
+      assert(restored.version === SAVE_VERSION && restored.run.runId === s.run.runId && restored.run.phase === s.run.phase);
       assert(restored.permanent.legacy === JSON.parse(v1(s)).permanent.legacy && restored.permanent.totalLegacy === s.permanent.completedCycles);
       assert(restored.game.gold.player === s.game.gold.player && restored.run.earnedLegacy === s.run.earnedLegacy);
       assert(restored.permanent.upgrades.production === s.permanent.upgrades.production);
@@ -243,7 +249,7 @@ export function registerTalentTests(test, assert, near) {
     const storage = { getItem: key => entries.get(key) ?? null, setItem: (key, value) => entries.set(key, value), removeItem: key => entries.delete(key) };
     const store = createSaveStore(() => storage), loaded = store.load();
     assert(loaded.ok && loaded.migrated && store.save(loaded.session).ok && entries.get(BACKUP_KEY) === old);
-    assert(JSON.parse(entries.get(SAVE_KEY)).version === 4);
+    assert(JSON.parse(entries.get(SAVE_KEY)).version === SAVE_VERSION);
   });
   test('Talents browser: purchase prerequisites, configure autobuyer, rebuild, reload and fit the full tree on a phone', async () => {
     let frame = await mountFixture(serializeSession(funded(30)));
@@ -254,7 +260,7 @@ export function registerTalentTests(test, assert, near) {
     assert(el('legacy').textContent === '27' && !el('buy-evolution').disabled);
     el('node-evolution').click(); el('buy-evolution').click(); el('node-defense').click(); el('buy-defense').click();
     el('node-conservation').click(); el('buy-conservation').click();
-    assert(el('talent-legacy-preview').textContent.includes('本轮终局 +1 · 下轮终局 +2'));
+    assert(el('talent-legacy-preview').textContent.includes('本轮终局 +1 · 常规重建终局 +2'));
     el('close-archives').click(); el('autobuyer-menu').click(); assert(el('automation-dialog').open && !el('archives-dialog').open);
     el('auto-enabled').click(); el('auto-evolve').click(); el('auto-defense').click();
     const setting = (id, value) => { el(id).value = value; el(id).dispatchEvent(new frame.contentWindow.Event('change')); };
@@ -278,7 +284,7 @@ export function registerTalentTests(test, assert, near) {
     const seed = funded(3); purchaseTalent(seed, 'autobuyer'); purchaseUpgrade(seed, 'production');
     const raw = v1(seed, { enabled: true, target: 'ranged' }), frame = await mountFixture(raw), page = frame.contentDocument;
     const storage = frame.contentWindow.__storage, restored = parseSession(storage.getItem(SAVE_KEY));
-    assert(JSON.parse(storage.getItem(SAVE_KEY)).version === 4 && storage.getItem(BACKUP_KEY) === raw);
+    assert(JSON.parse(storage.getItem(SAVE_KEY)).version === SAVE_VERSION && storage.getItem(BACKUP_KEY) === raw);
     assert(restored.permanent.legacy === 2 && restored.run.earnedLegacy === 1 && restored.permanent.upgrades.production === 1);
     assert(page.getElementById('save-status').textContent.includes('旧存档已升级'));
     page.getElementById('archives').click();
@@ -297,7 +303,7 @@ export function registerTalentTests(test, assert, near) {
         if (phase !== 'battle') finish(s, phase === 'victory' ? 1 : 5, phase === 'defeat' ? 'lost' : 'won');
       }
       const raw = v2(s), old = JSON.parse(raw), restored = parseSession(raw), p = restored.permanent;
-      assert(restored.version === 4 && p.legacy === old.permanent.legacy && p.totalLegacy === old.permanent.totalLegacy);
+      assert(restored.version === SAVE_VERSION && p.legacy === old.permanent.legacy && p.totalLegacy === old.permanent.totalLegacy);
       assert(JSON.stringify(p.automation) === JSON.stringify(old.permanent.automation));
       assert(p.talentGrants.join(',') === (phase === 'fresh' ? '' : 'autobuyer,logistics'));
       assert(restored.run.phase === s.run.phase && restored.run.runId === s.run.runId && restored.run.earnedLegacy === s.run.earnedLegacy);
@@ -422,7 +428,7 @@ export function registerTalentTests(test, assert, near) {
         if (phase !== 'battle') finish(s, phase === 'victory' ? 1 : 5, phase === 'defeat' ? 'lost' : 'won');
       }
       const raw = v3(s, needsRoot), old = JSON.parse(raw), restored = parseSession(raw);
-      assert(restored.version === 4 && restored.permanent.legacy === old.permanent.legacy && restored.permanent.totalLegacy === old.permanent.totalLegacy);
+      assert(restored.version === SAVE_VERSION && restored.permanent.legacy === old.permanent.legacy && restored.permanent.totalLegacy === old.permanent.totalLegacy);
       assert(restored.permanent.talents.autobuyer === Number(needsRoot) && restored.permanent.automation.unlocked === needsRoot);
       assert(!restored.permanent.automation.enabled && !restored.permanent.talents.logistics);
       assert(restored.permanent.talentGrants.join(',') === (needsRoot ? 'autobuyer' : ''));

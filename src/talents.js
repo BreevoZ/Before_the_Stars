@@ -1,4 +1,4 @@
-import { SURFACE, UPGRADES, UPGRADE_COSTS } from './progression-config.js';
+import { SURFACE, UPGRADES, UPGRADE_COSTS, CHALLENGE } from './progression-config.js';
 
 export const TALENT_VALUES = Object.freeze({ startingGold: 150, bountyPerLevel: 0.25, legacyMultiplierPerLevel: 0.5 });
 // All talents are bought between runs and snapshotted when a civilization starts.
@@ -22,6 +22,8 @@ export const TALENTS = Object.freeze({
     effects: Array.from({ length: 4 }, (_, level) => `击杀金币 ×${1 + level * TALENT_VALUES.bountyPerLevel}`) },
   conservation: { name: '遗产保存', branch: 'legacy', costs: [2, 4, 8], requires: { autobuyer: 1 },
     effects: Array.from({ length: 4 }, (_, level) => `终局基础遗产 ${SURFACE.legacyPerCycle + level}`) },
+  challenge: { name: '文明挑战', branch: 'legacy', costs: [2], requires: { conservation: 1 },
+    effects: ['常规文明循环', `通关后可挑战更强文明；每提高 1 级，通关遗产倍率 +1 倍，最高挑战 ${CHALLENGE.maxLevel}`] },
   continuity: { name: '文明传承', branch: 'legacy', costs: [6, 12], requires: { conservation: 2 },
     effects: Array.from({ length: 3 }, (_, level) => `终局遗产 ×${1 + level * TALENT_VALUES.legacyMultiplierPerLevel}`) },
 });
@@ -57,9 +59,9 @@ export function getTalentBonuses(talents) {
   return { startingGold: talents.supply * TALENT_VALUES.startingGold,
     bounty: 1 + talents.salvage * TALENT_VALUES.bountyPerLevel };
 }
-export function getLegacyReward(talents) {
+export function getLegacyReward(talents, challengeLevel = 0) {
   return Math.floor((SURFACE.legacyPerCycle + talents.conservation) *
-    (1 + talents.continuity * TALENT_VALUES.legacyMultiplierPerLevel));
+    (1 + talents.continuity * TALENT_VALUES.legacyMultiplierPerLevel) * (challengeLevel + 1));
 }
 export function getTalentSpending(talents, grants = []) {
   return Object.entries(TALENTS).reduce((sum, [key, config]) =>

@@ -7,6 +7,7 @@ import { getProjectilePose, getProjectileProfile, createProjectileImpact } from 
 import { drawProjectile, drawImpact, drawFields, drawAbilityImpact } from '../src/combat-effects.js';
 import { registerAnimationTests } from './animation-cases.js';
 import { registerProgressionTests } from './progression-cases.js';
+import { registerChallengeTests } from './challenge-cases.js';
 import { registerTalentTests } from './talent-cases.js';
 
 function loadClassicFixture(frame, html) {
@@ -1851,6 +1852,7 @@ test('Weapon impacts and abilities render distinctly, animate, and restore canva
 registerAnimationTests(test, assert, near);
 registerProgressionTests(test, assert, near);
 registerTalentTests(test, assert, near);
+registerChallengeTests(test, assert, near);
 let failures = 0;
 for (const { name, run } of tests) {
   const item = document.createElement('li');

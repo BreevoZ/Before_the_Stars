@@ -97,7 +97,7 @@ export function createTalentUI(getSession, changed) {
         text(`state-${key}`, reasons[state]); el(`node-${key}`).dataset.state = level ? 'owned' : state;
       }
     }
-    text('talent-legacy-preview', `本轮终局 +${getLegacyReward(run.talents)} · 下轮终局 +${getLegacyReward(p.talents)} · 累计获得 ${p.totalLegacy} 遗产`);
+    text('talent-legacy-preview', `本轮终局 +${getLegacyReward(run.talents, run.challengeLevel)} · 常规重建终局 +${getLegacyReward(p.talents)} · 累计获得 ${p.totalLegacy} 遗产`);
     text('root-caption', p.talents.autobuyer ? '已解锁 · 三条路线已开启' : `${configs.autobuyer.costs[0]} Legacy · 解锁自动购买`);
     text('talent-guide', !p.talents.autobuyer ? '先解锁根节点，再沿三条路线成长。点击节点查看与购买。' : '沿连线解锁天赋。两轮之间购买，重建后生效。');
     const auto = p.automation, nextControlsKey = JSON.stringify([auto, p.talents, game.ages.player]);

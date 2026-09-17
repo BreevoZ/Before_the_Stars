@@ -20,6 +20,7 @@
         <div class="legacy-wallet" title="文明遗产，用于购买永久天赋"><span aria-hidden="true">✧</span><strong id="legacy-balance">0</strong><span>Legacy<small>文明遗产</small></span></div>
         <div class="civilization-actions"><button id="archives" type="button" hidden>天赋树 <span aria-hidden="true">↗</span></button><button id="autobuyer-menu" type="button" hidden>自动购买 <small id="autobuyer-label">未解锁</small></button></div>
       </nav>
+      <p id="challenge-status" class="challenge-status" hidden></p>
       <p id="save-warning" class="save-warning" role="status" hidden></p>
       <section id="debug-tools" class="debug-tools" aria-label="快速调试" hidden>
         <span class="debug-label">调试 · 独立存档</span>
@@ -47,7 +48,7 @@
           <canvas id="battlefield" width="1280" height="480" tabindex="0" role="img" aria-describedby="spell-hint" aria-label="左侧青色为我方，右侧橙色为敌方。士兵自动前进并攻击。"></canvas>
           <div class="target-banner" id="target-banner" hidden><span data-icon="orbital"></span><span id="target-text">选择落点</span><button class="icon-button" id="cancel-target" type="button" data-icon="close" aria-label="取消瞄准" title="取消 · Esc"></button></div>
           <div class="result-overlay" id="result" hidden>
-            <div class="result-card"><h1 id="result-title"></h1><p id="result-detail"></p><button class="primary-button" id="play-again" type="button"><span data-icon="restart"></span>再战一局</button><button id="result-talents" class="text-button" type="button" hidden>查看天赋树</button><small id="result-hint" hidden></small></div>
+            <div class="result-card"><h1 id="result-title"></h1><p id="result-detail"></p><button class="primary-button" id="play-again" type="button"><span data-icon="restart"></span>再战一局</button><button id="result-challenge" class="secondary-button" type="button" hidden>挑战更强文明</button><button id="result-talents" class="text-button" type="button" hidden>查看天赋树</button><small id="result-hint" hidden></small></div>
           </div>
         </div>
         <section class="command-panel" aria-label="作战指令">
@@ -111,7 +112,22 @@
 
         <button id="archive-save" type="button">存档与恢复</button>
       </div>
-      <footer class="archive-footer" id="archive-footer" hidden><p id="rebuild-rules" hidden>重建清空本轮资源、时代与战场；保留有效循环、遗产、天赋和自动购买设置。</p><button class="primary-button" id="rebuild-civilization" type="button" hidden>重建文明</button></footer>
+      <footer class="archive-footer" id="archive-footer" hidden><p id="rebuild-rules" hidden>重建清空本轮资源、时代与战场；保留有效循环、遗产、天赋和自动购买设置。</p><button class="primary-button" id="rebuild-civilization" type="button" hidden>重建文明</button><button class="secondary-button" id="archive-challenge" type="button" hidden>挑战更强文明</button></footer>
+    </dialog>
+    <dialog id="challenge-dialog" aria-labelledby="challenge-title">
+      <header class="help-heading"><h2 id="challenge-title">文明挑战</h2><button id="close-challenge" class="icon-button" type="button" data-icon="close" aria-label="关闭挑战预览"></button></header>
+      <div class="archive-body">
+        <p id="challenge-intro" class="archive-note"></p>
+        <dl class="challenge-stats">
+          <div><dt>敌军起始金币 / 被动收入</dt><dd id="challenge-economy"></dd></div>
+          <div><dt>敌军战斗经验</dt><dd id="challenge-experience"></dd></div>
+          <div><dt>敌军部队生命 / 全部伤害</dt><dd id="challenge-power"></dd></div>
+          <div><dt>敌军基地生命</dt><dd id="challenge-base"></dd></div>
+          <div class="challenge-reward"><dt>击败未来敌军后获得</dt><dd id="challenge-reward"></dd></div>
+        </dl>
+        <p class="archive-note">从原始时代重新开始，清空本轮资源、时代、部队和防御；保留已入账遗产、天赋与自动购买设置。失败不扣已有遗产，可以重试当前难度或回到常规文明。</p>
+        <button id="begin-challenge" class="primary-button" type="button">开始挑战</button>
+      </div>
     </dialog>
     <dialog id="automation-dialog" aria-labelledby="automation-title">
       <header class="help-heading"><h2 id="automation-title">自动购买</h2><button id="close-automation" class="icon-button" type="button" data-icon="close" aria-label="关闭自动购买"></button></header>

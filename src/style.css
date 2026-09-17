@@ -405,3 +405,23 @@ progress::-moz-progress-bar { background: var(--player); border-radius: 2px; }
   .talent-detail p { font-size: 10px; }
   .talent-detail button { font-size: 11px; }
 }
+
+/* Optional challenge choice stays outside the battle controls. */
+#challenge-dialog { width: min(500px, calc(100% - 24px)); max-height: 88dvh; padding: 0; border: 1px solid #506555; border-radius: 12px; color: #e9eae4; background: #18231e; }
+#challenge-dialog::backdrop { background: #080f13ba; backdrop-filter: blur(5px); }
+.challenge-status { margin: -4px 0 12px; font-size: 11px; color: var(--gold); }
+.challenge-stats { margin: 20px 0; font-size: 12px; }
+.challenge-stats > div { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.challenge-stats dt { color: var(--muted); }
+.challenge-stats dd { margin: 0; text-align: right; flex-shrink: 0; }
+.challenge-reward dd { color: var(--gold); font-weight: 600; }
+#result-challenge { margin-left: 8px; }
+.archive-footer { flex-wrap: wrap; gap: 10px; }
+.archive-footer p { flex: 1 1 250px; }
+@media (max-width: 740px) {
+  #result:has(#result-challenge:not([hidden])) .result-card { padding: 10px; }
+  #result:has(#result-challenge:not([hidden])) .result-card p { margin-bottom: 12px; }
+  #result:has(#result-challenge:not([hidden])) button { font-size: 11px; padding-inline: 10px; }
+  #result:has(#result-challenge:not([hidden])) #result-hint { font-size: 9px; margin-top: 8px; }
+  .challenge-stats { font-size: 11px; }
+}

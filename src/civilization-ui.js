@@ -1,6 +1,6 @@
 import { getIncomeRate, AGES } from './game.js';
-import { createProgression, updateProgression, continueCivilization, rebuildCivilization, abandonCivilization } from './progression.js';
-import { SAVE_INTERVAL, SURFACE } from './progression-config.js';
+import { createProgression, updateProgression, continueCivilization, rebuildCivilization, abandonCivilization, startChallenge, getNextChallengeLevel } from './progression.js';
+import { SAVE_INTERVAL, SURFACE, CHALLENGE, getChallengeModifiers } from './progression-config.js';
 import { getTalentBonuses, getLegacyReward, TALENT_VALUES } from './talents.js';
 import { createTalentUI } from './talent-ui.js';
 import { createSaveStore, serializeSession, parseSession, MAX_SAVE_BYTES } from './save.js';
@@ -17,6 +17,26 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   let session = loaded.session ?? freshSession();
   let saveElapsed = 0;
   const dialog = el('archives-dialog'), saveDialog = el('save-dialog'), autoDialog = el('automation-dialog');
+  const challengeDialog = el('challenge-dialog');
+  let offeredRunId = null;
+  const multiplier = value => `×${Number(value.toFixed(3))}`;
+  function openChallenge() {
+    const level = getNextChallengeLevel(session);
+    if (level === null) return;
+    offeredRunId = session.run.runId;
+    const bonuses = getChallengeModifiers(level);
+    text('challenge-title', `文明挑战 ${level}`);
+    text('challenge-intro', `${session.run.phase === 'defeat' ? '重试当前难度' : '下一轮敌军将进一步强化'}。以下倍率均相对于常规文明（显示保留三位小数）。`);
+    text('challenge-economy', `${multiplier(bonuses.gold)} / ${multiplier(bonuses.income)}`);
+    text('challenge-experience', multiplier(bonuses.experience));
+    text('challenge-power', `${multiplier(bonuses.health)} / ${multiplier(bonuses.damage)}`);
+    text('challenge-base', multiplier(bonuses.baseHealth));
+    text('challenge-reward', `+${getLegacyReward(session.permanent.talents, level)} Legacy`);
+    text('begin-challenge', `开始挑战 ${level}`);
+    dialog.close(); autoDialog.close();
+    if (!challengeDialog.open) challengeDialog.showModal();
+    changed();
+  }
   function report(result, success = '已保存完整文明进度。') {
     text('save-status', result.ok ? success : result.error);
     el('save-warning').hidden = Boolean(result.ok);
@@ -37,13 +57,13 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   }
   function openSave() { if (!saveDialog.open) saveDialog.showModal(); changed(); }
   function replace(next) { session = next; saveElapsed = 0;
-    dialog.close(); autoDialog.close();
+    dialog.close(); autoDialog.close(); challengeDialog.close(); offeredRunId = null;
     changed(true); }
   function transition(action) {
     const runId = session.run.runId;
     if (!action()) return;
     if (debug && session.run.runId !== runId) supplyDebugRun(session);
-    save(); dialog.close(); autoDialog.close(); changed(true);
+    save(); dialog.close(); autoDialog.close(); challengeDialog.close(); offeredRunId = null; changed(true);
   }
   el('restart').title = '重开本轮文明 · 永久进度保留';
   el('restart').setAttribute('aria-label', '重开本轮文明');
@@ -60,6 +80,14 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   autoDialog.addEventListener('close', () => changed());
   el('close-archives').addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => changed());
+  el('result-challenge').addEventListener('click', openChallenge);
+  el('archive-challenge').addEventListener('click', openChallenge);
+  el('close-challenge').addEventListener('click', () => challengeDialog.close());
+  challengeDialog.addEventListener('close', () => { offeredRunId = null; changed(); });
+  el('begin-challenge').addEventListener('click', () => {
+    const runId = offeredRunId;
+    transition(() => startChallenge(session, runId));
+  });
   if (debug) {
     el('debug-tools').hidden = false;
     el('clear-progress').textContent = '清空调试进度';
@@ -118,6 +146,13 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   function sync() {
     const { run, permanent: p, game } = session;
     const between = ['destruction', 'defeat'].includes(run.phase);
+    const nextChallenge = getNextChallengeLevel(session);
+    const challengeLabel = run.phase === 'defeat' ? `重试挑战 ${nextChallenge}` : `挑战更强文明 · ${nextChallenge}`;
+    for (const id of ['result-challenge', 'archive-challenge']) {
+      el(id).hidden = nextChallenge === null; text(id, challengeLabel);
+    }
+    el('challenge-status').hidden = !run.challengeLevel;
+    text('challenge-status', `文明挑战 ${run.challengeLevel} · 通关 +${getLegacyReward(run.talents, run.challengeLevel)} Legacy${run.challengeLevel === CHALLENGE.maxLevel ? ' · 最高难度' : ''}`);
     document.body.dataset.civilizationPhase = run.phase;
     if (debug) {
       el('debug-speed').value = String(session.debugSpeed);
@@ -131,10 +166,15 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     el('archive-footer').hidden = !between;
     el('cycle-outcome').hidden = run.phase === 'battle' || run.phase === 'victory';
     el('rebuild-rules').hidden = !between; el('rebuild-civilization').hidden = !between;
-    text('rebuild-civilization', run.phase === 'defeat' ? '从原始时代重试' : '重建文明');
+    text('rebuild-civilization', run.challengeLevel ? '结束挑战 · 常规重建' : run.phase === 'defeat' ? '从原始时代重试' : '重建文明');
     talentControls.sync();
     const growth = getTalentBonuses(run.talents);
-    text('active-bonuses', `本轮：生产档案 ${run.upgrades.production} 级，${AGES[game.ages.player].income} × ${formatMultiplier(game.modifiers.income)} = ${formatMultiplier(getIncomeRate(game))} 金币/秒；战争档案 ${run.upgrades.warfare} 级，经验 ×${formatMultiplier(game.modifiers.experience)}。阵亡先按原规则向下取整，再乘倍率逐笔向下取整。重建储备提供起始金币 +${growth.startingGold}；战利品回收使击杀金币 ×${growth.bounty}，逐笔向下取整。终局遗产：(${SURFACE.legacyPerCycle} + ${run.talents.conservation}) × ${1 + run.talents.continuity * TALENT_VALUES.legacyMultiplierPerLevel}，向下取整 = ${getLegacyReward(run.talents)}。`);
+    let activeBonuses = `本轮：生产档案 ${run.upgrades.production} 级，${AGES[game.ages.player].income} × ${formatMultiplier(game.modifiers.income)} = ${formatMultiplier(getIncomeRate(game))} 金币/秒；战争档案 ${run.upgrades.warfare} 级，经验 ×${formatMultiplier(game.modifiers.experience)}。阵亡先按原规则向下取整，再乘倍率逐笔向下取整。重建储备提供起始金币 +${growth.startingGold}；战利品回收使击杀金币 ×${growth.bounty}，逐笔向下取整。终局遗产：(${SURFACE.legacyPerCycle} + ${run.talents.conservation}) × ${1 + run.talents.continuity * TALENT_VALUES.legacyMultiplierPerLevel} × ${run.challengeLevel + 1}（挑战倍率），最终向下取整 = ${getLegacyReward(run.talents, run.challengeLevel)}。`;
+    if (run.challengeLevel) {
+      const enemy = game.enemyModifiers;
+      activeBonuses += ` 挑战 ${run.challengeLevel}：敌军起始金币与收入 ${multiplier(enemy.income)}，战斗经验 ${multiplier(enemy.experience)}，部队生命与全部伤害 ${multiplier(enemy.health)}，基地生命 ${multiplier(enemy.baseHealth)}（倍率显示保留三位小数）。击杀金币不因挑战增加。`;
+    }
+    text('active-bonuses', activeBonuses);
     el('archives').hidden = p.completedCycles === 0;
     el('civilization-bar').hidden = p.completedCycles === 0;
     el('autobuyer-menu').hidden = p.completedCycles === 0;
@@ -142,13 +182,14 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     text('autobuyer-label', !p.automation.unlocked ? '未解锁' : p.automation.enabled ? '已开启' : '已关闭');
     el('autobuyer-menu').dataset.enabled = String(p.automation.enabled);
     el('archives').setAttribute('aria-label', `天赋树，${p.legacy} 文明遗产`);
-    el('result-talents').hidden = run.phase !== 'destruction' || p.completedCycles < 2;
+    el('result-talents').hidden = run.phase !== 'destruction' || p.completedCycles < 2 || nextChallenge !== null;
     el('result').classList.toggle('destruction', run.phase === 'destruction');
     if (run.phase !== 'battle') {
       text('result-title', run.phase === 'destruction' ? '文明未能幸存' : run.phase === 'victory' ? '战役胜利' : game.status === 'draw' ? '平局' : '战败');
       text('result-detail', run.phase === 'destruction' ? `你赢得了战争，却没能保住文明。+${run.earnedLegacy} 文明遗产已计入本轮结算。` :
         run.phase === 'victory' ? `敌方${AGES[game.ages.enemy].name}基地已被摧毁。资产保留，下一场冲突等待着你。` : '本轮没有遗产奖励。永久进度仍然保留。');
       text('play-again', run.phase === 'victory' ? '继续文明进程' : run.phase === 'destruction' ? (p.completedCycles === 1 ? '查看遗产与天赋' : '重建文明') : p.completedCycles ? '查看档案与重试' : '从原始时代重试');
+      if (run.challengeLevel && between) text('play-again', '结束挑战 · 常规重建');
       el('result-hint').hidden = false;
       text('result-hint', run.phase === 'destruction' ? (p.completedCycles === 1 ? '第一份文明遗产 · 解锁你的第一个天赋' : '重建清空本轮资源与战场 · 保留遗产、天赋与自动购买设置') : run.phase === 'victory' ? '未完成订单按支付价格退款 · 基地恢复满血' : '从原始时代重新尝试');
     }
@@ -159,8 +200,8 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   else text('save-status', '已恢复上次保存的完整进度，没有离线推进。');
   return {
     get session() { return session; },
-    get paused() { return dialog.open || saveDialog.open || autoDialog.open; },
-    get modalOpen() { return dialog.open || saveDialog.open || autoDialog.open; },
+    get paused() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open; },
+    get modalOpen() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open; },
     get timeScale() { return debug ? session.debugSpeed : 1; },
     sync, save, open,
     step(dt) {
@@ -173,14 +214,14 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
         const battleId = session.run.battleId;
         transition(() => continueCivilization(session, battleId));
       } else if ((session.run.phase === 'destruction' && session.permanent.completedCycles > 1) ||
-          (session.run.phase === 'defeat' && !session.permanent.completedCycles)) {
+          (session.run.phase === 'defeat' && (!session.permanent.completedCycles || session.run.challengeLevel))) {
         transition(() => rebuildCivilization(session, session.run.runId));
       } else if (['destruction', 'defeat'].includes(session.run.phase)) open();
     },
     restart() {
       if (['destruction', 'defeat'].includes(session.run.phase)) return this.resultAction();
       const runId = session.run.runId;
-      if (!window.confirm('放弃当前文明并从原始时代重开？本轮金币、经验、部队和防御将清除，不发放遗产；已有永久进度保留。')) return;
+      if (!window.confirm(`放弃当前文明并从原始时代重开${session.run.challengeLevel ? `挑战 ${session.run.challengeLevel}` : ''}？本轮金币、经验、部队和防御将清除，不发放遗产；已有永久进度保留。`)) return;
       transition(() => abandonCivilization(session, runId));
     },
   };

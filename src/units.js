@@ -506,7 +506,7 @@ function superSoldier(ctx, c, m, unit) {
   ctx.restore();
 }
 
-export function drawUnit(ctx, unit, time, scale = 1, reducedMotion = false) {
+export function drawUnit(ctx, unit, time, scale = 1, reducedMotion = false, maxHealth = UNITS[unit.type].health) {
   const stats = UNITS[unit.type];
   const remaining = Math.max(0, unit.attackAnimation ?? 0);
   const duration = stats.attackDuration;
@@ -546,10 +546,10 @@ export function drawUnit(ctx, unit, time, scale = 1, reducedMotion = false) {
     case 'warMachine': hoverMachine(ctx, c, m); break;
   }
   ctx.restore();
-  if (unit.hp < stats.health) {
+  if (unit.hp < maxHealth) {
     const width = stats.footprint ? 44 : 28, y = -stats.height - 12;
     ctx.fillStyle = '#142627'; ctx.fillRect(-width / 2, y, width, 4);
-    ctx.fillStyle = c.trim; ctx.fillRect(-width / 2, y, width * Math.max(0, unit.hp) / stats.health, 4);
+    ctx.fillStyle = c.trim; ctx.fillRect(-width / 2, y, width * Math.min(1, Math.max(0, unit.hp) / maxHealth), 4);
   }
   ctx.restore();
 }

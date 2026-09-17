@@ -1,5 +1,5 @@
-import { RULES, AGES, UNITS, TURRETS, ABILITIES } from './game.js';
-import { SAVE_VERSION, SURFACE, UPGRADE_COSTS, AUTOMATION_TARGETS, AUTOMATION_INTERVAL, getBonuses } from './progression-config.js';
+import { RULES, AGES, UNITS, TURRETS, ABILITIES, getBaseHealth, getUnitHealth } from './game.js';
+import { SAVE_VERSION, SURFACE, UPGRADE_COSTS, AUTOMATION_TARGETS, AUTOMATION_INTERVAL, CHALLENGE, getChallengeModifiers, getBonuses } from './progression-config.js';
 import { DEBUG_SPEEDS } from './debug.js';
 import { TALENTS, emptyTalents, getTalentBonuses, getTalentSpending, getLegacyReward } from './talents.js';
 import { createAutomation, validAutomation } from './automation.js';
@@ -28,7 +28,8 @@ function levels(value) {
   check(object(value) && Object.keys(value).length === 2, '升级等级');
   for (const key of ['production', 'warfare']) check(int(value[key], 0, UPGRADE_COSTS.length), key);
 }
-const V3_TALENTS = { ...TALENTS, conservation: { ...TALENTS.conservation, requires: {} } };
+const V4_TALENTS = Object.fromEntries(Object.entries(TALENTS).filter(([key]) => key !== 'challenge'));
+const V3_TALENTS = { ...V4_TALENTS, conservation: { ...TALENTS.conservation, requires: {} } };
 const V2_TALENTS = Object.fromEntries(Object.entries(V3_TALENTS).filter(([key]) => !['autobuyer', 'logistics'].includes(key)).map(([key, config]) => [key, key === 'formation' ? { ...config, requires: {} } : config]));
 function talentLevels(value, upgrades, configs = TALENTS) {
   check(object(value) && Object.keys(value).length === Object.keys(configs).length, '天赋等级');
@@ -59,7 +60,7 @@ function safeTree(value, depth = 0, key = '') {
 
 function validateRecord(session, version = SAVE_VERSION) {
   const oldVersion = version === 1, previousVersion = version < 3;
-  const configs = version === 2 ? V2_TALENTS : version === 3 ? V3_TALENTS : TALENTS;
+  const configs = version === 2 ? V2_TALENTS : version === 3 ? V3_TALENTS : version === 4 ? V4_TALENTS : TALENTS;
   check(object(session), '根记录');
   check(session.version === version, '不支持的存档版本');
   check(session.debug === undefined || session.debug === true, '调试标记');
@@ -70,11 +71,14 @@ function validateRecord(session, version = SAVE_VERSION) {
   check(int(p.completedCycles) && int(p.legacy), '遗产或循环数');
   levels(p.upgrades); levels(run.upgrades);
   if (!oldVersion) { talentLevels(p.talents, p.upgrades, configs); talentLevels(run.talents, run.upgrades, configs); }
+  const challengeLevel = version >= 5 ? run.challengeLevel : 0;
+  check(int(challengeLevel, 0, CHALLENGE.maxLevel), '挑战难度');
+  check(!challengeLevel || (run.talents.challenge === 1 && p.completedCycles >= challengeLevel), '挑战未解锁');
   if (version >= 4) for (const state of [p, run]) {
     check(!Object.values(state.upgrades).some(level => level > 0) || state.talents.autobuyer === 1, '档案需要根天赋');
   }
   const totalLegacy = oldVersion ? p.completedCycles * SURFACE.legacyPerCycle : p.totalLegacy;
-  const maxReward = oldVersion ? SURFACE.legacyPerCycle : getLegacyReward(Object.fromEntries(Object.entries(TALENTS).map(([key, config]) => [key, config.costs.length])));
+  const maxReward = oldVersion ? SURFACE.legacyPerCycle : getLegacyReward(Object.fromEntries(Object.entries(TALENTS).map(([key, config]) => [key, config.costs.length])), version >= 5 ? CHALLENGE.maxLevel : 0);
   check(int(totalLegacy, p.completedCycles * SURFACE.legacyPerCycle, Math.min(limit, p.completedCycles * maxReward)), '累计遗产');
   if (!previousVersion) {
     list(p.talentGrants, 2, '旧版功能保留');
@@ -91,7 +95,7 @@ function validateRecord(session, version = SAVE_VERSION) {
   check(id(run.runId) && int(run.battleNumber, 1, SURFACE.finalEnemyAge) && run.battleId === `${run.runId}:${run.battleNumber}`, '文明或战斗标识');
   check(run.processedBattleId === null || (id(run.processedBattleId) && run.processedBattleId.startsWith(`${run.runId}:`)), '胜利处理标记');
   check(['battle', 'victory', 'destruction', 'defeat'].includes(run.phase) && bool(run.settled), '流程阶段');
-  const reward = oldVersion ? SURFACE.legacyPerCycle : getLegacyReward(run.talents);
+  const reward = oldVersion ? SURFACE.legacyPerCycle : getLegacyReward(run.talents, challengeLevel);
   check(int(run.earnedLegacy, 0, reward), '本轮遗产');
   numbers(run, ['elapsed', 'autoElapsed']);
   check(run.autoElapsed < AUTOMATION_INTERVAL + 1e-8, '自动招募时钟');
@@ -111,6 +115,11 @@ function validateRecord(session, version = SAVE_VERSION) {
   const bonuses = getBonuses(run.upgrades);
   check(g.modifiers.income === bonuses.income && g.modifiers.experience === bonuses.experience, '本轮倍率');
   if (!oldVersion) check(g.modifiers.bounty === getTalentBonuses(run.talents).bounty, '本轮战利品倍率');
+  if (version >= 5) {
+    const expected = getChallengeModifiers(challengeLevel);
+    check(object(g.enemyModifiers) && Object.keys(g.enemyModifiers).length === Object.keys(expected).length &&
+      Object.entries(expected).every(([key, value]) => g.enemyModifiers[key] === value), '敌军挑战倍率');
+  }
   check(['playing', 'won', 'lost', 'draw'].includes(g.status), '战斗状态');
   check((run.phase === 'battle' && g.status === 'playing') ||
     (['victory', 'destruction'].includes(run.phase) && g.status === 'won') ||
@@ -124,7 +133,7 @@ function validateRecord(session, version = SAVE_VERSION) {
     check(int(g.ages[team], 1, SURFACE.finalEnemyAge) && num(g.gold[team]) && int(g.experience[team]), '时代或资源');
     const base = g.bases[team];
     check(object(base) && base.team === team && base.x === (team === 'player' ? RULES.playerBaseX : RULES.enemyBaseX), '基地');
-    check(base.maxHp === AGES[g.ages[team]].baseHealth && num(base.hp, 0, base.maxHp) && num(base.hitFlash), '基地生命');
+    check(base.maxHp === (version >= 5 ? getBaseHealth(g, team) : AGES[g.ages[team]].baseHealth) && num(base.hp, 0, base.maxHp) && num(base.hitFlash), '基地生命');
     list(g.queues[team], RULES.queueLimit, '训练队列');
     for (const order of g.queues[team]) {
       check(object(order) && member(order.type, UNITS) && int(order.id, 1, g.nextOrderId - 1) && !orderIds.has(order.id), '训练订单');
@@ -148,7 +157,7 @@ function validateRecord(session, version = SAVE_VERSION) {
   for (const unit of g.units) {
     check(object(unit) && member(unit.type, UNITS) && teams.includes(unit.team) && int(unit.id, 1, g.nextUnitId - 1) && !unitIds.has(unit.id), '部队实体');
     unitIds.add(unit.id);
-    check(UNITS[unit.type].age <= g.ages[unit.team] && num(unit.hp, Number.MIN_VALUE, UNITS[unit.type].health) && num(unit.x, 0, RULES.width) && bool(unit.moving), '部队属性');
+    check(UNITS[unit.type].age <= g.ages[unit.team] && num(unit.hp, Number.MIN_VALUE, version >= 5 ? getUnitHealth(g, unit.type, unit.team) : UNITS[unit.type].health) && num(unit.x, 0, RULES.width) && bool(unit.moving), '部队属性');
     numbers(unit, ['attackCooldown', 'attackAnimation', 'hitFlash'], ['distanceTravelled', 'chargeTravel', 'guardFlash', 'attackApproach', 'moveMultiplier', 'burstRemaining', 'burstCooldown'], -1);
     if (unit.attackStyle !== undefined) check(['melee', 'ranged'].includes(unit.attackStyle), '攻击姿态');
     if (unit.lastAttackCharged !== undefined) check(bool(unit.lastAttackCharged), '冲锋');
@@ -240,6 +249,13 @@ export function parseSession(text) {
       p.talentGrants.push('autobuyer');
       p.automation.unlocked = true; // Remains off unless the player enables it.
     }
+    session.version = 4;
+  }
+  if (session?.version === 4) {
+    validateRecord(session, 4);
+    session.permanent.talents.challenge = session.run.talents.challenge = 0;
+    session.run.challengeLevel = 0;
+    session.game.enemyModifiers = getChallengeModifiers(0);
     session.version = SAVE_VERSION;
   }
   return validateSession(session);

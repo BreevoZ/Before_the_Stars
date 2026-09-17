@@ -96,18 +96,31 @@ export function createGame(options = {}) {
   if (options.mode === 'incremental') {
     game.mode = 'incremental';
     game.modifiers = { income: options.modifiers?.income ?? 1, experience: options.modifiers?.experience ?? 1, bounty: options.modifiers?.bounty ?? 1 };
+    game.enemyModifiers = Object.fromEntries(['gold', 'income', 'experience', 'health', 'damage', 'baseHealth']
+      .map(key => [key, options.enemyModifiers?.[key] ?? 1]));
+    game.gold.enemy = Math.floor(game.gold.enemy * game.enemyModifiers.gold);
+    game.bases.enemy.hp = game.bases.enemy.maxHp = getBaseHealth(game, 'enemy');
   }
   return game;
 }
 
+function enemyMultiplier(game, team, key) {
+  return team === 'enemy' && game.mode === 'incremental' ? game.enemyModifiers?.[key] ?? 1 : 1;
+}
+export function getBaseHealth(game, team, age = game.ages[team]) {
+  return Math.round(AGES[age].baseHealth * enemyMultiplier(game, team, 'baseHealth'));
+}
+export function getUnitHealth(game, type, team) {
+  return Math.round(UNITS[type].health * enemyMultiplier(game, team, 'health'));
+}
 export function getIncomeRate(game, team = 'player') {
-  return AGES[game.ages[team]].income * (team === 'player' && game.mode === 'incremental' ? game.modifiers.income : 1);
+  return AGES[game.ages[team]].income * (team === 'player' && game.mode === 'incremental' ? game.modifiers.income : enemyMultiplier(game, team, 'income'));
 }
 
 // Preserve the classic reward first (including casualty rounding), then apply
-// the player's archive multiplier and floor each individual award once more.
+// the team's archive/challenge multiplier and floor each individual award once more.
 export function getExperienceReward(game, baseReward, team = 'player') {
-  return Math.floor(baseReward * (team === 'player' && game.mode === 'incremental' ? game.modifiers.experience : 1));
+  return Math.floor(baseReward * (team === 'player' && game.mode === 'incremental' ? game.modifiers.experience : enemyMultiplier(game, team, 'experience')));
 }
 
 export function getBountyReward(game, baseReward, team = 'player') {
@@ -124,11 +137,11 @@ export function getEvolutionState(game, team = 'player') {
 
 export function evolve(game, team = 'player') {
   if (getEvolutionState(game, team) !== 'ready') return false;
-  const nextAge = AGES[game.ages[team] + 1];
   const base = game.bases[team];
   // Keep damage already taken. Evolution adds capacity, not a full heal.
-  base.hp += nextAge.baseHealth - base.maxHp;
-  base.maxHp = nextAge.baseHealth;
+  const health = getBaseHealth(game, team, game.ages[team] + 1);
+  base.hp += health - base.maxHp;
+  base.maxHp = health;
   game.ages[team]++;
   game.effects.push({ kind: 'evolve', x: base.x, team, life: 1.2, duration: 1.2 });
   return true;
@@ -272,7 +285,7 @@ function updateTraining(game, team, dt) {
   const blocked = allies.some(unit => UNITS[unit.type].lane === stats.lane && Math.abs(unit.x - spawnX(team)) < unitSpacing(order.type, unit.type));
   if (order.remaining > EPSILON || allies.length >= RULES.armyLimit || blocked) return;
   game.units.push({
-    id: game.nextUnitId++, team, type: order.type, x: spawnX(team), hp: stats.health,
+    id: game.nextUnitId++, team, type: order.type, x: spawnX(team), hp: getUnitHealth(game, order.type, team),
     attackCooldown: 0, attackAnimation: 0, hitFlash: 0, moving: false, distanceTravelled: 0, chargeTravel: 0,
   });
   game.queues[team].shift();
@@ -600,7 +613,10 @@ function resolveHits(game, hits) {
     const stats = hit.target.type ? UNITS[hit.target.type] : null;
     const armor = stats && !hit.ignoreArmor ? Math.max(0, stats.armor - (hit.armorPierce ?? 0)) : 0;
     const guard = hit.ranged && !hit.ignoreArmor ? stats?.rangedReduction ?? 0 : 0;
-    hit.target.hp = Math.max(0, hit.target.hp - Math.max(1, (hit.damage - armor) * (1 - guard)));
+    // Scale outgoing damage exactly once, before armor/guard, including shots,
+    // charge/cleave, turret penetration and persistent fire/oil ticks.
+    const damage = hit.damage * enemyMultiplier(game, hit.team, 'damage');
+    hit.target.hp = Math.max(0, hit.target.hp - Math.max(1, (damage - armor) * (1 - guard)));
     if (guard) hit.target.guardFlash = 0.18;
     hit.target.hitFlash = 0.14;
     if (hit.visual !== false) {

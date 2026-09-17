@@ -1,5 +1,5 @@
 import { drawTurret } from './turrets.js';
-import { RULES, UNITS, AGES, ABILITIES, getTurretPosition, getAbilityRadius, getAbilityImpactX } from './game.js';
+import { RULES, UNITS, AGES, ABILITIES, getTurretPosition, getAbilityRadius, getAbilityImpactX, getUnitHealth } from './game.js';
 import { drawUnit } from './units.js';
 import { drawBase } from './bases.js';
 import { drawProjectile, drawImpact, drawFields, drawAbilityImpact, drawArrow } from './combat-effects.js';
@@ -219,7 +219,7 @@ export function createRenderer(canvas) {
     drawFields(ctx, game, time, entityScale, reducedMotion.matches);
     // Draw the ranged rank behind the frontline, including when allies pass each other.
     for (const lane of ['back', 'front']) {
-      for (const unit of game.units) if (UNITS[unit.type].lane === lane) drawUnit(ctx, unit, game.elapsed, entityScale, reducedMotion.matches);
+      for (const unit of game.units) if (UNITS[unit.type].lane === lane) drawUnit(ctx, unit, game.elapsed, entityScale, reducedMotion.matches, getUnitHealth(game, unit.type, unit.team));
     }
     for (const shot of game.projectiles) drawProjectile(ctx, shot, entityScale, reducedMotion.matches);
     if (targeting) drawTarget(ctx, targetX, getAbilityRadius(AGES[game.ages.player].ability));

@@ -1155,6 +1155,7 @@ test('Browser UI: purchase, queue/refund, tower, meteor targeting, keyboard, tra
   frame.src = '../?mode=classic'; frame.title = 'Game integration test';
   document.body.append(frame);
   await loaded;
+  try {
   const page = frame.contentDocument;
   const el = id => page.getElementById(id);
   const key = (code, repeat = false) => page.body.dispatchEvent(new frame.contentWindow.KeyboardEvent('keydown', { code, repeat, bubbles: true, cancelable: true }));
@@ -1186,13 +1187,19 @@ test('Browser UI: purchase, queue/refund, tower, meteor targeting, keyboard, tra
   el('restart').click();
   key('Digit1'); key('Digit2'); key('Digit3', true);
   assert(el('queue-count').textContent === '2 / 5');
-  await new Promise(resolve => setTimeout(resolve, 1850));
+  // Real animation frames may arrive late on busy/mobile browsers. Wait for
+  // the visible training result, without bypassing the simulation clock.
+  const deadline = performance.now() + 8000;
+  while (el('player-count').textContent === '0' && performance.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
   assert(el('player-count').textContent === '1', 'A real browser frame loop must finish training');
   el('restart').click();
   assert(el('player-count').textContent === '0' && el('enemy-count').textContent === '0' && el('clock').textContent === '00:00');
   const canvas = el('battlefield');
   assert(canvas.getContext('2d').getImageData(0, 0, 1, 1).data[3] === 255);
   assert(page.documentElement.scrollWidth <= frame.clientWidth);
+  } finally { frame.remove(); }
 });
 
 test('Browser UI: earn experience, evolve independently, replace cards and shortcuts, then reset', async () => {

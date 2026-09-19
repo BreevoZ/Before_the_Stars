@@ -1,10 +1,10 @@
 import { Q } from './quantity.js';
 import { RULES, AGES, UNITS, TURRETS, ABILITIES, getBaseHealth, getUnitHealth } from './game.js';
-import { SAVE_VERSION, SURFACE, UPGRADE_COSTS, AUTOMATION_TARGETS, AUTOMATION_INTERVAL, CHALLENGE, getChallengeModifiers, getBonuses } from './progression-config.js';
+import { SAVE_VERSION, SURFACE, UPGRADE_COSTS, AUTOMATION_TARGETS, AUTOMATION_INTERVAL, CHALLENGE, getChallengeModifiers, getBonuses, automationUnlocked, availableSpeeds } from './progression-config.js';
 import { DEBUG_SPEEDS } from './debug.js';
-import { TALENTS, getTalentBonuses, getLegacyReward } from './talents.js';
+import { TALENTS, getTalentBonuses, getLegacyReward, meetsTalentRequirements } from './talents.js';
 import { stat, attributes, createBonusStack, legacyBonuses, STAT_DEFINITIONS } from './stats.js';
-import { getRunBonuses } from './progression-bonuses.js';
+import { getRunBonuses, getV8RunBonuses } from './progression-bonuses.js';
 import { validAutomation } from './automation.js';
 
 import { check, object, num, int, bool, id, member, numbers, list, safeTree, limit } from './save-primitives.js';
@@ -12,16 +12,18 @@ import { HISTORICAL_TALENTS, HISTORICAL_UPGRADE_COSTS } from './save-history.js'
 import { validateShape, SESSION_SHAPE, RUN_SHAPE, GAME_SHAPE, UNIT_SHAPE, ORDER_SHAPE, TURRET_SHAPE, SHOT_SHAPE, FIELD_SHAPE, EFFECT_SHAPE, IMPACT_SHAPE, ABILITY_SHAPE, AI_SHAPE } from './save-schema.js';
 import { phaseMatchesResult } from './progression-machine.js';
 
+import { TRAITS, validTraitState } from './traits.js';
 const teams = ['player', 'enemy'];
 function levels(value, costs) {
   check(object(value) && Object.keys(value).length === 2, '升级等级');
   for (const key of ['production', 'warfare']) check(int(value[key], 0, costs.length), key);
 }
-function talentLevels(value, upgrades, configs = TALENTS) {
+function talentLevels(value, upgrades, configs = TALENTS, grants = []) {
   check(object(value) && Object.keys(value).length === Object.keys(configs).length, '天赋等级');
   for (const [key, config] of Object.entries(configs)) {
     check(int(value[key], 0, config.costs.length), `天赋 ${key}`);
-    if (value[key]) for (const [parent, required] of Object.entries(config.requires)) {
+    if (configs === TALENTS && value[key] && !grants.includes(key)) check(meetsTalentRequirements({ ...value, ...upgrades }, config), '时代层前置条件');
+    if (value[key] && !grants.includes(key)) for (const [parent, required] of Object.entries(config.requires)) {
       check((value[parent] ?? upgrades[parent]) >= required, '天赋前置条件');
     }
   }
@@ -45,12 +47,12 @@ export function validateRecord(session, version = SAVE_VERSION) {
   check(int(p.completedCycles) && int(p.legacy), '遗产或循环数');
   const upgradeCosts = version < 8 ? HISTORICAL_UPGRADE_COSTS : UPGRADE_COSTS;
   levels(p.upgrades, upgradeCosts); levels(run.upgrades, upgradeCosts);
-  if (!oldVersion) { talentLevels(p.talents, p.upgrades, configs); talentLevels(run.talents, run.upgrades, configs); }
+  if (!oldVersion) { talentLevels(p.talents, p.upgrades, configs, version >= 9 ? p.talentGrants : []); talentLevels(run.talents, run.upgrades, configs, version >= 9 ? p.talentGrants : []); }
   const challengeLevel = version >= 5 ? run.challengeLevel : 0;
   check(int(challengeLevel, 0, CHALLENGE.maxLevel), '挑战难度');
   check(!challengeLevel || (run.talents.challenge === 1 && p.completedCycles >= challengeLevel), '挑战未解锁');
   if (version >= 4) for (const state of [p, run]) {
-    check(!Object.values(state.upgrades).some(level => level > 0) || state.talents.autobuyer === 1, '档案需要根天赋');
+    check(!Object.values(state.upgrades).some(level => level > 0) || state.talents[version < 9 ? 'autobuyer' : 'spark'] === 1, '档案需要根天赋');
   }
   if (version >= 6) {
     check(g.mode === 'incremental' && Array.isArray(g.bonuses) && !g.modifiers && !g.enemyModifiers, '属性管线');
@@ -59,7 +61,7 @@ export function validateRecord(session, version = SAVE_VERSION) {
     if (version < 7) for (const effect of [...g.bonuses, ...(run.extraBonuses ?? [])]) {
       check(typeof effect.value === 'boolean' || num(effect.value, -1e9, 1e9), '旧版属性值');
     }
-    check(JSON.stringify(createBonusStack(g.bonuses)) === JSON.stringify(getRunBonuses(run)), '属性栈与本轮来源不一致');
+    check(JSON.stringify(createBonusStack(g.bonuses)) === JSON.stringify((version < 9 ? getV8RunBonuses : getRunBonuses)(run)), '属性栈与本轮来源不一致');
   }
   const combat = version >= 6 ? g : { ...g, bonuses: legacyBonuses(g.modifiers, g.enemyModifiers) };
   const totalLegacy = oldVersion ? p.completedCycles * SURFACE.legacyPerCycle : p.totalLegacy;
@@ -68,9 +70,9 @@ export function validateRecord(session, version = SAVE_VERSION) {
   const maxReward = version >= 6 ? STAT_DEFINITIONS.legacy.max : oldVersion ? SURFACE.legacyPerCycle : getLegacyReward(Object.fromEntries(Object.entries(TALENTS).map(([key, config]) => [key, config.costs.length])), version >= 5 ? CHALLENGE.maxLevel : 0);
   check(int(totalLegacy, version >= 6 ? 0 : p.completedCycles * SURFACE.legacyPerCycle, Math.min(limit, p.completedCycles * maxReward)), '累计遗产');
   if (!previousVersion) {
-    list(p.talentGrants, 2, '旧版功能保留');
+    list(p.talentGrants, version < 9 ? 2 : 3, '旧版功能保留');
     check(new Set(p.talentGrants).size === p.talentGrants.length && p.talentGrants.every(key =>
-      ['autobuyer', 'logistics'].includes(key) && p.talents[key] === 1 && p.completedCycles > 0), '旧版功能保留');
+      (version < 9 ? ['autobuyer', 'logistics'] : ['spark', 'logistics', 'superSoldierPlan']).includes(key) && p.talents[key] === 1 && p.completedCycles > 0), '旧版功能保留');
   }
   const spent = Object.values(p.upgrades).reduce((sum, level) => sum + upgradeCosts.slice(0, level).reduce((a, b) => a + b, 0), 0)
     + (oldVersion ? 0 : Object.entries(configs).reduce((sum, [key, config]) => sum +
@@ -78,8 +80,12 @@ export function validateRecord(session, version = SAVE_VERSION) {
   check(p.legacy + spent === totalLegacy, '遗产收支不一致');
   const auto = p.automation;
   check(object(auto) && bool(auto.unlocked) && bool(auto.enabled) && AUTOMATION_TARGETS.includes(auto.target), '自动招募设置');
-  check(auto.unlocked === (previousVersion ? p.completedCycles > 0 : p.talents.autobuyer > 0) && (auto.unlocked || !auto.enabled), '自动招募解锁');
+  check(auto.unlocked === (previousVersion ? p.completedCycles > 0 : version < 9 ? p.talents.autobuyer > 0 : automationUnlocked(p)) && (auto.unlocked || !auto.enabled), '自动招募解锁');
   if (!oldVersion) check(validAutomation(auto, p.talents, previousVersion), '自动购买设置或解锁条件');
+  if (version >= 9) {
+    check(object(p.settings) && availableSpeeds(p).includes(p.settings.speed), '游戏速度设置');
+    check(bool(p.automationRetained) && (!p.automationRetained || p.talentGrants.includes('spark')), '自动招募保留标记');
+  }
   if (version < 7) check(num(auto.reserve ?? 0, 0, 1e9), '旧版预留金币');
   check(id(run.runId) && int(run.battleNumber, 1, SURFACE.finalEnemyAge) && run.battleId === `${run.runId}:${run.battleNumber}`, '文明或战斗标识');
   check(run.processedBattleId === null || (id(run.processedBattleId) && run.processedBattleId.startsWith(`${run.runId}:`)), '胜利处理标记');
@@ -147,6 +153,7 @@ export function validateRecord(session, version = SAVE_VERSION) {
     check(member(unit.type, UNITS) && teams.includes(unit.team) && int(unit.id, 1, g.nextUnitId - 1) && !unitIds.has(unit.id), '部队实体');
     unitIds.add(unit.id);
     check(UNITS[unit.type].age <= g.ages[unit.team] && amount(unit.hp, 0, version >= 5 ? oldHealthCap(getUnitHealth(combat, unit.type, unit.team)) : UNITS[unit.type].health) && Q.gt(unit.hp, 0) && num(unit.x, 0, RULES.width) && bool(unit.moving), '部队属性');
+    if (version >= 9) check(validTraitState(unit), '兵种特性状态');
     if (unit.attackStyle !== undefined) check(['melee', 'ranged'].includes(unit.attackStyle), '攻击姿态');
     if (unit.lastAttackCharged !== undefined) check(bool(unit.lastAttackCharged), '冲锋');
     if (unit.burstTargetId != null) check(int(unit.burstTargetId, 1, g.nextUnitId - 1), '连发目标');
@@ -168,11 +175,14 @@ export function validateRecord(session, version = SAVE_VERSION) {
       check(amount(field.damage), '地面伤害');
       check(num(field.tickInterval, RULES.fixedStep, 10) && num(field.duration, RULES.fixedStep, 60) && field.remaining <= field.duration && field.slow > 0 && field.slow <= 1, '弹药地面效果进度');
     }
+    if (shot.sourceId !== undefined) check(int(shot.sourceId, 1, g.nextUnitId - 1), '弹药士兵来源');
+    if (shot.trait !== undefined) check(member(shot.trait, TRAITS), '弹药特性');
     if (shot.turretType !== undefined) check(member(shot.turretType, TURRETS), '弹药来源');
   }
   list(g.fields, 128, '地面效果');
   for (const field of g.fields) {
     validateShape(field, FIELD_SHAPE, 'field');
+    if (field.sourceId !== undefined) check(int(field.sourceId, 1, g.nextUnitId - 1) && member(field.trait, TRAITS), '火场来源');
     check(teams.includes(field.team) && num(field.x), '地面效果位置');
     check(amount(field.damage), '地面伤害');
     check(num(field.tickInterval, RULES.fixedStep, 10) && num(field.duration, RULES.fixedStep, 60) && field.remaining <= field.duration && field.slow > 0 && field.slow <= 1, '地面效果进度');
@@ -181,10 +191,13 @@ export function validateRecord(session, version = SAVE_VERSION) {
   for (const effect of g.effects) {
     validateShape(effect, EFFECT_SHAPE, 'effect');
     check(effect.duration > 0 && effect.life <= effect.duration, '视觉效果时长');
-    if (['impact', 'evolve', 'pierce'].includes(effect.kind)) check(teams.includes(effect.team), '效果阵营');
+    if (['impact', 'evolve', 'pierce', 'trait'].includes(effect.kind)) check(teams.includes(effect.team), '效果阵营');
     if (effect.kind === 'impact') {
       validateShape(effect, IMPACT_SHAPE, 'impact');
       if (effect.followTargetId != null) check(int(effect.followTargetId, 1, g.nextUnitId - 1), '命中跟踪目标');
+    } else if (effect.kind === 'trait') {
+      check(member(effect.trait, TRAITS) && ['throw','heal','shield','parry','volley','canister','coaxial','blink','overload','field','fieldBreak','fire','ricochet','suppression'].includes(effect.style), '特性表现');
+      if (effect.toX !== undefined) check(num(effect.toX, 0, RULES.width), '特性目标位置');
     } else if (effect.kind === 'pierce') numbers(effect, ['toX', 'y'], [], -RULES.width, RULES.width * 2);
     else if (effect.kind !== 'evolve') numbers(effect, ['radius']);
   }
@@ -202,6 +215,7 @@ export function validateRecord(session, version = SAVE_VERSION) {
     }
     check(g.ability.x <= RULES.width && int(g.ability.wavesLeft, 0, 4), '技能进度');
   }
+  if (g.traitActivations !== undefined) check(object(g.traitActivations) && Object.entries(g.traitActivations).every(([key, count]) => member(key, TRAITS) && int(count)), '特性触发计数');
   validateShape(g.ai, AI_SHAPE, 'ai');
   return session;
 }

@@ -1,3 +1,4 @@
+import { buyUnitPath } from './trait-cases.js';
 import { statMultiplier, v5Record } from './legacy-fixtures.js';
 import { purchaseTalent } from '../src/talents.js';
 import { RULES, AGES, UNITS, TURRETS, ABILITIES, createGame, getIncomeRate, getExperienceReward, recruit, evolve, buildTurret, expandTurretSlots, castAbility } from '../src/game.js';
@@ -57,7 +58,7 @@ export function registerProgressionTests(test, assert, near) {
     continueCivilization(s, s.run.battleId);
     assert(runDebugCommand(s, 'finale') && s.run.phase === 'destruction' && s.permanent.legacy === 1);
     assert(!runDebugCommand(s, 'finale') && s.permanent.completedCycles === 1);
-    assert(purchaseTalent(s, 'autobuyer')); rebuildCivilization(s, s.run.runId);
+    assert(purchaseTalent(s, 'spark')); rebuildCivilization(s, s.run.runId);
     assert(runDebugCommand(s, 'finale'));
     purchaseUpgrade(s, 'production'); rebuildCivilization(s, s.run.runId); supplyDebugRun(s);
     assert(s.debug && statMultiplier(s.game, 'income') === 1.5 && s.game.gold.player === RULES.startingGold + DEBUG_GOLD);
@@ -139,8 +140,8 @@ export function registerProgressionTests(test, assert, near) {
     const s = createProgression(), base = JSON.stringify({ AGES, UNITS });
     assert(!purchaseUpgrade(s, 'production'));
     finish(s);
-    s.permanent.totalLegacy = s.permanent.completedCycles = s.permanent.legacy = 63;
-    assert(purchaseTalent(s, 'autobuyer'));
+    s.permanent.totalLegacy = s.permanent.completedCycles = s.permanent.legacy = 63; s.permanent.automation.unlocked = true;
+    assert(purchaseTalent(s, 'spark'));
     for (const key of ['production', 'warfare']) {
       for (const cost of [1, 2, 4, 8, 16]) {
         const balance = s.permanent.legacy;
@@ -162,7 +163,7 @@ export function registerProgressionTests(test, assert, near) {
   });
   test('M1: actual casualty payouts round base reward then multiplier, without multiplying kill gold', () => {
     for (const victimTeam of ['player', 'enemy']) {
-      const s = createProgression(); finish(s); purchaseTalent(s, 'autobuyer'); rebuildCivilization(s, s.run.runId); finish(s); purchaseUpgrade(s, 'warfare'); rebuildCivilization(s, s.run.runId);
+      const s = createProgression(); finish(s); purchaseTalent(s, 'spark'); rebuildCivilization(s, s.run.runId); finish(s); purchaseUpgrade(s, 'warfare'); rebuildCivilization(s, s.run.runId);
       const g = s.game; g.ai.enabled = false;
       const winner = victimTeam === 'player' ? 'enemy' : 'player';
       g.units.push({ id: g.nextUnitId++, team: victimTeam, type: 'heavy', hp: 0, x: 640, moving: false, attackCooldown: 100, attackAnimation: 0, hitFlash: 0 });
@@ -175,7 +176,7 @@ export function registerProgressionTests(test, assert, near) {
   });
   test('M1: talent automation unlock is opt-in, pays normal prices, respects queue/army limits and changes era target', () => {
     const s = createProgression(); assert(!setAutomation(s, true, 'front'));
-    finish(s); assert(!s.permanent.automation.unlocked && !s.permanent.automation.enabled); purchaseTalent(s, 'autobuyer'); setAutomation(s, true, 'heavy'); rebuildCivilization(s, s.run.runId);
+    finish(s); assert(!s.permanent.automation.unlocked && !s.permanent.automation.enabled); purchaseTalent(s, 'spark'); rebuildCivilization(s, s.run.runId); finish(s); setAutomation(s, true, 'heavy'); rebuildCivilization(s, s.run.runId);
     s.game.ai.enabled = false;
     advance(s, 0.25); assert(s.game.queues.player[0].type === 'heavy');
     near(s.game.gold.player, 180 + 7 * 0.25 - 85);
@@ -191,7 +192,7 @@ export function registerProgressionTests(test, assert, near) {
     advance(s, 0.25); assert(s.game.queues.player.length === 0);
   });
   test('M1: pause, hidden page, disabled automation and ended battle cannot recruit or bank attempts', () => {
-    const s = createProgression(); finish(s); purchaseTalent(s, 'autobuyer'); setAutomation(s, true, 'ranged'); rebuildCivilization(s, s.run.runId);
+    const s = createProgression(); finish(s); purchaseTalent(s, 'spark'); rebuildCivilization(s, s.run.runId); finish(s); setAutomation(s, true, 'ranged'); rebuildCivilization(s, s.run.runId);
     for (const options of [{ paused: true }, { hidden: true }]) {
       const before = serializeSession(s); advance(s, 20, options); assert(serializeSession(s) === before);
     }
@@ -204,7 +205,7 @@ export function registerProgressionTests(test, assert, near) {
     assert(continueCivilization(s, battleId) && !continueCivilization(s, battleId));
     finish(s); s = parseSession(serializeSession(s));
     assert(!resolveBattle(s) && s.permanent.legacy === 1);
-    purchaseTalent(s, 'autobuyer'); rebuildCivilization(s, s.run.runId); finish(s);
+    purchaseTalent(s, 'spark'); rebuildCivilization(s, s.run.runId); finish(s);
     purchaseUpgrade(s, 'production'); setAutomation(s, true, 'ranged');
     const old = s.run.runId; assert(rebuildCivilization(s, old) && !rebuildCivilization(s, old));
     for (let i = 0; i < 5; i++) s = parseSession(serializeSession(s));
@@ -247,9 +248,9 @@ export function registerProgressionTests(test, assert, near) {
       if (i % 600 === 0) parseSession(serializeSession(s));
     }
     assert(s.run.phase === 'destruction' && s.permanent.completedCycles === 1, `Expected final victory, got ${s.run.phase}`);
-    assert(purchaseTalent(s, 'autobuyer'));
+    assert(purchaseTalent(s, 'spark'));
     assert(rebuildCivilization(s, s.run.runId));
-    assert(s.game.ages.player === 1 && s.run.talents.autobuyer === 1 && !s.permanent.legacy);
+    assert(s.game.ages.player === 1 && s.run.talents.spark === 1 && !s.permanent.legacy);
   });
   test('M1: all turret attacks, charging, bursts, ground fields and five abilities survive repeated save/resume', () => {
     const seen = new Set();
@@ -350,20 +351,20 @@ export function registerProgressionTests(test, assert, near) {
     assert(saved.permanent.legacy === 1 && saved.run.settled);
     frame.remove(); frame = await mount(serializeSession(saved)); time = 0; frame.contentWindow.__testFrame(0);
     el('play-again').click(); assert(!el('archives').hidden && el('archives-dialog').open && el('legacy').textContent === '1');
-    el('buy-autobuyer').click(); el('buy-autobuyer').click();
-    assert(el('legacy').textContent === '0' && el('buy-autobuyer').disabled && !el('auto-enabled').checked);
+    el('buy-spark').click(); el('buy-spark').click();
+    assert(el('legacy').textContent === '0' && el('buy-spark').disabled && !el('auto-enabled').checked);
     el('close-archives').click(); el('autobuyer-menu').click();
     assert(el('automation-dialog').open && !el('archives-dialog').open);
     el('auto-enabled').click(); el('auto-target').value = 'ranged'; el('auto-target').dispatchEvent(new Event('change'));
     el('automation-to-talents').click();
     el('rebuild-civilization').click(); el('rebuild-civilization').click();
     saved = parseSession(frame.contentWindow.__storage.getItem(SAVE_KEY));
-    assert(saved.run.phase === 'battle' && saved.permanent.completedCycles === 1 && saved.run.talents.autobuyer === 1 && statMultiplier(saved.game, 'income') === 1);
+    assert(saved.run.phase === 'battle' && saved.permanent.completedCycles === 1 && saved.run.talents.spark === 1 && statMultiplier(saved.game, 'income') === 1);
     frame.remove(); frame = await mount(serializeSession(saved)); time = 0; frame.contentWindow.__testFrame(0);
     assert(el('income-rate').textContent === '+7/s');
     el('pause-battle').click(); const gold = el('gold').textContent; tick(20);
     assert(el('gold').textContent === gold && el('queue-count').textContent === '0 / 5');
-    el('pause-battle').click(); tick(0.3); assert(el('queue-count').textContent === '1 / 5');
+    el('pause-battle').click(); el('recruit').click(); tick(0.3); assert(el('queue-count').textContent === '1 / 5');
     el('archives').click(); const pausedGold = el('gold').textContent; tick(20); assert(el('gold').textContent === pausedGold);
     page().body.dispatchEvent(new frame.contentWindow.KeyboardEvent('keydown', { code: 'Digit1', bubbles: true }));
     assert(el('queue-count').textContent === '1 / 5', 'Archive modal must block battle hotkeys');
@@ -435,7 +436,7 @@ export function registerProgressionTests(test, assert, near) {
     }
   });
   test('Super soldier training and both attack poses survive full save round trips', () => {
-    const seed = createProgression(); seed.game.ai.enabled = false; ageTo(seed.game, 5);
+    const seed = createProgression(); finish(seed); seed.permanent.totalLegacy = seed.permanent.completedCycles = seed.permanent.legacy = 100; seed.permanent.automation.unlocked = true; purchaseTalent(seed,'spark'); buyUnitPath(seed); rebuildCivilization(seed, seed.run.runId); seed.game.ai.enabled = false; ageTo(seed.game, 5);
     seed.game.gold.player = UNITS.superSoldier.cost;
     assert(recruit(seed.game, 'superSoldier'));
     let saved = parseSession(serializeSession(seed));
@@ -494,7 +495,7 @@ export function registerProgressionTests(test, assert, near) {
     command('finale'); assert(el('result-title').textContent === '文明未能幸存');
     command('finale'); el('play-again').click();
     assert(el('cycles').textContent === '1' && el('legacy').textContent === '1');
-    assert(el('buy-production').disabled); el('buy-autobuyer').click(); el('rebuild-civilization').click();
+    assert(el('buy-production').disabled); el('buy-spark').click(); el('rebuild-civilization').click();
     command('finale'); el('result-talents').click(); el('node-production').click();
     el('buy-production').click(); el('rebuild-civilization').click();
     assert(el('income-rate').textContent === '+10.5/s' && el('gold').textContent === String(RULES.startingGold + DEBUG_GOLD));

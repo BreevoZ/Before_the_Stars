@@ -6,12 +6,16 @@ import { drawProjectile, drawFields } from './combat-effects.js';
 import { drawLandscape, drawBattleEffects } from './render.js';
 import { getMountPose } from './mount-motion.js';
 import { getMeleeMotion } from './melee-motion.js';
+import { createTraitSampler } from './trait-scenarios.js';
+import { TRAITS } from './traits.js';
+import { TRAIT_DESCRIPTIONS } from './talents.js';
 import { BASE_DESIGNS } from './base-layouts.js';
 
 export const CLIP_SECONDS = 8;
-export const CATEGORIES = { all: '全部', unit: '部队', turret: '炮塔', combat: '弹道与命中', ability: '大招与地面', scene: '基地与环境' };
+export const CATEGORIES = { all: '全部', unit: '部队', turret: '炮塔', combat: '弹道与命中', trait: '兵种特性', ability: '大招与地面', scene: '基地与环境' };
 const mountNotes = { heavy: '探颈咬合 · 骑手同步刺矛 · 沿矛身回收', knight: '锥身骑枪 · 护手握持 · 沿枪轴直刺' };
 export const ANIMATION_CLIPS = [
+  ...Object.values(TRAITS).map(trait => ({ id: `trait-${trait.id}`, category: 'trait', kind: 'trait', source: 'unit', type: trait.units[0], trait: trait.id, age: UNITS[trait.units[0]].age, name: `${UNITS[trait.units[0]].name} · ${trait.name}`, note: `${TRAIT_DESCRIPTIONS[trait.id]} · 玩家特性实战预览` })),
   ...['heavy', 'knight', ...Object.keys(UNITS).filter(type => !mountNotes[type])].map(type => ({
     id: `unit-${type}`, category: 'unit', kind: 'unit', type, age: UNITS[type].age,
     name: UNITS[type].name, note: mountNotes[type] ?? UNITS[type].description,
@@ -21,7 +25,7 @@ export const ANIMATION_CLIPS = [
     id: `combat-${source}-${type}`, category: 'combat', kind: 'combat', source, type, age: stats.age,
     name: `${stats.name} · ${stats.projectile ? '弹道' : '命中'}`, note: stats.description,
   }))),
-  { id: 'combat-unit-superSoldier-melee', category: 'combat', kind: 'combat', source: 'unit', type: 'superSoldier', age: 5, melee: true, name: '超级士兵 · 近身短打', note: '目标进入 60 距离时收枪短打 · 前送、接触、迅速收回 · 完全穿甲' },
+  { id: 'combat-unit-superSoldier-melee', category: 'combat', kind: 'combat', source: 'unit', type: 'superSoldier', age: 5, melee: true, name: '超级士兵 · 激光短匕首', note: '目标进入 60 距离时收枪刺出激光短匕首 · 前送、接触、迅速收回 · 完全穿甲' },
   ...Object.entries(AGES).map(([age, stats]) => ({ id: `ability-${stats.ability}`, category: 'ability', kind: 'ability', type: stats.ability, age: +age, name: ABILITIES[stats.ability].name, note: ABILITIES[stats.ability].description })),
   ...['fire', 'oil'].map(type => ({ id: `field-${type}`, category: 'ability', kind: 'field', type, age: 2, name: type === 'fire' ? '燃烧区域' : '沸油与蒸汽', note: '落地后持续 2.4 秒 · 末段消散' })),
   ...Object.entries(AGES).map(([age, stats]) => ({ id: `base-${age}`, category: 'scene', kind: 'base', age: +age, name: `${stats.shortName}基地 · ${BASE_DESIGNS[age].name}`, note: `${BASE_DESIGNS[age].description} 预览扩容、受损与废墟。` })),
@@ -36,6 +40,7 @@ function soldier(id, type, team, x) {
 // Each preview is an isolated real battle with passive, stationary targets.
 // Quarter-second checkpoints make backward scrubbing deterministic and cheap.
 export function createClipSampler(clip, team) {
+  if (clip.kind === 'trait') return createTraitSampler(clip);
   let game = createGame(); game.ai.enabled = false;
   const direction = team === 'player' ? 1 : -1, opponent = team === 'player' ? 'enemy' : 'player';
   const source = clip.source ?? clip.kind;
@@ -126,7 +131,7 @@ export function createClipPainter(canvas, clip) {
     if (!samplers.has(team)) samplers.set(team, createClipSampler(clip, team));
     return samplers.get(team)(time);
   }
-  return (time, { team = 'player', action = 'march', guides = false } = {}) => {
+  return (time, { team = 'player', action = 'march', guides = false, reducedMotion = false } = {}) => {
     const bounds = canvas.getBoundingClientRect(), ratio = Math.min(devicePixelRatio || 1, 2);
     if (!bounds.width || !bounds.height) return;
     const width = Math.round(bounds.width * ratio), height = Math.round(bounds.height * ratio);
@@ -137,9 +142,10 @@ export function createClipPainter(canvas, clip) {
       const scale = width / RULES.width, h = height / scale;
       ctx.scale(scale, scale); drawLandscape(ctx, h, h * 0.78, clip.kind === 'sky' ? time * 15 : 83 + time); return;
     }
+    if (clip.kind === 'trait') team = 'player';
     const direction = team === 'player' ? 1 : -1;
-    const worldWidth = clip.kind === 'ability' ? 850 : clip.kind === 'combat' ? 450 : clip.kind === 'base' ? 280 : clip.kind === 'unit' ? 200 : 270;
-    const worldHeight = clip.kind === 'ability' ? 410 : clip.kind === 'base' ? 270 : clip.kind === 'combat' ? 240 : 150;
+    const worldWidth = clip.kind === 'ability' ? 850 : ['combat', 'trait'].includes(clip.kind) ? 450 : clip.kind === 'base' ? 280 : clip.kind === 'unit' ? 200 : 270;
+    const worldHeight = clip.kind === 'ability' ? 410 : clip.kind === 'base' ? 270 : ['combat', 'trait'].includes(clip.kind) ? 240 : 150;
     const scale = Math.min(width / worldWidth, height / worldHeight);
     ctx.setTransform(scale, 0, 0, scale, width / 2, height * 0.84);
     const floorWidth = width / scale;
@@ -152,25 +158,25 @@ export function createClipPainter(canvas, clip) {
         unit.hitFlash = Math.max(0, 0.14 - time % 1.2);
         unit.guardFlash = Math.max(0, 0.18 - time % 1.2); unit.hp *= 0.65;
       }
-      drawUnit(ctx, unit, time);
+      drawUnit(ctx, unit, time, 1, reducedMotion);
       if (guides) gaitGuides(ctx, unit, time, 1);
     } else if (clip.kind === 'turret') {
       drawTurret(ctx, sample(team, time).game.turrets[team][0], time, 2);
-    } else if (clip.kind === 'combat') {
+    } else if (['combat', 'trait'].includes(clip.kind)) {
       const { game, origin, sourceId } = sample(team, time);
-      const sourceX = origin?.x ?? game.units[0].x, targetX = game.units.find(unit => unit.id !== sourceId).x;
+      const sourceX = origin?.x ?? game.units.find(unit => unit.id === sourceId)?.x ?? 500, targetX = game.units.find(unit => clip.trait ? unit.team !== 'player' : unit.id !== sourceId)?.x ?? sourceX + 85;
       ctx.translate(-(sourceX + targetX) / 2, 0);
       drawFields(ctx, game, time, 1, false);
       if (origin) {
         drawBase(ctx, game.bases[team], game.ages[team], time, 1, 1);
         ctx.save(); ctx.translate(origin.x, origin.y); drawTurret(ctx, game.turrets[team][0], time, 1, false, true); ctx.restore();
       }
-      for (const unit of game.units) drawUnit(ctx, unit, time);
-      for (const shot of game.projectiles) drawProjectile(ctx, shot);
-      drawBattleEffects(ctx, game);
+      for (const unit of game.units) drawUnit(ctx, unit, time, 1, reducedMotion);
+      for (const shot of game.projectiles) drawProjectile(ctx, shot, 1, reducedMotion);
+      drawBattleEffects(ctx, game, 1, reducedMotion);
     } else if (clip.kind === 'ability') {
       const { game } = sample('player', clip.type === 'renewal' ? time : time % 4); ctx.translate(-640, 0);
-      for (const unit of game.units) drawUnit(ctx, unit, time);
+      for (const unit of game.units) drawUnit(ctx, unit, time, 1, reducedMotion);
       drawBattleEffects(ctx, game, 1, false, 320);
     } else if (clip.kind === 'field') {
       const remaining = 2.4 - time % 3;

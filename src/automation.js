@@ -26,7 +26,7 @@ export function validAutomation(auto, talents, previousVersion = false) {
   if (!Array.isArray(auto.weights) || auto.weights.length !== 3 || !auto.weights.every(weight => integer(weight, 0, 10)) ||
     !auto.weights.some(weight => weight > 0)) return false;
   const logistics = talents.logistics > 0 || previousVersion;
-  return (previousVersion || auto.unlocked === (talents.autobuyer > 0)) &&
+  return (previousVersion || typeof auto.unlocked === 'boolean') &&
     (logistics || (Q.eq(auto.reserve, 0) && auto.queueLimit === RULES.queueLimit && auto.priority === 'balanced' && auto.recruitEnabled)) &&
     (auto.unlocked || !auto.enabled) && (auto.mode !== 'balanced' || talents.formation > 0) &&
     (!auto.evolve || talents.evolution > 0) && (!auto.defense || talents.defense > 0) &&
@@ -101,9 +101,9 @@ function defensePlan(session) {
 // Shared read-only planning keeps the controls' explanation in sync with spending.
 export function getAutomationPlan(session) {
   const auto = session.permanent.automation;
-  if (!auto.unlocked) return { status: '在天赋树中解锁 Autobuyer 根节点', action: null };
+  if (!auto.unlocked) return { status: '累计通关 2 次后免费解锁自动招募', action: null };
   if (!auto.enabled) return { status: '自动购买已关闭', action: null };
-  if (!session.run.talents.autobuyer || session.run.phase !== 'battle' || session.game.status !== 'playing') return { status: '下一轮开始后执行', action: null };
+  if (session.run.phase !== 'battle' || session.game.status !== 'playing') return { status: '下一轮开始后执行', action: null };
   const plans = { recruit: recruitPlan(session), defense: defensePlan(session) };
   const first = auto.priority === 'balanced' ? session.run.autoTurn : auto.priority;
   const second = first === 'recruit' ? 'defense' : 'recruit';
@@ -116,7 +116,7 @@ export function getAutomationPlan(session) {
 export function updateAutomation(session, dt, { paused = false, hidden = false } = {}) {
   const { permanent, run, game } = session, auto = permanent.automation;
   if (paused || hidden || run.phase !== 'battle' || game.status !== 'playing' ||
-      !auto.unlocked || !run.talents.autobuyer || !auto.enabled || !Number.isFinite(dt) || dt <= 0) return;
+      !auto.unlocked || !auto.enabled || !Number.isFinite(dt) || dt <= 0) return;
   run.autoElapsed += Math.min(dt, 0.05);
   if (run.autoElapsed + 1e-9 < AUTOMATION_INTERVAL) return;
   run.autoElapsed = Math.max(0, run.autoElapsed - AUTOMATION_INTERVAL);

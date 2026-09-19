@@ -1,30 +1,45 @@
 import { createBindings } from './dom-bindings.js';
 import { buildTalentViewModel } from './talent-view-model.js';
-import { UPGRADES } from './progression-config.js';
+import { UPGRADES, TALENT_LAYER_REQUIREMENT } from './progression-config.js';
 import { purchaseUpgrade } from './progression.js';
-import { TALENT_TREE, purchaseTalent } from './talents.js';
+import { TALENT_TREE, purchaseTalent, layerTalents, talentPrerequisiteText } from './talents.js';
 import { drawBase } from './bases.js';
 
 const el = id => document.getElementById(id);
 const svgNS = 'http://www.w3.org/2000/svg';
 // Explicit art direction for this small tree; prerequisites still come from TALENT_TREE.
 // Coordinates are independent of node size, so a narrow screen never shrinks touch targets.
-export const TALENT_MAP = Object.freeze({
-  autobuyer: { x: 530, y: 465, mobile: [50, 850], kind: 'keystone', icon: 'M5 8h14v11H5z M9 8V5h6v3 M8 12h2m4 0h2 M9 16h6 M2 11v5m20-5v5' },
-  logistics: { x: 386, y: 382, mobile: [46, 685], icon: 'M3 6h18M3 12h18M3 18h18 M8 3v6m8 0v6M7 15v6' },
-  formation: { x: 266, y: 300, mobile: [18, 725], kind: 'keystone', icon: 'M4 7l3-4 3 4v5H4z m10 0 3-4 3 4v5h-6z M9 16l3-4 3 4v5H9z' },
-  evolution: { x: 200, y: 168, mobile: [17, 412], icon: 'M6 20V9m6 11V4m6 16V9 M3 12l3-3 3 3m0-5 3-3 3 3m0 5 3-3 3 3' },
-  defense: { x: 95, y: 275, mobile: [14, 565], kind: 'specialist', icon: 'M4 5l8-3 8 3v7c0 5-8 10-8 10S4 17 4 12z M8 11l3 3 5-6' },
-  elite: { x: 95, y: 77, mobile: [13, 255], kind: 'specialist', icon: 'M12 2l3 6 7 2-5 5v7l-5-3-5 3v-7l-5-5 7-2z' },
-  production: { x: 457, y: 252, mobile: [51, 510], icon: 'M4 20V9l6 3V6l6 4V3h4v17z M8 16h2m4 0h2' },
-  supply: { x: 396, y: 98, mobile: [41, 258], kind: 'specialist', icon: 'M3 7l9-4 9 4v12l-9 3-9-3z M3 7l9 4 9-4M12 11v11M7 5l10 4v5' },
-  warfare: { x: 619, y: 241, mobile: [52, 377], icon: 'M5 2l4 2 10 14-3 3L5 7z M3 16l5 5m-4-1 4-4 M17 3l3 1-1 4-5 6 M9 15l-5 5' },
-  salvage: { x: 671, y: 87, mobile: [47, 127], kind: 'specialist', icon: 'M5 12a7 7 0 0112-5l3 3 M20 4v6h-6 M19 12a7 7 0 01-12 5l-3-3 M4 20v-6h6' },
-  conservation: { x: 801, y: 331, mobile: [82, 660], kind: 'keystone', icon: 'M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z' },
-  challenge: { x: 959, y: 255, mobile: [85, 475], kind: 'specialist', icon: 'M2 20l8-15 4 7 3-5 5 13z M7 11l3 2 3-3 M10 5V2h5l-2 3' },
-  continuity: { x: 877, y: 109, mobile: [82, 235], kind: 'keystone', icon: 'M8 5h8l4 7-4 7H8l-4-7z M8 12h8M12 8v8 M12 1v2m0 18v2M1 12h2m18 0h2' },
+const glyphs = {
+  spark: 'M12 2c2 6 7 8 7 13a7 7 0 01-14 0c0-3 2-5 4-7-1 5 4 6 3-6z',
+  clock: 'M12 2a10 10 0 110 20 10 10 0 010-20M12 6v6l4 3',
+  automation: 'M5 8h14v11H5z M9 8V5h6v3 M8 12h2m4 0h2 M9 16h6',
+  growth: 'M4 20V9l6 3V6l6 4V3h4v17z M8 16h2m4 0h2',
+  legacy: 'M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z',
+  helmet: 'M5 20V8l3-5h8l3 5v12l-7 3z M5 10l7 3 7-3 M8 17h8',
+  blade: 'M3 21l5-6M6 13l5 5 M9 14L19 3l2 2-9 12',
+  arrow: 'M3 21L21 3M13 3h8v8M3 15l6 6',
+  heavy: 'M4 20V9l4-5h8l4 5v11z M4 12h16M9 8h6M9 16h6',
+};
+const mapData = {
+  spark: { x: 550, y: 1570, kind: 'keystone', icon: glyphs.spark },
+  logistics: { x: 125, y: 1350 }, formation: { x: 265, y: 1190, kind: 'keystone' },
+  evolution: { x: 125, y: 990 }, defense: { x: 265, y: 845, kind: 'specialist' },
+  production: { x: 825, y: 1330 }, supply: { x: 825, y: 1120, kind: 'specialist' },
+  warfare: { x: 955, y: 1110 }, salvage: { x: 955, y: 900, kind: 'specialist' },
+  conservation: { x: 1030, y: 1350, kind: 'keystone' }, challenge: { x: 1050, y: 690, kind: 'specialist' },
+  continuity: { x: 1020, y: 475, kind: 'keystone' }, timeAcceleration: { x: 830, y: 690, icon: glyphs.clock },
+  superSoldierPlan: { x: 550, y: 260, kind: 'keystone', icon: glyphs.helmet },
+  elite: { x: 380, y: 170, kind: 'specialist' }, superRanged: { x: 720, y: 170, kind: 'specialist', icon: glyphs.arrow },
+  bypasser: { x: 550, y: 60, kind: 'keystone', icon: 'M5 21V7l7-5 7 5v14M9 21V9h6v12M2 21h20' },
+};
+for (let layer = 1; layer <= 5; layer++) layerTalents(layer).forEach((key, slot) => {
+  mapData[key] = { x: 410 + slot * 140, y: 1320 - (layer - 1) * 210,
+    icon: [glyphs.blade, glyphs.arrow, glyphs.heavy][slot] };
 });
-const colors = Object.fromEntries(['root', 'automation', 'growth', 'legacy'].map(key => [key, `var(--route-${key})`]));
+export const TALENT_MAP = Object.freeze(Object.fromEntries(Object.entries(mapData).map(([key, art]) => [key,
+  { ...art, icon: art.icon ?? glyphs[TALENT_TREE[key].branch] ?? glyphs.automation }])));
+const GATES = Object.freeze(Object.fromEntries(Array.from({ length: 6 }, (_, index) => [index + 1, { x: 550, y: index === 5 ? 365 : 1418 - index * 210 }])));
+const colors = Object.fromEntries(['root', 'automation', 'growth', 'legacy', 'units'].map(key => [key, `var(--route-${key})`]));
 function pathElement(className) { const path = document.createElementNS(svgNS, 'path'); path.setAttribute('class', className); return path; }
 
 export function createTalentMap(getSession, changed) {
@@ -39,9 +54,9 @@ export function createTalentMap(getSession, changed) {
     label.dataset.branch = branch; label.innerHTML = `<span>${name}</span><small>${{ automation: '让文明自行运转', growth: '让每次重建更强', legacy: '让星火传得更远' }[branch]}</small>`; map.append(label);
   }
   for (const [key, config] of Object.entries(TALENT_TREE)) {
-    const art = TALENT_MAP[key], parent = Object.entries(config.requires)[0], kind = art.kind ?? 'ordinary';
+    const art = TALENT_MAP[key], parent = config.requiresLayer ? [`gate-${config.requiresLayer + 1}`, 1] : config.unit ? ['gate-1', 1] : Object.entries(config.requires)[0], kind = art.kind ?? 'ordinary';
     if (parent) {
-      const path = pathElement(`talent-link ${parent[0] === 'autobuyer' ? 'trunk' : 'twig'}`);
+      const path = pathElement(`talent-link ${parent[0] === 'spark' ? 'trunk' : 'twig'}`);
       path.id = `link-${key}`; path.dataset.parent = parent[0]; path.dataset.child = key; path.dataset.requiredLevel = parent[1]; path.style.color = colors[config.branch];
       const flow = pathElement('talent-flow'); flow.id = `flow-${key}`; flow.setAttribute('pathLength', '1'); flow.style.color = colors[config.branch];
       svg.append(path, flow); edges.set(key, { path, flow, parent: parent[0] });
@@ -50,7 +65,7 @@ export function createTalentMap(getSession, changed) {
     if (parent) { item.dataset.parent = parent[0]; item.dataset.requiredLevel = parent[1]; }
     item.style.setProperty('--star-color', colors[config.branch]);
     const shape = kind === 'specialist' ? '<path class="star-frame" d="M32 2 62 32 32 62 2 32Z"/>' : kind === 'keystone' ? '<circle class="star-halo" cx="32" cy="32" r="31"/><circle class="star-frame" cx="32" cy="32" r="27"/>' : '<path class="star-frame" d="M32 2 58 17v30L32 62 6 47V17Z"/>';
-    item.innerHTML = `<button id="node-${key}" class="talent-node" type="button" aria-controls="talent-details" aria-expanded="false" aria-pressed="false"><svg viewBox="0 0 64 64" aria-hidden="true">${shape}<path class="star-icon" d="${art.icon}" transform="translate(20 12)"/></svg><span class="node-ranks" id="level-${key}" aria-hidden="true"></span><small class="node-cost" id="cost-${key}"></small><span class="node-name">${config.name}</span></button>${key === 'autobuyer' ? '<span id="root-caption" class="root-caption"></span>' : ''}`;
+    item.innerHTML = `<button id="node-${key}" class="talent-node" type="button" aria-controls="talent-details" aria-expanded="false" aria-pressed="false"><svg viewBox="0 0 64 64" aria-hidden="true">${shape}<path class="star-icon" d="${art.icon}" transform="translate(20 12)"/></svg><span class="node-ranks" id="level-${key}" aria-hidden="true"></span><small class="node-cost" id="cost-${key}"></small><span class="node-name">${config.name}</span></button>${key === 'spark' ? '<span id="root-caption" class="root-caption"></span>' : ''}`;
     map.append(item);
     const button = el(`node-${key}`);
     button.addEventListener('pointerenter', event => { if (!mobile && !hoverSuppressed && event.pointerType === 'mouse' && !pinned) select(key); });
@@ -59,8 +74,8 @@ export function createTalentMap(getSession, changed) {
     button.addEventListener('click', () => select(key, true));
     button.addEventListener('keydown', event => navigate(event, key));
     const card = document.createElement('article'); card.className = 'talent-detail'; card.id = `talent-${key}`; card.hidden = true;
-    const parents = Object.entries(config.requires).map(([name, rank]) => `${TALENT_TREE[name].name} ${rank} 级`).join('、');
-    card.innerHTML = `<p class="talent-requires">${parents ? `前置：${parents}` : '根节点 · 一切从这里开始'}</p><h4>${config.name}</h4><div class="talent-comparison" id="effect-${key}"><div><small>当前</small><p id="current-${key}"></p></div><span aria-hidden="true">→</span><div><small>下一级</small><p id="next-${key}"></p></div></div><p class="archive-note" id="grant-${key}" hidden>旧版前置天赋已免费保留。</p><button id="buy-${key}" type="button" aria-describedby="effect-${key} state-${key}"></button><small id="state-${key}"></small>`;
+    const parents = talentPrerequisiteText(config);
+    card.innerHTML = `<p class="talent-requires">前置：${parents}${config.unit ? ` · ${['','原始','中世纪','文艺复兴','现代','未来'][config.layer]}兵种` : ''}</p><h4>${config.name}</h4><div class="talent-comparison" id="effect-${key}"><div><small>当前</small><p id="current-${key}"></p></div><span aria-hidden="true">→</span><div><small>下一级</small><p id="next-${key}"></p></div></div><p class="archive-note" id="grant-${key}" hidden>旧版前置天赋已免费保留。</p><button id="buy-${key}" type="button" aria-describedby="effect-${key} state-${key}"></button><small id="state-${key}"></small>`;
     el('talent-detail-cards').append(card);
     el(`buy-${key}`).addEventListener('click', () => {
       const s = getSession(), before = s.permanent.legacy;
@@ -68,6 +83,16 @@ export function createTalentMap(getSession, changed) {
       changed(); sync(); feedback(key, before - s.permanent.legacy);
       if (el(`buy-${key}`).disabled) el('close-talent-detail').focus({ preventScroll: true });
     });
+  }
+  for (const [layer, point] of Object.entries(GATES)) {
+    const gate = document.createElement('div'); gate.id = `gate-${layer}`; gate.className = 'era-gate';
+    gate.textContent = `${['', 'I · 原始', 'II · 中世纪', 'III · 文艺复兴', 'IV · 现代', 'V · 未来', '超级士兵计划'][layer]} · ${Number(layer) === 1 ? '点亮火种' : `前层任意 ${TALENT_LAYER_REQUIREMENT} 项`}`;
+    map.append(gate);
+    const parents = Number(layer) === 1 ? ['spark'] : layerTalents(Number(layer) - 1);
+    for (const parent of parents) {
+      const path = pathElement('talent-link trunk'); path.id = `gate-link-${parent}`; path.dataset.parent = parent; path.dataset.child = `gate-${layer}`; path.style.color = colors.units;
+      svg.append(path); edges.set(`gate-link-${parent}`, { path, flow: path, parent, to: `gate-${layer}` });
+    }
   }
   function scheduleHide() { clearTimeout(hideTimer); hideTimer = setTimeout(() => { if (!pinned) closeDetail(); }, 200); }
   function closeDetail(focus = false) {
@@ -122,7 +147,7 @@ export function createTalentMap(getSession, changed) {
     bind({ '#talent-feedback': `−${cost} Legacy · ${TALENT_TREE[key].name}已点亮` });
     animate(el(`node-${key}`), [{ transform: 'scale(1)' }, { transform: 'scale(1.16)', offset: .35 }, { transform: 'scale(1)' }], { duration: 460, easing: 'ease-out' });
     animate(el('legacy'), [{ transform: 'translateY(0) scale(1)' }, { transform: 'translateY(-5px) scale(1.2)', color: 'var(--purchase-flash)' }, { transform: 'translateY(0) scale(1)' }], { duration: 500 });
-    for (const [child, edge] of edges) if (child === key || (key === 'autobuyer' && edge.parent === key)) {
+    for (const [child, edge] of edges) if (child === key || (key === 'spark' && edge.parent === key)) {
       animate(edge.flow, [{ strokeDashoffset: 1, opacity: 0 }, { opacity: 1, offset: .12 }, { strokeDashoffset: 0, opacity: 0 }], { duration: 900, easing: 'ease-in-out' });
     }
     animate(el('talent-feedback'), [{ opacity: 0, transform: 'translate(-50%, 6px)' }, { opacity: 1, transform: 'translate(-50%, 0)', offset: .15 }, { opacity: 1, offset: .8 }, { opacity: 0 }], { duration: 2400 });
@@ -130,35 +155,26 @@ export function createTalentMap(getSession, changed) {
   function layout() {
     if (!screen.open) return;
     const width = map.clientWidth, wasMobile = mobile; mobile = window.innerWidth <= 740;
-    const height = mobile ? 955 : Math.max(360, Math.min(640, window.innerHeight - 315));
+    const height = 1700;
     map.style.height = `${height}px`; svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-    const sx = width / 1080, sy = (height - 40) / 525;
-    points = Object.fromEntries(Object.entries(TALENT_MAP).map(([key, art]) => [key, mobile ? { x: width * art.mobile[0] / 100, y: art.mobile[1] } : { x: art.x * sx, y: art.y * sy + 18 }]));
-    for (const [key, point] of Object.entries(points)) {
-      const node = el(`node-${key}`).parentElement; node.style.left = `${point.x}px`; node.style.top = `${point.y}px`;
+    const sx = width / 1120;
+    points = Object.fromEntries(Object.entries(TALENT_MAP).map(([key, art]) => [key, { x: art.x * sx, y: art.y }]));
+    const gates = Object.fromEntries(Object.entries(GATES).map(([layer, point]) => [`gate-${layer}`, { x: point.x * sx, y: point.y }]));
+    for (const [key, point] of Object.entries({ ...points, ...gates })) {
+      const node = key.startsWith('gate-') ? el(key) : el(`node-${key}`).parentElement;
+      node.style.left = `${point.x}px`; node.style.top = `${point.y}px`;
     }
     for (const [key, edge] of edges) {
-      const a = points[edge.parent], b = points[key];
-      const bend = (a.x + b.x) / 2;
-      let d = `M${a.x},${a.y} C${bend},${a.y - Math.abs(a.y - b.y) * .45} ${bend},${b.y + Math.abs(a.y - b.y) * .4} ${b.x},${b.y}`;
-      if (key === 'formation' && !mobile) d = `M${a.x},${a.y} C${a.x - (a.x - b.x) * .85},${a.y + 20} ${b.x - 20},${b.y + 80} ${b.x},${b.y}`;
-      if (mobile && edge.parent === 'autobuyer' && TALENT_TREE[key].branch === 'growth') {
-        const hub = { x: width * .69, y: points.production.y + 100 };
-        d = `M${a.x},${a.y} C${a.x + width * .18},${a.y - 70} ${hub.x},${hub.y + 90} ${hub.x},${hub.y} C${hub.x},${b.y + 60} ${b.x + 50},${b.y} ${b.x},${b.y}`;
-      }
-      // Route siblings around each other on phones: a line must never imply
-      // an unrelated node is a prerequisite simply by passing through it.
-      if (mobile && ['evolution', 'supply', 'salvage', 'continuity'].includes(key)) {
-        const x = width * { evolution: -.03, supply: .3, salvage: .66, continuity: 1.015 }[key];
-        d = `M${a.x},${a.y} C${x},${a.y - 90} ${x},${b.y + 90} ${b.x},${b.y}`;
-      }
+      const a = points[edge.parent] ?? gates[edge.parent], b = points[key] ?? gates[edge.to];
+      const mid = (a.y + b.y) / 2;
+      const d = `M${a.x},${a.y} C${a.x},${mid} ${b.x},${mid} ${b.x},${b.y}`;
       edge.path.setAttribute('d', d); edge.flow.setAttribute('d', d);
     }
-    for (const [branch, position] of Object.entries(mobile ? { automation: [.22, 52], growth: [.51, 20], legacy: [.82, 50] } : { automation: [.2, height - 105], growth: [.51, 12], legacy: [.83, height - 90] })) {
-      const label = el(`branch-${branch}`); label.style.left = `${width * position[0]}px`; label.style.top = `${position[1]}px`;
+    for (const [branch, position] of Object.entries({ automation: [190, 1460], growth: [845, 1460], legacy: [1020, 1460] })) {
+      const label = el(`branch-${branch}`); label.style.left = `${position[0] * sx}px`; label.style.top = `${position[1]}px`;
     }
     drawScene(); positionDetail();
-    if (mobile && !wasMobile) el('home-scroll').scrollTop = el('home-scroll').scrollHeight;
+    if (mobile && !wasMobile) { el('tree-scroll').scrollLeft = Math.max(0, points.spark.x - el('tree-scroll').clientWidth / 2); el('home-scroll').scrollTop = el('home-scroll').scrollHeight; }
   }
   function drawScene() {
     const canvas = el('home-sky'), width = screen.clientWidth, height = screen.clientHeight, ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -184,8 +200,8 @@ export function createTalentMap(getSession, changed) {
     screen.dataset.cinematic = String(cinematic && !reduced.matches); el('skip-home-intro').hidden = !cinematic || reduced.matches;
     closeDetail(); layout();
     // Root stays comfortably reachable on a phone; the branches grow upwards.
-    if (mobile) el('home-scroll').scrollTop = el('home-scroll').scrollHeight;
-    else el('home-scroll').scrollTop = 0;
+    el('home-scroll').scrollTop = el('home-scroll').scrollHeight;
+    el('tree-scroll').scrollLeft = Math.max(0, points.spark.x - el('tree-scroll').clientWidth / 2);
     el('close-archives').focus({ preventScroll: true });
   }
   function sync() {

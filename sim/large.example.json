@@ -1,17 +1,16 @@
 {
   "talents": {
-    "autobuyer": 1,
     "logistics": 1,
     "formation": 1,
     "evolution": 1,
     "defense": 2,
-    "elite": 1,
     "production": 3,
     "warfare": 2,
     "supply": 2,
     "salvage": 1,
     "conservation": 1,
-    "challenge": 1
+    "challenge": 1,
+    "spark": 1
   },
   "challengeLevel": 0,
   "automation": {
@@ -27,8 +26,7 @@
     "defense": true,
     "expand": true,
     "replace": true,
-    "maxTurrets": 2,
-    "elite": true
+    "maxTurrets": 2
   },
   "maxSeconds": 1800,
   "bonuses": [
@@ -165,5 +163,6 @@
         "label": "大数模拟"
       }
     }
-  ]
+  ],
+  "completedCycles": 10
 }

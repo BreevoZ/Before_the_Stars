@@ -2,11 +2,12 @@ import { Q } from './quantity.js';
 import { UNITS, TURRETS, getBaseHealth, projectileField } from './game.js';
 import { SAVE_VERSION, SURFACE, getChallengeModifiers } from './progression-config.js';
 import { attributes } from './stats.js';
-import { getRunBonuses } from './progression-bonuses.js';
+import { getV8RunBonuses } from './progression-bonuses.js';
 import { createAutomation } from './automation.js';
 import { HISTORICAL_TALENTS } from './save-history.js';
 import { validateRecord } from './save-validation.js';
-import { cloneRecord, toV8Record } from './save-record.js';
+import { cloneRecord, toV8Record, fromV8Record, toSaveRecord } from './save-record.js';
+import { emptyTalents } from './talents.js';
 const teams = ['player', 'enemy'];
 
 export function migrateV1(input) {
@@ -62,7 +63,7 @@ export function migrateV4(input) {
 export function migrateV5(input) {
   const session = cloneRecord(input);
   const g = session.game;
-  g.bonuses = getRunBonuses(session.run);
+  g.bonuses = getV8RunBonuses(session.run);
   // v5 stored raw outgoing damage and multiplied it on impact. v6 snapshots
   // the resolved attack at launch; convert in-flight payloads exactly once.
   for (const shot of g.projectiles) {
@@ -93,11 +94,31 @@ export function migrateV6(input) {
 }
 
 export function migrateV7(input) { return toV8Record(input); }
-export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7 });
+export function migrateV8(input) {
+  const session = fromV8Record(input), p = session.permanent;
+  const ownedRoot = p.talents.autobuyer === 1;
+  p.automationRetained = p.automation.unlocked;
+  p.settings = { speed: 1 };
+  // Remove the retired purchase, grant its replacement, and let the same
+  // earned-currency ledger derive the refund. A formerly free root refunds 0.
+  p.talentGrants = p.talentGrants.filter(key => key !== 'autobuyer');
+  if (ownedRoot) p.talentGrants.push('spark');
+  if (p.talents.elite) p.talentGrants.push('superSoldierPlan');
+  for (const state of [p, session.run]) {
+    const old = state.talents;
+    state.talents = Object.fromEntries(Object.keys(emptyTalents()).map(key => [key, old[key] ?? 0]));
+    state.talents.spark = Number(old.autobuyer === 1);
+    // Preserve a purchased elite recruiter without charging for its new gate.
+    if (old.elite) state.talents.superSoldierPlan = 1;
+  }
+  session.version = 9;
+  return toSaveRecord(session);
+}
+export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8 });
 export function migrateRecord(input) {
   let record = input;
   while (record.version < SAVE_VERSION) {
-    validateRecord(record, record.version);
+    validateRecord(record.version === 8 ? fromV8Record(record) : record, record.version);
     record = MIGRATIONS[record.version](record);
   }
   return record;

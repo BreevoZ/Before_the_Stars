@@ -10,7 +10,7 @@ import { purchaseTalent } from '../src/talents.js';
 import { createGame, recruit, evolve, getIncomeRate, AGES } from '../src/game.js';
 import { serializeSession, parseSession, createSaveStore, SAVE_KEY, BACKUP_KEY } from '../src/save.js';
 import { MIGRATIONS } from '../src/save-migrations.js';
-import { cloneRecord, fromSaveRecord } from '../src/save-record.js';
+import { cloneRecord, fromSaveRecord, fromV8Record } from '../src/save-record.js';
 import { validateRecord } from '../src/save-validation.js';
 import { SAVE_VERSION } from '../src/progression-config.js';
 import { record as capturedV7 } from './fixtures/v7-save.js';
@@ -59,12 +59,12 @@ export function registerArchitectureTests(test, assert) {
     const s = createProgression(); finish(s);
     let vm = buildCivilizationViewModel(s);
     assert(vm['#result-title'] === '文明未能幸存' && vm['#legacy-balance'] === 1 && !vm['#rebuild-civilization@hidden']);
-    assert(buildTalentViewModel(s)['#node-autobuyer@data-state'] === 'ready');
+    assert(buildTalentViewModel(s)['#node-spark@data-state'] === 'ready');
     assert(buildAutomationViewModel(s)['#automation-settings@hidden']);
-    assert(purchaseTalent(s, 'autobuyer'));
-    assert(buildTalentViewModel(s)['#level-autobuyer'] === '●');
+    assert(purchaseTalent(s, 'spark'));
+    assert(buildTalentViewModel(s)['#level-spark'] === '●');
     assert(buildTalentViewModel(s)['#link-formation@data-state'] === 'available');
-    assert(!buildAutomationViewModel(s)['#automation-settings@hidden']);
+    assert(buildAutomationViewModel(s)['#automation-settings@hidden']);
     rebuildCivilization(s, s.run.runId);
     vm = buildCivilizationViewModel(s);
     assert(!vm['#civilization-bar@hidden'] && vm['#rebuild-civilization@hidden']);
@@ -110,7 +110,7 @@ export function registerArchitectureTests(test, assert) {
     delete old.run.talents; delete old.run.challengeLevel; delete old.run.autoTurn;
     delete old.game.modifiers.bounty; delete old.game.enemyModifiers;
     for (let version = 1; version < SAVE_VERSION; version++) {
-      validateRecord(old, version);
+      validateRecord(version === 8 ? fromV8Record(old) : old, version);
       const source = freeze(old), before = json(source), next = MIGRATIONS[version](source);
       assert(next.version === version + 1 && next !== source && next.game !== source.game);
       assert(json(MIGRATIONS[version](source)) === json(next));
@@ -121,7 +121,7 @@ export function registerArchitectureTests(test, assert) {
   });
   test('Save v8: captured V7 migrates with an original backup and derived values are absent from the wire format', () => {
     const raw = JSON.stringify(capturedV7), s = parseSession(raw), next = JSON.parse(serializeSession(s));
-    assert(next.version === 8 && next.game.gold.player === capturedV7.game.gold.player);
+    assert(next.version === SAVE_VERSION && next.game.gold.player === capturedV7.game.gold.player);
     assert(!('legacy' in next.permanent) && !('unlocked' in next.permanent.automation));
     assert(!('bonuses' in next.game) && !('mode' in next.game) && !('maxHp' in next.game.bases.player));
     assert(!('battleId' in next.run) && 'processedBattleId' in next.run && 'settled' in next.run);
@@ -133,19 +133,19 @@ export function registerArchitectureTests(test, assert) {
   test('Save v8: pending orders, settled purchases and rebuilt attributes round-trip without refunds or repeat rewards', () => {
     let s = createProgression(); recruit(s.game, 'melee'); const paid = s.game.queues.player[0].paid;
     s = parseSession(serializeSession(s)); assert(s.game.queues.player[0].paid === paid && s.game.gold.player === 150);
-    finish(s); purchaseTalent(s, 'autobuyer');
+    finish(s); purchaseTalent(s, 'spark');
     s = parseSession(serializeSession(s)); assert(s.permanent.legacy === 0 && !resolveBattle(s));
     const id = s.run.runId; assert(rebuildCivilization(s, id));
     const income = getIncomeRate(s.game), gold = s.game.gold.player;
     s = parseSession(serializeSession(s));
     assert(Q.eq(getIncomeRate(s.game), income) && Q.eq(s.game.gold.player, gold));
-    assert(s.permanent.completedCycles === 1 && s.permanent.automation.unlocked && !s.permanent.automation.enabled);
+    assert(s.permanent.completedCycles === 1 && !s.permanent.automation.unlocked && !s.permanent.automation.enabled);
   });
   test('Save v8: schema rejects wrong types, missing inputs, redundant attributes and invalid purchase budgets', () => {
     const raw = serializeSession(createProgression());
     for (const mutate of [r => r.run.phase = 'orbital', r => r.game.ai.orders = '3', r => r.game.bases.player.maxHp = '600',
       r => r.permanent.legacy = 100, r => r.game.bonuses = [], r => r.permanent.automation.unlocked = true,
-      r => delete r.run.upgrades, r => r.permanent.totalLegacy = -1, r => r.permanent.talents.autobuyer = 1]) {
+      r => delete r.run.upgrades, r => r.permanent.totalLegacy = -1, r => r.permanent.talents.spark = 1]) {
       const r = JSON.parse(raw); mutate(r); rejects(() => parseSession(JSON.stringify(r)));
     }
     const old = cloneRecord(capturedV7); old.game.bonuses[0].value = '999';
@@ -165,9 +165,9 @@ export function registerArchitectureTests(test, assert) {
     assert(root.querySelector('span').classList.contains('ready'));
   });
   test.browser('UI binding regression: unchanged paused frames preserve portraits, typed input, focus and event counts', async () => {
-    const s = createProgression(); finish(s); purchaseTalent(s, 'autobuyer');
+    const s = createProgression(); finish(s); purchaseTalent(s, 'spark');
     // Enough earned balance for the logistics prerequisite while keeping ledger valid.
-    s.permanent.completedCycles = 3; s.permanent.totalLegacy = 3; s.permanent.legacy = 2;
+    s.permanent.completedCycles = 3; s.permanent.automation.unlocked = true; s.permanent.totalLegacy = 3; s.permanent.legacy = 2;
     purchaseTalent(s, 'logistics'); rebuildCivilization(s, s.run.runId);
     const frame = await mountFixture(serializeSession(s));
     try {

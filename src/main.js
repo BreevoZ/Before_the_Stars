@@ -257,6 +257,7 @@ window.addEventListener('keydown', event => {
     if (!event.repeat) togglePause();
     return;
   }
+  if (event.code === 'KeyR' && civilization) { event.preventDefault(); if (!event.repeat) civilization.cycleSpeed(); return; }
   if (event.code === 'Enter' && event.target.closest('button')) return;
   if (targeting && ['ArrowLeft', 'ArrowRight', 'Enter', 'Escape'].includes(event.code)) {
     event.preventDefault();

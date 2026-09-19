@@ -65,7 +65,14 @@ export function drawProjectile(ctx, shot, scale = 1, reducedMotion = false) {
   }
   ctx.translate(x, y); ctx.rotate(angle); ctx.scale(scale, scale);
   switch (shot.kind) {
-    case 'arrow': case 'bolt': drawArrow(ctx); break;
+    case 'javelin':
+      line(ctx, [[-32, 0], [8, 0]], '#a99d81', 1.8);
+      polygon(ctx, [[14, 0], [5, -3], [5, 3]], C.shell); break;
+    case 'grenade': oval(ctx, 0, 0, 4, 3, '#788977'); line(ctx, [[-2, -3], [1, -4], [3, -1]], C.shell, 1); break;
+    case 'canister':
+      for (const offset of [-1, 0, 1]) { line(ctx, [[-12, offset * (4 + p * 5)], [1, offset * (5 + p * 7)]], C.shell, 1.1); } break;
+    case 'arrow': case 'bolt': drawArrow(ctx);
+      if (shot.trait === 'fireArrow') oval(ctx, 3, 0, 3, 2, C.fire); break;
     case 'bullet': line(ctx, [[-9, 0], [1, 0]], '#ddca94', 1.5); break;
     case 'rail':
       line(ctx, [[-24, 0], [2, 0]], tint, 1.5);
@@ -280,6 +287,38 @@ export function drawAbilityImpact(ctx, effect, scale, ground) {
   } else if (effect.kind === 'airstrike') {
     explosion(ctx, p, 50, 2);
     ctx.save(); ctx.translate(0, -16 * p); dust(ctx, p, 42, C.smoke, 48); ctx.restore();
+  }
+  ctx.restore();
+}
+
+// Small, material-like accents rather than a shared circular explosion.
+export function drawTraitEffect(ctx, effect, scale = 1, reduced = false) {
+  const p = reduced ? .4 : 1 - effect.life / effect.duration, tint = energy(effect.team);
+  ctx.save(); ctx.translate(effect.x, 0); ctx.scale(scale, scale);
+  ctx.globalAlpha = reduced ? .35 : (1 - p) * .7;
+  if (effect.style === 'blink') {
+    if (!reduced) for (let i = 0; i < 3; i++) polygon(ctx, [[-8-i*9,-52],[2-i*9,-52],[8-i*9,-10],[-6-i*9,-10]], tint);
+    const end = ((effect.toX ?? effect.x) - effect.x) / scale;
+    line(ctx, [[end-8,-50],[end-10,-22],[end-6,-10]], tint, 1.5);
+  } else if (['shield', 'field', 'fieldBreak'].includes(effect.style)) {
+    const reach = effect.toX === undefined ? 0 : (effect.toX - effect.x) / scale;
+    if (reach) line(ctx, [[0,-48],[reach,-38]], tint, 1);
+    polygon(ctx, [[reach+17,-60],[reach+27,-48],[reach+24,-18],[reach+15,-10],[reach+18,-37]], tint);
+  } else if (effect.style === 'heal') {
+    for (let i=0;i<3;i++) { const x = i*9-9, y = -24-i*8-p*12;
+      polygon(ctx, [[x,y],[x+4,y-5],[x+6,y],[x+3,y+4]], tint); }
+  } else if (effect.style === 'parry') {
+    polygon(ctx, [[14,-47],[25,-40],[35,-43],[25,-36],[25,-28],[20,-36],[10,-34],[20,-40]], C.shell);
+  } else if (effect.style === 'suppression') {
+    for (let i=0;i<3;i++) line(ctx, [[i*6-6,-9],[i*6-9,-4]], C.shell, 1);
+  } else if (effect.style === 'overload') {
+    polygon(ctx, [[18,-47],[30,-43],[21,-39],[25,-43]], tint);
+  } else if (effect.style === 'ricochet') {
+    line(ctx, [[-5,-37],[0,-31],[8,-36]], C.stone, 1.5);
+  } else if (effect.style === 'volley') {
+    for (let i=0;i<3;i++) polygon(ctx, [[i*5-5,-74],[i*5-3,-77],[i*5-1,-74]], C.shell);
+  } else if (effect.style === 'coaxial' || effect.style === 'canister') {
+    polygon(ctx, [[20,-43],[35,-48],[30,-42],[38,-39],[20,-39]], C.hot);
   }
   ctx.restore();
 }

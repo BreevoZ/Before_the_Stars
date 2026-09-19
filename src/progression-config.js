@@ -6,8 +6,8 @@ export const SURFACE = Object.freeze({
   enemyStartingGold: Object.freeze(Object.fromEntries(Object.entries(AGES).map(([id, age]) => [id, age.startingGold]))),
 });
 export const UPGRADES = Object.freeze({
-  production: Object.freeze({ name: '生产档案', base: 1.5, description: '被动金币收入', requires: { autobuyer: 1 } }),
-  warfare: Object.freeze({ name: '战争档案', base: 1.25, description: '战斗经验', requires: { autobuyer: 1 } }),
+  production: Object.freeze({ name: '生产档案', base: 1.5, description: '被动金币收入', requires: { spark: 1 } }),
+  warfare: Object.freeze({ name: '战争档案', base: 1.25, description: '战斗经验', requires: { spark: 1 } }),
 });
 export const UPGRADE_COSTS = Object.freeze([1, 2, 4, 8, 16]);
 export const AUTOMATION_INTERVAL = 0.25;
@@ -19,8 +19,17 @@ export function getChallengeModifiers(level = 0) {
   return Object.fromEntries(Object.entries(CHALLENGE).filter(([key]) => key !== 'maxLevel')
     .map(([key, base]) => [key, Q.pow(base, level)]));
 }
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 export const SAVE_INTERVAL = 10;
 export function getBonuses(levels) {
   return { income: Q.pow(UPGRADES.production.base, levels.production), experience: Q.pow(UPGRADES.warfare.base, levels.warfare) };
 }
+
+export const AUTOMATION_MILESTONE = 2;
+export const TALENT_LAYER_REQUIREMENT = 1;
+export const UNIT_TALENT_COSTS = Object.freeze([1, 2, 4, 6, 10]);
+export const SPEEDS = Object.freeze([1, 2, 3]);
+const EMBERS = Object.freeze(['初生之地', '纷争余烬', '铁旗时代', '烽火大陆', '裂土之争', '燃烧边境', '钢铁洪流', '长夜战线', '失序世界', '终焉回声', '最后壁垒']);
+export function challengeName(level = 0) { return EMBERS[level] ?? '未知余烬'; }
+export function automationUnlocked(permanent) { return permanent.completedCycles >= AUTOMATION_MILESTONE || permanent.automationRetained === true; }
+export function availableSpeeds(permanent) { return SPEEDS.slice(0, permanent.talents.timeAcceleration ? 3 : permanent.talents.spark ? 2 : 1); }

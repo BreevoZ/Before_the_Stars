@@ -1,3 +1,4 @@
+import { TRAIT_STATS, TRAIT_DEFAULTS } from './traits.js';
 import { Q } from './quantity.js';
 import { RULES, UNITS, TURRETS, ABILITIES, AGES } from './game-config.js';
 
@@ -8,6 +9,7 @@ const growth = Object.freeze({ quantity: true, min: 0 });
 const growthInteger = Object.freeze({ quantity: true, min: 0, round: 'floor' });
 const count = max => ({ min: 0, max, round: 'floor' });
 export const STAT_DEFINITIONS = Object.freeze({
+  ...TRAIT_STATS, canRanged: { boolean: true },
   damage: growth, meleeDamage: growth, chargeDamage: growth, tickDamage: growth, baseDamage: growth,
   health: { quantity: true, min: 1, round: 'round' }, baseHealth: { quantity: true, min: 1, round: 'round' },
   armor: growth, armorPierce: growth, rangedReduction: { min: 0, max: 1 },
@@ -92,6 +94,7 @@ function baseValues(context) {
   if (context.kind === 'reward') return { bounty: 0, experience: 0 };
   if (context.kind === 'civilization') return { legacy: 1 };
   return { ...context.base, enabled: true, attackSpeed: 1,
+    ...(context.kind === 'unit' ? { ...TRAIT_DEFAULTS, canRanged: true } : {}),
     ...(context.kind === 'turret' ? { attackInterval: context.base.interval } : {}) };
 }
 function eraBonuses(context) {
@@ -143,7 +146,7 @@ function entryFor(game, subject) {
 function statusEffects(subject, key) {
   return key === 'speed' && subject?.moveMultiplier !== undefined && subject.moveMultiplier !== 1
     ? [{ target: { stat: 'speed', kind: 'unit' }, type: 'multiply', value: subject.moveMultiplier,
-      source: { id: 'oil', kind: 'status', label: '沸油减速' } }] : empty;
+      source: { id: subject.suppressionMultiplier === subject.moveMultiplier ? 'suppression' : 'oil', kind: 'status', label: subject.suppressionMultiplier === subject.moveMultiplier ? '压制射击' : '沸油减速' } }] : empty;
 }
 export function attributes(game, subject) {
   const values = entryFor(game, subject).values;

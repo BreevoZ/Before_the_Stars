@@ -42,11 +42,12 @@ test('Simulation: a real paid Autobuyer army continues early victories and settl
 });
 
 test('Simulation: challenge modifiers affect actual combat; only completed runs earn scaled Legacy', () => {
-  const normal = simulateRun(example), challenge = simulateRun({ ...example, challengeLevel: 1 });
+  const options = { ...example, automation: { ...example.automation, weights: [1,1,3] } };
+  const normal = simulateRun(options), challenge = simulateRun({ ...options, challengeLevel: 1 });
   assert.equal(challenge.outcome, 'won');
   assert.equal(challenge.legacy, normal.legacy * 2);
   assert.notEqual(challenge.duration, normal.duration);
-  const failed = simulateRun({ ...example, challengeLevel: 10 });
+  const failed = simulateRun({ ...example, challengeLevel: 10, completedCycles: 10 });
   assert.equal(failed.outcome, 'lost');
   assert.equal(failed.legacy, 0);
 });
@@ -75,7 +76,7 @@ test('Simulation: settings are opt-in; it does not silently supply manual evolut
   const off = simulateRun({ ...example, automation: { enabled: false } });
   assert.equal(off.outcome, 'lost');
   assert.equal(off.totalExperience, 0);
-  const basic = simulateRun({ talents: { autobuyer: 1 }, automation: { enabled: true }, maxSeconds: 300 });
+  const basic = simulateRun({ completedCycles: 2, talents: { spark: 1 }, automation: { enabled: true }, maxSeconds: 300 });
   assert.ok(basic.totalExperience > 0);
   assert.ok(basic.battles.every(battle => battle.playerEndAge === 1));
   assert.equal(basic.legacy, 0);
@@ -99,12 +100,12 @@ test('Simulation: repeated runs are deterministic and cannot mutate options, sha
 
 test('Simulation: rejects misspelled keys, invalid types/ranges, unmet prerequisites and locked settings', () => {
   const invalid = [null, [], { typo: 1 }, { talents: [] }, { talents: { typo: 1 } },
-    { talents: { autobuyer: null } }, { talents: { autobuyer: '1' } }, { talents: { autobuyer: 2 } },
-    { talents: { autobuyer: -1 } }, { talents: { autobuyer: 0.5 } }, { talents: { evolution: 1 } },
+    { talents: { spark: null } }, { talents: { spark: '1' } }, { talents: { spark: 2 } },
+    { talents: { spark: -1 } }, { talents: { spark: 0.5 } }, { talents: { evolution: 1 } },
     { talents: { production: 1 } }, { challengeLevel: 1 }, { challengeLevel: -1 }, { challengeLevel: 11 },
     { challengeLevel: NaN }, { challengeLevel: '0' }, { automation: null }, { automation: { typo: true } },
     { automation: { unlocked: true } }, { automation: { enabled: true } },
-    { talents: { autobuyer: 1 }, automation: { evolve: true } },
+    { talents: { spark: 1 }, automation: { evolve: true } },
     { ...example, automation: { weights: [0, 0, 0] } }, { ...example, automation: { reserve: -1 } },
     { ...example, automation: { queueLimit: 65 } }, { ...example, automation: { eliteLimit: 4 } },
     { maxSeconds: 0 }, { maxSeconds: Infinity }, { maxSeconds: 86401 }];

@@ -16,7 +16,8 @@ export function buildAutomationViewModel(session, { mobile = false } = {}) {
   const { permanent: p, game } = session, auto = p.automation, view = {};
   const put = (id, value, prop = '') => { view[`#${id}${prop ? `@${prop}` : ''}`] = value; };
   put('talent-legacy-preview', `本轮终局 +${stat(game, { kind: 'civilization' }, 'legacy')} · 常规重建终局 +${getLegacyReward(p.talents)} · 累计 ${p.totalLegacy} Legacy`);
-  put('talent-guide', !p.talents.autobuyer ? '从根节点点亮第一颗星。花 1 Legacy 解锁 Autobuyer，再沿三条路线成长。' : mobile ? '沿星路向上探索 · 点击节点查看与购买' : '微光指引可购买的天赋 · 悬停或点击查看 · 方向键探索星图');
+  put('talent-guide', !p.talents.spark ? '从根节点点亮第一颗星。花 1 Legacy 点亮文明火种，解锁 2× 速度。自动招募在累计通关 2 次后免费获得。' : mobile ? '上下探索时代，左右浏览侧枝 · 点击节点查看与购买' : '微光指引可购买的天赋 · 悬停或点击查看 · 方向键探索星图');
+  put('automation-locked', `累计通关 2 次免费解锁基础自动招募 · 当前 ${p.completedCycles}/2。解锁后默认关闭，可自行启用。`);
   put('automation-locked', auto.unlocked, 'hidden'); put('automation-settings', !auto.unlocked, 'hidden');
   for (const [key, level] of [['logistics', 1], ['formation', 1], ['elite', 1], ['evolution', 1], ['defense', 1], ['defense', 2]]) {
     view[`[data-auto-talent="${key}"]${level === 1 ? ':not([data-auto-level])' : `[data-auto-level="${level}"]`}@hidden`] = p.talents[key] < level;

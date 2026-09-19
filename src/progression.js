@@ -1,7 +1,7 @@
 import { Q } from './quantity.js';
 import { createGame, updateGame } from './game.js';
 import { updateAutomation, createAutomation, configureAutomation } from './automation.js';
-import { UPGRADES, UPGRADE_COSTS, SAVE_VERSION } from './progression-config.js';
+import { UPGRADES, UPGRADE_COSTS, SAVE_VERSION, automationUnlocked, availableSpeeds } from './progression-config.js';
 import { emptyTalents, talentLevel } from './talents.js';
 import { getRunBonuses } from './progression-bonuses.js';
 import { createBonusStack, stat } from './stats.js';
@@ -35,7 +35,7 @@ function startRun(session, challengeLevel = 0, extraBonuses = []) {
 
 export function createProgression() {
   const session = { version: SAVE_VERSION, permanent: { completedCycles: 0, legacy: 0, totalLegacy: 0,
-    upgrades: { production: 0, warfare: 0 }, talents: emptyTalents(), talentGrants: [], automation: createAutomation() } };
+    upgrades: { production: 0, warfare: 0 }, talents: emptyTalents(), talentGrants: [], settings: { speed: 1 }, automationRetained: false, automation: createAutomation() } };
   startRun(session);
   return session;
 }
@@ -91,6 +91,7 @@ const effects = {
     permanent.completedCycles++;
     permanent.legacy += reward;
     permanent.totalLegacy += reward;
+    permanent.automation.unlocked = automationUnlocked(permanent);
   },
   continue: continueConflict,
   rebuild: session => startRun(session),
@@ -123,4 +124,14 @@ export function purchaseUpgrade(session, key) {
 
 export function setAutomation(session, enabled, target) {
   return configureAutomation(session, { enabled, target });
+}
+
+export function setGameSpeed(session, speed) {
+  if (session.debug || !availableSpeeds(session.permanent).includes(speed)) return false;
+  session.permanent.settings.speed = speed;
+  return true;
+}
+export function cycleGameSpeed(session) {
+  const speeds = availableSpeeds(session.permanent), index = speeds.indexOf(session.permanent.settings.speed);
+  return setGameSpeed(session, speeds[(index + 1) % speeds.length]);
 }

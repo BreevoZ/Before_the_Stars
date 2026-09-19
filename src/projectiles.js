@@ -1,5 +1,8 @@
 // Presentation only: damage, flight duration and targeting remain in game.js.
 const PROFILES = Object.freeze({
+  javelin: { motion: 'ballistic', arc: 24, impact: 'thrust', life: .3 },
+  grenade: { motion: 'ballistic', arc: 70, impact: 'explosion', life: .6 },
+  canister: { motion: 'direct', impact: 'bullet', life: .2 },
   sling: { motion: 'ballistic', arc: 24, impact: 'stone', life: 0.35 },
   stone: { motion: 'ballistic', arc: 48, impact: 'stone', life: 0.4 },
   boulder: { motion: 'ballistic', arc: 85, impact: 'rubble', life: 0.65 },

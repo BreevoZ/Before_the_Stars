@@ -2,10 +2,13 @@
   "name": "before-the-stars",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "test": "node --test tests/node.test.js tests/sim.test.js",
     "sim": "node sim/run.js",
-    "sim:batch": "node sim/batch.js"
+    "sim:batch": "node sim/batch.js",
+    "sim:traits": "node sim/traits.js"
   }
 }

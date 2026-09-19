@@ -3,7 +3,7 @@ import { drawTurret } from './turrets.js';
 import { RULES, UNITS, AGES, ABILITIES, getTurretPosition, getAbilityRadius, getAbilityImpactX, getUnitHealth } from './game.js';
 import { drawUnit } from './units.js';
 import { drawBase } from './bases.js';
-import { drawProjectile, drawImpact, drawFields, drawAbilityImpact, drawArrow } from './combat-effects.js';
+import { drawProjectile, drawImpact, drawFields, drawAbilityImpact, drawArrow, drawTraitEffect } from './combat-effects.js';
 
 const PALETTES = {
   player: { light: '#b7d4b5', flag: '#bbd9b2' },
@@ -296,6 +296,7 @@ export function drawBattleEffects(ctx, game, entityScale = 1, reducedMotion = fa
       }
     }
   }
+  for (const effect of game.effects) if (effect.kind === 'trait') drawTraitEffect(ctx, effect, entityScale, reducedMotion);
   if (!reducedMotion) {
     for (const effect of game.effects) {
       ctx.globalAlpha = effect.life / effect.duration;

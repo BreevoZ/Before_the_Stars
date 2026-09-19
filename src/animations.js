@@ -83,11 +83,11 @@ function frame(now) {
   previous = now;
   if (dt) { time = (time + dt) % CLIP_SECONDS; dirty = true; sync(); }
   if (dirty && !document.hidden) {
-    if (enlarged) enlarged(time, settings);
+    if (enlarged) enlarged(time, { ...settings, reducedMotion: reducedMotion.matches });
     else for (const card of cards) {
       if (card.element.hidden || !card.visible) continue;
       card.paint ??= createClipPainter(card.canvas, card.clip);
-      card.paint(time, settings);
+      card.paint(time, { ...settings, reducedMotion: reducedMotion.matches });
     }
     dirty = false;
   }

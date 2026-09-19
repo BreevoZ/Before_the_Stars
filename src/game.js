@@ -1,4 +1,5 @@
 import { Q } from './quantity.js';
+import { runTraitHook, unitTraits } from './traits.js';
 import { BASE_MOUNTS } from './base-layouts.js';
 import { createProjectileImpact } from './projectiles.js';
 
@@ -296,8 +297,32 @@ function updateAI(game, dt) {
   if (type && recruit(game, type, 'enemy')) game.ai.orders++;
 }
 
+// All trait attacks enter the same hit/projectile paths as normal attacks.
+function traitEffect(game, id, style, x, team, toX) {
+  game.traitActivations ??= {};
+  game.traitActivations[id] = (game.traitActivations[id] ?? 0) + 1;
+  game.effects.push({ kind: 'trait', trait: id, style, x, team, ...(toX === undefined ? {} : { toX }), life: .38, duration: .38 });
+}
+function traitContext(game, unit, hits, extra = {}) {
+  return { unit, stats: attributes(game, unit), time: game.elapsed,
+    get allies() { return game.units.filter(other => other.team === unit.team); },
+    get enemies() { return game.units.filter(other => other.team !== unit.team); },
+    launch(target, kind, damage, options = {}) { addProjectile(game, unit.team, kind, unit.x, target, damage, { sourceId: unit.id, ...options }); },
+    strike(target, damage, options = {}) { hits.push({ target, damage, team: unit.team, attacker: unit.type, sourceId: unit.id, melee: true, ...options }); },
+    heal(target, amount) { target.hp = Q.min(stat(game, target, 'health'), Q.add(target.hp, amount)); },
+    effect(id, style, x, team, toX) {
+      traitEffect(game, id, style, x, team, toX);
+      if (style === 'throw') unit.traitAnimation = .38;
+    }, ...extra };
+}
+function traitHook(game, unit, hook, hits, extra = {}) {
+  if (unit.team !== 'player') return;
+  const applicable = unitTraits(unit).some(trait => trait.hooks[hook] && stat(game, unit, trait.stat));
+  if (applicable) runTraitHook(hook, traitContext(game, unit, hits, extra));
+}
+
 function addProjectile(game, team, kind, x, target, damage, options = {}) {
-  const speed = { sling: 460, arrow: 500, bullet: 900, rail: 1150, egg: 650, plasma: 700, 'plasma-orb': 480, rocket: 500 }[kind] ?? 420;
+  const speed = { sling: 460, arrow: 500, bullet: 900, rail: 1150, egg: 650, plasma: 700, 'plasma-orb': 480, rocket: 500, javelin: 620, grenade: 420, canister: 850 }[kind] ?? 420;
   const duration = kind === 'laser' ? 0.1 : kind === 'ion' ? 0.16 : Math.max(0.12, Math.abs(target.x - x) / speed);
   game.projectiles.push({
     team, kind, fromX: x, toX: target.x,
@@ -309,6 +334,7 @@ function addProjectile(game, team, kind, x, target, damage, options = {}) {
     arc: options.arc, turretType: options.turretType, field: options.fieldStats,
     pierce: options.pierce ?? 0, pierceFactor: options.pierceFactor, pierceDistance: options.pierceDistance,
     originX: options.originX ?? x, maxRange: options.maxRange ?? Infinity,
+    ...Object.fromEntries(['sourceId', 'trait', 'ricochet', 'slow', 'slowDuration', 'secondary', 'ranged'].filter(key => options[key] !== undefined).map(key => [key, options[key]])),
   });
 }
 
@@ -319,21 +345,22 @@ export function projectileField(stats) {
 }
 
 function updateProjectiles(game, dt, hits) {
-  for (const shot of game.projectiles) {
+  for (const shot of [...game.projectiles]) {
     shot.remaining -= dt;
     const target = shot.targetBase ? game.bases[shot.targetBase] : game.units.find(unit => unit.id === shot.targetId);
     if (target) shot.toX = target.x;
     if (shot.remaining <= 0) {
+      const payload = { sourceId: shot.sourceId, slow: shot.slow, slowDuration: shot.slowDuration, trait: shot.trait, secondary: shot.secondary };
       if (shot.splash > 0) {
         // Area shots detonate at their last tracked position even if the target has died.
         for (const victim of game.units) {
           if (victim.team !== shot.team && Math.abs(victim.x - shot.toX) <= shot.splash) {
-            hits.push({ target: victim, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce, visual: false });
+            hits.push({ ...payload, target: victim, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce, visual: false });
           }
         }
         // Siege units can hit a base directly; blast radius never adds extra base damage.
-        if (shot.targetBase && (target && Q.gt(target.hp, 0))) hits.push({ target, damage: shot.damage, team: shot.team, visual: false });
-      } else if ((target && Q.gt(target.hp, 0))) hits.push({ target, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce, ranged: true, visual: false });
+        if (shot.targetBase && (target && Q.gt(target.hp, 0))) hits.push({ ...payload, target, damage: shot.damage, team: shot.team, visual: false });
+      } else if ((target && Q.gt(target.hp, 0))) hits.push({ ...payload, target, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce, ranged: shot.ranged !== false, visual: false });
       if (shot.splash > 0 || (target && Q.gt(target.hp, 0))) game.effects.push(createProjectileImpact(shot, impactSurface(game, target)));
       if (shot.pierce) {
         const direction = shot.team === 'player' ? 1 : -1;
@@ -341,19 +368,31 @@ function updateProjectiles(game, dt, hits) {
           && (unit.x - shot.toX) * direction > 0 && (unit.x - shot.toX) * direction <= shot.pierceDistance
           && Math.abs(unit.x - shot.originX) <= shot.maxRange)
           .sort((a, b) => (a.x - b.x) * direction).slice(0, shot.pierce);
-        for (const victim of victims) hits.push({ target: victim, damage: Q.mul(shot.damage, shot.pierceFactor), team: shot.team,
-          ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce, ranged: true, visual: false });
+        for (const victim of victims) hits.push({ ...payload, target: victim, damage: Q.mul(shot.damage, shot.pierceFactor), team: shot.team,
+          ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce, ranged: shot.ranged !== false, visual: false });
         if (victims.length) game.effects.push({ kind: 'pierce', weapon: shot.kind, x: shot.toX, toX: victims.at(-1).x, y: shot.toY, team: shot.team, life: 0.16, duration: 0.16 });
         for (const victim of victims) game.effects.push(createProjectileImpact({ ...shot, toX: victim.x, targetId: victim.id }, impactSurface(game, victim)));
       }
-      if (shot.field) game.fields.push({ ...shot.field, team: shot.team, x: shot.toX });
+      if (shot.field) {
+        game.fields.push({ ...shot.field, team: shot.team, x: shot.toX, ...(shot.sourceId ? { sourceId: shot.sourceId, trait: shot.trait } : {}) });
+        if (shot.trait) traitEffect(game, shot.trait, 'fire', shot.toX, shot.team);
+      }
+      if (shot.ricochet && target?.type && Q.gt(target.hp, 0)) {
+        const direction = shot.team === 'player' ? 1 : -1;
+        const next = game.units.filter(unit => unit.team !== shot.team && Q.gt(unit.hp, 0) && (unit.x - target.x) * direction > 0 && Math.abs(unit.x - target.x) <= 110)
+          .sort((a, b) => (a.x - b.x) * direction || a.id - b.id)[0];
+        if (next) {
+          addProjectile(game, shot.team, shot.kind, target.x, next, Q.mul(shot.damage, shot.ricochet), { sourceId: shot.sourceId, fromY: shot.toY, arc: 20, secondary: true, ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce });
+          traitEffect(game, shot.trait, 'ricochet', target.x, shot.team, next.x);
+        }
+      }
     }
   }
   game.projectiles = game.projectiles.filter(shot => shot.remaining > 0);
 }
 
 function updateFields(game, dt, hits) {
-  for (const unit of game.units) unit.moveMultiplier = 1;
+  for (const unit of game.units) unit.moveMultiplier = (unit.suppressedUntil ?? 0) > game.elapsed ? unit.suppressionMultiplier : 1;
   for (const field of game.fields) {
     const active = Math.min(dt, field.remaining);
     const victims = game.units.filter(unit => unit.team !== field.team && Math.abs(unit.x - field.x) <= field.radius);
@@ -361,7 +400,7 @@ function updateFields(game, dt, hits) {
     field.remaining = Math.max(0, field.remaining - active);
     field.tickCooldown -= active;
     while (field.tickCooldown <= EPSILON) {
-      for (const unit of victims) hits.push({ target: unit, damage: field.damage, team: field.team, ignoreArmor: true, visual: false });
+      for (const unit of victims) hits.push({ sourceId: field.sourceId, target: unit, damage: field.damage, team: field.team, ignoreArmor: true, visual: false });
       field.tickCooldown += field.tickInterval;
     }
   }
@@ -407,10 +446,11 @@ function updateUnits(game, dt, hits) {
     unit.attackAnimation = Math.max(0, unit.attackAnimation - dt);
     unit.hitFlash = Math.max(0, unit.hitFlash - dt);
     unit.guardFlash = Math.max(0, (unit.guardFlash ?? 0) - dt);
+    if (unit.traitAnimation !== undefined) unit.traitAnimation = Math.max(0, unit.traitAnimation - dt);
     unit.moving = false;
     unit.attackApproach = 0;
     const direction = unit.team === 'player' ? 1 : -1;
-    const origin = positions.get(unit.id);
+    let origin = positions.get(unit.id);
     const base = game.bases[otherTeam(unit.team)];
     let closestEnemy = null;
     let enemyDistance = Infinity;
@@ -426,14 +466,27 @@ function updateUnits(game, dt, hits) {
         allySpace = Math.min(allySpace, distance * direction - unitSpacing(unit.type, other.type));
       }
     }
+    traitHook(game, unit, 'onEngage', hits, { target: closestEnemy, distance: enemyDistance,
+      moveToTarget(victim, range) {
+        const distance = Math.abs(victim.x - unit.x);
+        const step = Math.max(0, Math.min(distance - range, allySpace));
+        unit.x += direction * step; unit.distanceTravelled = (unit.distanceTravelled ?? 0) + step;
+      } });
+    if (unit.x !== origin) { origin = unit.x; positions.set(unit.id, origin); enemyDistance = Math.abs(closestEnemy.x - origin); }
     const baseDistance = Math.abs(base.x - origin) - RULES.baseHalfWidth;
     const baseRange = stats.baseRange ?? stats.range;
     const reach = attackRange(stats, closestEnemy);
     const target = enemyDistance <= reach + 0.01 ? closestEnemy : baseDistance <= baseRange + 0.01 ? base : null;
+    const prepareAttack = (victim, damage, projectile) => {
+      const attack = { damage, projectile, splash: stats.splash, ignoreArmor: stats.ignoreArmor, armorPierce: stats.armorPierce };
+      traitHook(game, unit, 'beforeAttack', hits, { target: victim, attack });
+      return attack;
+    };
     const fire = victim => {
+      const attack = prepareAttack(victim, stats.damage, stats.projectile);
       const muzzle = Math.min(stats.muzzleX ?? 0, Math.abs(victim.x - unit.x) * 0.5);
-      addProjectile(game, unit.team, stats.projectile, unit.x + direction * muzzle, victim, stats.damage,
-        { fromUnitX: unit.x, fromY: stats.muzzleY + (stats.lane === 'back' ? -7 : 0), splash: stats.splash, ignoreArmor: stats.ignoreArmor, armorPierce: stats.armorPierce });
+      addProjectile(game, unit.team, attack.projectile, unit.x + direction * muzzle, victim, attack.damage,
+        { ...attack, sourceId: unit.id, fromUnitX: unit.x, fromY: stats.muzzleY + (stats.lane === 'back' ? -7 : 0) });
       unit.attackAnimation = stats.attackDuration;
     };
     if (unit.burstRemaining > 0) {
@@ -452,7 +505,7 @@ function updateUnits(game, dt, hits) {
     }
     if (target) {
       if (unit.attackCooldown === 0) {
-        const closeCombat = stats.meleeRange && Math.abs(target.x - origin) - (target.type ? 0 : RULES.baseHalfWidth) <= stats.meleeRange;
+        const closeCombat = !stats.canRanged || stats.meleeRange && Math.abs(target.x - origin) - (target.type ? 0 : RULES.baseHalfWidth) <= stats.meleeRange;
         if (stats.meleeRange) unit.attackStyle = closeCombat ? 'melee' : 'ranged';
         if (stats.projectile && !closeCombat) {
           fire(target);
@@ -464,12 +517,13 @@ function updateUnits(game, dt, hits) {
           }
         } else {
           unit.lastAttackCharged = Boolean(stats.chargeDamage && (unit.chargeTravel ?? 0) >= stats.chargeDistance);
-          hits.push({ target, damage: Q.add(closeCombat ? stats.meleeDamage : stats.damage, unit.lastAttackCharged ? stats.chargeDamage : 0), team: unit.team, ignoreArmor: stats.ignoreArmor, armorPierce: stats.armorPierce, attacker: unit.type });
+          const attack = prepareAttack(target, Q.add(closeCombat ? stats.meleeDamage ?? stats.damage : stats.damage, unit.lastAttackCharged ? stats.chargeDamage : 0), null);
+          hits.push({ ...attack, target, team: unit.team, attacker: unit.type, sourceId: unit.id, melee: true });
           if (stats.cleaveRadius && target.type) {
             const secondary = game.units.filter(other => other !== target && other.team !== unit.team &&
               (positions.get(other.id) - origin) * direction >= 0 && Math.abs(positions.get(other.id) - positions.get(target.id)) <= stats.cleaveRadius)
               .sort((a, b) => Math.abs(positions.get(a.id) - origin) - Math.abs(positions.get(b.id) - origin))[0];
-            if (secondary) hits.push({ target: secondary, damage: Q.mul(stats.damage, stats.cleaveFactor), team: unit.team, attacker: unit.type });
+            if (secondary) hits.push({ sourceId: unit.id, secondary: true, melee: true, target: secondary, damage: Q.mul(stats.damage, stats.cleaveFactor), team: unit.team, attacker: unit.type });
           }
         }
         unit.chargeTravel = 0;
@@ -485,7 +539,7 @@ function updateUnits(game, dt, hits) {
       unit.chargeTravel = unit.moving ? (unit.chargeTravel ?? 0) + step : 0;
       // Visual anticipation for a ready melee weapon's first approach. Combat
       // still resolves at the existing range and cooldown, without a new delay.
-      if (!stats.projectile && unit.moving && unit.attackCooldown === 0 && !unit.attackAnimation) {
+      if ((!stats.projectile || !stats.canRanged) && unit.moving && unit.attackCooldown === 0 && !unit.attackAnimation) {
         const gap = Math.min(enemyDistance - reach, baseDistance - baseRange) - step;
         unit.attackApproach = Math.max(0, Math.min(1, 1 - gap / (stats.speed * 0.22)));
       }
@@ -554,18 +608,40 @@ function impactSurface(game, target) {
 }
 
 function resolveHits(game, hits) {
-  // Resolve all damage before removing casualties; rewards are paid once per death.
+  // Hooks and secondary hits run in insertion order. Resolve all casualties
+  // before removal; kill/death hooks and the existing rewards run once per unit.
+  const killers = new Map();
   for (const hit of hits) {
     const stats = hit.target.type ? attributes(game, hit.target) : null;
     const armor = stats && !hit.ignoreArmor ? Q.max(0, Q.sub(stats.armor, hit.armorPierce ?? 0)) : 0;
-    const guard = hit.ranged && !hit.ignoreArmor ? stats?.rangedReduction ?? 0 : 0;
-    const damage = hit.damage; // Already resolved at attack/launch time.
-    hit.target.hp = Q.max(0, Q.sub(hit.target.hp, Q.gt(damage, 0) ? Q.max(1, Q.mul(Q.sub(damage, armor), 1 - guard)) : 0));
-    if (guard) hit.target.guardFlash = 0.18;
+    hit.guard = hit.ranged && !hit.ignoreArmor ? stats?.rangedReduction ?? 0 : 0;
+    const attacker = game.units.find(unit => unit.id === hit.sourceId);
+    if (attacker) traitHook(game, attacker, 'onHit', hits, { hit, role: 'attacker', target: hit.target });
+    if (stats && Q.gt(hit.target.hp, 0)) traitHook(game, hit.target, 'onHit', hits, { hit, role: 'defender', attacker });
+    if (hit.cancelled) continue;
+    hit.resolvedDamage = Q.gt(hit.damage, 0) ? Q.max(1, Q.mul(Q.sub(hit.damage, armor), 1 - hit.guard)) : 0;
+    if (stats && Q.gt(hit.target.hp, 0) && hit.target.team === 'player' && !hit.secondary) {
+      const protector = game.units.filter(unit => unit !== hit.target && unit.team === 'player' && Q.gt(unit.hp, 0)
+        && unitTraits(unit).some(trait => trait.protectionRadius && Math.abs(unit.x - hit.target.x) <= trait.protectionRadius && stat(game, unit, trait.stat)))
+        .sort((a, b) => Math.abs(a.x - hit.target.x) - Math.abs(b.x - hit.target.x) || a.id - b.id)[0];
+      if (protector) traitHook(game, protector, 'onHit', hits, { hit, role: 'protector', absorb(damage) {
+        const alive = Q.gt(protector.hp, 0); protector.hp = Q.max(0, Q.sub(protector.hp, damage));
+        if (alive && Q.eq(protector.hp, 0)) killers.set(protector.id, attacker);
+      } });
+    }
+    const alive = Q.gt(hit.target.hp, 0);
+    hit.target.hp = Q.max(0, Q.sub(hit.target.hp, hit.resolvedDamage));
+    if (stats && alive && Q.eq(hit.target.hp, 0)) killers.set(hit.target.id, attacker);
+    if (stats && hit.slow && hit.slowDuration) {
+      hit.target.suppressedUntil = Math.max(hit.target.suppressedUntil ?? 0, game.elapsed + hit.slowDuration);
+      hit.target.suppressionMultiplier = hit.slow;
+      traitEffect(game, hit.trait, 'suppression', hit.target.x, hit.team);
+    }
+    if (hit.guard) hit.target.guardFlash = 0.18;
     hit.target.hitFlash = 0.14;
     if (hit.visual !== false) {
       const direction = hit.team === 'player' ? 1 : -1;
-      const style = { melee: 'blunt', heavy: 'bite', swordsman: 'slash', knight: 'thrust', duelist: 'thrust', commando: 'knife', blade: 'blade' }[hit.attacker] ?? 'blunt';
+      const style = { melee: 'blunt', heavy: 'bite', swordsman: 'slash', knight: 'thrust', duelist: 'thrust', commando: 'knife', blade: 'blade', superSoldier: 'blade' }[hit.attacker] ?? 'blunt';
       game.effects.push({ kind: 'impact', style, x: hit.target.x - (stats ? 0 : direction * RULES.baseHalfWidth),
         anchorX: stats ? undefined : hit.target.x, y: stats ? -stats.height * 0.52 - (stats.lane === 'back' ? 7 : 0) : -45,
         angle: direction > 0 ? 0 : Math.PI, team: hit.team, surface: impactSurface(game, hit.target), life: 0.22, duration: 0.22 });
@@ -573,6 +649,9 @@ function resolveHits(game, hits) {
   }
   for (const unit of game.units) {
     if (Q.lte(unit.hp, 0)) {
+      const killer = killers.get(unit.id);
+      if (killer) traitHook(game, killer, 'onKill', hits, { target: unit });
+      traitHook(game, unit, 'onDeath', hits, { attacker: killer });
       const winner = otherTeam(unit.team);
       game.gold[winner] = Q.add(game.gold[winner], getBountyReward(game, stat(game, unit, 'bounty'), winner));
       game.experience[winner] = Q.add(game.experience[winner], getExperienceReward(game, stat(game, unit, 'experience'), winner));

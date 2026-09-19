@@ -130,7 +130,7 @@ export function registerQuantityTests(test, assert, near) {
   });
 
   test('Quantity: simulator JSON/CSV preserves huge metrics as text and deterministic finite timings', () => {
-    const options = { maxSeconds: 20, talents: { autobuyer: 1 }, automation: { enabled: true }, bonuses: growth.map(key => bonus(key)) };
+    const options = { completedCycles: 2, maxSeconds: 20, talents: { spark: 1 }, automation: { enabled: true }, bonuses: growth.map(key => bonus(key)) };
     const a = simulateRun(options), b = simulateRun(options);
     assert(JSON.stringify(a) === JSON.stringify(b) && typeof a.peakGold === 'string');
     assert(Q.gt(a.peakGold, '1e400') && Number.isFinite(a.duration));

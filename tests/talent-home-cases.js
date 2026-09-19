@@ -13,8 +13,8 @@ export function registerTalentHomeTests(test, assert, near) {
       const rect = el('archives-dialog').getBoundingClientRect();
       assert(el('archives-dialog').open && el('archives-dialog').dataset.cinematic === 'false');
       near(rect.left, 0); near(rect.top, 0); near(rect.width, frame.clientWidth); near(rect.height, frame.clientHeight);
-      assert(el('talent-details').hidden && page.querySelectorAll('.talent-link').length === Object.keys(TALENT_TREE).length - 1);
-      for (const [key, config] of Object.entries(TALENT_TREE)) for (const [parent, rank] of Object.entries(config.requires)) {
+      assert(el('talent-details').hidden && page.querySelectorAll('.talent-link').length === Object.keys(TALENT_TREE).length - 1 + 16);
+      for (const [key, config] of Object.entries(TALENT_TREE).filter(([,c])=>!c.unit && !c.requiresLayer)) for (const [parent, rank] of Object.entries(config.requires)) {
         const link = el(`link-${key}`);
         assert(link.tagName.toLowerCase() === 'path' && link.getAttribute('d').includes('C') && link.dataset.parent === parent && Number(link.dataset.requiredLevel) === rank);
       }
@@ -70,7 +70,7 @@ export function registerTalentHomeTests(test, assert, near) {
         el('close-archives').click(); el('archives').click();
         assert(page.documentElement.scrollWidth <= frame.clientWidth && el('archives-dialog').scrollWidth <= frame.clientWidth);
         const nodes = [...page.querySelectorAll('.talent-node')].map(node => ({ id: node.id, rect: node.getBoundingClientRect() }));
-        for (const { rect } of nodes) assert(rect.width >= 56 && rect.height >= 56 && rect.left >= 0 && rect.right <= width, 'Node shrunk or escaped viewport');
+        for (const { rect } of nodes) assert(rect.width >= 56 && rect.height >= 56, 'Node shrunk while panning');
         for (const a of nodes) for (const b of nodes) if (a.id < b.id) assert(a.rect.right <= b.rect.left || a.rect.left >= b.rect.right || a.rect.bottom <= b.rect.top || a.rect.top >= b.rect.bottom, `Overlapping touch targets ${a.id} / ${b.id}`);
         const mapRect = el('talent-tree').getBoundingClientRect();
         for (const path of page.querySelectorAll('.talent-link')) {
@@ -83,7 +83,8 @@ export function registerTalentHomeTests(test, assert, near) {
             }
           }
         }
-        const root = el('node-autobuyer').getBoundingClientRect(), footer = el('archive-footer').getBoundingClientRect();
+        assert(el('tree-scroll').scrollWidth > el('tree-scroll').clientWidth && el('tree-scroll').scrollLeft > 0, 'Phone pans a full-size constellation centered on the root');
+        const root = el('node-spark').getBoundingClientRect(), footer = el('archive-footer').getBoundingClientRect();
         assert(root.top >= page.querySelector('.home-header').getBoundingClientRect().bottom);
         assert(root.bottom < footer.top && root.top > 0);
         el('node-conservation').click();
@@ -108,10 +109,10 @@ export function registerTalentHomeTests(test, assert, near) {
       assert(frame.contentWindow.__storage.getItem(DEBUG_SAVE_KEY) === serializeSession(s));
       frame.remove(); frame = await mountFixture(serializeSession(s), false, 'debug');
       assert(el('archives-dialog').open && el('archives-dialog').dataset.cinematic === 'false' && el('legacy').textContent === '1');
-      el('node-autobuyer').click(); el('buy-autobuyer').click(); el('rebuild-civilization').click();
+      el('node-spark').click(); el('buy-spark').click(); el('rebuild-civilization').click();
       assert(!el('archives-dialog').open && el('result').hidden);
       const next = parseSession(frame.contentWindow.__storage.getItem(DEBUG_SAVE_KEY));
-      assert(next.permanent.completedCycles === 1 && next.permanent.legacy === 0 && next.run.talents.autobuyer === 1);
+      assert(next.permanent.completedCycles === 1 && next.permanent.legacy === 0 && next.run.talents.spark === 1);
     } finally { frame.remove(); }
   });
   test('Civilization home: reduced-motion preference skips the cinematic and purchase transforms without suppressing feedback or rewards', async () => {
@@ -120,12 +121,12 @@ export function registerTalentHomeTests(test, assert, near) {
     try {
       frame.contentDocument.querySelector('[data-debug-command="finale"]').click();
       assert(el('archives-dialog').open && el('archives-dialog').dataset.cinematic === 'false' && el('skip-home-intro').hidden);
-      el('node-autobuyer').click(); el('buy-autobuyer').click();
-      assert(el('legacy').textContent === '0' && el('talent-feedback').textContent.includes('Autobuyer'));
-      assert(el('legacy').getAnimations().length === 0 && el('node-autobuyer').getAnimations().length === 0);
+      el('node-spark').click(); el('buy-spark').click();
+      assert(el('legacy').textContent === '0' && el('talent-feedback').textContent.includes('文明火种'));
+      assert(el('legacy').getAnimations().length === 0 && el('node-spark').getAnimations().length === 0);
       assert([...frame.contentDocument.querySelectorAll('.talent-flow')].every(path => path.getAnimations().length === 0));
       const s = parseSession(frame.contentWindow.__storage.getItem(DEBUG_SAVE_KEY));
-      assert(s.permanent.completedCycles === 1 && s.permanent.talents.autobuyer === 1 && s.run.earnedLegacy === 1);
+      assert(s.permanent.completedCycles === 1 && s.permanent.talents.spark === 1 && s.run.earnedLegacy === 1);
     } finally { frame.remove(); }
   });
   test('Civilization home: opening during a battle pauses automation, save and challenge views return safely', async () => {

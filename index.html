@@ -14,7 +14,7 @@
     <main class="game-shell">
       <header class="masthead">
         <div class="wordmark"><span class="brand-mark" aria-hidden="true">✳</span> BEFORE THE STARS</div>
-        <div class="masthead-actions"><button class="text-button" id="pause-battle" type="button" hidden aria-pressed="false">暂停</button><a class="animation-link" href="./animations.html" title="无需开局，查看所有动画">动画</a>
+        <div class="masthead-actions"><button class="text-button" id="game-speed" type="button" hidden title="R 切换速度">1×</button><button class="text-button" id="pause-battle" type="button" hidden aria-pressed="false">暂停</button><a class="animation-link" href="./animations.html" title="无需开局，查看所有动画">动画</a>
         <button class="icon-button" id="help" type="button" data-icon="help" aria-label="帮助与单位资料" title="帮助与单位资料 · ?"></button></div>
       </header>
       <nav id="civilization-bar" class="civilization-bar" aria-label="文明进度" hidden>
@@ -116,7 +116,7 @@
         </section>
         <section id="talents-panel" aria-labelledby="upgrades-title">
           <h3 id="upgrades-title" class="sr-only">文明天赋星图</h3>
-          <div id="talent-tree" class="talent-tree" aria-label="从 Autobuyer 根节点向外生长的三条天赋路线"></div>
+          <div id="tree-scroll" class="tree-scroll"><div id="talent-tree" class="talent-tree" aria-label="从文明火种向上，依次经过五个时代的兵种天赋与两侧分支"></div></div>
           <p id="talent-guide" class="map-guide"></p>
           <p id="talent-legacy-preview" class="map-yield"></p>
         </section>
@@ -127,7 +127,7 @@
       <p id="talent-feedback" role="status" aria-live="polite" class="talent-feedback"></p>
     </dialog>
     <dialog id="challenge-dialog" aria-labelledby="challenge-title">
-      <header class="help-heading"><h2 id="challenge-title">文明挑战</h2><button id="close-challenge" class="icon-button" type="button" data-icon="close" aria-label="关闭挑战预览"></button></header>
+      <header class="help-heading"><h2 id="challenge-title">余烬远征</h2><button id="close-challenge" class="icon-button" type="button" data-icon="close" aria-label="关闭挑战预览"></button></header>
       <div class="archive-body">
         <p id="challenge-intro" class="archive-note"></p>
         <dl class="challenge-stats">
@@ -145,7 +145,7 @@
       <header class="help-heading"><h2 id="automation-title">自动购买</h2><button id="close-automation" class="icon-button" type="button" data-icon="close" aria-label="关闭自动购买"></button></header>
       <div class="archive-body">
         <section id="automation-panel" aria-labelledby="automation-title">
-          <p id="automation-locked" class="archive-note" hidden>在天赋树花 1 Legacy 解锁 Autobuyer 根节点，即可使用基础自动招募。</p><button id="automation-to-talents" type="button" class="secondary-button">前往天赋树</button><div id="automation-settings"><p id="automation-hint" class="archive-note"></p>
+          <p id="automation-locked" class="archive-note" hidden>累计通关 2 次，免费解锁基础自动招募。</p><button id="automation-to-talents" type="button" class="secondary-button">前往天赋树</button><div id="automation-settings"><p id="automation-hint" class="archive-note"></p>
           <div class="automation-controls"><label><input type="checkbox" id="auto-enabled"> 启用自动购买</label></div>
           <p id="automation-status" class="automation-status"></p><p id="automation-error" class="archive-note" role="status"></p>
           <fieldset class="auto-group" data-auto-talent="logistics"><legend>预算与调度</legend><div class="auto-fields">
@@ -182,7 +182,7 @@
       <div class="help-body">
         <div class="help-legend"><span><i data-icon="coin"></i>金币</span><span><i data-icon="star"></i>经验</span><span><i data-icon="plus"></i>扩容</span><span><i data-icon="trash"></i>拆塔退款</span></div>
         <p>点击兵种图标训练，点击炮塔图标在选中炮位建造。悬停可查看名称与属性；手机可在下方查看当前时代的资料。阅读手册时战斗暂停。</p>
-        <p><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> 出兵 · <kbd>4</kbd> 未来超级士兵 · <kbd>空格</kbd> 暂停／继续 · <kbd>T</kbd> 第一种炮塔 · <kbd>E</kbd> 进化 · <kbd>Q</kbd> 大招</p>
+        <p><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> 出兵 · <kbd>4</kbd> 未来超级士兵 · <kbd>空格</kbd> 暂停／继续 · <kbd>R</kbd> 倍速（文明火种解锁） · <kbd>T</kbd> 第一种炮塔 · <kbd>E</kbd> 进化 · <kbd>Q</kbd> 大招</p>
         <p id="spell-hint"></p><p id="recruit-rule"></p>
         <details open><summary id="roster-age">当前时代</summary><div id="help-roster" class="help-roster"></div></details>
         <details><summary>大招与进化</summary><p id="ability-description"></p><h3 id="evolution-title"></h3><p id="evolution-hint"></p><p id="evolution-unlocks"></p><p id="evolution-benefit"></p><p>击杀获得完整经验，己方阵亡获得 75% 经验。进化保留旧部队、训练订单、炮塔与大招冷却。</p></details>

@@ -22,7 +22,7 @@ function finish(s, age = 5, status = 'won') {
 export function challengeSeed(unlock = true) {
   const s = createProgression();
   for (let i = 0; i < 8; i++) { if (i) rebuildCivilization(s, s.run.runId); finish(s); }
-  purchaseTalent(s, 'autobuyer'); purchaseTalent(s, 'conservation');
+  purchaseTalent(s, 'spark'); purchaseTalent(s, 'conservation');
   if (unlock) purchaseTalent(s, 'challenge');
   return s;
 }
@@ -141,7 +141,7 @@ export function registerChallengeTests(test, assert, near) {
     assert(getLegacyReward(talents) === 4 && getLegacyReward(talents, 2) === 13);
   });
   test('Challenge: an actual paid future army defeats enhanced AI and settles the larger reward', () => {
-    const s = challengeSeed(); startChallenge(s, s.run.runId);
+    const s = challengeSeed(); s.permanent.talents.superSoldierPlan = 1; s.permanent.talentGrants.push('superSoldierPlan'); startChallenge(s, s.run.runId);
     ageTo(s.game, 5, 'player'); ageTo(s.game, 5);
     s.game.gold.player = 12000; s.game.gold.enemy = Math.floor(SURFACE.enemyStartingGold[5] * 1.35);
     for (let i = 0; i < 4; i++) assert(recruit(s.game, 'superSoldier'));
@@ -188,7 +188,7 @@ export function registerChallengeTests(test, assert, near) {
       const store = createSaveStore(() => storage), loaded = store.load(), migrated = loaded.session;
       assert(loaded.ok && loaded.migrated && migrated.version === SAVE_VERSION && migrated.run.challengeLevel === 0);
       assert(migrated.run.runId === old.run.runId && migrated.run.phase === phase && migrated.run.earnedLegacy === old.run.earnedLegacy);
-      assert(migrated.permanent.legacy === old.permanent.legacy && migrated.game.gold.player === old.game.gold.player);
+      assert(migrated.permanent.legacy === old.permanent.legacy + (old.permanent.talents.autobuyer && !old.permanent.talentGrants.includes('autobuyer') ? 1 : 0) && migrated.game.gold.player === old.game.gold.player);
       assert(store.save(migrated).ok && entries.get(BACKUP_KEY) === raw);
     }
   });
@@ -220,7 +220,7 @@ export function registerChallengeTests(test, assert, near) {
       el('begin-challenge').click(); el('begin-challenge').click();
       let next = saved(); assert(next.run.challengeLevel === 1 && next.permanent.legacy === 3 && !el('challenge-dialog').open);
       frame.remove(); frame = await mountFixture(serializeSession(next), false, 'debug');
-      assert(el('challenge-status').textContent.includes('挑战 1') && el('challenge-status').textContent.includes('+4'));
+      assert(el('challenge-status').textContent.includes('纷争余烬') && el('challenge-status').textContent.includes('+4'));
       frame.contentDocument.querySelector('[data-debug-command="finale"]').click();
       next = saved(); assert(next.run.earnedLegacy === 4 && next.permanent.legacy === 7);
       frame.remove(); frame = await mountFixture(serializeSession(next), false, 'debug');
@@ -228,7 +228,7 @@ export function registerChallengeTests(test, assert, near) {
       assert(el('challenge-reward').textContent === '+6 Legacy'); el('begin-challenge').click();
       assert(saved().run.challengeLevel === 2);
       frame.contentDocument.querySelector('[data-debug-command="defeat"]').click();
-      assert(el('result-challenge').textContent.includes('重试挑战 2') && saved().permanent.legacy === 7);
+      assert(el('result-challenge').textContent.includes('重返铁旗时代') && saved().permanent.legacy === 7);
       el('result-challenge').click(); el('begin-challenge').click(); assert(saved().run.challengeLevel === 2);
       frame.contentDocument.querySelector('[data-debug-command="defeat"]').click(); el('play-again').click(); el('play-again').click();
       next = saved(); assert(next.run.challengeLevel === 0 && next.permanent.legacy === 7 && statMultiplier(next.game, 'health', 'enemy') === 1);

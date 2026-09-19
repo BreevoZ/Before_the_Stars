@@ -4,7 +4,7 @@ import { SURFACE } from '../src/progression-config.js';
 import { normalizeRunOptions } from './simulate.js';
 
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
-const paths = new Set(['challengeLevel', 'maxSeconds', 'bonuses',
+const paths = new Set(['challengeLevel', 'maxSeconds', 'bonuses', 'completedCycles',
   ...Object.keys(TALENT_TREE).map(key => `talents.${key}`),
   ...Object.keys(createAutomation()).filter(key => key !== 'unlocked').map(key => `automation.${key}`)]);
 

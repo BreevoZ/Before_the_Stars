@@ -145,3 +145,11 @@
 @media (max-width: 740px) {
   .home-story { position: sticky; top: 0; z-index: 2; margin: 0; padding: 15px 14px 17px; background: linear-gradient(var(--color-home-surface) 75%, var(--color-home-home-story-surface)); }
 }
+
+/* Keep touch targets full size. Only the constellation pans horizontally. */
+.tree-scroll { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: thin; }
+.talent-tree { min-width: 1120px; height: 1700px; }
+.era-gate { position: absolute; transform: translate(-50%, -50%); padding: 5px 10px; border-radius: 20px; background: var(--color-home-surface); color: var(--route-units); font-size: 10px; letter-spacing: 1px; white-space: nowrap; pointer-events: none; }
+.era-gate[data-state="locked"] { opacity: .5; }
+.talent-node[data-state="planned"] { opacity: .4; }
+:root { --route-units: var(--route-root); }

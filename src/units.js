@@ -101,7 +101,7 @@ function cavePerson(ctx, c, m, slinger) {
     if (m.remaining === 0 || m.windup) oval(ctx, 17 - pull, -44, 2.7, 2.4, MATERIAL.steelDark);
     oval(ctx, -11, -26, 5, 6, MATERIAL.woodDark);
   } else {
-    limb(ctx, [[-6, -39], [-13, -30], [-11, -23]], shade(c.skin), 4.5);
+    limb(ctx, m.throwing ? [[-6,-39],[4+m.throwProgress*7,-50],[12+m.throwProgress*16,-54+m.throwProgress*14]] : [[-6, -39], [-13, -30], [-11, -23]], shade(c.skin), 4.5);
     const armX = 20 + m.strike * 8;
     limb(ctx, [[4, -41], [13, -33], [armX, -38 + m.strike * 6]], c.skin, 5);
     ctx.save(); ctx.translate(armX, -38 + m.strike * 6); ctx.rotate(0.16 + m.strike * 1.25 - m.windup * 0.5);
@@ -240,7 +240,7 @@ function cavalry(ctx, c, m, unit) {
   shape(ctx, [[-16, -66], [-4, -70], [10, -62], [6, -47], [-16, -47]], c.metal);
   medievalHelmet(ctx, -7, -79, c, true);
   feather(ctx, -9, -91, c.cloth, pose.sway * 1.5 - attack.capeLift * 0.2);
-  limb(ctx, [[-9, -63], [-12, -55], [-4, -56]], MATERIAL.steelDark, 4);
+  limb(ctx, m.throwing ? [[-9,-63],[4+m.throwProgress*6,-76],[12+m.throwProgress*18,-80+m.throwProgress*16]] : [[-9, -63], [-12, -55], [-4, -56]], MATERIAL.steelDark, 4);
   const shoulder = [4, -64], elbow = solveJoint(shoulder, attack.hand, 16, 15, 1);
   limb(ctx, [shoulder, elbow, attack.hand], c.metal, 5);
   // A tapered riding lance with a counterweight, wrapped grip and cup guard.
@@ -347,8 +347,9 @@ function modernInfantry(ctx, c, m, rifle) {
   } else {
     stroke(ctx, [[-10, -23], [-14, -14]], MATERIAL.leather, 4);
     const shoulder = [5, -40], elbow = solveJoint(shoulder, attack.hand, 16, 15, 1);
-    limb(ctx, [[-7, -40], [-17, -29], attack.guard], MATERIAL.oliveDark, 4);
-    oval(ctx, ...attack.guard, 2.2, 2.2, c.skin);
+    const freeHand = m.throwing ? [12+m.throwProgress*18,-53+m.throwProgress*13] : attack.guard;
+    limb(ctx, [[-7, -40], m.throwing ? [5,-48] : [-17,-29], freeHand], MATERIAL.oliveDark, 4);
+    oval(ctx, ...freeHand, 2.2, 2.2, c.skin);
     limb(ctx, [shoulder, elbow], MATERIAL.olive, 5);
     limb(ctx, [elbow, attack.hand], c.skin, 4);
     // A compact forward grip: blade, guard and handle rotate as one piece.
@@ -447,7 +448,7 @@ function hoverMachine(ctx, c, m) {
 // a narrow visor and a small energy weapon. Armor follows the joints instead of
 // enlarging them; the veteran's relaxed pose and short attacks keep his identity.
 function superSoldier(ctx, c, m, unit) {
-  const punch = unit.attackStyle === 'melee';
+  const punch = unit.attackStyle !== 'ranged';
   const drive = punch ? getMeleeMotion('commando', m).drive : 0;
   const suit = '#52645d', plate = unit.hitFlash > 0 ? '#ded0ac' : MATERIAL.armor;
   const bodyX = drive * 14, bodyY = Math.abs(drive) - Math.abs(m.gait) * 0.5;
@@ -477,8 +478,10 @@ function superSoldier(ctx, c, m, unit) {
   stroke(ctx, [[-5, -28], [5, -27]], MATERIAL.armorDark, 2);
   shape(ctx, [[-9, -45], [-3, -46], [-2, -41], [-9, -40]], shade(c.cloth));
   shape(ctx, [[4, -46], [10, -43], [10, -39], [5, -40]], plate);
-  // A half helmet and visor keep an exposed jaw and ordinary human proportions.
-  face(ctx, 0, -54, c, false);
+  // Full helmet and articulated jaw plates; the silhouette stays human-sized.
+  shape(ctx, [[-6, -60], [4, -61], [8, -55], [6, -49], [-1, -47], [-6, -51]], plate);
+  shape(ctx, [[-6, -56], [-1, -53], [-1, -47], [-6, -51]], MATERIAL.armorDark);
+  stroke(ctx, [[1, -51], [5, -52]], MATERIAL.inset, 1.2);
   shape(ctx, [[-6, -54], [-8, -60], [-4, -66], [3, -65], [7, -61], [5, -58], [0, -61], [-4, -57]], plate);
   shape(ctx, [[-8, -60], [-4, -66], [-3, -61], [-5, -55], [-6, -54]], MATERIAL.armorDark);
   shape(ctx, [[-2, -59], [7, -58], [8, -54], [0, -54]], MATERIAL.inset);
@@ -493,8 +496,14 @@ function superSoldier(ctx, c, m, unit) {
   limb(ctx, [along(elbow, hand, 0.35), along(elbow, hand, 0.8)], plate, 4.5);
   oval(ctx, ...hand, 2.5, 2, MATERIAL.armorDark);
   if (punch) {
-    stroke(ctx, [[4, -24], [6, -18]], MATERIAL.inset, 2.5);
-    if (!m.reduced && m.remaining && m.age < 0.08) stroke(ctx, [[hand[0], hand[1] - 2], [hand[0] + 2, hand[1]]], c.energy, 1.2);
+    ctx.save(); ctx.translate(...hand); ctx.rotate(-.25 + drive * .16);
+    shape(ctx, [[-4, -3], [4, -3], [6, -1], [4, 2], [-4, 2]], MATERIAL.inset);
+    shape(ctx, [[4, -3], [22, -2], [30, 0], [21, 2], [4, 1]], c.energy);
+    stroke(ctx, [[6, -1], [24, 0]], '#e4ead4', 1.2);
+    if (!m.reduced && m.remaining && drive > .45) {
+      ctx.globalAlpha = .18; shape(ctx, [[5, 3], [28, 5], [18, 9]], c.energy);
+    }
+    ctx.restore();
   } else {
     ctx.save(); ctx.translate(...hand); ctx.rotate((1 - aim) * 0.65 - recoil * 0.08);
     shape(ctx, [[-4, -5], [10, -5], [14, -3], [14, 0], [2, 0], [-1, 4], [-4, 3]], MATERIAL.inset);
@@ -515,7 +524,7 @@ export function drawUnit(ctx, unit, time, scale = 1, reducedMotion = false, maxH
   const moving = !reducedMotion && unit.moving;
   const distance = unit.distanceTravelled ?? (unit.moving ? time * stats.speed : 0);
   const stride = distance / (stats.footprint ? 13 : 6) + unit.id * 1.7;
-  const m = { moving, distance: reducedMotion ? 0 : distance, stride, gait: moving ? Math.sin(stride) : 0,
+  const m = { throwing: unit.traitAnimation > 0, throwProgress: reducedMotion ? .5 : 1 - (unit.traitAnimation ?? 0) / .38, moving, distance: reducedMotion ? 0 : distance, stride, gait: moving ? Math.sin(stride) : 0,
     clock: reducedMotion ? 0 : time, breathe: reducedMotion ? 0 : Math.sin(time * 2 + unit.id), reduced: reducedMotion, mountOffset: (unit.id * 0.17) % 1,
     remaining, duration, cooldown: unit.attackCooldown ?? 0, approach: unit.attackApproach ?? 0, progress, age: progress * duration, kick: reducedMotion ? 0 : (1 - progress) ** 2,
     strike: reducedMotion || !remaining ? 0 : Math.max(0, Math.sin(Math.PI * Math.min(1, progress * 1.3 + 0.15))),

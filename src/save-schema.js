@@ -24,9 +24,10 @@ export const GAME_SHAPE = Object.freeze({ status: oneOf(['playing', 'won', 'lost
   ages: object, experience: object, gold: object, bases: object, queues: object, turrets: object });
 export const ORDER_SHAPE = Object.freeze({ id: positiveId, type: value => typeof value === 'string', remaining: clock });
 export const UNIT_SHAPE = Object.freeze({ id: positiveId, team: oneOf(['player', 'enemy']), moving: bool,
+  suppressionMultiplier: optional(value => num(value, .01, 1)),
   attackCooldown: signedClock, attackAnimation: signedClock, hitFlash: signedClock,
   ...Object.fromEntries(['distanceTravelled', 'chargeTravel', 'guardFlash', 'attackApproach', 'moveMultiplier',
-    'burstRemaining', 'burstCooldown'].map(key => [key, optional(signedClock)])) });
+    'burstRemaining', 'burstCooldown', 'traitAnimation', 'suppressedUntil'].map(key => [key, optional(signedClock)])) });
 
 // Fixed entity fields live here; validators only add cross-field constraints.
 const fields = (keys, test) => Object.fromEntries(keys.split(' ').map(key => [key, test]));
@@ -35,15 +36,16 @@ export const TURRET_SHAPE = Object.freeze({ team: oneOf(['player', 'enemy']),
   ...fields('cooldown flash shotSerial aim burstRemaining chargeRemaining', signedClock),
   ...fields('burstCooldown flashDuration lastBarrel', optional(signedClock)) });
 export const SHOT_SHAPE = Object.freeze({ team: oneOf(['player', 'enemy']),
-  kind: oneOf(['sling','stone','boulder','arrow','bolt','egg','fireball','oil','bullet','cannon','shell','rocket','plasma','plasma-orb','rail','laser','ion']),
+  kind: oneOf(['javelin','grenade','canister','sling','stone','boulder','arrow','bolt','egg','fireball','oil','bullet','cannon','shell','rocket','plasma','plasma-orb','rail','laser','ion']),
   ...fields('fromX toX fromY toY toOffsetX originX', coordinates),
   ...fields('fromUnitX fromTurretX fromBaseX arc', optional(coordinates)),
   ...fields('duration remaining splash pierce', clock),
   ...fields('pierceFactor pierceDistance', optional(clock)), ignoreArmor: bool,
+  ricochet: optional(value => num(value, 0, 1)), slow: optional(value => num(value, .01, 1)), slowDuration: optional(value => num(value, 0, 10)), secondary: optional(bool), ranged: optional(bool),
   maxRange: value => value === Infinity || clock(value) });
 export const FIELD_SHAPE = Object.freeze({ kind: oneOf(['fire', 'oil']),
   ...fields('radius remaining duration tickCooldown tickInterval slow', clock) });
-export const EFFECT_SHAPE = Object.freeze({ kind: oneOf(['impact','evolve','pierce','meteor','volley','airstrike','orbital']),
+export const EFFECT_SHAPE = Object.freeze({ kind: oneOf(['trait','impact','evolve','pierce','meteor','volley','airstrike','orbital']),
   ...fields('x life duration', clock) });
 export const IMPACT_SHAPE = Object.freeze({ ...fields('y angle', coordinates), anchorX: optional(coordinates), radius: optional(clock),
   style: oneOf(['stone','rubble','arrow','egg','fire','oil','bullet','solid','explosion','plasma','rail','laser','ion','blunt','bite','slash','thrust','knife','blade']),

@@ -1,7 +1,7 @@
 import { createBindings } from './dom-bindings.js';
 import { buildCivilizationViewModel, buildChallengeViewModel } from './civilization-view-model.js';
-import { createProgression, updateProgression, continueCivilization, rebuildCivilization, abandonCivilization, startChallenge } from './progression.js';
-import { SAVE_INTERVAL } from './progression-config.js';
+import { createProgression, updateProgression, continueCivilization, rebuildCivilization, abandonCivilization, startChallenge, cycleGameSpeed } from './progression.js';
+import { SAVE_INTERVAL, challengeName } from './progression-config.js';
 import { createTalentUI } from './talent-ui.js';
 import { createSaveStore, serializeSession, parseSession, MAX_SAVE_BYTES } from './save.js';
 import { createDebugProgression, supplyDebugRun, runDebugCommand, DEBUG_SPEEDS } from './debug.js';
@@ -59,6 +59,8 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   }
   el('restart').title = '重开本轮文明 · 永久进度保留';
   el('restart').setAttribute('aria-label', '重开本轮文明');
+  function cycleSpeed() { if (cycleGameSpeed(session)) { save(); changed(); } }
+  el('game-speed').addEventListener('click', cycleSpeed);
   el('save-menu').hidden = false;
   el('save-menu').addEventListener('click', openSave);
   el('archive-save').addEventListener('click', openSave);
@@ -160,8 +162,8 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     get homeOpen() { return dialog.open; },
     get paused() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open; },
     get modalOpen() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open; },
-    get timeScale() { return debug ? session.debugSpeed : 1; },
-    sync, save, open,
+    get timeScale() { return debug ? session.debugSpeed : session.permanent.settings.speed; },
+    sync, save, open, cycleSpeed,
     step(dt) {
       const resolved = updateProgression(session, dt);
       saveElapsed += dt;
@@ -179,7 +181,7 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     restart() {
       if (['destruction', 'defeat'].includes(session.run.phase)) return this.resultAction();
       const runId = session.run.runId;
-      if (!window.confirm(`放弃当前文明并从原始时代重开${session.run.challengeLevel ? `挑战 ${session.run.challengeLevel}` : ''}？本轮金币、经验、部队和防御将清除，不发放遗产；已有永久进度保留。`)) return;
+      if (!window.confirm(`放弃当前文明并从原始时代重开${session.run.challengeLevel ? `「${challengeName(session.run.challengeLevel)}」` : ''}？本轮金币、经验、部队和防御将清除，不发放遗产；已有永久进度保留。`)) return;
       transition(() => abandonCivilization(session, runId));
     },
   };

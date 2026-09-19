@@ -1,3 +1,5 @@
+import { unitTraits } from './traits.js';
+import { TRAIT_DESCRIPTIONS } from './talents.js';
 import { Q } from './quantity.js';
 import { stat, attributes } from './stats.js';
 import { describeStat } from './stat-text.js';
@@ -26,8 +28,11 @@ export function buildViewModel(session, { selectedSlot = 0, targeting = false, m
     const card = `[data-unit-slot="${index}"]`, unit = units[index];
     at(card, !unit, 'hidden');
     if (!unit) { at(card, true, 'disabled'); continue; }
-    const { type } = unit, state = getRecruitState(game, type), label = recruitLabels[state];
-    const description = `${unit.name} · ${Q.format(unit.cost)} 金币 · ${unit.trainTime} 秒训练\n${Q.format(unit.health)} 生命 / ${Q.format(unit.damage)}${unit.burst ? ` × ${unit.burst}` : ''} 攻击 / ${unit.attackInterval} 秒间隔 / ${Q.format(unit.armor)} 护甲 / ${unit.range} 对兵射程${unit.baseRange ? ` / ${unit.baseRange} 攻城射程` : ''}\n${unit.description}`;
+    const { type } = unit, state = getRecruitState(game, type), label = type === 'superSoldier' && state === 'disabled' && !session.run?.talents.superSoldierPlan ? '需要超级士兵计划' : recruitLabels[state];
+    if (type === 'superSoldier') unit.description = unit.canRanged ? '全覆轻甲 · 远程能量点射 / 近身激光短匕首' : '全覆轻甲 · 激光短匕首，近战完全穿甲';
+    for (const trait of unitTraits(unit)) if (unit[trait.stat]) unit.description += ` · ${trait.name}：${TRAIT_DESCRIPTIONS[trait.id]}`;
+    const attackDamage = unit.canRanged ? unit.damage : unit.meleeDamage ?? unit.damage;
+    const description = `${unit.name} · ${Q.format(unit.cost)} 金币 · ${unit.trainTime} 秒训练\n${Q.format(unit.health)} 生命 / ${Q.format(attackDamage)}${unit.burst ? ` × ${unit.burst}` : ''} 攻击 / ${unit.attackInterval} 秒间隔 / ${Q.format(unit.armor)} 护甲 / ${unit.range} 对兵射程${unit.baseRange ? ` / ${unit.baseRange} 攻城射程` : ''}\n${unit.description}`;
     unit.help = description;
     at(card, type, 'data-unit'); at(card, String(age.id ?? game.ages.player), 'data-age');
     at(`${card} strong`, unit.name); at(`${card} .unit-role`, unit.description);

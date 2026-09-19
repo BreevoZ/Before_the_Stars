@@ -1,7 +1,7 @@
 import { Q } from './quantity.js';
 import { createGame, updateGame } from './game.js';
 import { updateAutomation, createAutomation, configureAutomation } from './automation.js';
-import { UPGRADES, UPGRADE_COSTS, SAVE_VERSION, automationUnlocked, availableSpeeds } from './progression-config.js';
+import { UPGRADES, UPGRADE_COSTS, SAVE_VERSION, automationUnlocked, availableSpeeds, getVictorySupplies } from './progression-config.js';
 import { emptyTalents, talentLevel } from './talents.js';
 import { getRunBonuses } from './progression-bonuses.js';
 import { createBonusStack, stat } from './stats.js';
@@ -67,9 +67,10 @@ export function updateProgression(session, dt, { paused = false, hidden = false 
 
 function continueConflict(session) {
   const { game, run } = session;
+  const supplies = getVictorySupplies(game);
   const next = createConflict(run, { player: game.ages.player, enemy: game.ages.enemy + 1 });
-  next.experience.player = game.experience.player;
-  next.gold.player = Q.add(game.gold.player, Q.sum(game.queues.player.map(order => order.paid)));
+  next.experience.player = Q.add(game.experience.player, supplies.experience);
+  next.gold.player = Q.sum([game.gold.player, supplies.gold, ...game.queues.player.map(order => order.paid)]);
   next.turrets.player = game.turrets.player.map(turret => turret ? { ...turret,
     burstRemaining: 0, chargeRemaining: 0, chargeTargetId: null, burstTargetId: null, flash: 0 } : null);
   next.abilityCooldown = game.abilityCooldown;

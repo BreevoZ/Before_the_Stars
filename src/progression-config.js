@@ -11,6 +11,14 @@ export const UPGRADES = Object.freeze({
 });
 export const UPGRADE_COSTS = Object.freeze([1, 2, 4, 8, 16]);
 export const AUTOMATION_INTERVAL = 0.25;
+export const VICTORY_SUPPLIES = Object.freeze({ goldShare: 0.75, experienceShare: 0.5 });
+// A reserve for the next conflict, never a forced evolution or Legacy award.
+export function getVictorySupplies(game) {
+  const next = AGES[game.ages.enemy + 1];
+  if (game.mode !== 'incremental' || game.status !== 'won' || game.ages.enemy >= SURFACE.finalEnemyAge) return { gold: 0, experience: 0 };
+  return { gold: Math.floor(next.startingGold * VICTORY_SUPPLIES.goldShare),
+    experience: Q.floor(Q.mul(Q.max(0, Q.sub(next.experienceRequired, game.experience.player)), VICTORY_SUPPLIES.experienceShare)) };
+}
 export const AUTOMATION_TARGETS = Object.freeze(['front', 'ranged', 'heavy']);
 // Prototype challenge balance; level 0 is exactly the original surface campaign.
 export const CHALLENGE = Object.freeze({ maxLevel: 10, gold: 1.35, income: 1.35,

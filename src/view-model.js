@@ -22,7 +22,8 @@ export function buildViewModel(session, { selectedSlot = 0, targeting = false, m
   if (selectedSlot >= slots.length) selectedSlot = 0;
   if (finished || ABILITIES[age.ability].targeting === 'allies') targeting = false;
   at('body', String(game.ages.player), 'data-age');
-  const units = getAgeUnits(game.ages.player).map(type => ({ type, ...attributes(game, { type, team: 'player' }) }));
+  const visibleUnit = type => type !== 'superSoldier' || game.mode !== 'incremental' || Boolean(session.run?.talents.superSoldierPlan);
+  const units = getAgeUnits(game.ages.player).filter(visibleUnit).map(type => ({ type, ...attributes(game, { type, team: 'player' }) }));
   const towers = age.turrets.map(type => ({ type, ...attributes(game, { type, team: 'player' }) }));
   for (let index = 0; index < 4; index++) {
     const card = `[data-unit-slot="${index}"]`, unit = units[index];
@@ -103,7 +104,7 @@ export function buildViewModel(session, { selectedSlot = 0, targeting = false, m
   put('experience-bar', xpMax, 'max'); put('experience-bar', Q.toNumber(Q.min(xp, xpMax)), 'value');
   put('evolve', evolution !== 'ready', 'disabled'); put('evolve', evolution === 'ready', 'class:ready');
   put('evolve-label', evolveLabel); put('evolution-hint', evolutionHint); put('evolution-benefit', benefit);
-  put('evolution-unlocks', `${nextAge ? '下个时代' : '已解锁'}：${getAgeUnits(game.ages.player + (nextAge ? 1 : 0)).map(type => UNITS[type].name).join(' · ')}`);
+  put('evolution-unlocks', `${nextAge ? '下个时代' : '已解锁'}：${getAgeUnits(game.ages.player + (nextAge ? 1 : 0)).filter(visibleUnit).map(type => UNITS[type].name).join(' · ')}`);
   put('evolve', `${evolveLabel} · E\n${evolutionHint}\n${benefit}`, 'title'); put('evolve', evolveLabel, 'aria-label');
   for (const team of ['player', 'enemy']) {
     const base = game.bases[team], teamAge = AGES[game.ages[team]], next = AGES[game.ages[team] + 1];

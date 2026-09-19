@@ -56,7 +56,7 @@ export function registerChallengeTests(test, assert, near) {
     finish(s, 1); assert(getNextChallengeLevel(s) === null && !startChallenge(s, id));
     const battle = s.run.battleId;
     assert(continueCivilization(s, battle) && !continueCivilization(s, battle));
-    near(s.game.gold.player, gold + UNITS.heavy.cost);
+    near(s.game.gold.player, gold + UNITS.heavy.cost + 225);
     assert(s.run.runId === id && s.run.challengeLevel === 1 && s.game.ages.enemy === 2 && !s.game.queues.player.length);
     assert(s.game.gold.enemy === Math.floor(SURFACE.enemyStartingGold[2] * 1.35));
     assert(s.game.bases.enemy.maxHp === Math.round(AGES[2].baseHealth * 1.2));

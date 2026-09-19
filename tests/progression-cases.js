@@ -2,7 +2,7 @@ import { buyUnitPath } from './trait-cases.js';
 import { statMultiplier, v5Record } from './legacy-fixtures.js';
 import { purchaseTalent } from '../src/talents.js';
 import { RULES, AGES, UNITS, TURRETS, ABILITIES, createGame, getIncomeRate, getExperienceReward, recruit, evolve, buildTurret, expandTurretSlots, castAbility } from '../src/game.js';
-import { SURFACE } from '../src/progression-config.js';
+import { SURFACE, getVictorySupplies } from '../src/progression-config.js';
 import { createProgression, resolveBattle, updateProgression, continueCivilization, rebuildCivilization, abandonCivilization, purchaseUpgrade, setAutomation } from '../src/progression.js';
 import { serializeSession, parseSession, createSaveStore, SAVE_KEY, BACKUP_KEY, DEBUG_SAVE_KEY } from '../src/save.js';
 import { getGameMode, createDebugProgression, supplyDebugRun, runDebugCommand, DEBUG_GOLD } from '../src/debug.js';
@@ -99,7 +99,7 @@ export function registerProgressionTests(test, assert, near) {
     assert(!resolveBattle(s) && continueCivilization(s, battleId));
     assert(s.run.runId === runId && s.run.battleId !== battleId && s.run.battleNumber === 2);
     assert(s.game.ages.player === 3 && s.game.ages.enemy === 3);
-    near(s.game.gold.player, gold + 77 + UNITS.archer.cost);
+    near(s.game.gold.player, gold + 77 + UNITS.archer.cost + getVictorySupplies(g).gold);
     near(s.game.gold.enemy, SURFACE.enemyStartingGold[3]);
     assert(s.game.experience.player === g.experience.player && s.game.bases.player.hp === AGES[3].baseHealth);
     assert(JSON.stringify(s.game.turrets.player.map(t => t?.type ?? null)) === JSON.stringify(towers));

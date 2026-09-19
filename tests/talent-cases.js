@@ -102,8 +102,8 @@ export function registerTalentTests(test, assert, near) {
     const s = funded(4); purchaseTalent(s, 'spark'); purchaseUpgrade(s, 'production'); purchaseTalent(s, 'supply');
     assert(s.game.gold.player === 180); start(s); assert(s.game.gold.player === 330);
     s.game.gold.player = 200; recruit(s.game, 'melee'); finish(s, 1);
-    continueCivilization(s, s.run.battleId); assert(s.game.gold.player === 200, 'Only refund the pending order');
-    for (let i = 0; i < 3; i++) assert(parseSession(serializeSession(s)).game.gold.player === 200);
+    continueCivilization(s, s.run.battleId); assert(s.game.gold.player === 425, 'Refund plus one victory supply grant; no repeat starting resources');
+    for (let i = 0; i < 3; i++) assert(parseSession(serializeSession(s)).game.gold.player === 425);
     const id = s.run.runId; assert(abandonCivilization(s, id) && !abandonCivilization(s, id));
     assert(s.game.gold.player === 330);
   });

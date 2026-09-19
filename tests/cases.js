@@ -1,3 +1,4 @@
+import { registerEconomyTests } from './economy-cases.js';
 import { registerTraitTests } from './trait-cases.js';
 import { registerArchitectureTests } from './architecture-cases.js';
 import { registerGameTests } from './game-cases.js';
@@ -20,7 +21,7 @@ export function collectCases({ browser = false } = {}) {
   const cases = [];
   const test = (name, run) => cases.push({ name, run });
   test.browser = browser ? test : () => {};
-  for (const register of [registerGameTests, registerAnimationTests, registerProgressionTests,
+  for (const register of [registerEconomyTests, registerGameTests, registerAnimationTests, registerProgressionTests,
     registerTalentTests, registerChallengeTests, registerStatTests, registerQuantityTests, registerArchitectureTests, registerTraitTests]) register(test, assert, near);
   if (browser) registerTalentHomeTests(test, assert, near);
   return cases;

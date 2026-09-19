@@ -163,7 +163,7 @@ export function registerStatTests(test, assert, near) {
     const g = s.game; assert(recruit(g)); const paid = g.queues.player[0].paid, wallet = g.gold.player;
     g.bases.enemy.hp = 0; g.status = 'won'; resolveBattle(s);
     const id = s.run.battleId; assert(continueCivilization(s, id)); assert(!continueCivilization(s, id));
-    near(s.game.gold.player, wallet + paid); assert(s.game.bases.player.hp === 1200 && s.game.gold.enemy === 300);
+    near(s.game.gold.player, wallet + paid + 225); assert(s.game.bases.player.hp === 1200 && s.game.gold.enemy === 300);
     assert(stat(s.game, 'player', 'income') === 14 && s.permanent.legacy === 0);
     assert(serializeSession(parseSession(serializeSession(s))) === serializeSession(s));
   });

@@ -2,7 +2,7 @@ import { Q } from './quantity.js';
 import { AGES } from './game.js';
 import { describeStat } from './stat-text.js';
 import { getNextChallengeLevel, isBetweenRuns } from './progression-machine.js';
-import { CHALLENGE, getChallengeModifiers, challengeName, availableSpeeds } from './progression-config.js';
+import { CHALLENGE, getChallengeModifiers, challengeName, availableSpeeds, getVictorySupplies } from './progression-config.js';
 import { getLegacyReward } from './talents.js';
 
 export function buildCivilizationViewModel(session, { debug = false } = {}) {
@@ -56,7 +56,8 @@ export function buildCivilizationViewModel(session, { debug = false } = {}) {
     text('play-again', run.phase === 'victory' ? '继续文明进程' : run.phase === 'destruction' ? (p.completedCycles === 1 ? '查看遗产与天赋' : '重建文明') : p.completedCycles ? '查看档案与重试' : '从原始时代重试');
     if (run.challengeLevel && between) text('play-again', '返回初生之地');
     text('result-hint', false, 'hidden');
-    text('result-hint', run.phase === 'destruction' ? (p.completedCycles === 1 ? '第一份文明遗产 · 解锁你的第一个天赋' : '重建清空本轮资源与战场 · 保留遗产、天赋与自动购买设置') : run.phase === 'victory' ? '未完成订单按支付价格退款 · 基地恢复满血' : '从原始时代重新尝试');
+    const supplies = getVictorySupplies(game);
+    text('result-hint', run.phase === 'destruction' ? (p.completedCycles === 1 ? '第一份文明遗产 · 解锁你的第一个天赋' : '重建清空本轮资源与战场 · 保留遗产、天赋与自动购买设置') : run.phase === 'victory' ? `继续时获得战役补给：+${Q.format(supplies.gold)} 金币、+${Q.format(supplies.experience)} 经验 · 未完成订单退款 · 基地满血` : '从原始时代重新尝试');
   }
   return view;
 }

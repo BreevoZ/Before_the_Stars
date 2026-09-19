@@ -1,10 +1,11 @@
+import { Q } from './quantity.js';
 import { SUPER_WEAPONS } from './game-config.js';
 import { TRAITS, TRAIT_VALUES as V } from './traits.js';
 import { isBetweenRuns } from './progression-machine.js';
-import { SURFACE, UPGRADES, UPGRADE_COSTS, CHALLENGE, TALENT_LAYER_REQUIREMENT, UNIT_TALENT_COSTS } from './progression-config.js';
+import { SURFACE, UPGRADES, UPGRADE_COSTS, CHALLENGE, TALENT_LAYER_REQUIREMENT, UNIT_TALENT_COSTS, LEGACY_ECONOMY as ECONOMY, doublingCosts } from './progression-config.js';
 import { resolveStatValue, STAT_DEFINITIONS } from './stats.js';
 
-export const TALENT_VALUES = Object.freeze({ startingGold: 150, bountyPerLevel: 0.25, legacyMultiplierPerLevel: 0.5 });
+export const TALENT_VALUES = Object.freeze({ startingGold: 150, bountyPerLevel: 0.25 });
 // All talents are bought between runs and snapshotted when a civilization starts.
 // Historical prices participate in the save ledger; repricing needs a migration.
 const percent = value => `${Math.round(value * 10000) / 100}%`;
@@ -42,12 +43,18 @@ export const TALENTS = Object.freeze({
     effects: Array.from({ length: 4 }, (_, level) => `起始金币 +${level * TALENT_VALUES.startingGold}`) },
   salvage: { name: '战利品回收', branch: 'growth', costs: [2, 4, 8], requires: { warfare: 1 },
     effects: Array.from({ length: 4 }, (_, level) => `击杀金币 ×${1 + level * TALENT_VALUES.bountyPerLevel}`) },
-  conservation: { name: '遗产保存', branch: 'legacy', costs: [2, 4, 8], requires: { spark: 1 },
-    effects: Array.from({ length: 4 }, (_, level) => `终局基础遗产 ${SURFACE.legacyPerCycle + level}`) },
+  conservation: { name: '遗产保存', branch: 'legacy', costs: doublingCosts(ECONOMY.conservationCost, ECONOMY.rewardRanks), requires: { spark: 1 },
+    effects: Array.from({ length: ECONOMY.rewardRanks + 1 }, (_, level) => `终局遗产 ×${2 ** level} · 与文明传承相乘`) },
   challenge: { name: '余烬远征', branch: 'legacy', costs: [2], requires: { conservation: 1 },
     effects: ['初生之地循环', `通关后踏入下一片余烬；敌军逐步强化，通关遗产随远征深度提升，最多 ${CHALLENGE.maxLevel} 次深入`] },
-  continuity: { name: '文明传承', branch: 'legacy', costs: [6, 12], requires: { conservation: 2 },
-    effects: Array.from({ length: 3 }, (_, level) => `终局遗产 ×${1 + level * TALENT_VALUES.legacyMultiplierPerLevel}`) },
+  continuity: { name: '文明传承', branch: 'legacy', costs: doublingCosts(ECONOMY.continuityCost, ECONOMY.rewardRanks), requires: { conservation: 2 },
+    effects: Array.from({ length: ECONOMY.rewardRanks + 1 }, (_, level) => `终局遗产 ×${2 ** level} · 与遗产保存相乘`) },
+  legacyMachine: { name: '遗产生产机', branch: 'legacy', costs: [ECONOMY.producerCost], requires: { conservation: 2 }, requiresLayer: 3,
+    effects: ['尚未生产遗产', `战斗中每 ${ECONOMY.productionSeconds} 模拟秒生产 1 Legacy · 暂停／离线／结算时停止`] },
+  legacyCapacity: { name: '平行档案', branch: 'legacy', costs: doublingCosts(ECONOMY.upgradeCost, ECONOMY.capacityRanks), requires: { legacyMachine: 1 },
+    effects: Array.from({ length: ECONOMY.capacityRanks + 1 }, (_, level) => `单次产量 ${2 ** level} Legacy · 每级翻倍`) },
+  legacyEfficiency: { name: '回响加速', branch: 'legacy', costs: doublingCosts(ECONOMY.upgradeCost, ECONOMY.efficiencyRanks), requires: { legacyMachine: 1 },
+    effects: Array.from({ length: ECONOMY.efficiencyRanks + 1 }, (_, level) => `生产速度 ×${2 ** level} · 每 ${ECONOMY.productionSeconds / 2 ** level} 模拟秒生产一次`) },
   ...Object.fromEntries(Object.values(TRAITS).map(trait => {
     const layer = ['melee', 'archer', 'heavy'].includes(trait.units[0]) ? 1 : ['swordsman', 'crossbow', 'knight'].includes(trait.units[0]) ? 2 : ['duelist', 'musketeer', 'cannoneer'].includes(trait.units[0]) ? 3 : ['commando', 'rifleman', 'tank'].includes(trait.units[0]) ? 4 : 5;
     return [trait.id, { name: trait.name, branch: 'units', layer, unit: trait.units[0], costs: [UNIT_TALENT_COSTS[layer - 1]], requires: layer === 1 ? { spark: 1 } : {}, requiresLayer: layer > 1 ? layer - 1 : undefined,
@@ -83,11 +90,11 @@ export function getTalentState(session, key) {
   const config = TALENTS[key], level = talentLevel(session, key);
   if (level >= config.costs.length) return 'max';
   if (!meetsTalentRequirements({ ...session.permanent.talents, ...session.permanent.upgrades }, config)) return 'prerequisite';
-  return session.permanent.legacy >= config.costs[level] ? 'ready' : 'legacy';
+  return Q.gte(session.permanent.legacy, config.costs[level]) ? 'ready' : 'legacy';
 }
 export function purchaseTalent(session, key) {
   if (getTalentState(session, key) !== 'ready') return false;
-  session.permanent.legacy -= TALENTS[key].costs[session.permanent.talents[key]];
+  session.permanent.legacy = Q.sub(session.permanent.legacy, TALENTS[key].costs[session.permanent.talents[key]]);
   session.permanent.talents[key]++;
   return true;
 }
@@ -95,15 +102,15 @@ export function getTalentBonuses(talents) {
   return { startingGold: talents.supply * TALENT_VALUES.startingGold,
     bounty: 1 + talents.salvage * TALENT_VALUES.bountyPerLevel };
 }
-export function getLegacyBonuses(talents, challengeLevel = 0) {
+export function getLegacyBonuses(talents, challengeLevel = 0, rules = ECONOMY.rules) {
   return [
-    ['conservation', '遗产保存', 'doctrine', 'add', talents.conservation],
-    ['continuity', '文明传承', 'doctrine', 'multiply', 1 + talents.continuity * TALENT_VALUES.legacyMultiplierPerLevel],
+    ['conservation', '遗产保存', 'doctrine', rules < 10 ? 'add' : 'multiply', rules < 10 ? talents.conservation : 2 ** talents.conservation],
+    ['continuity', '文明传承', 'doctrine', 'multiply', (rules < 10 ? 1 + talents.continuity * 0.5 : 2 ** talents.continuity)],
     ['challenge:legacy', '挑战遗产', 'challenge', 'multiply', challengeLevel + 1],
   ].map(([id, label, kind, type, value]) => ({ target: { stat: 'legacy', kind: 'civilization' }, type, value, source: { id, label, kind } }));
 }
-export function getLegacyReward(talents, challengeLevel = 0) {
-  return resolveStatValue(SURFACE.legacyPerCycle, getLegacyBonuses(talents, challengeLevel), STAT_DEFINITIONS.legacy);
+export function getLegacyReward(talents, challengeLevel = 0, rules = ECONOMY.rules) {
+  return resolveStatValue(SURFACE.legacyPerCycle, getLegacyBonuses(talents, challengeLevel, rules), STAT_DEFINITIONS.legacy);
 }
 export function getTalentSpending(talents, grants = []) {
   return Object.entries(TALENTS).reduce((sum, [key, config]) =>

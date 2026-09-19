@@ -286,7 +286,7 @@ progress::-moz-progress-bar { background: var(--player); border-radius: 2px; }
 .legacy-wallet { display: flex; align-items: center; gap: 10px; color: var(--gold); }
 .legacy-wallet > span:first-child { font-size: 26px; }
 .legacy-wallet strong { font-size: 23px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.legacy-wallet > span:last-child { font-size: 12px; line-height: 1.3; }
+.legacy-wallet > span:nth-of-type(2) { font-size: 12px; line-height: 1.3; }
 .legacy-wallet small { display: block; color: var(--color-battle-legacy-wallet-small-text); font-size: 10px; margin-top: 3px; }
 .civilization-actions { display: flex; gap: 8px; }
 .civilization-actions button, .secondary-button { min-height: 44px; padding: 8px 16px; border: 1px solid var(--color-battle-civilization-actions-button-border); border-radius: 6px; background: var(--color-battle-civilization-actions-button-surface); color: var(--color-battle-civilization-actions-button-text); font-size: 13px; }

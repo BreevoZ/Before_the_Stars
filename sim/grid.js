@@ -43,11 +43,11 @@ const cell = value => {
 export function resultsToCSV(rows, gridPaths = []) {
   const headings = ['run', ...gridPaths, 'outcome', 'duration_seconds', 'battle_count',
     ...Array.from({ length: SURFACE.finalEnemyAge }, (_, i) => `battle_${i + 1}_seconds`),
-    'peak_gold', 'total_experience', 'legacy', 'battles_json', 'config_json'];
+    'peak_gold', 'total_experience', 'legacy', 'settlement_legacy', 'produced_legacy', 'battles_json', 'config_json'];
   const lines = rows.map(({ options, result }, index) => [index + 1,
     ...gridPaths.map(path => path.split('.').reduce((value, key) => value?.[key], options)),
     result.outcome, result.duration, result.battles.length,
     ...Array.from({ length: SURFACE.finalEnemyAge }, (_, i) => result.battles[i]?.duration ?? ''),
-    result.peakGold, result.totalExperience, result.legacy, result.battles, options]);
+    result.peakGold, result.totalExperience, result.legacy, result.settlementLegacy, result.producedLegacy, result.battles, options]);
   return [headings, ...lines].map(row => row.map(cell).join(',')).join('\n') + '\n';
 }

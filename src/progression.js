@@ -1,7 +1,8 @@
+import { createLegacyMachine, updateLegacyMachine } from './legacy-machine.js';
 import { Q } from './quantity.js';
 import { createGame, updateGame } from './game.js';
 import { updateAutomation, createAutomation, configureAutomation } from './automation.js';
-import { UPGRADES, UPGRADE_COSTS, SAVE_VERSION, automationUnlocked, availableSpeeds, getVictorySupplies } from './progression-config.js';
+import { UPGRADES, UPGRADE_COSTS, SAVE_VERSION, automationUnlocked, availableSpeeds, getVictorySupplies, LEGACY_ECONOMY } from './progression-config.js';
 import { emptyTalents, talentLevel } from './talents.js';
 import { getRunBonuses } from './progression-bonuses.js';
 import { createBonusStack, stat } from './stats.js';
@@ -18,7 +19,7 @@ export function createCivilizationRun(permanent, challengeLevel = 0, extraBonuse
   const runId = uniqueId();
   const upgrades = { ...permanent.upgrades };
   const talents = { ...permanent.talents };
-  const run = { runId, challengeLevel, battleNumber: 1, battleId: `${runId}:1`, phase: PHASE.BATTLE,
+  const run = { runId, legacyRules: LEGACY_ECONOMY.rules, challengeLevel, battleNumber: 1, battleId: `${runId}:1`, phase: PHASE.BATTLE,
     processedBattleId: null, settled: false, earnedLegacy: 0, upgrades, talents, autoElapsed: 0, autoTurn: 'recruit', elapsed: 0 };
   if (extraBonuses.length) run.extraBonuses = createBonusStack(extraBonuses);
   const game = createConflict(run);
@@ -35,7 +36,7 @@ function startRun(session, challengeLevel = 0, extraBonuses = []) {
 
 export function createProgression() {
   const session = { version: SAVE_VERSION, permanent: { completedCycles: 0, legacy: 0, totalLegacy: 0,
-    upgrades: { production: 0, warfare: 0 }, talents: emptyTalents(), talentGrants: [], settings: { speed: 1 }, automationRetained: false, automation: createAutomation() } };
+    legacyMachine: createLegacyMachine(), upgrades: { production: 0, warfare: 0 }, talents: emptyTalents(), talentGrants: [], settings: { speed: 1 }, automationRetained: false, automation: createAutomation() } };
   startRun(session);
   return session;
 }
@@ -59,6 +60,7 @@ export function updateProgression(session, dt, { paused = false, hidden = false 
   if (resolveBattle(session)) return true;
   if (session.run.phase !== PHASE.BATTLE) return false;
   dt = Math.min(dt, 0.05);
+  updateLegacyMachine(session, dt);
   updateAutomation(session, dt);
   updateGame(session.game, dt);
   session.run.elapsed += dt;
@@ -90,8 +92,8 @@ const effects = {
     run.settled = true;
     run.earnedLegacy = reward;
     permanent.completedCycles++;
-    permanent.legacy += reward;
-    permanent.totalLegacy += reward;
+    permanent.legacy = Q.add(permanent.legacy, reward);
+    permanent.totalLegacy = Q.add(permanent.totalLegacy, reward);
     permanent.automation.unlocked = automationUnlocked(permanent);
   },
   continue: continueConflict,
@@ -113,12 +115,12 @@ export function getUpgradeState(session, key) {
   const level = session.permanent.upgrades[key];
   if (level >= UPGRADE_COSTS.length) return 'max';
   if (Object.entries(UPGRADES[key].requires).some(([parent, required]) => talentLevel(session, parent) < required)) return 'prerequisite';
-  return session.permanent.legacy >= UPGRADE_COSTS[level] ? 'ready' : 'legacy';
+  return Q.gte(session.permanent.legacy, UPGRADE_COSTS[level]) ? 'ready' : 'legacy';
 }
 
 export function purchaseUpgrade(session, key) {
   if (getUpgradeState(session, key) !== 'ready') return false;
-  session.permanent.legacy -= UPGRADE_COSTS[session.permanent.upgrades[key]];
+  session.permanent.legacy = Q.sub(session.permanent.legacy, UPGRADE_COSTS[session.permanent.upgrades[key]]);
   session.permanent.upgrades[key]++;
   return true;
 }

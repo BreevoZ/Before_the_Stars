@@ -195,7 +195,7 @@ export function registerTraitTests(test,assert,near) {
  });
 
  test('Traits: every active trait state, launch snapshot and field validates and round-trips in v9',()=>{
-  const template=fund(400);purchaseTalent(template,'spark');purchaseUpgrade(template,'production');purchaseUpgrade(template,'warfare');buyAllTalents(template);rebuildCivilization(template,template.run.runId);
+  const template=fund(6000);purchaseTalent(template,'spark');purchaseUpgrade(template,'production');purchaseUpgrade(template,'warfare');buyAllTalents(template);rebuildCivilization(template,template.run.runId);
   for(const trait of Object.values(TRAITS)) for(const time of [.4,3.5,6.8]) {
    const s=parseSession(serializeSession(template));
    s.run.extraBonuses=[{target:{stat:'health',kind:'unit',team:'enemy'},type:'override',value:1e8,source:{kind:'challenge',id:'durable-targets',label:'固定检验目标'}}];

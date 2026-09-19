@@ -1,3 +1,4 @@
+import { LEGACY_ECONOMY } from './progression-config.js';
 import { TRAIT_STATS, TRAIT_DEFAULTS } from './traits.js';
 import { Q } from './quantity.js';
 import { RULES, UNITS, TURRETS, ABILITIES, AGES } from './game-config.js';
@@ -26,7 +27,8 @@ export const STAT_DEFINITIONS = Object.freeze({
   tickInterval: { min: RULES.fixedStep, max: 10 }, slow: { min: 0.01, max: 1 },
   enabled: { boolean: true }, canRecruit: { boolean: true }, canBuild: { boolean: true },
   canExpand: { boolean: true }, canEvolve: { boolean: true }, canCast: { boolean: true },
-  legacy: count(1e9),
+  legacy: growthInteger, legacyProduction: growthInteger, legacyMachine: { boolean: true },
+  legacyProductionInterval: { min: .25, max: 3600 },
 });
 const kinds = ['team', 'unit', 'turret', 'ability', 'reward', 'civilization'];
 const sources = ['doctrine', 'challenge', 'depth', 'milestone', 'age', 'status', 'legacy'];
@@ -93,7 +95,7 @@ function baseValues(context) {
     expansionCost: RULES.turretExpansionCosts[Math.max(0, context.slot ?? 0)] ?? 0,
     canRecruit: true, canBuild: true, canExpand: true, canEvolve: true, canCast: true };
   if (context.kind === 'reward') return { bounty: 0, experience: 0 };
-  if (context.kind === 'civilization') return { legacy: 1 };
+  if (context.kind === 'civilization') return { legacy: 1, legacyProduction: 1, legacyProductionInterval: LEGACY_ECONOMY.productionSeconds, legacyMachine: false };
   return { ...context.base, enabled: true, attackSpeed: 1,
     ...(context.kind === 'unit' ? { ...TRAIT_DEFAULTS, canRanged: true, sniperRifle: false } : {}),
     ...(context.kind === 'turret' ? { attackInterval: context.base.interval } : {}) };

@@ -18,7 +18,7 @@
         <button class="icon-button" id="help" type="button" data-icon="help" aria-label="帮助与单位资料" title="帮助与单位资料 · ?"></button></div>
       </header>
       <nav id="civilization-bar" class="civilization-bar" aria-label="文明进度" hidden>
-        <div class="legacy-wallet" title="文明遗产，用于购买永久天赋"><span aria-hidden="true">✧</span><strong id="legacy-balance">0</strong><span>Legacy<small>文明遗产</small></span></div>
+        <div class="legacy-wallet" title="文明遗产，用于购买永久天赋"><span aria-hidden="true">✧</span><strong id="legacy-balance">0</strong><span>Legacy<small>文明遗产</small></span><small id="legacy-production" hidden></small></div>
         <div class="civilization-actions"><button id="archives" type="button" hidden>天赋树 <span aria-hidden="true">↗</span></button><button id="autobuyer-menu" type="button" hidden>自动购买 <small id="autobuyer-label">未解锁</small></button></div>
       </nav>
       <p id="challenge-status" class="challenge-status" hidden></p>
@@ -119,6 +119,7 @@
           <div id="tree-scroll" class="tree-scroll"><div id="talent-tree" class="talent-tree" aria-label="从文明火种向上，依次经过五个时代的兵种天赋与两侧分支"></div></div>
           <p id="talent-guide" class="map-guide"></p>
           <p id="talent-legacy-preview" class="map-yield"></p>
+          <p id="legacy-machine-status" class="map-yield" hidden></p>
         </section>
         <details class="bonus-details"><summary>本轮加成与收益</summary><p class="archive-eyebrow" id="archive-run"></p><p class="archive-note" id="active-bonuses"></p></details>
       </div>

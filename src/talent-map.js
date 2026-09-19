@@ -1,3 +1,4 @@
+import { Q } from './quantity.js';
 import { createBindings } from './dom-bindings.js';
 import { buildTalentViewModel } from './talent-view-model.js';
 import { UPGRADES, TALENT_LAYER_REQUIREMENT } from './progression-config.js';
@@ -26,8 +27,11 @@ const mapData = {
   evolution: { x: 125, y: 990 }, defense: { x: 265, y: 845, kind: 'specialist' },
   production: { x: 825, y: 1330 }, supply: { x: 825, y: 1120, kind: 'specialist' },
   warfare: { x: 955, y: 1110 }, salvage: { x: 955, y: 900, kind: 'specialist' },
-  conservation: { x: 1030, y: 1350, kind: 'keystone' }, challenge: { x: 1050, y: 690, kind: 'specialist' },
-  continuity: { x: 1020, y: 475, kind: 'keystone' }, timeAcceleration: { x: 830, y: 690, icon: glyphs.clock },
+  conservation: { x: 1030, y: 1350, kind: 'keystone' }, challenge: { x: 990, y: 1210, kind: 'specialist' },
+  continuity: { x: 1040, y: 1000, kind: 'keystone' }, timeAcceleration: { x: 830, y: 690, icon: glyphs.clock },
+  legacyMachine: { x: 1030, y: 780, kind: 'keystone', icon: glyphs.automation },
+  legacyCapacity: { x: 930, y: 530, kind: 'specialist', icon: glyphs.heavy },
+  legacyEfficiency: { x: 1050, y: 320, kind: 'specialist', icon: glyphs.clock },
   superSoldierPlan: { x: 550, y: 260, kind: 'keystone', icon: glyphs.helmet },
   elite: { x: 380, y: 170, kind: 'specialist' }, superRanged: { x: 720, y: 170, kind: 'specialist', icon: glyphs.arrow },
   bypasser: { x: 550, y: 60, kind: 'keystone', icon: 'M5 21V7l7-5 7 5v14M9 21V9h6v12M2 21h20' },
@@ -80,7 +84,7 @@ export function createTalentMap(getSession, changed) {
     el(`buy-${key}`).addEventListener('click', () => {
       const s = getSession(), before = s.permanent.legacy;
       if (!(Object.hasOwn(UPGRADES, key) ? purchaseUpgrade : purchaseTalent)(s, key)) return;
-      changed(); sync(); feedback(key, before - s.permanent.legacy);
+      changed(); sync(); feedback(key, Q.sub(before, s.permanent.legacy));
       if (el(`buy-${key}`).disabled) el('close-talent-detail').focus({ preventScroll: true });
     });
   }
@@ -144,7 +148,7 @@ export function createTalentMap(getSession, changed) {
     animation.finished.then(() => animations.delete(animation), () => animations.delete(animation));
   }
   function feedback(key, cost) {
-    bind({ '#talent-feedback': `−${cost} Legacy · ${TALENT_TREE[key].name}已点亮` });
+    bind({ '#talent-feedback': `−${Q.format(cost)} Legacy · ${TALENT_TREE[key].name}已点亮` });
     animate(el(`node-${key}`), [{ transform: 'scale(1)' }, { transform: 'scale(1.16)', offset: .35 }, { transform: 'scale(1)' }], { duration: 460, easing: 'ease-out' });
     animate(el('legacy'), [{ transform: 'translateY(0) scale(1)' }, { transform: 'translateY(-5px) scale(1.2)', color: 'var(--purchase-flash)' }, { transform: 'translateY(0) scale(1)' }], { duration: 500 });
     for (const [child, edge] of edges) if (child === key || (key === 'spark' && edge.parent === key)) {

@@ -1,3 +1,4 @@
+import { legacyMachineBonuses } from './legacy-machine.js';
 import { SUPER_WEAPONS } from './game-config.js';
 import { TRAITS } from './traits.js';
 import { getBonuses, getChallengeModifiers, challengeName } from './progression-config.js';
@@ -18,14 +19,15 @@ export function getV8RunBonuses(run) {
     ...Object.entries(getChallengeModifiers(run.challengeLevel)).map(([key, value]) => contribution('challenge',
       `challenge:${run.challengeLevel}`, `挑战 ${run.challengeLevel}`, { stat: key === 'gold' ? 'startingGold' : key, team: 'enemy',
         ...(key === 'experience' ? { kind: 'reward' } : {}) }, 'multiply', value)),
-  ], getLegacyBonuses(run.talents, run.challengeLevel), run.extraBonuses ?? []);
+  ], getLegacyBonuses(run.talents, run.challengeLevel, run.legacyRules ?? 9), run.extraBonuses ?? []);
 }
 
 export function getRunBonuses(run) {
   const talents = run.talents;
-  const base = getV8RunBonuses({ ...run, extraBonuses: [] }).map(effect => effect.source.kind === 'challenge'
+  const base = getV8RunBonuses({ ...run, legacyRules: run.legacyRules ?? 10, extraBonuses: [] }).map(effect => effect.source.kind === 'challenge'
     ? { ...effect, source: { ...effect.source, label: challengeName(run.challengeLevel) } } : effect);
   return createBonusStack(base,
+    (run.legacyRules ?? 10) >= 10 ? legacyMachineBonuses(talents) : [],
     getSuperSoldierBonuses(Boolean(talents.superRanged), Boolean(talents.superSoldierPlan)),
     Object.values(TRAITS).filter(trait => talents[trait.id]).map(trait => contribution('doctrine', trait.id, trait.name,
       { stat: trait.stat, type: trait.units[0], team: 'player' }, 'override', true)),
@@ -42,3 +44,5 @@ export function getSuperSoldierBonuses(ranged = false, enabled = true) {
       contribution('doctrine', 'superRanged', ranged ? '狙击激光枪' : '贴身激光匕首', target(key), 'override', value)),
   ];
 }
+
+export const getV9RunBonuses = run => getRunBonuses({ ...run, legacyRules: 9 });

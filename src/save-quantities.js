@@ -1,7 +1,7 @@
 import { STAT_DEFINITIONS } from './stats.js';
 import { check, object } from './save-primitives.js';
 const teams = ['player', 'enemy'];
-// Explicit schema walk: numbers in coordinates, clocks, IDs and Legacy are
+// Explicit schema walk: numbers in coordinates, clocks and IDs are
 // never revived as quantities. Unknown properties cannot smuggle Decimal data.
 export function mapSessionQuantities(session, convert) {
   const { game: g, run, permanent: p } = session;
@@ -23,8 +23,13 @@ export function mapSessionQuantities(session, convert) {
     if (STAT_DEFINITIONS[key]?.quantity) field(g.ability.stats, key);
   }
   for (const effect of [...(g.bonuses ?? []), ...(run.extraBonuses ?? [])]) {
-    if (STAT_DEFINITIONS[effect.target?.stat]?.quantity) field(effect, 'value');
+    if (STAT_DEFINITIONS[effect.target?.stat]?.quantity && (effect.target.stat !== 'legacy' || session.version >= 10)) field(effect, 'value');
   }
   field(p.automation, 'reserve');
+  if (session.version >= 10) {
+    field(p, 'totalLegacy'); if (p.legacy !== undefined) field(p, 'legacy');
+    field(run, 'earnedLegacy');
+    if (p.legacyMachine) field(p.legacyMachine, 'produced');
+  }
   return session;
 }

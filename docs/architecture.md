@@ -32,7 +32,7 @@ sync({ gold: '180', canEvolve: false });
 
 默认调色板位于 `:root, [data-civilization-layer="surface"]`。未来可在另一主题根上覆盖这些变量，无需改组件选择器。本轮只提供地表配色。Canvas 场景／人物本身仍使用美术模块中的画布配色。
 
-## 存档 v9：输入与必要快照
+## 存档 v10：输入与必要快照
 
 运行时 session 结构保持兼容。持久化记录省去可由输入推导的字段：
 
@@ -60,7 +60,7 @@ sync({ gold: '180', canEvolve: false });
 - `save-history.js`：独立于当前天赋配置的旧购买规则。
 - `save-migrations.js`：每个旧版本一个纯函数，返回新对象；迁移器在每一步前验证旧记录。
 
-v1–v8 有效存档逐版本升级到 v9，原有效记录仍保留为备份。未知版本或损坏存档阻止自动覆盖。新格式不接受冗余的派生字段，防止两份属性互相矛盾；本地存档并不承担服务器反作弊职责。
+v1–v9 有效存档逐版本升级到 v10，原有效记录仍保留为备份。未知版本或损坏存档阻止自动覆盖。新格式不接受冗余的派生字段，防止两份属性互相矛盾；本地存档并不承担服务器反作弊职责。
 
 新增版本时保留已有迁移函数及历史规则，添加下一步纯数据迁移，加入真实旧格式 fixture 和不修改输入的测试。不要让旧迁移通过更新后的 `SAVE_VERSION` 跳过中间版本。
 
@@ -92,3 +92,11 @@ node sim/batch.js --out sim/results/scan.csv
 ```
 
 `tests/architecture-cases.js` 覆盖纯视图模型、全部阶段／事件组合、陈旧 token、迁移纯度、捕获的 v7 记录、v8 往返、结算后购买和重建恢复、冗余／错误字段。浏览器专项检查无变化绑定零写入、输入编辑保留、非法编辑恢复、画像身份与单次点击。原有经典模式、三种模式键盘、320px 布局、星图与减少动态效果回归仍保留。
+
+### v10 遗产经济
+
+- 追加遗产天赋等级，不修改历史已付价格；v9 购买 schema 保存在历史表中。
+- `run.legacyRules` 保留旧轮次的奖励约定，重建后采用 10；迁移不重算已结算奖励。
+- `permanent.legacyMachine = { progress, produced }` 保存不足一批的进度（0 ≤ progress < 1）及累计生产所得；实际收入加入同一 `totalLegacy` 账本。
+- `legacy-machine.js` 仅由 `updateProgression` 的有效战斗步调用，产能读取属性栈；不存在独立定时器或离线推进。UI 是纯投影，不发奖励。
+- `legacy`、`legacyProduction` 使用 Quantity；生产周期仍为有界 Number。机器不会增加 `completedCycles` 或改变终局结算凭据。

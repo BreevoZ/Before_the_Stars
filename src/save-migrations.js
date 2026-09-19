@@ -1,3 +1,4 @@
+import { createLegacyMachine } from './legacy-machine.js';
 import { Q } from './quantity.js';
 import { UNITS, TURRETS, getBaseHealth, projectileField } from './game.js';
 import { SAVE_VERSION, SURFACE, getChallengeModifiers } from './progression-config.js';
@@ -6,7 +7,7 @@ import { getV8RunBonuses } from './progression-bonuses.js';
 import { createAutomation } from './automation.js';
 import { HISTORICAL_TALENTS } from './save-history.js';
 import { validateRecord } from './save-validation.js';
-import { cloneRecord, toV8Record, fromV8Record, toSaveRecord } from './save-record.js';
+import { cloneRecord, toV8Record, fromV8Record, fromV9Record } from './save-record.js';
 import { emptyTalents } from './talents.js';
 const teams = ['player', 'enemy'];
 
@@ -106,19 +107,29 @@ export function migrateV8(input) {
   if (p.talents.elite) p.talentGrants.push('superSoldierPlan');
   for (const state of [p, session.run]) {
     const old = state.talents;
-    state.talents = Object.fromEntries(Object.keys(emptyTalents()).map(key => [key, old[key] ?? 0]));
+    state.talents = Object.fromEntries(Object.keys(HISTORICAL_TALENTS[9]).map(key => [key, old[key] ?? 0]));
     state.talents.spark = Number(old.autobuyer === 1);
     // Preserve a purchased elite recruiter without charging for its new gate.
     if (old.elite) state.talents.superSoldierPlan = 1;
   }
   session.version = 9;
-  return toSaveRecord(session);
+  return { ...toV8Record(session), version: 9 };
 }
-export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8 });
+export function migrateV9(input) {
+  const session = fromV9Record(input);
+  session.permanent.legacyMachine = createLegacyMachine();
+  for (const state of [session.permanent, session.run]) state.talents = { ...emptyTalents(), ...state.talents };
+  // Finish the existing run under its original reward contract, including an
+  // already-settled finale. The next fresh run uses exponential rewards.
+  session.run.legacyRules = 9;
+  session.version = 10;
+  return { ...toV8Record(session), version: 10 };
+}
+export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9 });
 export function migrateRecord(input) {
   let record = input;
   while (record.version < SAVE_VERSION) {
-    validateRecord(record.version === 8 ? fromV8Record(record) : record, record.version);
+    validateRecord(record.version === 8 ? fromV8Record(record) : record.version === 9 ? fromV9Record(record) : record, record.version);
     record = MIGRATIONS[record.version](record);
   }
   return record;

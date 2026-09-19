@@ -85,7 +85,7 @@ export function registerTalentTests(test, assert, near) {
     assert(getTalentState(s, 'defense') === 'during-run');
   });
   test('Talents: all costs and prerequisite paths can be purchased, capped and saved without sharing configuration', () => {
-    const s = funded(400), original = JSON.stringify({ AGES, UNITS, TURRETS });
+    const s = funded(6000), original = JSON.stringify({ AGES, UNITS, TURRETS });
     assert(purchaseTalent(s, 'spark'));
     for (const key of ['production', 'warfare']) for (let i = 0; i < 5; i++) assert(purchaseUpgrade(s, key));
     buyAllTalents(s);
@@ -119,15 +119,15 @@ export function registerTalentTests(test, assert, near) {
   });
   test('Talents: legacy scales from run snapshots, rounds once and settles exactly once across refresh/purchase/rebuild', () => {
     let s = funded(30); purchaseTalent(s, 'spark'); purchaseTalent(s, 'conservation'); purchaseTalent(s, 'conservation'); purchaseTalent(s, 'continuity');
-    assert(s.run.earnedLegacy === 1 && getLegacyReward(s.permanent.talents) === 4);
+    assert(s.run.earnedLegacy === 1 && getLegacyReward(s.permanent.talents) === 8);
     const before = s.permanent.totalLegacy; start(s); finish(s);
-    assert(s.run.earnedLegacy === 4 && s.permanent.totalLegacy === before + 4);
+    assert(s.run.earnedLegacy === 8 && s.permanent.totalLegacy === before + 8);
     s = parseSession(serializeSession(s)); const balance = s.permanent.legacy;
     for (let i = 0; i < 10; i++) { resolveBattle(s); updateProgression(s, 0.05); }
     assert(s.permanent.legacy === balance);
-    purchaseTalent(s, 'continuity'); assert(s.run.earnedLegacy === 4 && parseSession(serializeSession(s)).run.earnedLegacy === 4);
-    start(s); finish(s, 5, 'draw'); assert(s.run.earnedLegacy === 0 && s.permanent.totalLegacy === before + 4);
-    start(s); finish(s); assert(s.run.earnedLegacy === 6);
+    purchaseTalent(s, 'continuity'); assert(s.run.earnedLegacy === 8 && parseSession(serializeSession(s)).run.earnedLegacy === 8);
+    start(s); finish(s, 5, 'draw'); assert(s.run.earnedLegacy === 0 && s.permanent.totalLegacy === before + 8);
+    start(s); finish(s); assert(s.run.earnedLegacy === 16);
   });
   test('Autobuyer: reserve, custom queue limit, army cap and manual override all use normal payment', () => {
     const s = funded(2); purchaseTalent(s, 'spark'); purchaseTalent(s, 'logistics'); start(s); configureAutomation(s, { enabled: true, target: 'heavy', reserve: 150, queueLimit: 1 });
@@ -204,7 +204,7 @@ export function registerTalentTests(test, assert, near) {
     configureAutomation(s, { enabled: true }); finish(s); const ended = serializeSession(s); attempt(s); assert(serializeSession(s) === ended);
   });
   test('Autobuyer full civilization: purchased talents, normal paid armies and defense reach the finale without manual combat commands', () => {
-    const s = funded(400);
+    const s = funded(6000);
     assert(purchaseTalent(s, 'spark'));
     for (const key of ['production', 'warfare']) for (let i = 0; i < 5; i++) purchaseUpgrade(s, key);
     buyAllTalents(s);
@@ -217,7 +217,7 @@ export function registerTalentTests(test, assert, near) {
       updateProgression(s, RULES.fixedStep);
       if (i % 600 === 0) parseSession(serializeSession(s));
     }
-    assert(s.run.phase === 'destruction' && s.run.earnedLegacy === 8 && s.permanent.completedCycles === 401);
+    assert(s.run.phase === 'destruction' && s.run.earnedLegacy === 65536 && s.permanent.completedCycles === 6001);
   });
   test('Save v4: valid v1 battle, victory, settlement and rebuilt progress migrate without awards, resource grants or setting loss', () => {
     for (const phase of ['battle', 'victory', 'destruction', 'rebuilt']) {
@@ -437,7 +437,7 @@ export function registerTalentTests(test, assert, near) {
       assert(!restored.permanent.automation.enabled && !restored.permanent.talents.logistics);
       assert(restored.permanent.talentGrants.join(',') === (needsRoot ? 'spark' : ''));
       assert(restored.run.runId === old.run.runId && restored.run.phase === phase.replace('no-upgrades', 'destruction').replace('fresh', 'battle'));
-      assert(restored.run.earnedLegacy === old.run.earnedLegacy && JSON.stringify(canonical(restored.game)) === JSON.stringify(canonical(s.game)));
+      assert(restored.run.earnedLegacy === old.run.earnedLegacy && JSON.stringify(canonical({ ...restored.game, bonuses: restored.game.bonuses.filter(b => !['legacy','legacyMachine','legacyProduction','legacyProductionInterval'].includes(b.target.stat)) })) === JSON.stringify(canonical({ ...s.game, bonuses: s.game.bonuses.filter(b => !['legacy','legacyMachine','legacyProduction','legacyProductionInterval'].includes(b.target.stat)) })));
       assert(!resolveBattle(restored) && serializeSession(parseSession(serializeSession(restored))) === serializeSession(restored));
       if (needsRoot) {
         old.version = 4; rejects(() => parseSession(JSON.stringify(old)));

@@ -64,7 +64,7 @@ stat(game, 'player', 'canBuild');           // false
 | 大招 | `damage`、`baseDamage`、`radius`、`cooldown`、`healing`、`enabled` |
 | 阵营 | `startingGold`、`income`、`baseHealth`、`armyLimit`、`queueLimit`、`initialTurretSlots`、`maxTurretSlots`、`expansionCost`、`canRecruit`、`canBuild`、`canExpand`、`canEvolve`、`canCast` |
 | 奖励接收方 | `bounty`、`experience`，调用 `stat(game, { kind: 'reward', team }, key, 基础奖励)` |
-| 文明 | `legacy` |
+| 文明 | `legacy`、`legacyMachine`、`legacyProduction`、`legacyProductionInterval` |
 
 `attackSpeed` 是攻速倍率，基础为 1；实际攻击间隔为结算后的 `attackInterval / attackSpeed`，最低一帧。炮塔配置里的 `interval` 映射为同一个 `attackInterval`，结算表保留 `interval` 别名供既有逻辑使用。技能冷却以秒为单位。
 

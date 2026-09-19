@@ -27,7 +27,7 @@ export function getChallengeModifiers(level = 0) {
   return Object.fromEntries(Object.entries(CHALLENGE).filter(([key]) => key !== 'maxLevel')
     .map(([key, base]) => [key, Q.pow(base, level)]));
 }
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 export const SAVE_INTERVAL = 10;
 export function getBonuses(levels) {
   return { income: Q.pow(UPGRADES.production.base, levels.production), experience: Q.pow(UPGRADES.warfare.base, levels.warfare) };
@@ -41,3 +41,9 @@ const EMBERS = Object.freeze(['初生之地', '纷争余烬', '铁旗时代', '�
 export function challengeName(level = 0) { return EMBERS[level] ?? '未知余烬'; }
 export function automationUnlocked(permanent) { return permanent.completedCycles >= AUTOMATION_MILESTONE || permanent.automationRetained === true; }
 export function availableSpeeds(permanent) { return SPEEDS.slice(0, permanent.talents.timeAcceleration ? 3 : permanent.talents.spark ? 2 : 1); }
+
+// Surface economy tuning: each rank doubles both its price and its effect.
+export const LEGACY_ECONOMY = Object.freeze({ rules: 10, rewardRanks: 8,
+  conservationCost: 2, continuityCost: 6, producerCost: 8,
+  capacityRanks: 8, efficiencyRanks: 6, upgradeCost: 8, productionSeconds: 60 });
+export const doublingCosts = (first, ranks) => Object.freeze(Array.from({ length: ranks }, (_, rank) => first * 2 ** rank));

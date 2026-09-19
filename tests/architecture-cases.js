@@ -10,7 +10,7 @@ import { purchaseTalent } from '../src/talents.js';
 import { createGame, recruit, evolve, getIncomeRate, AGES } from '../src/game.js';
 import { serializeSession, parseSession, createSaveStore, SAVE_KEY, BACKUP_KEY } from '../src/save.js';
 import { MIGRATIONS } from '../src/save-migrations.js';
-import { cloneRecord, fromSaveRecord, fromV8Record } from '../src/save-record.js';
+import { cloneRecord, fromSaveRecord, fromV8Record, fromV9Record } from '../src/save-record.js';
 import { validateRecord } from '../src/save-validation.js';
 import { SAVE_VERSION } from '../src/progression-config.js';
 import { record as capturedV7 } from './fixtures/v7-save.js';
@@ -58,7 +58,7 @@ export function registerArchitectureTests(test, assert) {
   test('View models: settlement, root purchase, rebuild and automation unlocks share authoritative progression', () => {
     const s = createProgression(); finish(s);
     let vm = buildCivilizationViewModel(s);
-    assert(vm['#result-title'] === '文明未能幸存' && vm['#legacy-balance'] === 1 && !vm['#rebuild-civilization@hidden']);
+    assert(vm['#result-title'] === '文明未能幸存' && vm['#legacy-balance'] === '1' && !vm['#rebuild-civilization@hidden']);
     assert(buildTalentViewModel(s)['#node-spark@data-state'] === 'ready');
     assert(buildAutomationViewModel(s)['#automation-settings@hidden']);
     assert(purchaseTalent(s, 'spark'));
@@ -124,7 +124,7 @@ export function registerArchitectureTests(test, assert) {
     delete old.run.talents; delete old.run.challengeLevel; delete old.run.autoTurn;
     delete old.game.modifiers.bounty; delete old.game.enemyModifiers;
     for (let version = 1; version < SAVE_VERSION; version++) {
-      validateRecord(version === 8 ? fromV8Record(old) : old, version);
+      validateRecord(version === 8 ? fromV8Record(old) : version === 9 ? fromV9Record(old) : old, version);
       const source = freeze(old), before = json(source), next = MIGRATIONS[version](source);
       assert(next.version === version + 1 && next !== source && next.game !== source.game);
       assert(json(MIGRATIONS[version](source)) === json(next));

@@ -8,6 +8,7 @@ import { createBonusStack } from '../src/stats.js';
 
 export const DEFAULT_MAX_SECONDS = 1800;
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+const jsonAmount = value => typeof value === 'number' ? value : Q.encode(value);
 const round = value => Math.round(value * 1e6) / 1e6;
 
 // A hypothetical purchased loadout, never a browser save or a grant of resources.
@@ -45,7 +46,8 @@ export function normalizeRunOptions(options = {}) {
 
 /** Simulate one civilization using the actual fixed-step game and Autobuyer.
  * No wall clock, rendering, storage, debug gold, manual commands or offline time.
- * Durations are simulation seconds. A timeout earns no Legacy.
+ * Durations are simulation seconds. A timeout earns no completion reward;
+ * unlocked production may still earn Legacy during actual simulated battle.
  */
 export function simulateRun(options = {}) {
   const config = normalizeRunOptions(options);
@@ -85,5 +87,5 @@ export function simulateRun(options = {}) {
   const outcome = session.run.phase === 'destruction' ? 'won'
     : session.run.phase === 'defeat' ? session.game.status : 'timeout';
   return { outcome, traitActivations, duration: round(ticks * RULES.fixedStep), battles,
-    peakGold: typeof peakGold === 'number' ? round(peakGold) : Q.encode(peakGold), totalExperience: typeof session.game.experience.player === 'number' ? session.game.experience.player : Q.encode(session.game.experience.player), legacy: session.run.earnedLegacy };
+    peakGold: typeof peakGold === 'number' ? round(peakGold) : Q.encode(peakGold), totalExperience: typeof session.game.experience.player === 'number' ? session.game.experience.player : Q.encode(session.game.experience.player), legacy: jsonAmount(Q.add(session.run.earnedLegacy, permanent.legacyMachine.produced)), settlementLegacy: jsonAmount(session.run.earnedLegacy), producedLegacy: jsonAmount(permanent.legacyMachine.produced) };
 }

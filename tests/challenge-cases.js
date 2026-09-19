@@ -136,9 +136,9 @@ export function registerChallengeTests(test, assert, near) {
     near(rear.hp, 720 - (100 * .6 * 1.25 - 4));
     roundtrip(s);
   });
-  test('Challenge: reward multiplies before one final floor, never rounding talent earnings early', () => {
+  test('Challenge: the exponential talent reward multiplies by expedition depth', () => {
     const talents = { ...challengeSeed().permanent.talents, conservation: 2, continuity: 1 };
-    assert(getLegacyReward(talents) === 4 && getLegacyReward(talents, 2) === 13);
+    assert(getLegacyReward(talents) === 8 && getLegacyReward(talents, 2) === 24);
   });
   test('Challenge: an actual paid future army defeats enhanced AI and settles the larger reward', () => {
     const s = challengeSeed(); s.permanent.talents.superSoldierPlan = 1; s.permanent.talentGrants.push('superSoldierPlan'); startChallenge(s, s.run.runId);
@@ -174,7 +174,7 @@ export function registerChallengeTests(test, assert, near) {
     s = roundtrip(s); assert(!resolveBattle(s) && s.run.earnedLegacy === reward && s.permanent.totalLegacy === total);
     assert(startChallenge(s, s.run.runId)); const raw = serializeSession(s);
     assert(serializeSession(roundtrip(s)) === raw && s.run.challengeLevel === 2);
-    assert(statMultiplier(s.game, 'health', 'enemy') === 1.25 ** 2 && getLegacyReward(s.run.talents, 2) === 9);
+    assert(statMultiplier(s.game, 'health', 'enemy') === 1.25 ** 2 && getLegacyReward(s.run.talents, 2) === 12);
   });
   test('Save v5: all v4 phases migrate to normal challenge with no resource, reward, or upgrade changes; backup preserved', () => {
     for (const phase of ['battle', 'victory', 'destruction', 'defeat']) {

@@ -105,7 +105,7 @@
       <header class="home-header">
         <div class="home-wordmark"><span aria-hidden="true">✳</span><div><small>BEFORE THE STARS</small><h2 id="archives-title">文明星图</h2></div></div>
         <div class="home-wallet"><span aria-hidden="true">✧</span><strong id="legacy">0</strong><span>Legacy<small>文明遗产</small></span></div>
-        <nav class="home-nav" aria-label="文明档案"><button id="home-automation" class="text-button" type="button">自动购买</button><button id="archive-save" class="text-button" type="button">存档</button><button class="icon-button" id="close-archives" type="button" data-icon="close" aria-label="返回战场"></button></nav>
+        <nav class="home-nav" aria-label="文明档案"><button id="return-orbit" class="text-button" type="button" hidden>返回轨道</button><button id="home-automation" class="text-button" type="button">自动购买</button><button id="archive-save" class="text-button" type="button">存档</button><button class="icon-button" id="close-archives" type="button" data-icon="close" aria-label="返回战场"></button></nav>
       </header>
       <div class="home-scroll" id="home-scroll">
         <section class="home-story" aria-labelledby="home-heading">
@@ -126,6 +126,22 @@
       <aside id="talent-details" class="talent-details" aria-label="所选天赋详情" hidden><button id="close-talent-detail" class="icon-button" type="button" aria-label="关闭天赋详情">×</button><div id="talent-detail-cards"></div></aside>
       <footer class="archive-footer" id="archive-footer" hidden><p id="rebuild-rules" hidden>文明会消逝，遗产不会。重建清空本轮资源与战场，保留天赋和自动购买设置。</p><button class="primary-button" id="rebuild-civilization" type="button" hidden>重建文明</button><button class="secondary-button" id="archive-challenge" type="button" hidden>挑战更强文明</button></footer>
       <p id="talent-feedback" role="status" aria-live="polite" class="talent-feedback"></p>
+      <button id="debug-legacy" class="text-button debug-legacy" data-debug-command="legacy" type="button" hidden title="仅调试存档：增加 2,097,152 Legacy，不增加通关次数">调试 · 启航预算 +2²¹</button>
+      <section id="orbital-presentation" class="orbital-presentation" aria-label="越过大过滤器" hidden>
+        <canvas id="orbital-sky" aria-hidden="true"></canvas>
+        <p id="orbital-departure">这一回，文明选择离开。</p>
+        <button id="skip-orbital" type="button" class="text-button">跳过启航 · Esc</button>
+        <p id="orbital-save-warning" role="status" hidden></p>
+        <div id="orbital-arrival" hidden>
+          <p class="orbital-eyebrow">BEYOND THE GREAT FILTER</p>
+          <h2 id="orbital-title" tabindex="-1">VI <span>轨道文明</span></h2>
+          <p>我们终于走出了那片废墟。</p>
+          <div id="orbital-actions" hidden>
+            <p class="orbital-note">地表篇已完成 · 轨道建设将在后续版本开放</p>
+            <nav aria-label="轨道文明"><button id="review-surface" class="secondary-button" type="button">回望星图</button><button id="replay-orbital" class="text-button" type="button">重播启航</button><button id="orbital-save" class="text-button" type="button">存档</button></nav>
+          </div>
+        </div>
+      </section>
     </dialog>
     <dialog id="challenge-dialog" aria-labelledby="challenge-title">
       <header class="help-heading"><h2 id="challenge-title">余烬远征</h2><button id="close-challenge" class="icon-button" type="button" data-icon="close" aria-label="关闭挑战预览"></button></header>

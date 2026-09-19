@@ -1,6 +1,7 @@
-import { SURFACE, CHALLENGE } from './progression-config.js';
+import { SURFACE, CHALLENGE, TALENT_PRICES } from './progression-config.js';
+import { Q } from './quantity.js';
 
-export const PHASE = Object.freeze({ BATTLE: 'battle', VICTORY: 'victory', DESTRUCTION: 'destruction', DEFEAT: 'defeat' });
+export const PHASE = Object.freeze({ BATTLE: 'battle', VICTORY: 'victory', DESTRUCTION: 'destruction', DEFEAT: 'defeat', ORBITAL: 'orbital' });
 export const isBetweenRuns = phase => phase === PHASE.DESTRUCTION || phase === PHASE.DEFEAT;
 export function getNextChallengeLevel({ run, permanent }) {
   if (!permanent.talents.challenge) return null;
@@ -12,6 +13,9 @@ export function getNextChallengeLevel({ run, permanent }) {
 // Ordered guards are mutually exclusive. Tokens are mandatory, including for
 // simulation-originated resolution, so a stale click cannot act on a new run.
 export const TRANSITIONS = Object.freeze([
+  { event: 'launch', from: [PHASE.DESTRUCTION], to: PHASE.ORBITAL, token: 'runId', effect: 'launch',
+    guard: ({ run, game, permanent: p }) => run.settled && game.status === 'won' && game.ages.enemy === SURFACE.finalEnemyAge &&
+      p.talents.superSoldierPlan === 1 && p.talents.bypasser === 0 && Q.gte(p.legacy, TALENT_PRICES.bypasser[0]) },
   { event: 'resolve', from: [PHASE.BATTLE], to: PHASE.DEFEAT, token: 'battleId', effect: 'finishBattle',
     guard: ({ game }) => ['lost', 'draw'].includes(game.status) },
   { event: 'resolve', from: [PHASE.BATTLE], to: PHASE.VICTORY, token: 'battleId', effect: 'finishBattle',
@@ -36,5 +40,5 @@ export function getTransition(session, event, token) {
 // Save validation uses the same phase vocabulary as live transitions.
 export function phaseMatchesResult(phase, status) {
   return ({ [PHASE.BATTLE]: ['playing'], [PHASE.VICTORY]: ['won'],
-    [PHASE.DESTRUCTION]: ['won'], [PHASE.DEFEAT]: ['lost', 'draw'] })[phase]?.includes(status) ?? false;
+    [PHASE.DESTRUCTION]: ['won'], [PHASE.ORBITAL]: ['won'], [PHASE.DEFEAT]: ['lost', 'draw'] })[phase]?.includes(status) ?? false;
 }

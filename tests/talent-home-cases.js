@@ -28,19 +28,19 @@ export function registerTalentHomeTests(test, assert, near) {
   test('Civilization home: node ranks/costs and SVG line state match prerequisites; purchase animates once and preserves save ledger', async () => {
     const frame = await mountFixture(serializeSession(challengeSeed(false))), page = frame.contentDocument, el = id => page.getElementById(id);
     try {
-      assert(el('node-formation').dataset.state === 'ready' && el('cost-formation').textContent === '1 ✧');
+      assert(el('node-formation').dataset.state === 'ready' && el('cost-formation').textContent === '2 ✧');
       assert(el('level-conservation').textContent === '●○○○○○○○' && el('node-continuity').dataset.state === 'prerequisite');
       assert(el('link-conservation').dataset.state === 'owned' && el('link-evolution').dataset.state === 'locked');
       el('node-formation').click(); assert(!el('talent-details').hidden && el('talent-formation').textContent.includes('→'));
       assert(el('current-formation').textContent === '单一兵种' && el('next-formation').textContent.includes('比例'));
       el('buy-formation').click(); el('buy-formation').click();
-      assert(el('legacy').textContent === '4' && el('level-formation').textContent === '●');
+      assert(el('legacy').textContent === '3' && el('level-formation').textContent === '●');
       assert(el('link-formation').dataset.state === 'owned' && el('link-evolution').dataset.state === 'available');
       const reduced = frame.contentWindow.matchMedia('(prefers-reduced-motion: reduce)').matches;
       if (!reduced) assert(el('flow-formation').getAnimations().length === 1 && el('node-formation').getAnimations().length === 1 && el('legacy').getAnimations().length === 1);
-      assert(el('talent-feedback').textContent.includes('−1 Legacy') && page.activeElement.id === 'close-talent-detail');
+      assert(el('talent-feedback').textContent.includes('−2 Legacy') && page.activeElement.id === 'close-talent-detail');
       const s = parseSession(frame.contentWindow.__storage.getItem(SAVE_KEY));
-      assert(s.permanent.legacy === 4 && s.permanent.talents.formation === 1 && s.run.earnedLegacy === 1);
+      assert(s.permanent.legacy === 3 && s.permanent.talents.formation === 1 && s.run.earnedLegacy === 1);
     } finally { frame.remove(); }
   });
   test('Civilization home: hover, keyboard and touch reveal one floating detail; Escape closes detail before leaving home', async () => {

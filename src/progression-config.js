@@ -9,7 +9,16 @@ export const UPGRADES = Object.freeze({
   production: Object.freeze({ name: '生产档案', base: 1.5, description: '被动金币收入', requires: { spark: 1 } }),
   warfare: Object.freeze({ name: '战争档案', base: 1.25, description: '战斗经验', requires: { spark: 1 } }),
 });
-export const UPGRADE_COSTS = Object.freeze([1, 2, 4, 8, 16]);
+// A doubled base reward reaches exactly the next price tier. The archive and
+// side branches use the same tiers as the unit-era spine.
+export const tierCosts = (tier, ranks = 1) => Object.freeze(Array.from({ length: ranks }, (_, rank) => 2 ** (tier + rank)));
+export const UPGRADE_COSTS = tierCosts(1, 5);
+export const TALENT_PRICES = Object.freeze({
+  spark: tierCosts(0), logistics: tierCosts(1), formation: tierCosts(1),
+  evolution: tierCosts(2), defense: tierCosts(2, 2), elite: tierCosts(7),
+  supply: tierCosts(2, 3), salvage: tierCosts(3, 3), challenge: tierCosts(2),
+  timeAcceleration: tierCosts(4), superSoldierPlan: tierCosts(6), superRanged: tierCosts(7), bypasser: tierCosts(20),
+});
 export const AUTOMATION_INTERVAL = 0.25;
 export const VICTORY_SUPPLIES = Object.freeze({ goldShare: 0.75, experienceShare: 0.5 });
 // A reserve for the next conflict, never a forced evolution or Legacy award.
@@ -27,7 +36,7 @@ export function getChallengeModifiers(level = 0) {
   return Object.fromEntries(Object.entries(CHALLENGE).filter(([key]) => key !== 'maxLevel')
     .map(([key, base]) => [key, Q.pow(base, level)]));
 }
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 export const SAVE_INTERVAL = 10;
 export function getBonuses(levels) {
   return { income: Q.pow(UPGRADES.production.base, levels.production), experience: Q.pow(UPGRADES.warfare.base, levels.warfare) };
@@ -35,7 +44,7 @@ export function getBonuses(levels) {
 
 export const AUTOMATION_MILESTONE = 2;
 export const TALENT_LAYER_REQUIREMENT = 1;
-export const UNIT_TALENT_COSTS = Object.freeze([1, 2, 4, 6, 10]);
+export const UNIT_TALENT_COSTS = tierCosts(1, 5);
 export const SPEEDS = Object.freeze([1, 2, 3]);
 const EMBERS = Object.freeze(['初生之地', '纷争余烬', '铁旗时代', '烽火大陆', '裂土之争', '燃烧边境', '钢铁洪流', '长夜战线', '失序世界', '终焉回声', '最后壁垒']);
 export function challengeName(level = 0) { return EMBERS[level] ?? '未知余烬'; }
@@ -44,6 +53,6 @@ export function availableSpeeds(permanent) { return SPEEDS.slice(0, permanent.ta
 
 // Surface economy tuning: each rank doubles both its price and its effect.
 export const LEGACY_ECONOMY = Object.freeze({ rules: 10, rewardRanks: 8,
-  conservationCost: 2, continuityCost: 6, producerCost: 8,
-  capacityRanks: 8, efficiencyRanks: 6, upgradeCost: 8, productionSeconds: 60 });
+  conservationCost: 2, continuityCost: 512, producerCost: 8,
+  capacityRanks: 8, efficiencyRanks: 6, capacityCost: 16, efficiencyCost: 32, productionSeconds: 60 });
 export const doublingCosts = (first, ranks) => Object.freeze(Array.from({ length: ranks }, (_, rank) => first * 2 ** rank));

@@ -1,4 +1,5 @@
 import { buyUnitPath, buyAllTalents } from './trait-cases.js';
+import { HISTORICAL_TALENTS } from '../src/save-history.js';
 import { canonical } from './legacy-fixtures.js';
 import { statMultiplier, v5Record } from './legacy-fixtures.js';
 import { AGES, UNITS, TURRETS, RULES, createGame, evolve, getIncomeRate, getBountyReward, recruit } from '../src/game.js';
@@ -6,7 +7,7 @@ import { createProgression, resolveBattle, rebuildCivilization, continueCiviliza
 import { TALENTS, TALENT_TREE, layerTalents, purchaseTalent, getTalentState, getLegacyReward, getTalentSpending } from '../src/talents.js';
 import { configureAutomation, getAutomationPlan, updateAutomation } from '../src/automation.js';
 import { parseSession, serializeSession, createSaveStore, SAVE_KEY, BACKUP_KEY } from '../src/save.js';
-import { SAVE_VERSION } from '../src/progression-config.js';
+import { SAVE_VERSION, UPGRADE_COSTS } from '../src/progression-config.js';
 import { mountFixture } from './progression-cases.js';
 
 function finish(session, age = 5, status = 'won') {
@@ -17,12 +18,13 @@ function finish(session, age = 5, status = 'won') {
   session.game.bases.player.hp = status === 'lost' || status === 'draw' ? 0 : session.game.bases.player.maxHp;
   resolveBattle(session);
 }
-function funded(cycles = 40) {
+function funded(cycles = 1000) {
   const session = createProgression();
-  for (let i = 0; i < cycles; i++) {
+  for (let i = 0; i < Math.min(cycles, 100); i++) {
     if (i) rebuildCivilization(session, session.run.runId);
     finish(session);
   }
+  if (cycles > 100) { session.permanent.completedCycles = session.permanent.totalLegacy = session.permanent.legacy = cycles; }
   return session;
 }
 function start(session) { rebuildCivilization(session, session.run.runId); session.game.ai.enabled = false; return session; }
@@ -37,7 +39,7 @@ function v1(session, settings = {}) {
 }
 
 function stripChallenge(old) {
-  old.permanent.legacy += old.permanent.talents.challenge * TALENTS.challenge.costs[0];
+  old.permanent.legacy += old.permanent.talents.challenge * HISTORICAL_TALENTS[5].challenge.costs[0];
   delete old.permanent.talents.challenge; delete old.run.talents.challenge;
   delete old.run.challengeLevel; delete old.game.enemyModifiers;
 }
@@ -79,18 +81,18 @@ export function registerTalentTests(test, assert, near) {
     assert(!s.permanent.automation.enabled && s.permanent.automation.mode === 'single');
     assert(!configureAutomation(s, { mode: 'balanced' }) && !configureAutomation(s, { reserve: 1 }) && !configureAutomation(s, { queueLimit: 1 }) && !configureAutomation(s, { recruitEnabled: false }));
     assert(!configureAutomation(s, { enabled: true, target: 'heavy' }));
-    start(s); finish(s); assert(configureAutomation(s, { enabled: true, target: 'heavy' })); assert(purchaseTalent(s, 'formation'));
+    start(s); finish(s); assert(configureAutomation(s, { enabled: true, target: 'heavy' })); assert(!purchaseTalent(s, 'formation')); start(s); finish(s); assert(purchaseTalent(s, 'formation'));
     assert(configureAutomation(s, { mode: 'balanced' }) && !configureAutomation(s, { evolve: true }));
     assert(!s.run.talents.formation); start(s); assert(s.run.talents.formation === 1);
     assert(getTalentState(s, 'defense') === 'during-run');
   });
   test('Talents: all costs and prerequisite paths can be purchased, capped and saved without sharing configuration', () => {
-    const s = funded(6000), original = JSON.stringify({ AGES, UNITS, TURRETS });
+    const s = funded(200000), original = JSON.stringify({ AGES, UNITS, TURRETS });
     assert(purchaseTalent(s, 'spark'));
     for (const key of ['production', 'warfare']) for (let i = 0; i < 5; i++) assert(purchaseUpgrade(s, key));
     buyAllTalents(s);
     for (const key of Object.keys(TALENTS)) assert(!purchaseTalent(s, key));
-    assert(s.permanent.legacy + 62 + getTalentSpending(s.permanent.talents) === s.permanent.totalLegacy);
+    assert(s.permanent.legacy + 2 * UPGRADE_COSTS.reduce((a,b)=>a+b,0) + getTalentSpending(s.permanent.talents) === s.permanent.totalLegacy);
     assert(!purchaseTalent(s, 'constructor'));
     start(s); const restored = parseSession(serializeSession(s));
     near(restored.game.gold.player, 180 + 450); near(getIncomeRate(restored.game, 'enemy'), 7);
@@ -99,7 +101,7 @@ export function registerTalentTests(test, assert, near) {
     assert(JSON.stringify({ AGES, UNITS, TURRETS }) === original);
   });
   test('Talents: starting resources apply once per rebuild, not per conflict, purchase or reload', () => {
-    const s = funded(4); purchaseTalent(s, 'spark'); purchaseUpgrade(s, 'production'); purchaseTalent(s, 'supply');
+    const s = funded(20); purchaseTalent(s, 'spark'); purchaseUpgrade(s, 'production'); purchaseTalent(s, 'supply');
     assert(s.game.gold.player === 180); start(s); assert(s.game.gold.player === 330);
     s.game.gold.player = 200; recruit(s.game, 'melee'); finish(s, 1);
     continueCivilization(s, s.run.battleId); assert(s.game.gold.player === 425, 'Refund plus one victory supply grant; no repeat starting resources');
@@ -109,7 +111,7 @@ export function registerTalentTests(test, assert, near) {
   });
   test('Talents: salvage changes only player kill gold with one final rounding; actual casualty payouts use it', () => {
     for (const victim of ['player', 'enemy']) {
-      const s = funded(4); purchaseTalent(s, 'spark'); purchaseUpgrade(s, 'warfare'); purchaseTalent(s, 'salvage'); start(s);
+      const s = funded(20); purchaseTalent(s, 'spark'); purchaseUpgrade(s, 'warfare'); purchaseTalent(s, 'salvage'); start(s);
       const g = s.game, winner = victim === 'player' ? 'enemy' : 'player';
       g.units.push({ id: g.nextUnitId++, type: 'melee', team: victim, x: 640, hp: 0, moving: false, attackCooldown: 0, attackAnimation: 0, hitFlash: 0 });
       const before = g.gold[winner]; updateProgression(s, RULES.fixedStep);
@@ -118,7 +120,7 @@ export function registerTalentTests(test, assert, near) {
     }
   });
   test('Talents: legacy scales from run snapshots, rounds once and settles exactly once across refresh/purchase/rebuild', () => {
-    let s = funded(30); purchaseTalent(s, 'spark'); purchaseTalent(s, 'conservation'); purchaseTalent(s, 'conservation'); purchaseTalent(s, 'continuity');
+    let s = funded(2000); purchaseTalent(s, 'spark'); purchaseTalent(s, 'conservation'); purchaseTalent(s, 'conservation'); purchaseTalent(s, 'continuity');
     assert(s.run.earnedLegacy === 1 && getLegacyReward(s.permanent.talents) === 8);
     const before = s.permanent.totalLegacy; start(s); finish(s);
     assert(s.run.earnedLegacy === 8 && s.permanent.totalLegacy === before + 8);
@@ -130,7 +132,7 @@ export function registerTalentTests(test, assert, near) {
     start(s); finish(s); assert(s.run.earnedLegacy === 16);
   });
   test('Autobuyer: reserve, custom queue limit, army cap and manual override all use normal payment', () => {
-    const s = funded(2); purchaseTalent(s, 'spark'); purchaseTalent(s, 'logistics'); start(s); configureAutomation(s, { enabled: true, target: 'heavy', reserve: 150, queueLimit: 1 });
+    const s = funded(3); purchaseTalent(s, 'spark'); purchaseTalent(s, 'logistics'); start(s); configureAutomation(s, { enabled: true, target: 'heavy', reserve: 150, queueLimit: 1 });
     attempt(s); assert(!s.game.queues.player.length && getAutomationPlan(s).action.state === 'budget');
     s.game.gold.player = 235; attempt(s); assert(s.game.gold.player === 150 && s.game.queues.player[0].paid === 85);
     s.game.gold.player = 10000; attempt(s); assert(s.game.queues.player.length === 1);
@@ -188,7 +190,7 @@ export function registerTalentTests(test, assert, near) {
     assert(s.game.gold.player === 100 && s.game.queues.player.length === 1);
   });
   test('Autobuyer: elite recruitment is unlocked, future-only, fully paid and counts queued soldiers toward its target', () => {
-    const s = funded(80); for (const key of ['spark', 'formation', 'evolution']) purchaseTalent(s, key); buyUnitPath(s); purchaseTalent(s,'elite'); start(s);
+    const s = funded(1000); for (const key of ['spark', 'formation', 'evolution']) purchaseTalent(s, key); buyUnitPath(s); purchaseTalent(s,'elite'); start(s);
     configureAutomation(s, { enabled: true, elite: true, eliteLimit: 2 }); s.game.gold.player = 10000; attempt(s);
     assert(s.game.queues.player[0].type === 'melee'); s.game.queues.player = []; ageTo(s.game, 5);
     s.game.gold.player = 6000; attempt(s); attempt(s);
@@ -204,7 +206,7 @@ export function registerTalentTests(test, assert, near) {
     configureAutomation(s, { enabled: true }); finish(s); const ended = serializeSession(s); attempt(s); assert(serializeSession(s) === ended);
   });
   test('Autobuyer full civilization: purchased talents, normal paid armies and defense reach the finale without manual combat commands', () => {
-    const s = funded(6000);
+    const s = funded(200000);
     assert(purchaseTalent(s, 'spark'));
     for (const key of ['production', 'warfare']) for (let i = 0; i < 5; i++) purchaseUpgrade(s, key);
     buyAllTalents(s);
@@ -217,7 +219,7 @@ export function registerTalentTests(test, assert, near) {
       updateProgression(s, RULES.fixedStep);
       if (i % 600 === 0) parseSession(serializeSession(s));
     }
-    assert(s.run.phase === 'destruction' && s.run.earnedLegacy === 65536 && s.permanent.completedCycles === 6001);
+    assert(s.run.phase === 'destruction' && s.run.earnedLegacy === 65536 && s.permanent.completedCycles === 200001);
   });
   test('Save v4: valid v1 battle, victory, settlement and rebuilt progress migrate without awards, resource grants or setting loss', () => {
     for (const phase of ['battle', 'victory', 'destruction', 'rebuilt']) {
@@ -250,12 +252,12 @@ export function registerTalentTests(test, assert, near) {
     assert(JSON.parse(entries.get(SAVE_KEY)).version === SAVE_VERSION);
   });
   test.browser('Talents browser: purchase prerequisites, configure spark, rebuild, reload and fit the full tree on a phone', async () => {
-    let frame = await mountFixture(serializeSession(funded(30)));
+    let frame = await mountFixture(serializeSession(funded(1000)));
     const page = () => frame.contentDocument, el = id => page().getElementById(id);
     el('archives').click(); assert(el('archives-dialog').open && !el('talents-panel').hidden);
     assert(el('buy-evolution').disabled); el('buy-spark').click(); el('node-logistics').click(); el('buy-logistics').click();
     el('node-formation').click(); el('buy-formation').click(); el('buy-formation').click();
-    assert(el('legacy').textContent === '27' && !el('buy-evolution').disabled);
+    assert(el('legacy').textContent === '995' && !el('buy-evolution').disabled);
     el('node-evolution').click(); el('buy-evolution').click(); el('node-defense').click(); el('buy-defense').click();
     el('node-conservation').click(); el('buy-conservation').click();
     assert(el('talent-legacy-preview').textContent.includes('本轮终局 +1 · 常规重建终局 +2'));
@@ -292,7 +294,7 @@ export function registerTalentTests(test, assert, near) {
   });
   test('Save v4: v2 saves retain former free features, purchased paths, exact wallets and active settings across every phase', () => {
     for (const phase of ['fresh', 'first-settlement', 'battle', 'victory', 'destruction', 'defeat']) {
-      const s = phase === 'fresh' ? createProgression() : funded(phase === 'first-settlement' ? 1 : 80);
+      const s = phase === 'fresh' ? createProgression() : funded(phase === 'first-settlement' ? 1 : 1000);
       if (!['fresh', 'first-settlement'].includes(phase)) {
         for (const key of ['spark', 'logistics', 'formation', 'evolution', 'defense', 'defense']) assert(purchaseTalent(s, key)); buyUnitPath(s); assert(purchaseTalent(s,'elite'));
         assert(configureAutomation(s, { enabled: true, mode: 'balanced', weights: [1, 2, 3], reserve: 100, queueLimit: 2,
@@ -399,7 +401,7 @@ export function registerTalentTests(test, assert, near) {
   });
 
   test('Single root: all three routes require the one-Legacy Autobuyer root and every node has one path back to it', () => {
-    const s = funded(30);
+    const s = funded(1000);
     assert(Object.keys(TALENT_TREE).filter(key => !Object.keys(TALENT_TREE[key].requires).length && !TALENT_TREE[key].requiresLayer).join(',') === 'spark');
     for (const key of Object.keys(TALENT_TREE)) {
       const visited = new Set(); let current = key;

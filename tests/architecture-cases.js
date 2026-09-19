@@ -1,3 +1,4 @@
+import { launchReady } from './orbital-cases.js';
 import { Q } from '../src/quantity.js';
 import { buildViewModel } from '../src/view-model.js';
 import { buildCivilizationViewModel } from '../src/civilization-view-model.js';
@@ -10,7 +11,7 @@ import { purchaseTalent } from '../src/talents.js';
 import { createGame, recruit, evolve, getIncomeRate, AGES } from '../src/game.js';
 import { serializeSession, parseSession, createSaveStore, SAVE_KEY, BACKUP_KEY } from '../src/save.js';
 import { MIGRATIONS } from '../src/save-migrations.js';
-import { cloneRecord, fromSaveRecord, fromV8Record, fromV9Record } from '../src/save-record.js';
+import { cloneRecord, fromSaveRecord, fromV8Record, fromV9Record, fromV10Record } from '../src/save-record.js';
 import { validateRecord } from '../src/save-validation.js';
 import { SAVE_VERSION } from '../src/progression-config.js';
 import { record as capturedV7 } from './fixtures/v7-save.js';
@@ -81,15 +82,16 @@ export function registerArchitectureTests(test, assert) {
         assert(vm[`#buy-${key}@disabled`] && !vm[`#node-${key}@aria-label`].includes('下一级'));
       }
       assert(!JSON.stringify(vm).includes('undefined'));
-      assert(vm['#buy-bypasser'] === '尚未开放');
+      assert(vm['#buy-bypasser'].includes('1.048576e+6'));
     }
   });
   test('State machine: every phase/event pair has an explicit transition and all stale tokens are rejected', () => {
-    const expected = { battle: ['abandon'], victory: ['continue', 'abandon'], destruction: ['rebuild'], defeat: ['rebuild'] };
+    const expected = { battle: ['abandon'], victory: ['continue', 'abandon'], destruction: ['rebuild'], defeat: ['rebuild'], orbital: [] };
     for (const phase of Object.values(PHASE)) {
-      const s = createProgression();
-      if (phase !== PHASE.BATTLE) finish(s, phase === PHASE.VICTORY ? 1 : 5, phase === PHASE.DEFEAT ? 'lost' : 'won');
-      for (const event of ['resolve', 'continue', 'rebuild', 'challenge', 'abandon', 'unknown']) {
+      const s = phase === PHASE.ORBITAL ? launchReady() : createProgression();
+      if (phase === PHASE.ORBITAL) purchaseTalent(s, 'bypasser');
+      else if (phase !== PHASE.BATTLE) finish(s, phase === PHASE.VICTORY ? 1 : 5, phase === PHASE.DEFEAT ? 'lost' : 'won');
+      for (const event of ['resolve', 'continue', 'rebuild', 'challenge', 'abandon', 'launch', 'unknown']) {
         const token = ['resolve', 'continue'].includes(event) ? s.run.battleId : s.run.runId;
         assert(Boolean(getTransition(s, event, token)) === expected[phase].includes(event), `${phase}/${event}`);
         const before = serializeSession(s);
@@ -124,7 +126,7 @@ export function registerArchitectureTests(test, assert) {
     delete old.run.talents; delete old.run.challengeLevel; delete old.run.autoTurn;
     delete old.game.modifiers.bounty; delete old.game.enemyModifiers;
     for (let version = 1; version < SAVE_VERSION; version++) {
-      validateRecord(version === 8 ? fromV8Record(old) : version === 9 ? fromV9Record(old) : old, version);
+      validateRecord(version === 8 ? fromV8Record(old) : version === 9 ? fromV9Record(old) : version === 10 ? fromV10Record(old) : old, version);
       const source = freeze(old), before = json(source), next = MIGRATIONS[version](source);
       assert(next.version === version + 1 && next !== source && next.game !== source.game);
       assert(json(MIGRATIONS[version](source)) === json(next));

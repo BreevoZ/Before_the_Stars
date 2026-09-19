@@ -153,3 +153,21 @@
 .era-gate[data-state="locked"] { opacity: .5; }
 .talent-node[data-state="planned"] { opacity: .4; }
 :root { --route-units: var(--route-root); }
+
+.orbital-presentation { position: absolute; inset: 0; z-index: 10; display: grid; place-items: center; text-align: center; padding: 24px; }
+.orbital-presentation[hidden] { display: none; }
+#orbital-sky { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; opacity: var(--scene-opacity, 1); }
+#skip-orbital { position: absolute; right: max(24px, env(safe-area-inset-right)); top: max(24px, env(safe-area-inset-top)); min-height: 44px; color: var(--color-home-text); }
+#orbital-departure { position: absolute; top: 32%; letter-spacing: 5px; font-size: clamp(13px, 2vw, 19px); color: var(--color-home-text); opacity: var(--scene-opacity, 0); }
+#orbital-arrival { opacity: var(--arrival-opacity, 1); max-width: 560px; }
+.orbital-eyebrow { letter-spacing: 4px; font-size: 9px; color: var(--route-units); }
+#orbital-title { font: 300 clamp(64px, 12vw, 116px)/1.2 Georgia, serif; color: var(--color-home-text); margin: 24px 0; outline: none; }
+#orbital-title span { display: block; margin-top: 14px; font: 400 clamp(21px, 4vw, 32px)/1.5 sans-serif; letter-spacing: 10px; padding-left: 10px; }
+#orbital-arrival > p:not(.orbital-eyebrow) { font-size: 13px; letter-spacing: 3px; color: var(--color-home-home-wallet-small-text); }
+#orbital-actions { margin-top: 42px; }
+.orbital-note { font-size: 10px; line-height: 1.8; color: var(--color-home-home-wallet-small-text); }
+#orbital-actions nav { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px 22px; margin-top: 24px; }
+#orbital-actions button { min-height: 44px; font-size: 12px; }
+#archives-dialog[data-orbital] .talent-feedback { opacity: 0 !important; }
+.debug-legacy { position: absolute; left: 16px; bottom: 110px; z-index: 4; font-size: 10px; min-height: 44px; background: var(--color-home-surface); }
+#orbital-save-warning { position: absolute; bottom: max(16px, env(safe-area-inset-bottom)); left: 20px; right: 20px; margin: 0 auto; max-width: 640px; font-size: 11px; line-height: 1.8; color: var(--route-legacy); }

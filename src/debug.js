@@ -28,7 +28,13 @@ export function createDebugProgression() {
 // Explicit debug commands still use the normal civilization settlement logic.
 // They are unavailable to either production incremental or classic sessions.
 export function runDebugCommand(session, command) {
-  if (session.debug !== true || session.run.phase !== 'battle' || session.game.status !== 'playing') return false;
+  if (session.debug !== true) return false;
+  if (command === 'legacy') {
+    if (!session.permanent.completedCycles || !['destruction', 'defeat'].includes(session.run.phase)) return false;
+    for (const key of ['legacy', 'totalLegacy']) session.permanent[key] = Q.add(session.permanent[key], 2 ** 21);
+    return true;
+  }
+  if (session.run.phase !== 'battle' || session.game.status !== 'playing') return false;
   const game = session.game;
   if (command === 'resources') return supplyDebugRun(session);
   if (!['victory', 'finale', 'defeat'].includes(command)) return false;

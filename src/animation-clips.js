@@ -12,6 +12,7 @@ import { createTraitSampler } from './trait-scenarios.js';
 import { TRAITS } from './traits.js';
 import { TRAIT_DESCRIPTIONS } from './talents.js';
 import { BASE_DESIGNS } from './base-layouts.js';
+import { drawOrbitalScene, ORBITAL_SECONDS } from './orbital-scene.js';
 
 export const CLIP_SECONDS = 8;
 export const CATEGORIES = { all: '全部', unit: '部队', turret: '炮塔', combat: '弹道与命中', trait: '兵种特性', ability: '大招与地面', scene: '基地与环境' };
@@ -34,6 +35,7 @@ export const ANIMATION_CLIPS = [
   ...Object.entries(AGES).map(([age, stats]) => ({ id: `base-${age}`, category: 'scene', kind: 'base', age: +age, name: `${stats.shortName}基地 · ${BASE_DESIGNS[age].name}`, note: `${BASE_DESIGNS[age].description} 预览扩容、受损与废墟。` })),
   { id: 'day-night', category: 'scene', kind: 'sky', name: '昼夜更替', note: '将完整的 120 秒昼夜压缩到 8 秒预览' },
   { id: 'stars', category: 'scene', kind: 'stars', name: '星空闪烁', note: '夜间原速 · 每颗星拥有独立的闪烁节奏' },
+  { id: 'orbital-launch', category: 'scene', kind: 'orbital', name: 'VI · 轨道启航', note: '36 艘火箭从废墟升空，镜头进入星空 · 24 秒演出压缩到 8 秒，可拖动预览' },
 ];
 
 function soldier(id, type, team, x) {
@@ -141,6 +143,9 @@ export function createClipPainter(canvas, clip) {
     if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = '#1d2d24'; ctx.fillRect(0, 0, width, height);
+    if (clip.kind === 'orbital') {
+      ctx.scale(ratio, ratio); drawOrbitalScene(ctx, bounds.width, bounds.height, time / CLIP_SECONDS * ORBITAL_SECONDS, { reducedMotion }); return;
+    }
     if (clip.kind === 'sky' || clip.kind === 'stars') {
       const scale = width / RULES.width, h = height / scale;
       ctx.scale(scale, scale); drawLandscape(ctx, h, h * 0.78, clip.kind === 'sky' ? time * 15 : 83 + time); return;

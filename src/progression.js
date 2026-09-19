@@ -1,9 +1,10 @@
 import { createLegacyMachine, updateLegacyMachine } from './legacy-machine.js';
 import { Q } from './quantity.js';
+import { payLegacy } from './legacy-ledger.js';
 import { createGame, updateGame } from './game.js';
 import { updateAutomation, createAutomation, configureAutomation } from './automation.js';
 import { UPGRADES, UPGRADE_COSTS, SAVE_VERSION, automationUnlocked, availableSpeeds, getVictorySupplies, LEGACY_ECONOMY } from './progression-config.js';
-import { emptyTalents, talentLevel } from './talents.js';
+import { emptyTalents, talentLevel, TALENTS, getTalentState } from './talents.js';
 import { getRunBonuses } from './progression-bonuses.js';
 import { createBonusStack, stat } from './stats.js';
 import { PHASE, getTransition, getNextChallengeLevel, isBetweenRuns } from './progression-machine.js';
@@ -36,7 +37,7 @@ function startRun(session, challengeLevel = 0, extraBonuses = []) {
 
 export function createProgression() {
   const session = { version: SAVE_VERSION, permanent: { completedCycles: 0, legacy: 0, totalLegacy: 0,
-    legacyMachine: createLegacyMachine(), upgrades: { production: 0, warfare: 0 }, talents: emptyTalents(), talentGrants: [], settings: { speed: 1 }, automationRetained: false, automation: createAutomation() } };
+    purchaseCosts: {}, legacyMachine: createLegacyMachine(), upgrades: { production: 0, warfare: 0 }, talents: emptyTalents(), talentGrants: [], settings: { speed: 1 }, automationRetained: false, automation: createAutomation() } };
   startRun(session);
   return session;
 }
@@ -100,6 +101,10 @@ const effects = {
   rebuild: session => startRun(session),
   challenge: session => startRun(session, getNextChallengeLevel(session)),
   abandon: session => startRun(session, session.run.challengeLevel, session.run.extraBonuses ?? []),
+  launch({ permanent }) {
+    payLegacy(permanent, 'bypasser', TALENTS.bypasser.costs[0]);
+    permanent.talents.bypasser = 1;
+  },
 };
 
 export const continueCivilization = (session, battleId) => transitionCivilization(session, 'continue', battleId);
@@ -107,6 +112,14 @@ export const rebuildCivilization = (session, runId) => transitionCivilization(se
 export const startChallenge = (session, runId) => transitionCivilization(session, 'challenge', runId);
 // The controller confirms abandonment before dispatching this event.
 export const abandonCivilization = (session, runId) => transitionCivilization(session, 'abandon', runId);
+
+export function purchaseTalent(session, key) {
+  if (getTalentState(session, key) !== 'ready') return false;
+  if (key === 'bypasser') return transitionCivilization(session, 'launch', session.run.runId);
+  payLegacy(session.permanent, key, TALENTS[key].costs[session.permanent.talents[key]]);
+  session.permanent.talents[key]++;
+  return true;
+}
 
 export function getUpgradeState(session, key) {
   if (!Object.hasOwn(UPGRADES, key)) return 'invalid';
@@ -120,7 +133,7 @@ export function getUpgradeState(session, key) {
 
 export function purchaseUpgrade(session, key) {
   if (getUpgradeState(session, key) !== 'ready') return false;
-  session.permanent.legacy = Q.sub(session.permanent.legacy, UPGRADE_COSTS[session.permanent.upgrades[key]]);
+  payLegacy(session.permanent, key, UPGRADE_COSTS[session.permanent.upgrades[key]]);
   session.permanent.upgrades[key]++;
   return true;
 }

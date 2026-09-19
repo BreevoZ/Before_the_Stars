@@ -20,7 +20,7 @@ import { simulateRun } from '../sim/simulate.js';
 export const UNIT_PATH = ['openingStone','shieldWall','parry','grenade','blink'];
 export function buyUnitPath(s) { for (const key of [...UNIT_PATH, 'superSoldierPlan']) if (!s.permanent.talents[key] && !purchaseTalent(s,key)) throw Error(`Cannot buy ${key}`); }
 export function buyAllTalents(s) {
-  const pending = new Set(Object.keys(TALENTS).filter(key=>!TALENTS[key].placeholder));
+  const pending = new Set(Object.keys(TALENTS).filter(key=>key!=='bypasser' && !TALENTS[key].placeholder));
   for(let pass=0;pass<20 && pending.size;pass++) for(const key of pending) {
     if(getTalentState(s,key)==='max') pending.delete(key);
     else if(purchaseTalent(s,key) && getTalentState(s,key)==='max') pending.delete(key);
@@ -36,7 +36,7 @@ function fixture(id, distance=30) {
 }
 const ticks=(g,n)=>{for(let i=0;i<n;i++)updateGame(g,RULES.fixedStep);};
 function finish(s) { s.game.experience.enemy=AGES[5].experienceRequired;while(s.game.ages.enemy<5)evolve(s.game,'enemy');s.game.bases.enemy.hp=0;s.game.status='won';resolveBattle(s); }
-function fund(count=100) { const s=createProgression(); for(let i=0;i<count;i++){if(i)rebuildCivilization(s,s.run.runId);finish(s);}return s; }
+function fund(count=1000) { const s=createProgression(); for(let i=0;i<Math.min(count,100);i++){if(i)rebuildCivilization(s,s.run.runId);finish(s);}if(count>100){s.permanent.completedCycles=s.permanent.totalLegacy=s.permanent.legacy=count;}return s; }
 function sniperFixture() {
  const g=createGame({mode:'incremental',ages:{player:5,enemy:5},bonuses:getSuperSoldierBonuses(true)});g.ai.enabled=false;
  const player=soldier(g,'superSoldier','player',400),enemy=soldier(g,'warMachine','enemy',850,10000);
@@ -52,12 +52,12 @@ export function registerTraitTests(test,assert,near) {
   assert(cycleGameSpeed(s)&&s.permanent.settings.speed===1&&RULES.fixedStep===1/60);
   s.debug=true;s.debugSpeed=10;assert(!cycleGameSpeed(s)&&s.debugSpeed===10);
  });
- test('V9: age gates use any one previous unit talent, max speed is 3 and bypasser cannot spend currency',()=>{
+ test('V9: age gates use any one previous unit talent, max speed is 3 and bypasser stays unaffordable before the late economy',()=>{
   const s=fund();assert(purchaseTalent(s,'spark'));assert(getTalentState(s,'shieldWall')==='prerequisite');
   assert(purchaseTalent(s,'ricochet')&&purchaseTalent(s,'fireArrow')&&purchaseTalent(s,'volley'));
   assert(purchaseTalent(s,'timeAcceleration'));assert(availableSpeeds(s.permanent).join(',')==='1,2,3'&&setGameSpeed(s,3));
   assert(getTalentState(s,'superSoldierPlan')==='prerequisite');assert(purchaseTalent(s,'coaxial')&&purchaseTalent(s,'overload')&&purchaseTalent(s,'superSoldierPlan'));
-  const before=s.permanent.legacy;assert(!purchaseTalent(s,'bypasser')&&s.permanent.legacy===before&&getTalentState(s,'bypasser')==='planned');
+  const before=s.permanent.legacy;assert(!purchaseTalent(s,'bypasser')&&s.permanent.legacy===before&&getTalentState(s,'bypasser')==='legacy');
   rebuildCivilization(s,s.run.runId);finish(s);assert(s.run.phase==='destruction');parseSession(serializeSession(s));
  });
  test('V9: paid and free v8 roots migrate by ledger, retaining automation without duplicate grants or reward',()=>{
@@ -91,7 +91,7 @@ export function registerTraitTests(test,assert,near) {
   }
  });
  test('Traits: opener snapshots damage, only launches once and cannot replay after a v9 save',()=>{
-  const s=fund(2);purchaseTalent(s,'spark');purchaseTalent(s,'openingStone');rebuildCivilization(s,s.run.runId);
+  const s=fund(3);purchaseTalent(s,'spark');purchaseTalent(s,'openingStone');rebuildCivilization(s,s.run.runId);
   const g=s.game;g.ai.enabled=false;g.units=[soldier(g,'melee','player',500),soldier(g,'melee','enemy',630)];g.units[1].attackCooldown=100;
   ticks(g,1);const shot=g.projectiles[0];near(shot.damage,UNITS.melee.damage*.45);assert(g.units[0].traits.openingStone.used);
   const resumed=parseSession(serializeSession(s));ticks(resumed.game,120);assert(resumed.game.traitActivations.openingStone===1);
@@ -195,7 +195,7 @@ export function registerTraitTests(test,assert,near) {
  });
 
  test('Traits: every active trait state, launch snapshot and field validates and round-trips in v9',()=>{
-  const template=fund(6000);purchaseTalent(template,'spark');purchaseUpgrade(template,'production');purchaseUpgrade(template,'warfare');buyAllTalents(template);rebuildCivilization(template,template.run.runId);
+  const template=fund(200000);purchaseTalent(template,'spark');purchaseUpgrade(template,'production');purchaseUpgrade(template,'warfare');buyAllTalents(template);rebuildCivilization(template,template.run.runId);
   for(const trait of Object.values(TRAITS)) for(const time of [.4,3.5,6.8]) {
    const s=parseSession(serializeSession(template));
    s.run.extraBonuses=[{target:{stat:'health',kind:'unit',team:'enemy'},type:'override',value:1e8,source:{kind:'challenge',id:'durable-targets',label:'固定检验目标'}}];

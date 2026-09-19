@@ -26,6 +26,13 @@ export function mapSessionQuantities(session, convert) {
     if (STAT_DEFINITIONS[effect.target?.stat]?.quantity && (effect.target.stat !== 'legacy' || session.version >= 10)) field(effect, 'value');
   }
   field(p.automation, 'reserve');
+  if (session.version >= 11) {
+    check(object(p.purchaseCosts), '缺少购买账本');
+    for (const costs of Object.values(p.purchaseCosts)) {
+      check(Array.isArray(costs), '购买账本格式');
+      for (let rank = 0; rank < costs.length; rank++) field(costs, rank);
+    }
+  }
   if (session.version >= 10) {
     field(p, 'totalLegacy'); if (p.legacy !== undefined) field(p, 'legacy');
     field(run, 'earnedLegacy');

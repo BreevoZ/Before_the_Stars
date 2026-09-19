@@ -23,8 +23,9 @@ export function buildCivilizationViewModel(session, { debug = false } = {}) {
   put('body@data-civilization-phase', run.phase);
   if (debug) {
     put('#debug-speed@value', String(session.debugSpeed));
-    put('[data-debug-command]@disabled', run.phase !== 'battle');
+    put('[data-debug-command]:not([data-debug-command="legacy"])@disabled', run.phase !== 'battle');
   }
+  text('debug-legacy', !debug || !p.completedCycles || !between, 'hidden');
   text('game-speed', debug || availableSpeeds(p).length === 1, 'hidden');
   text('game-speed', `${p.settings.speed}×`);
   text('game-speed', `游戏速度 ${p.settings.speed} 倍；R 切换，最高 ${availableSpeeds(p).at(-1)} 倍`, 'aria-label');
@@ -67,6 +68,15 @@ export function buildCivilizationViewModel(session, { debug = false } = {}) {
     text('result-hint', false, 'hidden');
     const supplies = getVictorySupplies(game);
     text('result-hint', run.phase === 'destruction' ? (p.completedCycles === 1 ? '第一份文明遗产 · 解锁你的第一个天赋' : '重建清空本轮资源与战场 · 保留遗产、天赋与自动购买设置') : run.phase === 'victory' ? `继续时获得战役补给：+${Q.format(supplies.gold)} 金币、+${Q.format(supplies.experience)} 经验 · 未完成订单退款 · 基地满血` : '从原始时代重新尝试');
+  }
+  text('return-orbit', run.phase !== 'orbital', 'hidden');
+  if (run.phase === 'orbital') {
+    text('home-heading', '地表的星火，已经抵达轨道。');
+    text('cycle-outcome', 'Great Filter Bypasser 已建成。地表天赋、遗产与通关记录均已保留。');
+    text('result-title', 'VI · 轨道文明');
+    text('result-detail', '人类已越过大过滤器。轨道建设将在后续版本开放。');
+    text('play-again', '返回轨道');
+    text('result-hint', '启航已保存 · 可回望地表星图或重播演出');
   }
   return view;
 }

@@ -1,6 +1,6 @@
 import { serializeSession, parseSession } from '../src/save.js';
 import { getBonuses, getChallengeModifiers, UPGRADE_COSTS } from '../src/progression-config.js';
-import { HISTORICAL_TALENTS } from '../src/save-history.js';
+import { HISTORICAL_TALENTS, HISTORICAL_UPGRADE_COSTS } from '../src/save-history.js';
 import { getTalentBonuses } from '../src/talents.js';
 
 export const statMultiplier = (game, key, team = 'player') => (game.bonuses ?? [])
@@ -17,8 +17,8 @@ export function v5Record(session) {
   }
   old.permanent.talentGrants = old.permanent.talentGrants.map(key => key === 'spark' ? 'autobuyer' : key);
   old.permanent.automation.unlocked = old.permanent.talents.autobuyer > 0;
-  old.permanent.legacy = old.permanent.totalLegacy - Object.values(old.permanent.upgrades).reduce((sum,level)=>sum+UPGRADE_COSTS.slice(0,level).reduce((a,b)=>a+b,0),0) - Object.entries(HISTORICAL_TALENTS[5]).reduce((sum,[key,c])=>sum+(old.permanent.talentGrants.includes(key)?0:c.costs.slice(0,old.permanent.talents[key]).reduce((a,b)=>a+b,0)),0);
-  delete old.permanent.settings; delete old.permanent.automationRetained; delete old.permanent.legacyMachine; delete old.run.legacyRules;
+  old.permanent.legacy = old.permanent.totalLegacy - Object.values(old.permanent.upgrades).reduce((sum,level)=>sum+HISTORICAL_UPGRADE_COSTS.slice(0,level).reduce((a,b)=>a+b,0),0) - Object.entries(HISTORICAL_TALENTS[5]).reduce((sum,[key,c])=>sum+(old.permanent.talentGrants.includes(key)?0:c.costs.slice(0,old.permanent.talents[key]).reduce((a,b)=>a+b,0)),0);
+  delete old.permanent.purchaseCosts; delete old.permanent.settings; delete old.permanent.automationRetained; delete old.permanent.legacyMachine; delete old.run.legacyRules;
 
   game.modifiers = { ...getBonuses(old.run.upgrades), bounty: getTalentBonuses(old.run.talents).bounty };
   game.enemyModifiers = getChallengeModifiers(old.run.challengeLevel);

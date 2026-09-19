@@ -7,7 +7,7 @@ import { simulateRun } from '../sim/simulate.js';
 import { Q } from '../src/quantity.js';
 import { createGame, evolve, AGES, recruit, RULES } from '../src/game.js';
 import { createProgression, resolveBattle, continueCivilization, rebuildCivilization, updateProgression, abandonCivilization } from '../src/progression.js';
-import { getVictorySupplies } from '../src/progression-config.js';
+import { getVictorySupplies, SAVE_VERSION } from '../src/progression-config.js';
 import { buildViewModel } from '../src/view-model.js';
 import { buildCivilizationViewModel } from '../src/civilization-view-model.js';
 import { serializeSession, parseSession } from '../src/save.js';
@@ -22,7 +22,7 @@ function finish(s,age=5) {
 }
 function productionSession() {
   const s=createProgression();finish(s);
-  s.permanent.completedCycles=s.permanent.totalLegacy=s.permanent.legacy=10000;s.permanent.automation.unlocked=true;
+  s.permanent.completedCycles=s.permanent.totalLegacy=s.permanent.legacy=200000;s.permanent.automation.unlocked=true;
   for(const key of ['spark','conservation','conservation','openingStone','shieldWall','parry','legacyMachine']) {
     if(!purchaseTalent(s,key))throw Error(`Missing production prerequisite: ${key}`);
   }
@@ -55,7 +55,7 @@ export function registerEconomyTests(test,assert,near) {
     s.game.ages.enemy=5;assert(getVictorySupplies(s.game).gold===0);
   });
   test.browser('Roster browser: future super soldier stays hidden and keyboard 4 cannot recruit before the plan',async()=>{
-    const s=createProgression();s.game.ai.enabled=false;s.game.gold.player=10000;ageTo(s.game,5);
+    const s=createProgression();s.game.ai.enabled=false;s.game.gold.player=200000;ageTo(s.game,5);
     const frame=await mountFixture(serializeSession(s));
     try {
       const doc=frame.contentDocument,card=doc.querySelector('[data-unit-slot="3"]');
@@ -106,7 +106,7 @@ export function registerEconomyTests(test,assert,near) {
   });
   test('Legacy v10: every captured v9 phase retains wallet, old rewards, purchases and battle state until a new run',()=>{
     for(const [phase,old] of Object.entries(v9Records)) {
-      let s=parseSession(JSON.stringify(old));assert(s.version===10&&s.run.phase===phase&&s.run.legacyRules===9);
+      let s=parseSession(JSON.stringify(old));assert(s.version===SAVE_VERSION&&s.run.phase===phase&&s.run.legacyRules===9);
       assert(Q.eq(s.permanent.totalLegacy,old.permanent.totalLegacy)&&Q.eq(s.run.earnedLegacy,old.run.earnedLegacy));
       assert(s.permanent.legacyMachine.progress===0&&s.permanent.legacyMachine.produced===0);
       assert(stat(s.game,{kind:'civilization'},'legacy')===4&&getLegacyReward(s.permanent.talents)===8);

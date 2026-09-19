@@ -20,6 +20,7 @@ export function normalizeRunOptions(options = {}) {
   const { talents = {}, challengeLevel = 0, automation = {}, maxSeconds = DEFAULT_MAX_SECONDS, completedCycles = 0 } = options;
   if (!record(talents) || Object.keys(talents).some(key => !Object.hasOwn(TALENT_TREE, key))) throw new TypeError('Unknown talent ID');
   const levels = Object.fromEntries(Object.keys(TALENT_TREE).map(key => [key, Object.hasOwn(talents, key) ? talents[key] : 0]));
+  if (levels.bypasser) throw new RangeError('Bypasser completes the surface campaign; orbital combat is not simulated');
   for (const [key, config] of Object.entries(TALENT_TREE)) {
     if (!Number.isInteger(levels[key]) || levels[key] < 0 || levels[key] > config.costs.length) throw new RangeError(`Invalid talent level: ${key}`);
     if (levels[key] && !meetsTalentRequirements(levels, config)) {

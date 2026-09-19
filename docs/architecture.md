@@ -32,13 +32,13 @@ sync({ gold: '180', canEvolve: false });
 
 默认调色板位于 `:root, [data-civilization-layer="surface"]`。未来可在另一主题根上覆盖这些变量，无需改组件选择器。本轮只提供地表配色。Canvas 场景／人物本身仍使用美术模块中的画布配色。
 
-## 存档 v10：输入与必要快照
+## 存档 v11：输入与必要快照
 
 运行时 session 结构保持兼容。持久化记录省去可由输入推导的字段：
 
 | 保存 | 读取时推导 |
 | --- | --- |
-| 累计已获 Legacy、购买等级、历史免费赠予 | 可消费 Legacy = 累计获得 − 已付购买价格 |
+| 累计已获 Legacy、购买等级、逐级实付账本、历史免费赠予 | 可消费 Legacy = 累计获得 − 已付购买价格 |
 | 有效循环次数、旧版自动化保留标记、用户偏好 | automation.unlocked |
 | runId、battleNumber | battleId |
 | 本轮升级／天赋／挑战／额外来源 | mode、完整加成栈 |
@@ -48,7 +48,7 @@ sync({ gold: '180', canEvolve: false });
 
 `settled`、`processedBattleId`、`earnedLegacy` 与永久数据在同一记录内保存；这些是结算凭据，不能当作可丢弃的显示缓存。读档不会执行流程事件，也不会调用创建新局来补发资源。
 
-购买等级是当前不可洗点、固定价格树的购买次数。以后改价、删节点或加入配装时，必须显式迁移已付费用／赠予，不能直接用新价格重算老存档。此处没有加入尚不存在的购买历史、免费洗点或定理货币。
+`purchaseCosts` 逐天赋记录每一级实际支付，免费赠予计 0。v10 → v11 用冻结的 v10 价格建立账本，之后新购买追加现价；余额从累计收入减去真实付款恢复。校验支付数量与等级一致、每笔匹配历史价或当前价，拒绝重复、负值与未知账项。未来改价仍需保留历史价格校验和迁移。
 
 ### 文件职责
 
@@ -60,7 +60,7 @@ sync({ gold: '180', canEvolve: false });
 - `save-history.js`：独立于当前天赋配置的旧购买规则。
 - `save-migrations.js`：每个旧版本一个纯函数，返回新对象；迁移器在每一步前验证旧记录。
 
-v1–v9 有效存档逐版本升级到 v10，原有效记录仍保留为备份。未知版本或损坏存档阻止自动覆盖。新格式不接受冗余的派生字段，防止两份属性互相矛盾；本地存档并不承担服务器反作弊职责。
+v1–v10 有效存档逐版本升级到 v11，原有效记录仍保留为备份。未知版本或损坏存档阻止自动覆盖。新格式不接受冗余的派生字段，防止两份属性互相矛盾；本地存档并不承担服务器反作弊职责。
 
 新增版本时保留已有迁移函数及历史规则，添加下一步纯数据迁移，加入真实旧格式 fixture 和不修改输入的测试。不要让旧迁移通过更新后的 `SAVE_VERSION` 跳过中间版本。
 
@@ -79,6 +79,7 @@ v9 用 `settings.speed` 保存正式倍速偏好，`automationRetained` 保存�
 | rebuild | destruction / defeat | 常规新 run |
 | challenge | destruction / defeat | 已解锁时进入下一难度或重试当前挑战 |
 | abandon | battle / victory | 同难度新 run；控制器先提示放弃 |
+| launch | destruction | 验证计划与余额，扣款、登记 Bypasser，并原子进入 orbital |
 
 resolve / continue 必须匹配 battleId；其余转换必须匹配 runId。错误阶段、未知事件、旧 ID 和已处理结算直接返回 false，不发生效果。继续、重建等原有函数保留为这些事件的兼容包装。状态机不控制战斗中的动画，不依赖动画结束来发奖。
 
@@ -100,3 +101,9 @@ node sim/batch.js --out sim/results/scan.csv
 - `permanent.legacyMachine = { progress, produced }` 保存不足一批的进度（0 ≤ progress < 1）及累计生产所得；实际收入加入同一 `totalLegacy` 账本。
 - `legacy-machine.js` 仅由 `updateProgression` 的有效战斗步调用，产能读取属性栈；不存在独立定时器或离线推进。UI 是纯投影，不发奖励。
 - `legacy`、`legacyProduction` 使用 Quantity；生产周期仍为有界 Number。机器不会增加 `completedCycles` 或改变终局结算凭据。
+
+### VI 入口与表现
+
+`orbital` 保留已结算的地表 run 与奖励凭据，必须与永久 Bypasser 等级、支付账目一致。当前终点不再接受重建或重复 launch。购买控制器先立即保存，再启动 `orbital-ui.js`；其时钟复用页面 RAF，仅改变画面，隐藏页面与存档弹窗时停止。刷新直接呈现抵达状态，不存演出帧，不依赖结束回调提交进度。
+
+`orbital-scene.js` 是可按时间寻址的纯 Canvas 表现，星图背景与动画工坊共用它。36 艘飞船由固定种子生成，镜头位移和尾焰使用演出时间；减少动态效果直接选最终帧。

@@ -4,7 +4,7 @@ import { buildTalentViewModel } from './talent-view-model.js';
 import { UPGRADES, TALENT_LAYER_REQUIREMENT } from './progression-config.js';
 import { purchaseUpgrade } from './progression.js';
 import { TALENT_TREE, purchaseTalent, layerTalents, talentPrerequisiteText } from './talents.js';
-import { drawBase } from './bases.js';
+import { drawOrbitalScene } from './orbital-scene.js';
 
 const el = id => document.getElementById(id);
 const svgNS = 'http://www.w3.org/2000/svg';
@@ -84,7 +84,8 @@ export function createTalentMap(getSession, changed) {
     el(`buy-${key}`).addEventListener('click', () => {
       const s = getSession(), before = s.permanent.legacy;
       if (!(Object.hasOwn(UPGRADES, key) ? purchaseUpgrade : purchaseTalent)(s, key)) return;
-      changed(); sync(); feedback(key, Q.sub(before, s.permanent.legacy));
+      if (key === 'bypasser') { closeDetail(); changed(key); sync(); return; }
+      changed(key); sync(); feedback(key, Q.sub(before, s.permanent.legacy));
       if (el(`buy-${key}`).disabled) el('close-talent-detail').focus({ preventScroll: true });
     });
   }
@@ -184,16 +185,7 @@ export function createTalentMap(getSession, changed) {
     const canvas = el('home-sky'), width = screen.clientWidth, height = screen.clientHeight, ratio = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio);
     const ctx = canvas.getContext('2d'); ctx.scale(ratio, ratio);
-    const wash = ctx.createLinearGradient(0, 0, 0, height); wash.addColorStop(0, '#0c1519'); wash.addColorStop(.7, '#132322'); wash.addColorStop(1, '#192923'); ctx.fillStyle = wash; ctx.fillRect(0, 0, width, height);
-    const light = ctx.createRadialGradient(width * .5, height * .75, 0, width * .5, height * .75, Math.max(width, height) * .55); light.addColorStop(0, '#64745b20'); light.addColorStop(1, '#15202000'); ctx.fillStyle = light; ctx.fillRect(0, 0, width, height);
-    let seed = 57; const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-    for (let i = 0; i < 140; i++) { const x = random() * width, y = random() * height * .88, size = random() * 1.15 + .25; ctx.globalAlpha = random() * .45 + .1; ctx.fillStyle = '#c8d3b9'; ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI * 2); ctx.fill(); }
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = '#0d1919'; ctx.beginPath(); ctx.moveTo(0, height); ctx.lineTo(0, height * .84);
-    for (let x = 0; x <= width + 60; x += 60) ctx.lineTo(x, height * .88 - random() * 35); ctx.lineTo(width, height); ctx.fill();
-    ctx.save(); ctx.translate(0, height - (width < 700 ? 118 : 82)); ctx.globalAlpha = .35;
-    for (const [x, age, scale] of [[.12, 2, 1.2], [.32, 4, 1.1], [.65, 5, 1.6], [.88, 3, 1.2]]) drawBase(ctx, { x: width * x, team: 'player', hp: 0, maxHp: 1 }, age, 0, scale * (width < 700 ? .7 : 1));
-    ctx.restore();
+    drawOrbitalScene(ctx, width, height, 0);
   }
   new ResizeObserver(layout).observe(screen);
   new ResizeObserver(layout).observe(map);

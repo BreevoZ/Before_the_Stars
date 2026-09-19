@@ -285,6 +285,7 @@ byId('mode-link').addEventListener('click', () => civilization?.save());
 byId('debug-link').addEventListener('click', () => civilization?.save());
 
 function frame(timestamp) {
+  civilization?.animate(timestamp);
   if (lastTime !== null && !manualPaused && !document.hidden && !helpDialog.open && !civilization?.paused && game.status === 'playing') {
     accumulator += Math.min((timestamp - lastTime) / 1000, 0.1) * (civilization?.timeScale ?? 1);
     while (accumulator >= RULES.fixedStep && game.status === 'playing') {

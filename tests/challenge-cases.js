@@ -35,12 +35,12 @@ function spawn(game, type, team) {
 function roundtrip(s) { return parseSession(serializeSession(s)); }
 
 export function registerChallengeTests(test, assert, near) {
-  test('Challenge: legacy subtree costs 2, requires conservation, unlocks next run after settlement without retroactive rewards', () => {
+  test('Challenge: legacy subtree costs 4, requires conservation, unlocks next run after settlement without retroactive rewards', () => {
     const s = createProgression(); finish(s);
     assert(!purchaseTalent(s, 'challenge') && !startChallenge(s, s.run.runId));
     const seed = challengeSeed(false), legacy = seed.permanent.legacy, reward = seed.run.earnedLegacy;
     assert(TALENTS.challenge.requires.conservation === 1 && purchaseTalent(seed, 'challenge'));
-    assert(seed.permanent.legacy === legacy - 2 && seed.run.earnedLegacy === reward && !seed.run.talents.challenge);
+    assert(seed.permanent.legacy === legacy - 4 && seed.run.earnedLegacy === reward && !seed.run.talents.challenge);
     assert(!purchaseTalent(seed, 'challenge') && getNextChallengeLevel(seed) === 1);
     const runId = seed.run.runId;
     assert(startChallenge(seed, runId) && !startChallenge(seed, runId));
@@ -91,7 +91,7 @@ export function registerChallengeTests(test, assert, near) {
     }
   });
   test('Challenge: player/archive/classic attributes stay isolated; trained enemies receive health, damage, income and XP boosts', () => {
-    const s = challengeSeed(); purchaseUpgrade(s, 'production'); purchaseUpgrade(s, 'warfare'); startChallenge(s, s.run.runId);
+    const s = challengeSeed(); s.permanent.totalLegacy += 4; s.permanent.legacy += 4; assert(purchaseUpgrade(s, 'production')); assert(purchaseUpgrade(s, 'warfare')); startChallenge(s, s.run.runId);
     const g = s.game; g.ai.enabled = false;
     const enemy = spawn(g, 'melee', 'enemy'), player = spawn(g, 'melee', 'player');
     assert(enemy.hp === Math.round(70 * 1.25) && player.hp === 70 && UNITS.melee.health === 70);
@@ -141,7 +141,7 @@ export function registerChallengeTests(test, assert, near) {
     assert(getLegacyReward(talents) === 8 && getLegacyReward(talents, 2) === 24);
   });
   test('Challenge: an actual paid future army defeats enhanced AI and settles the larger reward', () => {
-    const s = challengeSeed(); s.permanent.talents.superSoldierPlan = 1; s.permanent.talentGrants.push('superSoldierPlan'); startChallenge(s, s.run.runId);
+    const s = challengeSeed(); s.permanent.talents.superSoldierPlan = 1; s.permanent.talentGrants.push('superSoldierPlan'); s.permanent.purchaseCosts.superSoldierPlan = [0]; startChallenge(s, s.run.runId);
     ageTo(s.game, 5, 'player'); ageTo(s.game, 5);
     s.game.gold.player = 12000; s.game.gold.enemy = Math.floor(SURFACE.enemyStartingGold[5] * 1.35);
     for (let i = 0; i < 4; i++) assert(recruit(s.game, 'superSoldier'));
@@ -210,7 +210,7 @@ export function registerChallengeTests(test, assert, near) {
     const saved = () => parseSession(frame.contentWindow.__storage.getItem(DEBUG_SAVE_KEY));
     try {
       assert(el('result-challenge').hidden); el('archives').click(); el('node-challenge').click(); el('buy-challenge').click();
-      assert(!el('archive-challenge').hidden && el('legacy-balance').textContent === '3');
+      assert(!el('archive-challenge').hidden && el('legacy-balance').textContent === '1');
       el('archive-challenge').click(); assert(el('challenge-dialog').open && !el('archives-dialog').open);
       assert(el('challenge-reward').textContent === '+4 Legacy' && el('challenge-power').textContent === '×1.25 / ×1.25');
       const previous = saved();
@@ -218,20 +218,20 @@ export function registerChallengeTests(test, assert, near) {
       frame.contentDocument.body.dispatchEvent(new frame.contentWindow.KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
       assert(saved().run.runId === previous.run.runId && !el('pause-battle').getAttribute('aria-pressed').includes('true'));
       el('begin-challenge').click(); el('begin-challenge').click();
-      let next = saved(); assert(next.run.challengeLevel === 1 && next.permanent.legacy === 3 && !el('challenge-dialog').open);
+      let next = saved(); assert(next.run.challengeLevel === 1 && next.permanent.legacy === 1 && !el('challenge-dialog').open);
       frame.remove(); frame = await mountFixture(serializeSession(next), false, 'debug');
       assert(el('challenge-status').textContent.includes('纷争余烬') && el('challenge-status').textContent.includes('+4'));
       frame.contentDocument.querySelector('[data-debug-command="finale"]').click();
-      next = saved(); assert(next.run.earnedLegacy === 4 && next.permanent.legacy === 7);
+      next = saved(); assert(next.run.earnedLegacy === 4 && next.permanent.legacy === 5);
       frame.remove(); frame = await mountFixture(serializeSession(next), false, 'debug');
-      assert(saved().permanent.legacy === 7); el('result-challenge').click();
+      assert(saved().permanent.legacy === 5); el('result-challenge').click();
       assert(el('challenge-reward').textContent === '+6 Legacy'); el('begin-challenge').click();
       assert(saved().run.challengeLevel === 2);
       frame.contentDocument.querySelector('[data-debug-command="defeat"]').click();
-      assert(el('result-challenge').textContent.includes('重返铁旗时代') && saved().permanent.legacy === 7);
+      assert(el('result-challenge').textContent.includes('重返铁旗时代') && saved().permanent.legacy === 5);
       el('result-challenge').click(); el('begin-challenge').click(); assert(saved().run.challengeLevel === 2);
       frame.contentDocument.querySelector('[data-debug-command="defeat"]').click(); el('play-again').click(); el('play-again').click();
-      next = saved(); assert(next.run.challengeLevel === 0 && next.permanent.legacy === 7 && statMultiplier(next.game, 'health', 'enemy') === 1);
+      next = saved(); assert(next.run.challengeLevel === 0 && next.permanent.legacy === 5 && statMultiplier(next.game, 'health', 'enemy') === 1);
       assert(el('challenge-status').hidden && el('save-warning').hidden);
     } finally { frame.remove(); }
   });

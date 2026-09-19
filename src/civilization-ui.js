@@ -1,4 +1,6 @@
 import { createBindings } from './dom-bindings.js';
+import { Q } from './quantity.js';
+import { createOrbitalUI } from './orbital-ui.js';
 import { buildCivilizationViewModel, buildChallengeViewModel } from './civilization-view-model.js';
 import { createProgression, updateProgression, continueCivilization, rebuildCivilization, abandonCivilization, startChallenge, cycleGameSpeed } from './progression.js';
 import { SAVE_INTERVAL, challengeName } from './progression-config.js';
@@ -32,6 +34,8 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   function report(result, success = '已保存完整文明进度。') {
     text('save-status', result.ok ? success : result.error);
     el('save-warning').hidden = Boolean(result.ok);
+    el('orbital-save-warning').hidden = Boolean(result.ok);
+    if (!result.ok) text('orbital-save-warning', `尚未写入本地存档：${result.error} 请通过「存档」导出当前进度。`);
     if (!result.ok) text('save-warning', `存档提示：${result.error} 当前可继续试玩并导出进度；请在「存档」处理。`);
     return result.ok;
   }
@@ -41,6 +45,7 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     if (!session.permanent.completedCycles) return;
     autoDialog.close();
     if (!dialog.open) dialog.showModal(); talentControls.open(cinematic); changed();
+    if (session.run.phase === 'orbital') orbital.present(false);
   }
   function openAutomation() {
     if (!session.permanent.completedCycles) return;
@@ -48,7 +53,7 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     if (!autoDialog.open) autoDialog.showModal(); changed();
   }
   function openSave() { if (!saveDialog.open) saveDialog.showModal(); changed(); }
-  function replace(next) { session = next; saveElapsed = 0;
+  function replace(next) { orbital.dismiss(); session = next; saveElapsed = 0; shownFinaleRunId = null;
     dialog.close(); autoDialog.close(); challengeDialog.close(); offeredRunId = null;
     changed(true); }
   function transition(action) {
@@ -100,7 +105,13 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
       if (runDebugCommand(session, button.dataset.debugCommand)) { save(); changed(); }
     }));
   }
-  const talentControls = createTalentUI(() => session, () => { save(); changed(); });
+  const talentControls = createTalentUI(() => session, key => {
+    if (key === 'bypasser') shownFinaleRunId = `${session.run.runId}:orbital`;
+    save(); changed();
+    if (key === 'bypasser') orbital.present(true);
+  });
+  const orbital = createOrbitalUI({ review: () => talentControls.open(false), save: openSave });
+  el('return-orbit').addEventListener('click', () => orbital.present(false));
   el('rebuild-civilization').addEventListener('click', () => {
     const runId = session.run.runId;
     transition(() => rebuildCivilization(session, runId));
@@ -127,7 +138,7 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     try {
       const next = parseSession(el('save-data').value);
       if ((next.debug === true) !== debug) throw new Error('正式存档与调试存档不能互相导入。');
-      if (!window.confirm(`存档有效：${next.permanent.completedCycles} 次循环，${next.permanent.legacy} 遗产。替换当前全部增量进度？建议先导出当前存档。`)) return;
+      if (!window.confirm(`存档有效：${next.permanent.completedCycles} 次循环，${Q.format(next.permanent.legacy)} 遗产。替换当前全部增量进度？建议先导出当前存档。`)) return;
       if (report(store.replace(next), '存档已导入，战斗保持在保存时刻。')) replace(next);
     } catch (error) { text('save-status', `未导入：${error.message}`); }
   });
@@ -154,8 +165,9 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   const restoredFinale = loaded.session?.run.phase === 'destruction' ? loaded.session.run.runId : null;
   return {
     presentEnd() {
-      if (session.run.phase !== 'destruction' || shownFinaleRunId === session.run.runId) return;
-      shownFinaleRunId = session.run.runId;
+      const key = `${session.run.runId}:${session.run.phase}`;
+      if (!['destruction', 'orbital'].includes(session.run.phase) || shownFinaleRunId === key) return;
+      shownFinaleRunId = key;
       open({ cinematic: session.run.runId !== restoredFinale });
     },
     get session() { return session; },
@@ -163,13 +175,14 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     get paused() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open; },
     get modalOpen() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open; },
     get timeScale() { return debug ? session.debugSpeed : session.permanent.settings.speed; },
-    sync, save, open, cycleSpeed,
+    sync, save, open, cycleSpeed, animate: timestamp => orbital.tick(timestamp, saveDialog.open || autoDialog.open || challengeDialog.open),
     step(dt) {
       const resolved = updateProgression(session, dt);
       saveElapsed += dt;
       if (resolved || saveElapsed >= SAVE_INTERVAL) save();
     },
     resultAction() {
+      if (session.run.phase === 'orbital') { open(); return; }
       if (session.run.phase === 'victory') {
         const battleId = session.run.battleId;
         transition(() => continueCivilization(session, battleId));
@@ -179,6 +192,7 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
       } else if (['destruction', 'defeat'].includes(session.run.phase)) open();
     },
     restart() {
+      if (session.run.phase === 'orbital') { open(); return; }
       if (['destruction', 'defeat'].includes(session.run.phase)) return this.resultAction();
       const runId = session.run.runId;
       if (!window.confirm(`放弃当前文明并从原始时代重开${session.run.challengeLevel ? `「${challengeName(session.run.challengeLevel)}」` : ''}？本轮金币、经验、部队和防御将清除，不发放遗产；已有永久进度保留。`)) return;

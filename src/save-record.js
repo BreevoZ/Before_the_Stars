@@ -1,8 +1,8 @@
 import { Q, isLargeQuantity } from './quantity.js';
 import { RULES } from './game-config.js';
-import { SAVE_VERSION, UPGRADE_COSTS, automationUnlocked } from './progression-config.js';
-import { getTalentSpending } from './talents.js';
-import { HISTORICAL_TALENTS } from './save-history.js';
+import { SAVE_VERSION, automationUnlocked } from './progression-config.js';
+import { HISTORICAL_TALENTS, HISTORICAL_UPGRADE_COSTS } from './save-history.js';
+import { paidLegacy } from './legacy-ledger.js';
 import { createBonusStack, stat } from './stats.js';
 import { getRunBonuses, getV8RunBonuses, getV9RunBonuses } from './progression-bonuses.js';
 import { check, object, int } from './save-primitives.js';
@@ -14,9 +14,13 @@ export function cloneRecord(value) {
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, cloneRecord(item)]));
 }
 export function spentLegacy(permanent, version = SAVE_VERSION) {
+  if (version >= 11) {
+    check(object(permanent.purchaseCosts) && Object.values(permanent.purchaseCosts).every(costs => Array.isArray(costs) && costs.every(cost => Q.valid(cost) && Q.gte(cost, 0))), '购买账本');
+    return paidLegacy(permanent);
+  }
   return Object.values(permanent.upgrades).reduce((sum, level) =>
-    sum + UPGRADE_COSTS.slice(0, level).reduce((a, b) => a + b, 0), 0)
-    + (version < 10 ? Object.entries(HISTORICAL_TALENTS[version < 8 ? 8 : version]).reduce((sum, [key, config]) => sum + (permanent.talentGrants.includes(key) ? 0 : config.costs.slice(0, permanent.talents[key]).reduce((a, b) => a + b, 0)), 0) : getTalentSpending(permanent.talents, permanent.talentGrants));
+    sum + HISTORICAL_UPGRADE_COSTS.slice(0, level).reduce((a, b) => a + b, 0), 0)
+    + Object.entries(HISTORICAL_TALENTS[version < 8 ? 8 : version]).reduce((sum, [key, config]) => sum + (permanent.talentGrants.includes(key) ? 0 : config.costs.slice(0, permanent.talents[key]).reduce((a, b) => a + b, 0)), 0);
 }
 
 // Persist purchases, earned currency, preferences and the active simulation.
@@ -59,5 +63,6 @@ function hydrateRecord(input, version) {
 
 export const fromV8Record = input => hydrateRecord(input, 8);
 export const fromV9Record = input => hydrateRecord(input, 9);
+export const fromV10Record = input => hydrateRecord(input, 10);
 export const fromSaveRecord = input => hydrateRecord(input, SAVE_VERSION);
 export function toSaveRecord(session) { const record = toV8Record(session); record.version = SAVE_VERSION; return record; }

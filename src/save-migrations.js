@@ -5,9 +5,9 @@ import { SAVE_VERSION, SURFACE, getChallengeModifiers } from './progression-conf
 import { attributes } from './stats.js';
 import { getV8RunBonuses } from './progression-bonuses.js';
 import { createAutomation } from './automation.js';
-import { HISTORICAL_TALENTS } from './save-history.js';
+import { HISTORICAL_TALENTS, HISTORICAL_UPGRADE_COSTS } from './save-history.js';
 import { validateRecord } from './save-validation.js';
-import { cloneRecord, toV8Record, fromV8Record, fromV9Record } from './save-record.js';
+import { cloneRecord, toV8Record, fromV8Record, fromV9Record, fromV10Record } from './save-record.js';
 import { emptyTalents } from './talents.js';
 const teams = ['player', 'enemy'];
 
@@ -125,11 +125,19 @@ export function migrateV9(input) {
   session.version = 10;
   return { ...toV8Record(session), version: 10 };
 }
-export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9 });
+export function migrateV10(input) {
+  const session = fromV10Record(input), p = session.permanent;
+  const configs = { ...HISTORICAL_TALENTS[10], production: { costs: HISTORICAL_UPGRADE_COSTS }, warfare: { costs: HISTORICAL_UPGRADE_COSTS } };
+  p.purchaseCosts = Object.fromEntries(Object.entries(configs).filter(([key]) => (p.talents[key] ?? p.upgrades[key]) > 0)
+    .map(([key, config]) => [key, config.costs.slice(0, p.talents[key] ?? p.upgrades[key]).map(cost => p.talentGrants.includes(key) ? 0 : cost)]));
+  session.version = 11;
+  return { ...toV8Record(session), version: 11 };
+}
+export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9, 10: migrateV10 });
 export function migrateRecord(input) {
   let record = input;
   while (record.version < SAVE_VERSION) {
-    validateRecord(record.version === 8 ? fromV8Record(record) : record.version === 9 ? fromV9Record(record) : record, record.version);
+    validateRecord(record.version === 8 ? fromV8Record(record) : record.version === 9 ? fromV9Record(record) : record.version === 10 ? fromV10Record(record) : record, record.version);
     record = MIGRATIONS[record.version](record);
   }
   return record;

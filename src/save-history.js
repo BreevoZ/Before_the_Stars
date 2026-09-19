@@ -48,5 +48,12 @@ const v9 = {
   superRanged: {"costs":[12],"requires":{"superSoldierPlan":1},"layer":7,"branch":"units"},
   bypasser: {"costs":[],"requires":{"superSoldierPlan":1},"layer":8,"branch":"legacy","placeholder":true},
 };
-export const HISTORICAL_TALENTS = freeze({ 2: v2, 3: v3, 4: v4, 5: v5, 6: v5, 7: v5, 8: v5, 9: v9 });
+const v10 = { ...v9,
+  conservation: { ...v9.conservation, costs: [2,4,8,16,32,64,128,256] },
+  continuity: { ...v9.continuity, costs: [6,12,24,48,96,192,384,768] },
+  legacyMachine: { costs: [8], requires: { conservation: 2 }, requiresLayer: 3, branch: 'legacy' },
+  legacyCapacity: { costs: [8,16,32,64,128,256,512,1024], requires: { legacyMachine: 1 }, branch: 'legacy' },
+  legacyEfficiency: { costs: [8,16,32,64,128,256], requires: { legacyMachine: 1 }, branch: 'legacy' },
+};
+export const HISTORICAL_TALENTS = freeze({ 2: v2, 3: v3, 4: v4, 5: v5, 6: v5, 7: v5, 8: v5, 9: v9, 10: v10 });
 export const HISTORICAL_UPGRADE_COSTS = Object.freeze([1, 2, 4, 8, 16]);

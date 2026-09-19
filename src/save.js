@@ -1,3 +1,4 @@
+import { Q, isLargeQuantity } from './quantity.js';
 import { RULES, AGES, UNITS, TURRETS, ABILITIES, getBaseHealth, getUnitHealth, projectileField } from './game.js';
 import { SAVE_VERSION, SURFACE, UPGRADE_COSTS, AUTOMATION_TARGETS, AUTOMATION_INTERVAL, CHALLENGE, getChallengeModifiers, getBonuses } from './progression-config.js';
 import { DEBUG_SPEEDS } from './debug.js';
@@ -45,6 +46,7 @@ function talentLevels(value, upgrades, configs = TALENTS) {
 function safeTree(value, depth = 0, key = '') {
   check(depth <= 12, '嵌套过深');
   if (value === Infinity && key === 'maxRange') return;
+  if (isLargeQuantity(value)) { check(Q.valid(value), '大数格式'); return; }
   if (typeof value === 'number') check(num(value, -limit), '数值超出范围');
   else if (typeof value === 'string') check(value.length <= 200, '文字过长');
   else if (Array.isArray(value)) {
@@ -62,6 +64,10 @@ function safeTree(value, depth = 0, key = '') {
 
 function validateRecord(session, version = SAVE_VERSION) {
   const oldVersion = version === 1, previousVersion = version < 3;
+  const amount = (value, min = 0, max = version < 7 ? limit : undefined) => version < 7 ? num(value, min, max)
+    : Q.valid(value) && Q.gte(value, min) && (max === undefined || Q.lte(value, max));
+  const wholeAmount = value => amount(value) && Q.isInteger(value);
+  const oldHealthCap = value => version < 7 ? Q.toNumber(Q.min(value, 1e9)) : value;
   const configs = version === 2 ? V2_TALENTS : version === 3 ? V3_TALENTS : version === 4 ? V4_TALENTS : TALENTS;
   check(object(session), '根记录');
   check(session.version === version, '不支持的存档版本');
@@ -83,6 +89,9 @@ function validateRecord(session, version = SAVE_VERSION) {
     check(g.mode === 'incremental' && Array.isArray(g.bonuses) && !g.modifiers && !g.enemyModifiers, '属性管线');
     check(run.extraBonuses === undefined || Array.isArray(run.extraBonuses), '额外属性来源');
     createBonusStack(run.extraBonuses ?? []);
+    if (version < 7) for (const effect of [...g.bonuses, ...(run.extraBonuses ?? [])]) {
+      check(typeof effect.value === 'boolean' || num(effect.value, -1e9, 1e9), '旧版属性值');
+    }
     check(JSON.stringify(createBonusStack(g.bonuses)) === JSON.stringify(getRunBonuses(run)), '属性栈与本轮来源不一致');
   }
   const combat = version >= 6 ? g : { ...g, bonuses: legacyBonuses(g.modifiers, g.enemyModifiers) };
@@ -103,6 +112,7 @@ function validateRecord(session, version = SAVE_VERSION) {
   check(object(auto) && bool(auto.unlocked) && bool(auto.enabled) && AUTOMATION_TARGETS.includes(auto.target), '自动招募设置');
   check(auto.unlocked === (previousVersion ? p.completedCycles > 0 : p.talents.autobuyer > 0) && (auto.unlocked || !auto.enabled), '自动招募解锁');
   if (!oldVersion) check(validAutomation(auto, p.talents, previousVersion), '自动购买设置或解锁条件');
+  if (version < 7) check(num(auto.reserve ?? 0, 0, 1e9), '旧版预留金币');
   check(id(run.runId) && int(run.battleNumber, 1, SURFACE.finalEnemyAge) && run.battleId === `${run.runId}:${run.battleNumber}`, '文明或战斗标识');
   check(run.processedBattleId === null || (id(run.processedBattleId) && run.processedBattleId.startsWith(`${run.runId}:`)), '胜利处理标记');
   check(['battle', 'victory', 'destruction', 'defeat'].includes(run.phase) && bool(run.settled), '流程阶段');
@@ -143,28 +153,28 @@ function validateRecord(session, version = SAVE_VERSION) {
   for (const key of ['ages', 'experience', 'gold', 'bases', 'queues', 'turrets']) check(object(g[key]), key);
   const orderIds = new Set(), unitIds = new Set();
   for (const team of teams) {
-    check(int(g.ages[team], 1, SURFACE.finalEnemyAge) && num(g.gold[team]) && int(g.experience[team]), '时代或资源');
+    check(int(g.ages[team], 1, SURFACE.finalEnemyAge) && amount(g.gold[team]) && wholeAmount(g.experience[team]), '时代或资源');
     const base = g.bases[team];
     check(object(base) && base.team === team && base.x === (team === 'player' ? RULES.playerBaseX : RULES.enemyBaseX), '基地');
-    check(base.maxHp === (version >= 5 ? getBaseHealth(combat, team) : AGES[g.ages[team]].baseHealth) && num(base.hp, 0, base.maxHp) && num(base.hitFlash), '基地生命');
+    check(amount(base.maxHp, 1) && Q.eq(base.maxHp, version >= 5 ? oldHealthCap(getBaseHealth(combat, team)) : AGES[g.ages[team]].baseHealth) && amount(base.hp, 0, base.maxHp) && num(base.hitFlash), '基地生命');
     list(g.queues[team], version >= 6 ? STAT_DEFINITIONS.queueLimit.max : RULES.queueLimit, '训练队列');
     for (const order of g.queues[team]) {
       check(object(order) && member(order.type, UNITS) && int(order.id, 1, g.nextOrderId - 1) && !orderIds.has(order.id), '训练订单');
       orderIds.add(order.id);
       if (version >= 6) check(num(order.duration, RULES.fixedStep, 3600), '训练订单快照');
-      check(UNITS[order.type].age <= g.ages[team] && num(order.remaining, 0, version >= 6 ? order.duration : UNITS[order.type].trainTime) && num(order.paid, 0, version >= 6 ? 1e9 : 10000), '订单进度或支付价格');
+      check(UNITS[order.type].age <= g.ages[team] && num(order.remaining, 0, version >= 6 ? order.duration : UNITS[order.type].trainTime) && amount(order.paid, 0, version >= 7 ? undefined : version >= 6 ? 1e9 : 10000), '订单进度或支付价格');
     }
     list(g.turrets[team], RULES.maxTurretSlots, '炮位');
     if (version < 6) check(g.turrets[team].length >= 1, '缺少初始炮位');
     g.turrets[team].forEach((turret, slot) => {
       if (turret === null) return;
       check(object(turret) && member(turret.type, TURRETS) && turret.team === team && turret.slot === slot && TURRETS[turret.type].age <= g.ages[team], '炮塔');
-      if (version >= 6) check(num(turret.paid, 0, 1e9), '炮塔支付快照');
+      if (version >= 6) check(amount(turret.paid, 0, version >= 7 ? undefined : 1e9), '炮塔支付快照');
       numbers(turret, ['cooldown', 'flash', 'shotSerial', 'aim', 'burstRemaining', 'chargeRemaining'], ['burstCooldown', 'flashDuration', 'lastBarrel'], -1, limit);
       for (const key of ['chargeTargetId', 'burstTargetId']) if (turret[key] != null) check(int(turret[key], 1, g.nextUnitId - 1), '炮塔目标');
     });
   }
-  const lost = g.bases.player.hp === 0, won = g.bases.enemy.hp === 0;
+  const lost = Q.eq(g.bases.player.hp, 0), won = Q.eq(g.bases.enemy.hp, 0);
   check(g.status === (lost && won ? 'draw' : lost ? 'lost' : won ? 'won' : 'playing'), '基地与胜负不一致');
   if (run.phase === 'destruction') check(g.ages.enemy === SURFACE.finalEnemyAge, '终局敌人');
   if (run.phase === 'victory') check(g.ages.enemy < SURFACE.finalEnemyAge, '普通战役终点');
@@ -172,7 +182,7 @@ function validateRecord(session, version = SAVE_VERSION) {
   for (const unit of g.units) {
     check(object(unit) && member(unit.type, UNITS) && teams.includes(unit.team) && int(unit.id, 1, g.nextUnitId - 1) && !unitIds.has(unit.id), '部队实体');
     unitIds.add(unit.id);
-    check(UNITS[unit.type].age <= g.ages[unit.team] && num(unit.hp, Number.MIN_VALUE, version >= 5 ? getUnitHealth(combat, unit.type, unit.team) : UNITS[unit.type].health) && num(unit.x, 0, RULES.width) && bool(unit.moving), '部队属性');
+    check(UNITS[unit.type].age <= g.ages[unit.team] && amount(unit.hp, 0, version >= 5 ? oldHealthCap(getUnitHealth(combat, unit.type, unit.team)) : UNITS[unit.type].health) && Q.gt(unit.hp, 0) && num(unit.x, 0, RULES.width) && bool(unit.moving), '部队属性');
     numbers(unit, ['attackCooldown', 'attackAnimation', 'hitFlash'], ['distanceTravelled', 'chargeTravel', 'guardFlash', 'attackApproach', 'moveMultiplier', 'burstRemaining', 'burstCooldown'], -1);
     if (unit.attackStyle !== undefined) check(['melee', 'ranged'].includes(unit.attackStyle), '攻击姿态');
     if (unit.lastAttackCharged !== undefined) check(bool(unit.lastAttackCharged), '冲锋');
@@ -187,14 +197,16 @@ function validateRecord(session, version = SAVE_VERSION) {
   for (const shot of g.projectiles) {
     check(object(shot) && teams.includes(shot.team) && ['sling','stone','boulder','arrow','bolt','egg','fireball','oil','bullet','cannon','shell','rocket','plasma','plasma-orb','rail','laser','ion'].includes(shot.kind), '弹药类型');
     numbers(shot, ['fromX', 'toX', 'fromY', 'toY', 'toOffsetX', 'originX'], ['fromUnitX', 'fromTurretX', 'fromBaseX', 'arc'], -RULES.width, RULES.width * 2);
-    numbers(shot, ['damage', 'duration', 'remaining', 'splash', 'armorPierce', 'pierce'], ['pierceFactor', 'pierceDistance']);
+    numbers(shot, ['duration', 'remaining', 'splash', 'pierce'], ['pierceFactor', 'pierceDistance']);
+    check(amount(shot.damage) && amount(shot.armorPierce), '弹药伤害');
     check(shot.duration > 0 && shot.remaining > 0 && shot.remaining <= shot.duration && bool(shot.ignoreArmor), '弹药进度');
     check((shot.targetId === null || int(shot.targetId, 1, g.nextUnitId - 1)) && (shot.targetBase === null || teams.includes(shot.targetBase)), '弹药目标');
     check(shot.maxRange === Infinity || num(shot.maxRange), '弹药射程');
     if (version >= 6 && shot.field != null) {
       const field = shot.field;
       check(object(field) && ['fire', 'oil'].includes(field.kind), '弹药地面效果');
-      numbers(field, ['radius', 'remaining', 'duration', 'tickCooldown', 'tickInterval', 'damage', 'slow']);
+      numbers(field, ['radius', 'remaining', 'duration', 'tickCooldown', 'tickInterval', 'slow']);
+    check(amount(field.damage), '地面伤害');
       check(num(field.tickInterval, RULES.fixedStep, 10) && num(field.duration, RULES.fixedStep, 60) && field.remaining <= field.duration && field.slow > 0 && field.slow <= 1, '弹药地面效果进度');
     }
     if (shot.turretType !== undefined) check(member(shot.turretType, TURRETS), '弹药来源');
@@ -202,7 +214,8 @@ function validateRecord(session, version = SAVE_VERSION) {
   list(g.fields, 128, '地面效果');
   for (const field of g.fields) {
     check(object(field) && ['fire', 'oil'].includes(field.kind) && teams.includes(field.team), '地面效果类型');
-    numbers(field, ['x', 'radius', 'remaining', 'duration', 'tickCooldown', 'tickInterval', 'damage', 'slow']);
+    numbers(field, ['x', 'radius', 'remaining', 'duration', 'tickCooldown', 'tickInterval', 'slow']);
+    check(amount(field.damage), '地面伤害');
     check(num(field.tickInterval, RULES.fixedStep, 10) && num(field.duration, RULES.fixedStep, 60) && field.remaining <= field.duration && field.slow > 0 && field.slow <= 1, '地面效果进度');
   }
   list(g.effects, 2048, '视觉效果');
@@ -229,7 +242,7 @@ function validateRecord(session, version = SAVE_VERSION) {
       check(object(snapshot) && Object.keys(snapshot).length === Object.keys(expected).length, '技能属性快照');
       for (const [key, base] of Object.entries(expected)) {
         const definition = STAT_DEFINITIONS[key];
-        check(definition ? definition.boolean ? bool(snapshot[key]) : num(snapshot[key], definition.min, definition.max) : snapshot[key] === base, '技能快照属性');
+        check(definition ? definition.boolean ? bool(snapshot[key]) : definition.quantity ? amount(snapshot[key], definition.min, version < 7 ? 1e9 : undefined) : num(snapshot[key], definition.min, definition.max) : snapshot[key] === base, '技能快照属性');
       }
     }
     numbers(g.ability, ['remaining', 'wavesLeft', 'x']);
@@ -242,13 +255,48 @@ function validateRecord(session, version = SAVE_VERSION) {
 
 export function validateSession(session) { return validateRecord(session); }
 
+// Explicit schema walk: numbers in coordinates, clocks, IDs and Legacy are
+// never revived as quantities. Unknown properties cannot smuggle Decimal data.
+export function mapSessionQuantities(session, convert) {
+  const { game: g, run, permanent: p } = session;
+  check(object(g) && object(run) && object(p), '缺少游戏状态');
+  const field = (object, key) => { object[key] = convert(object[key]); };
+  for (const team of teams) {
+    field(g.gold, team); field(g.experience, team);
+    field(g.bases[team], 'hp'); field(g.bases[team], 'maxHp');
+    for (const order of g.queues[team]) field(order, 'paid');
+    for (const tower of g.turrets[team]) if (tower) field(tower, 'paid');
+  }
+  for (const unit of g.units) field(unit, 'hp');
+  for (const shot of g.projectiles) {
+    field(shot, 'damage'); field(shot, 'armorPierce');
+    if (shot.field) field(shot.field, 'damage');
+  }
+  for (const area of g.fields) field(area, 'damage');
+  if (g.ability) for (const key of Object.keys(g.ability.stats)) {
+    if (STAT_DEFINITIONS[key]?.quantity) field(g.ability.stats, key);
+  }
+  for (const effect of [...g.bonuses, ...(run.extraBonuses ?? [])]) {
+    if (STAT_DEFINITIONS[effect.target?.stat]?.quantity) field(effect, 'value');
+  }
+  field(p.automation, 'reserve');
+  return session;
+}
+const jsonReplacer = (key, value) => key === 'maxRange' && value === Infinity ? 'unbounded' : value;
 export function serializeSession(session) {
   validateSession(session);
-  return JSON.stringify(session, (key, value) => key === 'maxRange' && value === Infinity ? 'unbounded' : value);
+  // Clone only for encoding. LargeQuantity.toJSON already emits its value as
+  // text; the schema walk also encodes the native small-value representation.
+  const record = JSON.parse(JSON.stringify(session, jsonReplacer));
+  mapSessionQuantities(record, Q.encode);
+  const text = JSON.stringify(record);
+  check(text.length <= MAX_SAVE_BYTES, '文件大小');
+  return text;
 }
 export function parseSession(text) {
   check(typeof text === 'string' && text.length <= MAX_SAVE_BYTES, '文件大小');
   const session = JSON.parse(text, (key, value) => key === 'maxRange' && value === 'unbounded' ? Infinity : value);
+  if (session?.version === 7) { safeTree(session); mapSessionQuantities(session, Q.decode); }
   if (session?.version === 1) {
     // Validate the complete old record before introducing any defaults. Never
     // rerun settlement or starting-resource grants while upgrading a save.
@@ -308,6 +356,16 @@ export function parseSession(text) {
     }
     if (g.ability) g.ability.stats = { ...attributes(g, { kind: 'ability', type: g.ability.type, team: 'player' }) };
     delete g.modifiers; delete g.enemyModifiers;
+    session.version = 6;
+  }
+  if (session?.version === 6) {
+    validateRecord(session, 6);
+    // Removing the old prototype HP ceiling preserves damage already taken.
+    for (const team of teams) {
+      const base = session.game.bases[team], maximum = getBaseHealth(session.game, team);
+      if (Q.gt(base.hp, 0)) base.hp = Q.add(base.hp, Q.sub(maximum, base.maxHp));
+      base.maxHp = maximum;
+    }
     session.version = SAVE_VERSION;
   }
   validateSession(session);

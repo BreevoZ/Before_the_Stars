@@ -1,4 +1,5 @@
-import { serializeSession } from '../src/save.js';
+import { serializeSession, mapSessionQuantities } from '../src/save.js';
+import { Q } from '../src/quantity.js';
 import { getBonuses, getChallengeModifiers } from '../src/progression-config.js';
 import { getTalentBonuses } from '../src/talents.js';
 
@@ -10,6 +11,7 @@ export const statMultiplier = (game, key, team = 'player') => (game.bonuses ?? [
 // accidentally test a current schema with only its version number changed.
 export function v5Record(session) {
   const old = JSON.parse(serializeSession(session)), game = old.game;
+  mapSessionQuantities(old, Q.decode);
   old.version = 5;
   game.modifiers = { ...getBonuses(old.run.upgrades), bounty: getTalentBonuses(old.run.talents).bounty };
   game.enemyModifiers = getChallengeModifiers(old.run.challengeLevel);

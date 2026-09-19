@@ -1,20 +1,23 @@
+import { Q } from './quantity.js';
 import { RULES, UNITS, TURRETS, ABILITIES, AGES } from './game-config.js';
 
 // Values are resolved once: last override, sum of additions, product of
 // multipliers, then the stat's rounding and bounds. Never mutate base configs.
 const scalar = Object.freeze({ min: 0, max: 1e9 });
+const growth = Object.freeze({ quantity: true, min: 0 });
+const growthInteger = Object.freeze({ quantity: true, min: 0, round: 'floor' });
 const count = max => ({ min: 0, max, round: 'floor' });
 export const STAT_DEFINITIONS = Object.freeze({
-  damage: scalar, meleeDamage: scalar, chargeDamage: scalar, tickDamage: scalar, baseDamage: scalar,
-  health: { min: 1, max: 1e9, round: 'round' }, baseHealth: { min: 1, max: 1e9, round: 'round' },
-  armor: scalar, armorPierce: scalar, rangedReduction: { min: 0, max: 1 },
+  damage: growth, meleeDamage: growth, chargeDamage: growth, tickDamage: growth, baseDamage: growth,
+  health: { quantity: true, min: 1, round: 'round' }, baseHealth: { quantity: true, min: 1, round: 'round' },
+  armor: growth, armorPierce: growth, rangedReduction: { min: 0, max: 1 },
   speed: scalar, range: scalar, baseRange: scalar, meleeRange: scalar,
   attackSpeed: { min: 0.01, max: 100 }, attackInterval: { min: RULES.fixedStep, max: 3600 },
-  trainTime: { min: RULES.fixedStep, max: 3600 }, cost: count(1e9),
-  bounty: count(1e9), experience: count(1e9), income: scalar, startingGold: count(1e9),
+  trainTime: { min: RULES.fixedStep, max: 3600 }, cost: growthInteger,
+  bounty: growthInteger, experience: growthInteger, income: growth, startingGold: growthInteger,
   armyLimit: count(256), queueLimit: count(64), maxTurretSlots: count(RULES.maxTurretSlots),
-  initialTurretSlots: count(RULES.maxTurretSlots), expansionCost: count(1e9),
-  cooldown: scalar, healing: scalar, radius: scalar, splash: scalar,
+  initialTurretSlots: count(RULES.maxTurretSlots), expansionCost: growthInteger,
+  cooldown: scalar, healing: growth, radius: scalar, splash: scalar,
   chargeTime: scalar, burstInterval: { min: RULES.fixedStep, max: 3600 },
   fieldRadius: scalar, fieldDuration: { min: RULES.fixedStep, max: 60 },
   tickInterval: { min: RULES.fixedStep, max: 10 }, slow: { min: 0.01, max: 1 },
@@ -32,7 +35,8 @@ export function createBonusStack(...contributions) {
   if (stack.length > 256) throw new RangeError('Too many stat bonuses');
   return Object.freeze(stack.map(effect => {
     if (!object(effect) || !exactKeys(effect, ['target', 'type', 'value', 'source'])) throw new TypeError('Invalid stat bonus');
-    const { target, type, value, source } = effect;
+    const { target, type, source } = effect;
+    let { value } = effect;
     if (!object(target) || !exactKeys(target, ['stat', 'kind', 'team', 'type', 'role', 'age']) ||
         !Object.hasOwn(STAT_DEFINITIONS, target.stat) ||
         (target.kind !== undefined && !kinds.includes(target.kind)) ||
@@ -41,7 +45,10 @@ export function createBonusStack(...contributions) {
         (target.role !== undefined && !['melee', 'archer', 'heavy'].includes(target.role)) ||
         (target.age !== undefined && (!Number.isInteger(target.age) || !Object.hasOwn(AGES, target.age)))) throw new TypeError('Invalid stat target');
     if (!['add', 'multiply', 'override'].includes(type)) throw new TypeError('Invalid stat operation');
-    if (STAT_DEFINITIONS[target.stat].boolean ? type !== 'override' || typeof value !== 'boolean'
+    const definition = STAT_DEFINITIONS[target.stat];
+    if (definition.quantity) value = Q.of(value);
+    if (definition.boolean ? type !== 'override' || typeof value !== 'boolean'
+      : definition.quantity ? (type === 'multiply' && Q.lt(value, 0))
       : !Number.isFinite(value) || Math.abs(value) > 1e9 || (type === 'multiply' && value < 0)) throw new TypeError('Invalid stat value');
     if (!object(source) || !exactKeys(source, ['id', 'kind', 'label']) || !sources.includes(source.kind) ||
         ![source.id, source.label].every(text => typeof text === 'string' && text.length > 0 && text.length <= 100)) throw new TypeError('Invalid bonus source');
@@ -50,20 +57,20 @@ export function createBonusStack(...contributions) {
 }
 
 export function resolveStatValue(base, effects, definition = scalar) {
-  let value = base, add = 0, multiply = 1, zeroMultiplier = false;
+  let value = base, add = 0;
   for (const effect of effects) {
     if (effect.type === 'override') value = effect.value;
-    if (effect.type === 'add') add += effect.value;
-    if (effect.type === 'multiply') {
-      multiply *= effect.value;
-      zeroMultiplier ||= effect.value === 0;
-    }
+    if (effect.type === 'add') add = Q.add(add, effect.value);
   }
   if (definition.boolean) return value;
-  // Even an overflowing stack must keep zero effects at zero, never NaN.
-  value = zeroMultiplier || value + add === 0 ? 0 : (value + add) * multiply;
-  value = Math.max(definition.min, Math.min(definition.max, value));
-  return definition.round ? Math[definition.round](value) : value;
+  // Resolve zero before multiplying; even an enormous stack cannot create NaN.
+  const multipliers = effects.filter(effect => effect.type === 'multiply');
+  value = multipliers.some(effect => Q.eq(effect.value, 0)) ? 0
+    : Q.mul(Q.add(value, add), multipliers.reduce((product, effect) => Q.mul(product, effect.value), 1));
+  value = Q.max(definition.min, value);
+  if (definition.max !== undefined) value = Q.min(definition.max, value);
+  if (definition.round) value = Q[definition.round](value);
+  return definition.quantity ? value : Q.toNumber(value);
 }
 
 const empty = Object.freeze([]), caches = new WeakMap();
@@ -150,7 +157,7 @@ export function stat(game, subject, key, base) {
     return entry.values[key];
   }
   base ??= entry.base[key];
-  if (!Object.hasOwn(STAT_DEFINITIONS, key) || !Number.isFinite(base)) throw new TypeError('Invalid stat base');
+  if (!Object.hasOwn(STAT_DEFINITIONS, key) || !Q.valid(base)) throw new TypeError('Invalid stat base');
   const effects = entry.applied.get(key) ?? entry.effects.filter(effect => matches(effect, entry.context, key));
   const value = resolveStatValue(base, temporary.length ? [...effects, ...temporary] : effects, STAT_DEFINITIONS[key]);
   return key === 'attackInterval' ? Math.max(RULES.fixedStep, Math.min(3600, value / entry.values.attackSpeed)) : value;

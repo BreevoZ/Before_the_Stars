@@ -149,7 +149,7 @@
           <div class="automation-controls"><label><input type="checkbox" id="auto-enabled"> 启用自动购买</label></div>
           <p id="automation-status" class="automation-status"></p><p id="automation-error" class="archive-note" role="status"></p>
           <fieldset class="auto-group" data-auto-talent="logistics"><legend>预算与调度</legend><div class="auto-fields">
-            <label>预留金币<input id="auto-reserve" type="number" min="0" max="1000000000" step="10" inputmode="numeric" value="0"></label>
+            <label>预留金币<input id="auto-reserve" type="text" inputmode="text" maxlength="120" placeholder="例如 100 或 1e400" value="0"></label>
             <label>购买优先级<select id="auto-priority"><option value="balanced">部队与防御交替</option><option value="recruit">部队优先</option><option value="defense">防御优先</option></select></label>
           </div><p class="archive-note">只使用预留金额之外的金币。当前目标买不起时先存钱；队列或兵力已满时，仍可处理防御。手动操作不受此预算限制。</p></fieldset>
           <fieldset class="auto-group"><legend>部队</legend>

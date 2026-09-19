@@ -1,3 +1,4 @@
+import { Q } from './quantity.js';
 import { drawTurret } from './turrets.js';
 import { RULES, UNITS, AGES, ABILITIES, getTurretPosition, getAbilityRadius, getAbilityImpactX, getUnitHealth } from './game.js';
 import { drawUnit } from './units.js';
@@ -161,7 +162,7 @@ export function drawLandscape(ctx, height, ground, time) {
 }
 
 function drawDefenses(ctx, game, team, scale, reducedMotion) {
-  if (game.bases[team].hp <= 0) return;
+  if (Q.lte(game.bases[team].hp, 0)) return;
   for (let slot = 0; slot < game.turrets[team].length; slot++) {
     const turret = game.turrets[team][slot];
     if (!turret) continue;

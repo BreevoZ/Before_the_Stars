@@ -1,10 +1,12 @@
+import { Q } from './quantity.js';
 import { AGES, UNITS, TURRETS, RULES, getRecruitState, recruit, getEvolutionState, evolve,
   getTurretState, buildTurret, getExpansionState, expandTurretSlots, sellTurret } from './game.js';
 import { stat, STAT_DEFINITIONS } from './stats.js';
 import { getExpansionCost, getTurretRefund } from './game.js';
 import { AUTOMATION_INTERVAL, AUTOMATION_TARGETS, SURFACE } from './progression-config.js';
 
-export const AUTOMATION_MAX_RESERVE = 1_000_000_000;
+// Reserve is a nonnegative integral quantity, bounded by the quantity format.
+export const AUTOMATION_MAX_RESERVE = Q.of("1e8999999999999999");
 export function createAutomation() {
   return { unlocked: false, enabled: false, target: 'front', recruitEnabled: true,
     mode: 'single', weights: [2, 2, 1], reserve: 0, queueLimit: RULES.queueLimit,
@@ -19,13 +21,13 @@ export function validAutomation(auto, talents, previousVersion = false) {
     .every(key => typeof auto[key] === 'boolean')) return false;
   if (!AUTOMATION_TARGETS.includes(auto.target) || !['single', 'balanced'].includes(auto.mode) ||
     !['balanced', 'recruit', 'defense'].includes(auto.priority)) return false;
-  if (!integer(auto.reserve, 0, AUTOMATION_MAX_RESERVE) || !integer(auto.queueLimit, 1, STAT_DEFINITIONS.queueLimit.max) ||
+  if (!Q.isInteger(auto.reserve) || Q.lt(auto.reserve, 0) || !integer(auto.queueLimit, 1, STAT_DEFINITIONS.queueLimit.max) ||
     !integer(auto.turretTarget, 0, 2) || !integer(auto.maxTurrets, 1, RULES.maxTurretSlots) || !integer(auto.eliteLimit, 1, 3)) return false;
   if (!Array.isArray(auto.weights) || auto.weights.length !== 3 || !auto.weights.every(weight => integer(weight, 0, 10)) ||
     !auto.weights.some(weight => weight > 0)) return false;
   const logistics = talents.logistics > 0 || previousVersion;
   return (previousVersion || auto.unlocked === (talents.autobuyer > 0)) &&
-    (logistics || (auto.reserve === 0 && auto.queueLimit === RULES.queueLimit && auto.priority === 'balanced' && auto.recruitEnabled)) &&
+    (logistics || (Q.eq(auto.reserve, 0) && auto.queueLimit === RULES.queueLimit && auto.priority === 'balanced' && auto.recruitEnabled)) &&
     (auto.unlocked || !auto.enabled) && (auto.mode !== 'balanced' || talents.formation > 0) &&
     (!auto.evolve || talents.evolution > 0) && (!auto.defense || talents.defense > 0) &&
     (!auto.expand || talents.defense > 0) && (!auto.replace || talents.defense > 1) && (!auto.elite || talents.elite > 0);
@@ -34,6 +36,7 @@ export function configureAutomation(session, patch) {
   if (!session.permanent.automation.unlocked || !patch || typeof patch !== 'object' || Array.isArray(patch) ||
     Object.keys(patch).some(key => key === 'unlocked' || !Object.hasOwn(createAutomation(), key))) return false;
   const next = { ...session.permanent.automation, ...patch };
+  try { next.reserve = Q.of(next.reserve); } catch { return false; }
   if (!validAutomation(next, session.permanent.talents)) return false;
   next.weights = [...next.weights];
   session.permanent.automation = next;
@@ -43,9 +46,9 @@ export function configureAutomation(session, patch) {
 
 const inactive = (state, label) => ({ state, label });
 function budget(session, plan) {
-  const available = Math.max(0, session.game.gold.player - session.permanent.automation.reserve);
-  return { ...plan, state: available + 1e-6 >= plan.cost ? 'ready' : 'budget',
-    label: `${available + 1e-6 >= plan.cost ? '待执行' : '储蓄中'} · ${plan.label} · ${plan.cost} 金币（预留外可用 ${Math.floor(available)}）` };
+  const available = Q.max(0, Q.sub(session.game.gold.player, session.permanent.automation.reserve));
+  return { ...plan, state: Q.canAfford(available, plan.cost) ? 'ready' : 'budget',
+    label: `${Q.canAfford(available, plan.cost) ? '待执行' : '储蓄中'} · ${plan.label} · ${Q.format(plan.cost)} 金币（预留外可用 ${Q.format(Q.floor(available))}）` };
 }
 function recruitPlan(session) {
   const { game, run, permanent: { automation: auto } } = session;
@@ -85,12 +88,12 @@ function defensePlan(session) {
   }
   if (auto.expand && stat(game, { type, team: 'player' }, 'enabled') && towers.length < auto.maxTurrets && ['ready', 'gold'].includes(getExpansionState(game))) {
     return budget(session, { kind: 'expand', type, slot: towers.length,
-      cost: getExpansionCost(game) + stat(game, { type, team: 'player' }, 'cost'), label: `扩容并建造${TURRETS[type].name}` });
+      cost: Q.add(getExpansionCost(game), stat(game, { type, team: 'player' }, 'cost')), label: `扩容并建造${TURRETS[type].name}` });
   }
   if (auto.replace && run.talents.defense >= 2) {
     const outdated = towers.findIndex((tower, i) => i < Math.min(auto.maxTurrets, stat(game, 'player', 'maxTurretSlots')) && tower && TURRETS[tower.type].age < game.ages.player);
     if (outdated !== -1 && stat(game, { type, team: 'player' }, 'enabled')) return budget(session, { kind: 'replace', type, slot: outdated,
-      cost: stat(game, { type, team: 'player' }, 'cost') - getTurretRefund(game, towers[outdated]), label: `替换炮位 ${outdated + 1} · ${TURRETS[type].name}（净支出）` });
+      cost: Q.sub(stat(game, { type, team: 'player' }, 'cost'), getTurretRefund(game, towers[outdated])), label: `替换炮位 ${outdated + 1} · ${TURRETS[type].name}（净支出）` });
   }
   return inactive('complete', '防御目标已满足');
 }

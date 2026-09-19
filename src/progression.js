@@ -1,3 +1,4 @@
+import { Q } from './quantity.js';
 import { createGame, updateGame } from './game.js';
 import { updateAutomation, createAutomation, configureAutomation } from './automation.js';
 import { SURFACE, UPGRADES, UPGRADE_COSTS, SAVE_VERSION, CHALLENGE } from './progression-config.js';
@@ -74,7 +75,7 @@ export function continueCivilization(session, battleId) {
   const nextAge = game.ages.enemy + 1;
   const next = createConflict(run, { player: game.ages.player, enemy: nextAge });
   next.experience.player = game.experience.player;
-  next.gold.player = game.gold.player + game.queues.player.reduce((sum, order) => sum + order.paid, 0);
+  next.gold.player = Q.add(game.gold.player, Q.sum(game.queues.player.map(order => order.paid)));
   next.turrets.player = game.turrets.player.map(turret => turret ? { ...turret,
     burstRemaining: 0, chargeRemaining: 0, chargeTargetId: null, burstTargetId: null, flash: 0 } : null);
   next.abilityCooldown = game.abilityCooldown;

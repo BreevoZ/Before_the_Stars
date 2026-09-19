@@ -1,3 +1,4 @@
+import { Q } from './quantity.js';
 import { BASE_MOUNTS } from './base-layouts.js';
 import { createProjectileImpact } from './projectiles.js';
 
@@ -14,7 +15,7 @@ const EPSILON = 0.000001;
 const otherTeam = team => team === 'player' ? 'enemy' : 'player';
 const validTeam = team => TEAMS.includes(team);
 const validType = type => Object.hasOwn(UNITS, type);
-const canAfford = (gold, cost) => gold + EPSILON >= cost;
+const canAfford = Q.canAfford;
 
 export function createGame(options = {}) {
   const game = {
@@ -57,7 +58,7 @@ export const getIncomeRate = (game, team = 'player') => stat(game, team, 'income
 export const getExperienceReward = (game, base, team = 'player') => stat(game, { kind: 'reward', team }, 'experience', base);
 export const getBountyReward = (game, base, team = 'player') => stat(game, { kind: 'reward', team }, 'bounty', base);
 export const getExpansionCost = (game, team = 'player') => stat(game, { kind: 'team', team, slot: game.turrets[team].length - 1 }, 'expansionCost');
-export const getTurretRefund = (game, turret) => Math.floor((turret.paid ?? stat(game, turret, 'cost')) / 2);
+export const getTurretRefund = (game, turret) => Q.floor(Q.div(turret.paid ?? stat(game, turret, 'cost'), 2));
 
 export function getEvolutionState(game, team = 'player') {
   if (!validTeam(team)) return 'invalid';
@@ -65,7 +66,7 @@ export function getEvolutionState(game, team = 'player') {
   if (!stat(game, team, 'canEvolve')) return 'disabled';
   const nextAge = AGES[game.ages[team] + 1];
   if (!nextAge) return 'max-age';
-  return game.experience[team] >= nextAge.experienceRequired ? 'ready' : 'experience';
+  return Q.gte(game.experience[team], nextAge.experienceRequired) ? 'ready' : 'experience';
 }
 
 export function evolve(game, team = 'player') {
@@ -73,7 +74,7 @@ export function evolve(game, team = 'player') {
   const base = game.bases[team];
   // Keep damage already taken. Evolution adds capacity, not a full heal.
   const health = getBaseHealth(game, team, game.ages[team] + 1);
-  base.hp = Math.max(1, base.hp + health - base.maxHp);
+  base.hp = Q.max(1, Q.sub(Q.add(base.hp, health), base.maxHp));
   base.maxHp = health;
   game.ages[team]++;
   game.effects.push({ kind: 'evolve', x: base.x, team, life: 1.2, duration: 1.2 });
@@ -97,7 +98,7 @@ export function getRecruitState(game, type = 'melee', team = 'player') {
 export function recruit(game, type = 'melee', team = 'player') {
   if (getRecruitState(game, type, team) !== 'ready') return false;
   const stats = attributes(game, { type, team });
-  game.gold[team] = Math.max(0, game.gold[team] - stats.cost);
+  game.gold[team] = Q.max(0, Q.sub(game.gold[team], stats.cost));
   game.queues[team].push({ id: game.nextOrderId++, type, remaining: stats.trainTime, duration: stats.trainTime, paid: stats.cost });
   return true;
 }
@@ -107,7 +108,7 @@ export function cancelTraining(game, orderId, team = 'player') {
   const index = game.queues[team].findIndex(order => order.id === orderId);
   if (index < 0) return false;
   const [order] = game.queues[team].splice(index, 1);
-  game.gold[team] += order.paid ?? UNITS[order.type].cost;
+  game.gold[team] = Q.add(game.gold[team], order.paid ?? UNITS[order.type].cost);
   return true;
 }
 
@@ -132,7 +133,7 @@ export function buildTurret(game, team = 'player', type = null, slot = null) {
   type ??= AGES[game.ages[team]].turrets[0];
   slot ??= game.turrets[team].indexOf(null);
   const paid = stat(game, { type, team }, 'cost');
-  game.gold[team] = Math.max(0, game.gold[team] - paid);
+  game.gold[team] = Q.max(0, Q.sub(game.gold[team], paid));
   game.turrets[team][slot] = { team, type, slot, paid, cooldown: 0, flash: 0, shotSerial: 0, aim: 0, burstRemaining: 0, chargeRemaining: 0 };
   return true;
 }
@@ -149,7 +150,7 @@ export function getExpansionState(game, team = 'player') {
 export function expandTurretSlots(game, team = 'player') {
   if (getExpansionState(game, team) !== 'ready') return false;
   const cost = getExpansionCost(game, team);
-  game.gold[team] = Math.max(0, game.gold[team] - cost);
+  game.gold[team] = Q.max(0, Q.sub(game.gold[team], cost));
   game.turrets[team].push(null);
   return true;
 }
@@ -158,7 +159,7 @@ export function sellTurret(game, slot, team = 'player') {
   if (game.status !== 'playing' || !validTeam(team) || !Number.isInteger(slot)) return false;
   const turret = game.turrets[team][slot];
   if (!turret) return false;
-  game.gold[team] += getTurretRefund(game, turret);
+  game.gold[team] = Q.add(game.gold[team], getTurretRefund(game, turret));
   game.turrets[team][slot] = null;
   return true;
 }
@@ -244,22 +245,22 @@ function updateAI(game, dt) {
   // Save for a defensive tower when pressured; it uses the same wallet as training.
   const towers = game.turrets.enemy;
   const owned = towers.filter(Boolean).length;
-  if (stat(game, 'enemy', 'canBuild') && AGES[game.ages.enemy].turrets.some(type => stat(game, { type, team: 'enemy' }, 'enabled')) && !siegeThreat && game.elapsed > 18 && (invaders.length >= 3 || game.bases.enemy.hp < game.bases.enemy.maxHp * 0.65)) {
+  if (stat(game, 'enemy', 'canBuild') && AGES[game.ages.enemy].turrets.some(type => stat(game, { type, team: 'enemy' }, 'enabled')) && !siegeThreat && game.elapsed > 18 && (invaders.length >= 3 || Q.lt(game.bases.enemy.hp, Q.mul(game.bases.enemy.maxHp, 0.65)))) {
     const choices = AGES[game.ages.enemy].turrets.filter(type => stat(game, { type, team: 'enemy' }, 'enabled'));
     const towerStats = type => attributes(game, { type, team: 'enemy' });
     const coverage = type => { const stats = towerStats(type); return (stats.splash ?? 0) + (stats.fieldRadius ?? 0) + (stats.pierce ?? 0) * 40; };
     const type = invaders.length >= 3 ? choices.reduce((best, type) =>
       coverage(type) > coverage(best) ? type : best)
-      : invaders.some(unit => stat(game, unit, 'armor') > 0)
+      : invaders.some(unit => Q.gt(stat(game, unit, 'armor'), 0))
       ? choices.find(type => towerStats(type).ignoreArmor) ?? choices[0]
       : choices.reduce((fastest, type) => towerStats(type).attackInterval < towerStats(fastest).attackInterval ? type : fastest);
     if (towers.includes(null) && buildTurret(game, 'enemy', type)) return;
-    const reserve = stat(game, { type, team: 'enemy' }, 'cost') + stat(game, { type: AGES[game.ages.enemy].units[0], team: 'enemy' }, 'cost');
-    if (owned === towers.length && game.gold.enemy >= reserve + (getExpansionState(game, 'enemy') === 'max-slots' ? Infinity : getExpansionCost(game, 'enemy'))) {
+    const reserve = Q.add(stat(game, { type, team: 'enemy' }, 'cost'), stat(game, { type: AGES[game.ages.enemy].units[0], team: 'enemy' }, 'cost'));
+    if (owned === towers.length && getExpansionState(game, 'enemy') !== 'max-slots' && Q.gte(game.gold.enemy, Q.add(reserve, getExpansionCost(game, 'enemy')))) {
       expandTurretSlots(game, 'enemy');
       return;
     }
-    if (towers.includes(null) && game.gold.enemy >= 70) return;
+    if (towers.includes(null) && Q.gte(game.gold.enemy, 70)) return;
   }
   const [melee, archer, heavy] = AGES[game.ages.enemy].units;
   if (game.ai.strategy === 'siege') {
@@ -270,7 +271,7 @@ function updateAI(game, dt) {
       : [heavy, archer, game.ai.waves % 2 === 0 ? melee : archer];
     const wave = desiredWave.filter(type => stat(game, { type, team: 'enemy' }, 'enabled'));
     if (!wave.length || !stat(game, 'enemy', 'canRecruit')) return;
-    const cost = wave.reduce((sum, type) => sum + stat(game, { type, team: 'enemy' }, 'cost'), 0);
+    const cost = Q.sum(wave.map(type => stat(game, { type, team: 'enemy' }, 'cost')));
     const armySize = game.units.filter(unit => unit.team === 'enemy').length;
     if (armySize + wave.length > stat(game, 'enemy', 'armyLimit') || !canAfford(game.gold.enemy, cost)) return;
     for (const type of wave) {
@@ -331,16 +332,16 @@ function updateProjectiles(game, dt, hits) {
           }
         }
         // Siege units can hit a base directly; blast radius never adds extra base damage.
-        if (shot.targetBase && target?.hp > 0) hits.push({ target, damage: shot.damage, team: shot.team, visual: false });
-      } else if (target?.hp > 0) hits.push({ target, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce, ranged: true, visual: false });
-      if (shot.splash > 0 || target?.hp > 0) game.effects.push(createProjectileImpact(shot, impactSurface(game, target)));
+        if (shot.targetBase && (target && Q.gt(target.hp, 0))) hits.push({ target, damage: shot.damage, team: shot.team, visual: false });
+      } else if ((target && Q.gt(target.hp, 0))) hits.push({ target, damage: shot.damage, team: shot.team, ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce, ranged: true, visual: false });
+      if (shot.splash > 0 || (target && Q.gt(target.hp, 0))) game.effects.push(createProjectileImpact(shot, impactSurface(game, target)));
       if (shot.pierce) {
         const direction = shot.team === 'player' ? 1 : -1;
-        const victims = game.units.filter(unit => unit.team !== shot.team && unit.id !== shot.targetId && unit.hp > 0
+        const victims = game.units.filter(unit => unit.team !== shot.team && unit.id !== shot.targetId && Q.gt(unit.hp, 0)
           && (unit.x - shot.toX) * direction > 0 && (unit.x - shot.toX) * direction <= shot.pierceDistance
           && Math.abs(unit.x - shot.originX) <= shot.maxRange)
           .sort((a, b) => (a.x - b.x) * direction).slice(0, shot.pierce);
-        for (const victim of victims) hits.push({ target: victim, damage: shot.damage * shot.pierceFactor, team: shot.team,
+        for (const victim of victims) hits.push({ target: victim, damage: Q.mul(shot.damage, shot.pierceFactor), team: shot.team,
           ignoreArmor: shot.ignoreArmor, armorPierce: shot.armorPierce, ranged: true, visual: false });
         if (victims.length) game.effects.push({ kind: 'pierce', weapon: shot.kind, x: shot.toX, toX: victims.at(-1).x, y: shot.toY, team: shot.team, life: 0.16, duration: 0.16 });
         for (const victim of victims) game.effects.push(createProjectileImpact({ ...shot, toX: victim.x, targetId: victim.id }, impactSurface(game, victim)));
@@ -373,9 +374,9 @@ function updateAbility(game, dt, hits) {
   const ability = game.ability;
   const stats = ability.stats ?? attributes(game, { kind: 'ability', type: ability.type, team: 'player' });
   if (stats.targeting === 'allies') {
-    const healing = stats.healing * Math.min(dt, ability.remaining);
+    const healing = Q.mul(stats.healing, Math.min(dt, ability.remaining));
     for (const unit of game.units) {
-      if (unit.team === 'player' && unit.hp > 0) unit.hp = Math.min(stat(game, unit, 'health'), unit.hp + healing);
+      if (unit.team === 'player' && Q.gt(unit.hp, 0)) unit.hp = Q.min(stat(game, unit, 'health'), Q.add(unit.hp, healing));
     }
     ability.remaining -= dt;
     if (ability.remaining <= EPSILON) game.ability = null;
@@ -438,7 +439,7 @@ function updateUnits(game, dt, hits) {
     if (unit.burstRemaining > 0) {
       const victim = unit.burstTargetBase ? game.bases[unit.burstTargetBase] : game.units.find(other => other.id === unit.burstTargetId);
       const distance = victim ? Math.abs(victim.x - origin) - (victim.type ? 0 : RULES.baseHalfWidth) : Infinity;
-      if (!victim || victim.hp <= 0 || distance > (victim.type ? stats.range : baseRange) + 0.01) unit.burstRemaining = 0;
+      if (!victim || Q.lte(victim.hp, 0) || distance > (victim.type ? stats.range : baseRange) + 0.01) unit.burstRemaining = 0;
       else {
         unit.burstCooldown -= dt;
         if (unit.burstCooldown <= EPSILON) {
@@ -463,12 +464,12 @@ function updateUnits(game, dt, hits) {
           }
         } else {
           unit.lastAttackCharged = Boolean(stats.chargeDamage && (unit.chargeTravel ?? 0) >= stats.chargeDistance);
-          hits.push({ target, damage: (closeCombat ? stats.meleeDamage : stats.damage) + (unit.lastAttackCharged ? stats.chargeDamage : 0), team: unit.team, ignoreArmor: stats.ignoreArmor, armorPierce: stats.armorPierce, attacker: unit.type });
+          hits.push({ target, damage: Q.add(closeCombat ? stats.meleeDamage : stats.damage, unit.lastAttackCharged ? stats.chargeDamage : 0), team: unit.team, ignoreArmor: stats.ignoreArmor, armorPierce: stats.armorPierce, attacker: unit.type });
           if (stats.cleaveRadius && target.type) {
             const secondary = game.units.filter(other => other !== target && other.team !== unit.team &&
               (positions.get(other.id) - origin) * direction >= 0 && Math.abs(positions.get(other.id) - positions.get(target.id)) <= stats.cleaveRadius)
               .sort((a, b) => Math.abs(positions.get(a.id) - origin) - Math.abs(positions.get(b.id) - origin))[0];
-            if (secondary) hits.push({ target: secondary, damage: stats.damage * stats.cleaveFactor, team: unit.team, attacker: unit.type });
+            if (secondary) hits.push({ target: secondary, damage: Q.mul(stats.damage, stats.cleaveFactor), team: unit.team, attacker: unit.type });
           }
         }
         unit.chargeTravel = 0;
@@ -501,7 +502,7 @@ function updateTurrets(game, dt) {
       turret.cooldown = Math.max(0, turret.cooldown - dt);
       turret.flash = Math.max(0, turret.flash - dt);
       const { x, y } = getTurretPosition(game, team, turret.slot);
-      const valid = unit => unit && unit.hp > 0 && unit.team !== team && Math.abs(unit.x - x) <= stats.range;
+      const valid = unit => unit && Q.gt(unit.hp, 0) && unit.team !== team && Math.abs(unit.x - x) <= stats.range;
       const lockedId = turret.chargeRemaining > 0 ? turret.chargeTargetId : turret.burstRemaining > 0 ? turret.burstTargetId : null;
       const target = lockedId !== null ? game.units.find(unit => unit.id === lockedId)
         : game.units.filter(valid).sort((a, b) => Math.abs(a.x - x) - Math.abs(b.x - x))[0];
@@ -556,10 +557,10 @@ function resolveHits(game, hits) {
   // Resolve all damage before removing casualties; rewards are paid once per death.
   for (const hit of hits) {
     const stats = hit.target.type ? attributes(game, hit.target) : null;
-    const armor = stats && !hit.ignoreArmor ? Math.max(0, stats.armor - (hit.armorPierce ?? 0)) : 0;
+    const armor = stats && !hit.ignoreArmor ? Q.max(0, Q.sub(stats.armor, hit.armorPierce ?? 0)) : 0;
     const guard = hit.ranged && !hit.ignoreArmor ? stats?.rangedReduction ?? 0 : 0;
     const damage = hit.damage; // Already resolved at attack/launch time.
-    hit.target.hp = Math.max(0, hit.target.hp - (damage > 0 ? Math.max(1, (damage - armor) * (1 - guard)) : 0));
+    hit.target.hp = Q.max(0, Q.sub(hit.target.hp, Q.gt(damage, 0) ? Q.max(1, Q.mul(Q.sub(damage, armor), 1 - guard)) : 0));
     if (guard) hit.target.guardFlash = 0.18;
     hit.target.hitFlash = 0.14;
     if (hit.visual !== false) {
@@ -571,17 +572,17 @@ function resolveHits(game, hits) {
     }
   }
   for (const unit of game.units) {
-    if (unit.hp <= 0) {
+    if (Q.lte(unit.hp, 0)) {
       const winner = otherTeam(unit.team);
-      game.gold[winner] += getBountyReward(game, stat(game, unit, 'bounty'), winner);
-      game.experience[winner] += getExperienceReward(game, stat(game, unit, 'experience'), winner);
+      game.gold[winner] = Q.add(game.gold[winner], getBountyReward(game, stat(game, unit, 'bounty'), winner));
+      game.experience[winner] = Q.add(game.experience[winner], getExperienceReward(game, stat(game, unit, 'experience'), winner));
       // Losses teach the attacking side too, so a tower-only defense cannot freeze its age.
-      game.experience[unit.team] += getExperienceReward(game, Math.floor(stat(game, unit, 'experience') * RULES.casualtyExperienceRate), unit.team);
+      game.experience[unit.team] = Q.add(game.experience[unit.team], getExperienceReward(game, Q.floor(Q.mul(stat(game, unit, 'experience'), RULES.casualtyExperienceRate)), unit.team));
     }
   }
-  game.units = game.units.filter(unit => unit.hp > 0);
-  const playerLost = game.bases.player.hp === 0;
-  const enemyLost = game.bases.enemy.hp === 0;
+  game.units = game.units.filter(unit => Q.gt(unit.hp, 0));
+  const playerLost = Q.eq(game.bases.player.hp, 0);
+  const enemyLost = Q.eq(game.bases.enemy.hp, 0);
   if (playerLost || enemyLost) game.status = playerLost && enemyLost ? 'draw' : playerLost ? 'lost' : 'won';
 }
 
@@ -590,7 +591,7 @@ export function updateGame(game, dt) {
   dt = Math.min(dt, 0.05);
   game.elapsed += dt;
   for (const team of TEAMS) {
-    game.gold[team] += stat(game, team, 'income') * dt;
+    game.gold[team] = Q.add(game.gold[team], Q.mul(stat(game, team, 'income'), dt));
     game.bases[team].hitFlash = Math.max(0, game.bases[team].hitFlash - dt);
   }
   for (const effect of game.effects) effect.life -= dt;

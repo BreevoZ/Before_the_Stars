@@ -1,3 +1,4 @@
+import { Q } from './quantity.js';
 import { describeStat } from './stat-text.js';
 import { AGES } from './game.js';
 import { createProgression, updateProgression, continueCivilization, rebuildCivilization, abandonCivilization, startChallenge, getNextChallengeLevel } from './progression.js';
@@ -9,7 +10,7 @@ import { createDebugProgression, supplyDebugRun, runDebugCommand, DEBUG_SPEEDS }
 
 const el = id => document.getElementById(id);
 const text = (id, value) => { if (el(id).textContent !== String(value)) el(id).textContent = value; };
-export const formatMultiplier = value => String(value);
+export const formatMultiplier = value => Q.format(value, null);
 
 export function createCivilizationUI(onChange, { debug = false } = {}) {
   const store = createSaveStore(undefined, { debug });
@@ -20,7 +21,7 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   const dialog = el('archives-dialog'), saveDialog = el('save-dialog'), autoDialog = el('automation-dialog');
   const challengeDialog = el('challenge-dialog');
   let offeredRunId = null, challengeFromHome = false;
-  const multiplier = value => `×${Number(value.toFixed(3))}`;
+  const multiplier = value => `×${Q.format(value)}`;
   function openChallenge() {
     const level = getNextChallengeLevel(session);
     if (level === null) return;

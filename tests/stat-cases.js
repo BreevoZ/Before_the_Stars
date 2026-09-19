@@ -8,6 +8,7 @@ import { serializeSession, parseSession } from '../src/save.js';
 import { record, afterTwoSeconds } from './fixtures/v5-battle.js';
 import { challengeSeed } from './challenge-cases.js';
 import { mountFixture } from './progression-cases.js';
+import { SAVE_VERSION } from '../src/progression-config.js';
 
 const effect = (key, type, value, target = {}, source = 'doctrine') => ({
   target: { stat: key, ...target }, type, value, source: { kind: source, id: `${source}:${key}`, label: `${source} ${key}` },
@@ -171,19 +172,19 @@ export function registerStatTests(test, assert, near) {
       effect('queueLimit', 'override', 7), effect('armyLimit', 'override', 24), effect('damage', 'multiply', 2)]);
     s.game.gold.player = 1000; for (let i = 0; i < 7; i++) assert(recruit(s.game)); assert(buildTurret(s.game));
     assert(castAbility(s.game, 600)); const raw = serializeSession(s), restored = parseSession(raw);
-    assert(restored.version === 6 && !restored.game.modifiers && !restored.game.enemyModifiers);
+    assert(restored.version === SAVE_VERSION && !restored.game.modifiers && !restored.game.enemyModifiers);
     assert(restored.game.queues.player[0].duration === 3.2 && restored.game.turrets.player[0].paid === 60);
     for (let i = 0; i < 120; i++) { updateGame(s.game, RULES.fixedStep); updateGame(restored.game, RULES.fixedStep); }
     assert(serializeSession(restored) === serializeSession(s));
     for (const mutate of [record => record.game.bonuses[0].value++, record => record.game.queues.player[0].duration = -1,
-      record => record.run.extraBonuses[0].source.kind = 'unknown', record => record.game.ability.stats.damage = '900']) {
+      record => record.run.extraBonuses[0].source.kind = 'unknown', record => record.game.ability.stats.damage = 900]) {
       const corrupt = JSON.parse(raw); mutate(corrupt); rejects(() => parseSession(JSON.stringify(corrupt)));
     }
   });
 
   test('Stats save v5: captured old in-flight attacks continue identically after migration and repeated reloads', () => {
     const session = parseSession(JSON.stringify(record));
-    assert(session.version === 6 && !session.game.enemyModifiers);
+    assert(session.version === SAVE_VERSION && !session.game.enemyModifiers);
     advance(session.game, 2);
     const { game } = session;
     const actual = { gold: game.gold, experience: game.experience, units: game.units.map(({ team, hp, x }) => ({ team, hp, x })), bases: game.bases };

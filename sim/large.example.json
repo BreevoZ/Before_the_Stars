@@ -1,0 +1,169 @@
+{
+  "talents": {
+    "autobuyer": 1,
+    "logistics": 1,
+    "formation": 1,
+    "evolution": 1,
+    "defense": 2,
+    "elite": 1,
+    "production": 3,
+    "warfare": 2,
+    "supply": 2,
+    "salvage": 1,
+    "conservation": 1,
+    "challenge": 1
+  },
+  "challengeLevel": 0,
+  "automation": {
+    "enabled": true,
+    "mode": "balanced",
+    "weights": [
+      2,
+      2,
+      1
+    ],
+    "queueLimit": 2,
+    "evolve": true,
+    "defense": true,
+    "expand": true,
+    "replace": true,
+    "maxTurrets": 2,
+    "elite": true
+  },
+  "maxSeconds": 1800,
+  "bonuses": [
+    {
+      "target": {
+        "stat": "startingGold"
+      },
+      "type": "multiply",
+      "value": "1e400",
+      "source": {
+        "kind": "depth",
+        "id": "large-example:startingGold",
+        "label": "大数模拟"
+      }
+    },
+    {
+      "target": {
+        "stat": "income"
+      },
+      "type": "multiply",
+      "value": "1e400",
+      "source": {
+        "kind": "depth",
+        "id": "large-example:income",
+        "label": "大数模拟"
+      }
+    },
+    {
+      "target": {
+        "stat": "cost"
+      },
+      "type": "multiply",
+      "value": "1e400",
+      "source": {
+        "kind": "depth",
+        "id": "large-example:cost",
+        "label": "大数模拟"
+      }
+    },
+    {
+      "target": {
+        "stat": "expansionCost"
+      },
+      "type": "multiply",
+      "value": "1e400",
+      "source": {
+        "kind": "depth",
+        "id": "large-example:expansionCost",
+        "label": "大数模拟"
+      }
+    },
+    {
+      "target": {
+        "stat": "health"
+      },
+      "type": "multiply",
+      "value": "1e400",
+      "source": {
+        "kind": "depth",
+        "id": "large-example:health",
+        "label": "大数模拟"
+      }
+    },
+    {
+      "target": {
+        "stat": "baseHealth"
+      },
+      "type": "multiply",
+      "value": "1e400",
+      "source": {
+        "kind": "depth",
+        "id": "large-example:baseHealth",
+        "label": "大数模拟"
+      }
+    },
+    {
+      "target": {
+        "stat": "damage"
+      },
+      "type": "multiply",
+      "value": "1e400",
+      "source": {
+        "kind": "depth",
+        "id": "large-example:damage",
+        "label": "大数模拟"
+      }
+    },
+    {
+      "target": {
+        "stat": "armor"
+      },
+      "type": "multiply",
+      "value": "1e400",
+      "source": {
+        "kind": "depth",
+        "id": "large-example:armor",
+        "label": "大数模拟"
+      }
+    },
+    {
+      "target": {
+        "stat": "armorPierce"
+      },
+      "type": "multiply",
+      "value": "1e400",
+      "source": {
+        "kind": "depth",
+        "id": "large-example:armorPierce",
+        "label": "大数模拟"
+      }
+    },
+    {
+      "target": {
+        "stat": "healing"
+      },
+      "type": "multiply",
+      "value": "1e400",
+      "source": {
+        "kind": "depth",
+        "id": "large-example:healing",
+        "label": "大数模拟"
+      }
+    },
+    {
+      "target": {
+        "stat": "bounty",
+        "kind": "reward"
+      },
+      "type": "multiply",
+      "value": "1e400",
+      "source": {
+        "kind": "depth",
+        "id": "large-example:bounty",
+        "label": "大数模拟"
+      }
+    }
+  ]
+}

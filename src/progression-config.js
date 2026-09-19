@@ -1,3 +1,4 @@
+import { Q } from './quantity.js';
 import { AGES } from './game-config.js';
 // M1 covers only surface civilization. Later layers must not change this endpoint.
 export const SURFACE = Object.freeze({
@@ -16,10 +17,10 @@ export const CHALLENGE = Object.freeze({ maxLevel: 10, gold: 1.35, income: 1.35,
   experience: 1.2, health: 1.25, damage: 1.25, baseHealth: 1.2 });
 export function getChallengeModifiers(level = 0) {
   return Object.fromEntries(Object.entries(CHALLENGE).filter(([key]) => key !== 'maxLevel')
-    .map(([key, base]) => [key, base ** level]));
+    .map(([key, base]) => [key, Q.pow(base, level)]));
 }
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 export const SAVE_INTERVAL = 10;
 export function getBonuses(levels) {
-  return { income: UPGRADES.production.base ** levels.production, experience: UPGRADES.warfare.base ** levels.warfare };
+  return { income: Q.pow(UPGRADES.production.base, levels.production), experience: Q.pow(UPGRADES.warfare.base, levels.warfare) };
 }

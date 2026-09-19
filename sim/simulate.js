@@ -1,3 +1,4 @@
+import { Q } from '../src/quantity.js';
 import { RULES } from '../src/game.js';
 import { createProgression, createCivilizationRun, updateProgression, continueCivilization } from '../src/progression.js';
 import { CHALLENGE, UPGRADES } from '../src/progression-config.js';
@@ -31,6 +32,7 @@ export function normalizeRunOptions(options = {}) {
     throw new TypeError('Unknown automation setting; unlocked is derived from talents.autobuyer');
   }
   const auto = { ...defaults, ...automation, unlocked: levels.autobuyer > 0 };
+  auto.reserve = Q.of(auto.reserve);
   if (!validAutomation(auto, levels)) throw new RangeError('Invalid automation settings or missing automation talent');
   auto.weights = [...auto.weights];
   if (!Number.isFinite(maxSeconds) || maxSeconds < RULES.fixedStep || maxSeconds > 86400) {
@@ -63,7 +65,7 @@ export function simulateRun(options = {}) {
   while (ticks < limit && session.run.phase === 'battle') {
     updateProgression(session, RULES.fixedStep);
     ticks++;
-    peakGold = Math.max(peakGold, session.game.gold.player);
+    peakGold = Q.max(peakGold, session.game.gold.player);
     if (session.run.phase === 'battle') continue;
     recordBattle(session.game.status);
     if (session.run.phase !== 'victory') break;
@@ -71,7 +73,7 @@ export function simulateRun(options = {}) {
     // transition handles refunds, retained assets and the enemy's next age.
     if (ticks === limit) break;
     if (!continueCivilization(session, session.run.battleId)) throw new Error('Could not continue a won conflict');
-    peakGold = Math.max(peakGold, session.game.gold.player);
+    peakGold = Q.max(peakGold, session.game.gold.player);
     battleStart = ticks;
     enemyStartAge = session.game.ages.enemy;
   }
@@ -79,5 +81,5 @@ export function simulateRun(options = {}) {
   const outcome = session.run.phase === 'destruction' ? 'won'
     : session.run.phase === 'defeat' ? session.game.status : 'timeout';
   return { outcome, duration: round(ticks * RULES.fixedStep), battles,
-    peakGold: round(peakGold), totalExperience: session.game.experience.player, legacy: session.run.earnedLegacy };
+    peakGold: typeof peakGold === 'number' ? round(peakGold) : Q.encode(peakGold), totalExperience: typeof session.game.experience.player === 'number' ? session.game.experience.player : Q.encode(session.game.experience.player), legacy: session.run.earnedLegacy };
 }

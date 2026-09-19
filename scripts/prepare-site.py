@@ -13,7 +13,7 @@ files = [
     Path(name) for name in tracked if name and (
         (Path(name).parent == Path(".") and Path(name).suffix == ".html")
         or (Path(name).parts[0] in {"src", "tests"}
-            and Path(name).suffix in {".html", ".js", ".css"})
+            and (Path(name).suffix in {".html", ".js", ".css"} or Path(name).name == "LICENSE"))
     )
 ]
 if Path("index.html") not in files:

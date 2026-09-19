@@ -5,6 +5,7 @@ import { registerTalentTests } from './talent-cases.js';
 import { registerChallengeTests } from './challenge-cases.js';
 import { registerTalentHomeTests } from './talent-home-cases.js';
 import { registerStatTests } from './stat-cases.js';
+import { registerQuantityTests } from './quantity-cases.js';
 
 function assert(condition, message = 'Assertion failed') { if (!condition) throw new Error(message); }
 function near(actual, expected, message = '') {
@@ -18,7 +19,7 @@ export function collectCases({ browser = false } = {}) {
   const test = (name, run) => cases.push({ name, run });
   test.browser = browser ? test : () => {};
   for (const register of [registerGameTests, registerAnimationTests, registerProgressionTests,
-    registerTalentTests, registerChallengeTests, registerStatTests]) register(test, assert, near);
+    registerTalentTests, registerChallengeTests, registerStatTests, registerQuantityTests]) register(test, assert, near);
   if (browser) registerTalentHomeTests(test, assert, near);
   return cases;
 }

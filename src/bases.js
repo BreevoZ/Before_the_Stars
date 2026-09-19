@@ -1,3 +1,4 @@
+import { Q } from './quantity.js';
 import { BASE_MOUNTS } from './base-layouts.js';
 
 // Keep the landscape's quiet palette, but give each era its own massing,
@@ -258,13 +259,13 @@ function ruins(ctx, age, m) {
 const MODELS = [null, tribal, medieval, renaissance, modern, future];
 export function drawBase(ctx, base, age, time = 0, scale = 1, slots = 1) {
   const palette = ERA_MATERIALS[age], enemy = base.team === 'enemy';
-  const m = { ...palette, cloth: enemy ? '#bc9675' : '#7fa68b', energy: enemy ? '#dec291' : '#b0d5bd', damaged: base.hp < base.maxHp * 0.5 };
+  const m = { ...palette, cloth: enemy ? '#bc9675' : '#7fa68b', energy: enemy ? '#dec291' : '#b0d5bd', damaged: Q.ratio(base.hp, base.maxHp) < 0.5 };
   if (base.hitFlash > 0) { m.body = '#d4d6b7'; m.light = '#e1dfbd'; }
   const mounts = BASE_MOUNTS[age].slice(0, slots);
   ctx.save(); ctx.translate(base.x, 0); ctx.scale(scale * (enemy ? -1 : 1), scale);
   ctx.lineCap = 'butt'; ctx.lineJoin = 'bevel';
   oval(ctx, 0, 1, 74, 5, '#14231e55');
-  if (base.hp > 0) {
+  if (Q.gt(base.hp, 0)) {
     MODELS[age](ctx, mounts, m, time);
     for (const { x, y } of mounts) oval(ctx, x, y + 1, 12, 1.3, m.dark);
     if (m.damaged) damage(ctx, age, m);

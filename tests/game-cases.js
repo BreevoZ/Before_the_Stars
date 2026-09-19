@@ -1228,7 +1228,7 @@ test.browser('Browser UI: earn experience, evolve independently, replace cards a
   const abilityState = el('ability-state').textContent;
   key('KeyE');
   assert(el('player-age').textContent.includes('中世纪') && el('enemy-age').textContent === enemyAge);
-  assert(el('player-health-bar').max === AGES[2].baseHealth && el('evolve').disabled);
+  assert(el('player-health-bar').max === 1 && el('player-health').textContent.endsWith('/ ' + AGES[2].baseHealth) && el('evolve').disabled);
   assert(el('gold').textContent === gold && [...page.querySelectorAll('.queue-name')].map(element => element.textContent).join() === queue);
   assert([...page.querySelectorAll('[data-unit]:not([hidden])')].map(card => card.dataset.unit).join() === AGES[2].units.join());
   assert(el('recruit-heavy').querySelector('strong').textContent === '重甲骑士');
@@ -1249,7 +1249,7 @@ test.browser('Browser UI: earn experience, evolve independently, replace cards a
   el('restart').click();
   assert(el('player-age').textContent.includes('原始时代') && el('enemy-age').textContent.includes('原始时代'));
   assert(el('experience-total').textContent === `0 / ${AGES[2].experienceRequired} 经验`);
-  assert(el('recruit').dataset.unit === 'melee' && el('evolve').disabled && el('player-health-bar').max === RULES.baseHealth);
+  assert(el('recruit').dataset.unit === 'melee' && el('evolve').disabled && el('player-health-bar').max === 1 && el('player-health').textContent.endsWith('/ ' + RULES.baseHealth));
   assert(el('ability-name').textContent === ABILITIES.meteor.name && el('build-turret').dataset.turret === 'rockSling');
   assert(el('turret-capacity').textContent === '0 / 1');
 });
@@ -1353,7 +1353,7 @@ test.browser('Browser UI: all five rosters, era progress, income, support target
     if (age < 5) assert(el('evolve-label').textContent.includes(AGES[age + 1].name));
   }
   assert(el('evolve').disabled && el('evolution-hint').textContent.includes('五个时代已全部解锁'));
-  assert(el('experience-bar').value === AGES[5].experienceRequired && el('player-health-bar').max === AGES[5].baseHealth);
+  assert(el('experience-bar').value === AGES[5].experienceRequired && el('player-health-bar').max === 1 && el('player-health').textContent.endsWith('/ ' + AGES[5].baseHealth));
   URL.revokeObjectURL(fixture);
 });
 

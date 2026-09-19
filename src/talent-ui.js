@@ -1,3 +1,4 @@
+import { Q } from './quantity.js';
 import { stat } from './stats.js';
 import { AGES, UNITS, TURRETS } from './game.js';
 import { AUTOMATION_TARGETS } from './progression-config.js';
@@ -12,7 +13,7 @@ export function createTalentUI(getSession, changed) {
   const map = createTalentMap(getSession, changed);
   const fields = {
     'auto-enabled': ['enabled', 'checked'], 'auto-recruit': ['recruitEnabled', 'checked'], 'auto-target': ['target', 'value'],
-    'auto-reserve': ['reserve', 'number'], 'auto-queue': ['queueLimit', 'number'], 'auto-priority': ['priority', 'value'], 'auto-mode': ['mode', 'value'],
+    'auto-reserve': ['reserve', 'quantity'], 'auto-queue': ['queueLimit', 'number'], 'auto-priority': ['priority', 'value'], 'auto-mode': ['mode', 'value'],
     'auto-evolve': ['evolve', 'checked'], 'auto-defense': ['defense', 'checked'], 'auto-turret': ['turretTarget', 'number'],
     'auto-max-turrets': ['maxTurrets', 'number'], 'auto-expand': ['expand', 'checked'], 'auto-replace': ['replace', 'checked'],
     'auto-elite': ['elite', 'checked'], 'auto-elite-limit': ['eliteLimit', 'number'],
@@ -25,6 +26,7 @@ export function createTalentUI(getSession, changed) {
     text('automation-error', '设置已保存。'); changed();
   }
   for (const [id, [key, type]] of Object.entries(fields)) el(id).addEventListener('change', () => {
+    if (type === 'quantity') { apply({ [key]: el(id).value.trim() }); return; }
     apply({ [key]: type === 'number' ? (el(id).value === '' ? NaN : Number(el(id).value)) : el(id)[type] });
   });
   AUTOMATION_TARGETS.forEach((role, index) => el(`auto-weight-${role}`).addEventListener('change', () => {
@@ -49,7 +51,7 @@ export function createTalentUI(getSession, changed) {
       }));
       el('auto-queue').title = `实际训练队列最多 ${stat(game, 'player', 'queueLimit')} 位；自动购买还受此上限约束。`;
       for (const [id, [key, type]] of Object.entries(fields)) {
-        el(id)[type === 'checked' ? 'checked' : 'value'] = auto[key]; el(id).disabled = !auto.unlocked;
+        el(id)[type === 'checked' ? 'checked' : 'value'] = type === 'quantity' ? Q.encode(auto[key]) : auto[key]; el(id).disabled = !auto.unlocked;
       }
       AUTOMATION_TARGETS.forEach((role, i) => { el(`auto-weight-${role}`).value = auto.weights[i]; el(`auto-weight-${role}`).disabled = !p.talents.formation; });
       for (const id of ['auto-reserve', 'auto-queue', 'auto-priority', 'auto-recruit']) el(id).disabled = !p.talents.logistics;

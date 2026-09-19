@@ -1,10 +1,12 @@
 import { Q } from './quantity.js';
 import { createGame, updateGame } from './game.js';
 import { updateAutomation, createAutomation, configureAutomation } from './automation.js';
-import { SURFACE, UPGRADES, UPGRADE_COSTS, SAVE_VERSION, CHALLENGE } from './progression-config.js';
+import { UPGRADES, UPGRADE_COSTS, SAVE_VERSION } from './progression-config.js';
 import { emptyTalents, talentLevel } from './talents.js';
 import { getRunBonuses } from './progression-bonuses.js';
 import { createBonusStack, stat } from './stats.js';
+import { PHASE, getTransition, getNextChallengeLevel, isBetweenRuns } from './progression-machine.js';
+export { getNextChallengeLevel } from './progression-machine.js';
 
 function uniqueId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
@@ -16,7 +18,7 @@ export function createCivilizationRun(permanent, challengeLevel = 0, extraBonuse
   const runId = uniqueId();
   const upgrades = { ...permanent.upgrades };
   const talents = { ...permanent.talents };
-  const run = { runId, challengeLevel, battleNumber: 1, battleId: `${runId}:1`, phase: 'battle',
+  const run = { runId, challengeLevel, battleNumber: 1, battleId: `${runId}:1`, phase: PHASE.BATTLE,
     processedBattleId: null, settled: false, earnedLegacy: 0, upgrades, talents, autoElapsed: 0, autoTurn: 'recruit', elapsed: 0 };
   if (extraBonuses.length) run.extraBonuses = createBonusStack(extraBonuses);
   const game = createConflict(run);
@@ -38,30 +40,24 @@ export function createProgression() {
   return session;
 }
 
-// Called by the simulation/controller, never by rendering or animation callbacks.
-export function resolveBattle(session) {
-  const { run, game, permanent } = session;
-  if (run.phase !== 'battle' || game.status === 'playing' || run.processedBattleId === run.battleId) return false;
-  run.processedBattleId = run.battleId;
-  if (game.status !== 'won') run.phase = 'defeat';
-  else if (game.ages.enemy !== SURFACE.finalEnemyAge) run.phase = 'victory';
-  else {
-    run.phase = 'destruction';
-    if (!run.settled) {
-      run.settled = true;
-      run.earnedLegacy = stat(game, { kind: 'civilization' }, 'legacy');
-      permanent.completedCycles++;
-      permanent.legacy += run.earnedLegacy;
-      permanent.totalLegacy += run.earnedLegacy;
-    }
-  }
+// Every meta event passes through the same state/token/guard table. Effects
+// are synchronous simulation work; rendering and animations never dispatch rewards.
+export function transitionCivilization(session, event, token) {
+  const transition = getTransition(session, event, token);
+  if (!transition) return false;
+  effects[transition.effect](session);
+  session.run.phase = transition.to;
   return true;
+}
+
+export function resolveBattle(session) {
+  return transitionCivilization(session, 'resolve', session.run.battleId);
 }
 
 export function updateProgression(session, dt, { paused = false, hidden = false } = {}) {
   if (paused || hidden || !Number.isFinite(dt) || dt <= 0) return false;
   if (resolveBattle(session)) return true;
-  if (session.run.phase !== 'battle') return false;
+  if (session.run.phase !== PHASE.BATTLE) return false;
   dt = Math.min(dt, 0.05);
   updateAutomation(session, dt);
   updateGame(session.game, dt);
@@ -69,11 +65,9 @@ export function updateProgression(session, dt, { paused = false, hidden = false 
   return resolveBattle(session);
 }
 
-export function continueCivilization(session, battleId) {
+function continueConflict(session) {
   const { game, run } = session;
-  if (run.phase !== 'victory' || battleId !== run.battleId || game.status !== 'won' || game.ages.enemy >= SURFACE.finalEnemyAge) return false;
-  const nextAge = game.ages.enemy + 1;
-  const next = createConflict(run, { player: game.ages.player, enemy: nextAge });
+  const next = createConflict(run, { player: game.ages.player, enemy: game.ages.enemy + 1 });
   next.experience.player = game.experience.player;
   next.gold.player = Q.add(game.gold.player, Q.sum(game.queues.player.map(order => order.paid)));
   next.turrets.player = game.turrets.player.map(turret => turret ? { ...turret,
@@ -81,46 +75,39 @@ export function continueCivilization(session, battleId) {
   next.abilityCooldown = game.abilityCooldown;
   run.battleNumber++;
   run.battleId = `${run.runId}:${run.battleNumber}`;
-  run.phase = 'battle';
   run.autoElapsed = 0;
   run.autoTurn = 'recruit';
   session.game = next;
-  return true;
 }
 
-export function rebuildCivilization(session, runId) {
-  if (session.run.runId !== runId || !['destruction', 'defeat'].includes(session.run.phase)) return false;
-  startRun(session);
-  return true;
-}
+const effects = {
+  finishBattle({ run }) { run.processedBattleId = run.battleId; },
+  settle(session) {
+    const { run, game, permanent } = session;
+    const reward = stat(game, { kind: 'civilization' }, 'legacy');
+    run.processedBattleId = run.battleId;
+    run.settled = true;
+    run.earnedLegacy = reward;
+    permanent.completedCycles++;
+    permanent.legacy += reward;
+    permanent.totalLegacy += reward;
+  },
+  continue: continueConflict,
+  rebuild: session => startRun(session),
+  challenge: session => startRun(session, getNextChallengeLevel(session)),
+  abandon: session => startRun(session, session.run.challengeLevel, session.run.extraBonuses ?? []),
+};
 
-// Only a completed civilization can unlock the next difficulty. The run ID
-// makes stale/double clicks harmless, including after a reload or import.
-export function getNextChallengeLevel(session) {
-  const { run, permanent } = session;
-  if (!permanent.talents.challenge) return null;
-  if (run.phase === 'destruction' && run.settled && run.challengeLevel < CHALLENGE.maxLevel) return run.challengeLevel + 1;
-  if (run.phase === 'defeat' && run.challengeLevel > 0) return run.challengeLevel;
-  return null;
-}
-export function startChallenge(session, runId) {
-  const level = getNextChallengeLevel(session);
-  if (session.run.runId !== runId || level === null) return false;
-  startRun(session, level);
-  return true;
-}
-
-// The UI must confirm abandoning an unfinished civilization before calling this.
-export function abandonCivilization(session, runId) {
-  if (session.run.runId !== runId || !['battle', 'victory'].includes(session.run.phase)) return false;
-  startRun(session, session.run.challengeLevel, session.run.extraBonuses ?? []);
-  return true;
-}
+export const continueCivilization = (session, battleId) => transitionCivilization(session, 'continue', battleId);
+export const rebuildCivilization = (session, runId) => transitionCivilization(session, 'rebuild', runId);
+export const startChallenge = (session, runId) => transitionCivilization(session, 'challenge', runId);
+// The controller confirms abandonment before dispatching this event.
+export const abandonCivilization = (session, runId) => transitionCivilization(session, 'abandon', runId);
 
 export function getUpgradeState(session, key) {
   if (!Object.hasOwn(UPGRADES, key)) return 'invalid';
   if (!session.permanent.completedCycles) return 'locked';
-  if (!['destruction', 'defeat'].includes(session.run.phase)) return 'during-run';
+  if (!isBetweenRuns(session.run.phase)) return 'during-run';
   const level = session.permanent.upgrades[key];
   if (level >= UPGRADE_COSTS.length) return 'max';
   if (Object.entries(UPGRADES[key].requires).some(([parent, required]) => talentLevel(session, parent) < required)) return 'prerequisite';

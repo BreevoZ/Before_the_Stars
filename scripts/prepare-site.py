@@ -14,6 +14,8 @@ files = [
         (Path(name).parent == Path(".") and Path(name).suffix == ".html")
         or (Path(name).parts[0] in {"src", "tests"}
             and (Path(name).suffix in {".html", ".js", ".css"} or Path(name).name == "LICENSE"))
+        # Shared browser regressions also exercise the DOM-free simulator.
+        or name in {"sim/simulate.js", "sim/grid.js"}
     )
 ]
 if Path("index.html") not in files:

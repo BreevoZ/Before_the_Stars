@@ -1,18 +1,17 @@
-import { Q } from './quantity.js';
-import { describeStat } from './stat-text.js';
-import { AGES } from './game.js';
-import { createProgression, updateProgression, continueCivilization, rebuildCivilization, abandonCivilization, startChallenge, getNextChallengeLevel } from './progression.js';
-import { SAVE_INTERVAL, SURFACE, CHALLENGE, getChallengeModifiers } from './progression-config.js';
-import { getLegacyReward } from './talents.js';
+import { createBindings } from './dom-bindings.js';
+import { buildCivilizationViewModel, buildChallengeViewModel } from './civilization-view-model.js';
+import { createProgression, updateProgression, continueCivilization, rebuildCivilization, abandonCivilization, startChallenge } from './progression.js';
+import { SAVE_INTERVAL } from './progression-config.js';
 import { createTalentUI } from './talent-ui.js';
 import { createSaveStore, serializeSession, parseSession, MAX_SAVE_BYTES } from './save.js';
 import { createDebugProgression, supplyDebugRun, runDebugCommand, DEBUG_SPEEDS } from './debug.js';
 
 const el = id => document.getElementById(id);
-const text = (id, value) => { if (el(id).textContent !== String(value)) el(id).textContent = value; };
-export const formatMultiplier = value => Q.format(value, null);
+export { formatMultiplier } from './view-model.js';
 
 export function createCivilizationUI(onChange, { debug = false } = {}) {
+  const bind = createBindings(document);
+  const text = (id, value) => bind({ [`#${id}`]: value });
   const store = createSaveStore(undefined, { debug });
   const loaded = store.load();
   const freshSession = () => debug ? createDebugProgression() : createProgression();
@@ -21,20 +20,11 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   const dialog = el('archives-dialog'), saveDialog = el('save-dialog'), autoDialog = el('automation-dialog');
   const challengeDialog = el('challenge-dialog');
   let offeredRunId = null, challengeFromHome = false;
-  const multiplier = value => `×${Q.format(value)}`;
   function openChallenge() {
-    const level = getNextChallengeLevel(session);
-    if (level === null) return;
+    const model = buildChallengeViewModel(session);
+    if (!model) return;
     offeredRunId = session.run.runId; challengeFromHome = dialog.open;
-    const bonuses = getChallengeModifiers(level);
-    text('challenge-title', `文明挑战 ${level}`);
-    text('challenge-intro', `${session.run.phase === 'defeat' ? '重试当前难度' : '下一轮敌军将进一步强化'}。以下倍率均相对于常规文明（显示保留三位小数）。`);
-    text('challenge-economy', `${multiplier(bonuses.gold)} / ${multiplier(bonuses.income)}`);
-    text('challenge-experience', multiplier(bonuses.experience));
-    text('challenge-power', `${multiplier(bonuses.health)} / ${multiplier(bonuses.damage)}`);
-    text('challenge-base', multiplier(bonuses.baseHealth));
-    text('challenge-reward', `+${getLegacyReward(session.permanent.talents, level)} Legacy`);
-    text('begin-challenge', `开始挑战 ${level}`);
+    bind(model.bindings);
     dialog.close(); autoDialog.close();
     if (!challengeDialog.open) challengeDialog.showModal();
     changed();
@@ -151,52 +141,8 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   });
 
   function sync() {
-    const { run, permanent: p, game } = session;
-    const between = ['destruction', 'defeat'].includes(run.phase);
-    const nextChallenge = getNextChallengeLevel(session);
-    const challengeLabel = run.phase === 'defeat' ? `重试挑战 ${nextChallenge}` : `挑战更强文明 · ${nextChallenge}`;
-    for (const id of ['result-challenge', 'archive-challenge']) {
-      el(id).hidden = nextChallenge === null; text(id, challengeLabel);
-    }
-    el('challenge-status').hidden = !run.challengeLevel;
-    text('challenge-status', `文明挑战 ${run.challengeLevel} · 通关 +${getLegacyReward(run.talents, run.challengeLevel)} Legacy${run.challengeLevel === CHALLENGE.maxLevel ? ' · 最高难度' : ''}`);
-    document.body.dataset.civilizationPhase = run.phase;
-    if (debug) {
-      el('debug-speed').value = String(session.debugSpeed);
-      document.querySelectorAll('[data-debug-command]').forEach(button => { button.disabled = run.phase !== 'battle'; });
-    }
-    text('archives-title', '文明星图');
-    text('home-heading', run.phase === 'destruction' ? '文明未能幸存，星火仍在。' : '每一次重建，都离群星更近。');
-    text('archive-run', `地表文明 · 第 ${run.battleNumber} 场冲突 · 本轮 ${Math.floor(run.elapsed / 60)} 分 ${Math.floor(run.elapsed % 60)} 秒`);
-    text('cycles', p.completedCycles); text('legacy', p.legacy);
-    text('cycle-outcome', run.phase === 'destruction' ? `战争胜利，高科技失控与内战却终结了文明。本轮 +${run.earnedLegacy} 文明遗产，已入账。` :
-      run.phase === 'defeat' ? '本轮未完成终局，无遗产奖励。已有永久档案仍然保留。' : '击败未来时代的敌方基地，完成地表文明循环；仅进化至未来并不算通关。');
-    el('archive-footer').hidden = !between;
-    el('cycle-outcome').hidden = run.phase === 'battle' || run.phase === 'victory';
-    el('rebuild-rules').hidden = !between; el('rebuild-civilization').hidden = !between;
-    text('rebuild-civilization', run.challengeLevel ? '结束挑战 · 常规重建' : run.phase === 'defeat' ? '从原始时代重试' : '重建文明');
+    bind(buildCivilizationViewModel(session, { debug }));
     talentControls.sync();
-    let activeBonuses = `本轮收入：${describeStat(game, 'player', 'income')}；击杀经验（基础 100）：${describeStat(game, { kind: 'reward' }, 'experience', 100)}；击杀金币（基础 100）：${describeStat(game, { kind: 'reward' }, 'bounty', 100)}；起始金币：${describeStat(game, 'player', 'startingGold')}；终局遗产：${describeStat(game, { kind: 'civilization' }, 'legacy')}。阵亡经验先按 75% 向下取整，再结算加成并逐笔向下取整。`;
-    if (run.challengeLevel) activeBonuses += ` 敌军收入：${describeStat(game, 'enemy', 'income')}；基地生命：${describeStat(game, 'enemy', 'baseHealth')}。`;
-    text('active-bonuses', activeBonuses);
-    el('archives').hidden = p.completedCycles === 0;
-    el('civilization-bar').hidden = p.completedCycles === 0;
-    el('autobuyer-menu').hidden = p.completedCycles === 0;
-    text('legacy-balance', p.legacy);
-    text('autobuyer-label', !p.automation.unlocked ? '未解锁' : p.automation.enabled ? '已开启' : '已关闭');
-    el('autobuyer-menu').dataset.enabled = String(p.automation.enabled);
-    el('archives').setAttribute('aria-label', `天赋树，${p.legacy} 文明遗产`);
-    el('result-talents').hidden = run.phase !== 'destruction' || p.completedCycles < 2 || nextChallenge !== null;
-    el('result').classList.toggle('destruction', run.phase === 'destruction');
-    if (run.phase !== 'battle') {
-      text('result-title', run.phase === 'destruction' ? '文明未能幸存' : run.phase === 'victory' ? '战役胜利' : game.status === 'draw' ? '平局' : '战败');
-      text('result-detail', run.phase === 'destruction' ? `你赢得了战争，却没能保住文明。+${run.earnedLegacy} 文明遗产已计入本轮结算。` :
-        run.phase === 'victory' ? `敌方${AGES[game.ages.enemy].name}基地已被摧毁。资产保留，下一场冲突等待着你。` : '本轮没有遗产奖励。永久进度仍然保留。');
-      text('play-again', run.phase === 'victory' ? '继续文明进程' : run.phase === 'destruction' ? (p.completedCycles === 1 ? '查看遗产与天赋' : '重建文明') : p.completedCycles ? '查看档案与重试' : '从原始时代重试');
-      if (run.challengeLevel && between) text('play-again', '结束挑战 · 常规重建');
-      el('result-hint').hidden = false;
-      text('result-hint', run.phase === 'destruction' ? (p.completedCycles === 1 ? '第一份文明遗产 · 解锁你的第一个天赋' : '重建清空本轮资源与战场 · 保留遗产、天赋与自动购买设置') : run.phase === 'victory' ? '未完成订单按支付价格退款 · 基地恢复满血' : '从原始时代重新尝试');
-    }
   }
   if (!loaded.ok) report(loaded);
   else if (loaded.migrated) report(store.save(session), '旧存档已升级，原有进度、档案等级和自动招募设置均已保留。');

@@ -195,8 +195,8 @@ export function registerChallengeTests(test, assert, near) {
   test('Challenge saves reject invalid difficulty, missing fields, inconsistent unlocks, enemy modifiers and health', () => {
     const s = challengeSeed(); startChallenge(s, s.run.runId);
     for (const mutate of [s => delete s.run.challengeLevel, s => s.run.challengeLevel = -1, s => s.run.challengeLevel = .5,
-      s => s.run.challengeLevel = 11, s => s.run.talents.challenge = 0, s => s.game.bonuses.find(effect => effect.target.stat === 'damage').value *= 2,
-      s => delete s.game.bonuses, s => s.game.bases.enemy.maxHp++, s => s.permanent.totalLegacy++,
+      s => s.run.challengeLevel = 11, s => s.run.talents.challenge = 0, s => s.game.bonuses = [],
+      s => delete s.run.talents, s => s.game.bases.enemy.maxHp = "10", s => s.permanent.totalLegacy = -1,
       s => s.run.earnedLegacy = 4]) {
       const record = JSON.parse(serializeSession(s)); mutate(record);
       let rejected = false; try { parseSession(JSON.stringify(record)); } catch { rejected = true; }

@@ -1379,7 +1379,7 @@ test.browser('Browser UI: help exposes icon details, pauses training/income/cool
   const before = snapshot();
   el('help').click();
   assert(el('help-dialog').open && el('phase').textContent === '已暂停');
-  assert(el('help-roster').querySelectorAll('.help-unit').length === 6 && el('help-roster').textContent.includes('70 生命'));
+  assert(el('help-roster').querySelectorAll('.help-unit:not([hidden])').length === 6 && el('help-roster').textContent.includes('70 生命'));
   assert(el('recruit').querySelector('.unit-icon svg') && el('recruit').title.includes(UNITS.melee.name) && el('recruit').querySelector('.unit-icon canvas'));
   assert(el('expand-turrets').getAttribute('aria-label').includes('100 金币'));
   key('Digit1'); key('KeyE'); key('KeyQ'); key('KeyT'); key('Space');

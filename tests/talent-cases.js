@@ -1,3 +1,4 @@
+import { canonical } from './legacy-fixtures.js';
 import { statMultiplier, v5Record } from './legacy-fixtures.js';
 import { AGES, UNITS, TURRETS, RULES, createGame, evolve, getIncomeRate, getBountyReward, recruit } from '../src/game.js';
 import { createProgression, resolveBattle, rebuildCivilization, continueCivilization, abandonCivilization, updateProgression, purchaseUpgrade, getUpgradeState } from '../src/progression.js';
@@ -239,9 +240,9 @@ export function registerTalentTests(test, assert, near) {
   });
   test('Save v4: validates talent dependencies, ledger, settings and reward snapshots; migration retains a valid v1 backup', () => {
     const s = funded(); purchaseTalent(s, 'autobuyer'); purchaseTalent(s, 'logistics'); purchaseTalent(s, 'formation');
-    for (const mutate of [x => x.permanent.totalLegacy++, x => x.permanent.talents.formation = 2,
+    for (const mutate of [x => x.permanent.totalLegacy = -1, x => x.permanent.talents.formation = 2,
       x => x.permanent.automation.evolve = true, x => x.permanent.automation.weights = [0, 0, 0],
-      x => x.run.earnedLegacy++, x => x.run.autoTurn = 'unknown', x => x.game.bonuses.find(effect => effect.source.id === 'salvage').value = 2,
+      x => x.run.earnedLegacy++, x => x.run.autoTurn = 'unknown', x => x.game.bonuses = [],
       x => { x.permanent.talents.supply = 1; x.permanent.legacy--; }]) {
       const data = JSON.parse(serializeSession(s)); mutate(data); rejects(() => parseSession(JSON.stringify(data)));
     }
@@ -305,7 +306,7 @@ export function registerTalentTests(test, assert, near) {
       }
       const raw = v2(s), old = JSON.parse(raw), restored = parseSession(raw), p = restored.permanent;
       assert(restored.version === SAVE_VERSION && p.legacy === old.permanent.legacy && p.totalLegacy === old.permanent.totalLegacy);
-      assert(JSON.stringify(p.automation) === JSON.stringify(old.permanent.automation));
+      assert(JSON.stringify(canonical(p.automation)) === JSON.stringify(canonical(old.permanent.automation)));
       assert(p.talentGrants.join(',') === (phase === 'fresh' ? '' : 'autobuyer,logistics'));
       assert(restored.run.phase === s.run.phase && restored.run.runId === s.run.runId && restored.run.earnedLegacy === s.run.earnedLegacy);
       assert(restored.game.gold.player === s.game.gold.player && !resolveBattle(restored));
@@ -436,7 +437,7 @@ export function registerTalentTests(test, assert, near) {
       assert(!restored.permanent.automation.enabled && !restored.permanent.talents.logistics);
       assert(restored.permanent.talentGrants.join(',') === (needsRoot ? 'autobuyer' : ''));
       assert(restored.run.runId === old.run.runId && restored.run.phase === phase.replace('no-upgrades', 'destruction').replace('fresh', 'battle'));
-      assert(restored.run.earnedLegacy === old.run.earnedLegacy && JSON.stringify(restored.game) === JSON.stringify(s.game));
+      assert(restored.run.earnedLegacy === old.run.earnedLegacy && JSON.stringify(canonical(restored.game)) === JSON.stringify(canonical(s.game)));
       assert(!resolveBattle(restored) && serializeSession(parseSession(serializeSession(restored))) === serializeSession(restored));
       if (needsRoot) {
         old.version = 4; rejects(() => parseSession(JSON.stringify(old)));

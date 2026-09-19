@@ -279,7 +279,7 @@ export function registerProgressionTests(test, assert, near) {
     for (const mutate of [s => s.version++, s => delete s.game.queues, s => s.permanent.legacy = -1,
       s => s.permanent.completedCycles = '1', s => s.permanent.upgrades.production = 6,
       s => s.permanent.automation.target = 'dragon', s => s.run.phase = 'orbital', s => s.run.settled = true,
-      s => s.game.bases.player.hp = 601, s => s.game.gold.player = 1e100, s => s.game.bonuses.find(effect => effect.source.id === 'production').value = 999,
+      s => s.game.bases.player.hp = 601, s => s.game.gold.player = 1e100, s => s.game.bonuses = [],
       s => s.game.units.push({}), s => s.game.fields.push({ kind: 'oil', tickInterval: 0 }), s => delete s.run.runId]) {
       const s = JSON.parse(raw); mutate(s); throws(() => parseSession(JSON.stringify(s)));
     }

@@ -1,8 +1,10 @@
+@import url('./tokens.css');
+
 :root {
   color-scheme: dark;
   font-family: Inter,"PingFang SC","Microsoft YaHei",sans-serif;
-  color: #d8dfca;
-  background: #111b19;
+  color: var(--color-workshop-text);
+  background: var(--color-workshop-surface);
   font-synthesis: none;
   font-size: 14px;
 }
@@ -16,19 +18,19 @@ body {
   display: none !important;
 }
 a {
-  color: #b6c7ad;
+  color: var(--color-workshop-a-text);
   text-decoration: none;
 }
 a:hover {
-  color: #eef0d4;
+  color: var(--color-workshop-a-text-2);
 }
 button,input,select {
   font: inherit;
   color: inherit;
 }
 button,select,input[type=search] {
-  background: #1b2923;
-  border: 1px solid #39483b;
+  background: var(--color-workshop-button-surface);
+  border: 1px solid var(--color-workshop-button-border);
   border-radius: 5px;
   padding: 9px 12px;
 }
@@ -36,17 +38,17 @@ button,select,input[type=checkbox],input[type=range] {
   cursor: pointer;
 }
 button:hover {
-  border-color: #a1b393;
-  background: #26382b;
+  border-color: var(--color-workshop-button-border-2);
+  background: var(--color-workshop-button-surface-2);
 }
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible {
-  outline: 2px solid #c1d39f;
+  outline: 2px solid var(--color-workshop-button-focus);
   outline-offset: 4px;
 }
 button[aria-pressed=true] {
-  color: #e5edcc;
-  background: #30422f;
-  border-color: #8f9d73;
+  color: var(--color-workshop-button-text);
+  background: var(--color-workshop-button-surface-3);
+  border-color: var(--color-workshop-button-border-3);
 }
 .site-header {
   max-width: 1280px;
@@ -74,16 +76,16 @@ main {
 }
 .catalog-nav a {
   padding-bottom: 9px;
-  color: #86957f;
+  color: var(--color-workshop-catalog-nav-a-text);
 }
 .catalog-nav [aria-current] {
-  color: #dce4ca;
-  border-bottom: 1px solid #b9c99f;
+  color: var(--color-workshop-catalog-nav-text);
+  border-bottom: 1px solid var(--color-workshop-catalog-nav-border-bottom);
 }
 .eyebrow {
   font-size: 10px;
   letter-spacing: 2.4px;
-  color: #9fac86;
+  color: var(--color-workshop-eyebrow-text);
   margin: 0 0 9px;
 }
 h1 {
@@ -93,7 +95,7 @@ h1 {
   margin: 0 0 12px;
 }
 .intro>p:last-child {
-  color: #98a58f;
+  color: var(--color-workshop-intro-p-text);
   margin: 0;
 }
 .intro {
@@ -103,9 +105,9 @@ h1 {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #15211ef5;
+  background: var(--color-workshop-transport-surface);
   backdrop-filter: blur(12px);
-  border-block: 1px solid #344237;
+  border-block: 1px solid var(--color-workshop-transport-border-block);
   padding: 14px 0;
 }
 .control-row,.viewer-controls {
@@ -119,7 +121,7 @@ h1 {
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #a5b19a;
+  color: var(--color-workshop-control-row-label-text);
 }
 .control-row select {
   padding: 8px;
@@ -128,7 +130,7 @@ h1 {
   margin-left: auto;
 }
 .check input {
-  accent-color: #a4ba8f;
+  accent-color: var(--color-workshop-check-input-accent-color);
 }
 .timeline {
   display: flex;
@@ -136,12 +138,12 @@ h1 {
   gap: 13px;
   margin-top: 15px;
   font-size: 11px;
-  color: #a7b498;
+  color: var(--color-workshop-timeline-text);
 }
 .timeline input {
   flex: 1;
   min-width: 50px;
-  accent-color: #afc498;
+  accent-color: var(--color-workshop-timeline-input-accent-color);
 }
 .timeline output {
   font-variant-numeric: tabular-nums;
@@ -164,19 +166,19 @@ h1 {
 #categories button {
   border-color: transparent;
   background: transparent;
-  color: #95a38b;
+  color: var(--color-workshop-categories-button-text);
   padding: 8px 10px;
 }
 #categories [aria-pressed=true] {
-  background: #293a2b;
-  color: #d5e3bf;
+  background: var(--color-workshop-categories-surface);
+  color: var(--color-workshop-categories-text);
 }
 .find {
   display: flex;
   align-items: center;
   gap: 9px;
   font-size: 12px;
-  color: #93a28b;
+  color: var(--color-workshop-find-text);
 }
 .find input {
   max-width: 185px;
@@ -186,7 +188,7 @@ h1 {
 }
 .result-count {
   font-size: 11px;
-  color: #7f9079;
+  color: var(--color-workshop-result-count-text);
   margin: 22px 0 12px;
 }
 .clips {
@@ -196,8 +198,8 @@ h1 {
 }
 .clip {
   min-width: 0;
-  background: #18251f;
-  border: 1px solid #304033;
+  background: var(--color-workshop-clip-surface);
+  border: 1px solid var(--color-workshop-clip-border);
   border-radius: 7px;
   overflow: hidden;
 }
@@ -210,12 +212,12 @@ h1 {
   border: 0;
   border-radius: 0;
   padding: 0;
-  background: #1d2d24;
+  background: var(--color-workshop-preview-button-surface);
   text-align: left;
   position: relative;
 }
 .preview-button:hover {
-  background: #25362a;
+  background: var(--color-workshop-preview-button-surface-2);
 }
 .preview-button::after {
   content: '放大 ↗';
@@ -224,7 +226,7 @@ h1 {
   top: 13px;
   font-size: 10px;
   opacity: 0;
-  color: #bdcda9;
+  color: var(--color-workshop-preview-button-text);
   transition: opacity .15s;
 }
 .preview-button:hover::after,.preview-button:focus-visible::after {
@@ -240,7 +242,7 @@ h1 {
 }
 .clip-meta {
   font-size: 10px;
-  color: #8c9d7f;
+  color: var(--color-workshop-clip-meta-text);
   letter-spacing: 1px;
   display: flex;
   justify-content: space-between;
@@ -254,32 +256,32 @@ h1 {
 .clip-info p {
   font-size: 11px;
   line-height: 1.7;
-  color: #97a68c;
+  color: var(--color-workshop-clip-info-p-text);
   margin: 0;
 }
 .footnote {
   font-size: 11px;
   line-height: 1.9;
-  color: #87967e;
+  color: var(--color-workshop-footnote-text);
   max-width: 750px;
   margin-top: 28px;
 }
 #empty {
   padding: 50px 0;
-  color: #b2c29f;
+  color: var(--color-workshop-empty-text);
 }
 dialog {
   width: min(900px,calc(100% - 32px));
   max-height: calc(100dvh - 32px);
-  border: 1px solid #627154;
-  background: #17251f;
+  border: 1px solid var(--color-workshop-dialog-border);
+  background: var(--color-workshop-dialog-surface);
   color: inherit;
   border-radius: 10px;
   padding: 24px;
   overflow: auto;
 }
 dialog::backdrop {
-  background: #080e0cd9;
+  background: var(--color-workshop-dialog-surface-2);
   backdrop-filter: blur(5px);
 }
 .viewer-heading {
@@ -301,12 +303,12 @@ dialog::backdrop {
   height: clamp(240px,48vh,460px);
   display: block;
   margin-top: 20px;
-  background: #1d2d24;
+  background: var(--color-workshop-preview-button-surface);
   border-radius: 5px;
 }
 #viewer-description {
   font-size: 12px;
-  color: #adba9c;
+  color: var(--color-workshop-viewer-description-text);
   line-height: 1.6;
 }
 .viewer-controls {

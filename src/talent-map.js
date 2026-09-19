@@ -1,11 +1,12 @@
+import { createBindings } from './dom-bindings.js';
+import { buildTalentViewModel } from './talent-view-model.js';
 import { UPGRADES } from './progression-config.js';
-import { getUpgradeState, purchaseUpgrade } from './progression.js';
-import { TALENT_TREE, getTalentState, purchaseTalent } from './talents.js';
+import { purchaseUpgrade } from './progression.js';
+import { TALENT_TREE, purchaseTalent } from './talents.js';
 import { drawBase } from './bases.js';
 
 const el = id => document.getElementById(id);
 const svgNS = 'http://www.w3.org/2000/svg';
-const reasons = { locked: '首次通关后解锁', 'during-run': '本轮已启程 · 重建前可购买', prerequisite: '先点亮前置星辰', legacy: '遗产不足', max: '已满级', ready: '新文明开始时生效' };
 // Explicit art direction for this small tree; prerequisites still come from TALENT_TREE.
 // Coordinates are independent of node size, so a narrow screen never shrinks touch targets.
 export const TALENT_MAP = Object.freeze({
@@ -23,14 +24,14 @@ export const TALENT_MAP = Object.freeze({
   challenge: { x: 959, y: 255, mobile: [85, 475], kind: 'specialist', icon: 'M2 20l8-15 4 7 3-5 5 13z M7 11l3 2 3-3 M10 5V2h5l-2 3' },
   continuity: { x: 877, y: 109, mobile: [82, 235], kind: 'keystone', icon: 'M8 5h8l4 7-4 7H8l-4-7z M8 12h8M12 8v8 M12 1v2m0 18v2M1 12h2m18 0h2' },
 });
-const colors = { root: '#bfd2b5', automation: '#8ab2a1', growth: '#b7c7a0', legacy: '#cbb685' };
-const put = (id, value) => { const node = el(id); if (node.textContent !== value) node.textContent = value; };
+const colors = Object.fromEntries(['root', 'automation', 'growth', 'legacy'].map(key => [key, `var(--route-${key})`]));
 function pathElement(className) { const path = document.createElementNS(svgNS, 'path'); path.setAttribute('class', className); return path; }
 
 export function createTalentMap(getSession, changed) {
+  const bind = createBindings(document);
   const screen = el('archives-dialog'), map = el('talent-tree'), details = el('talent-details');
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-  let selected = null, pinned = false, hoverSuppressed = false, hideTimer = 0, treeKey = '', points = {}, mobile = false;
+  let selected = null, pinned = false, hoverSuppressed = false, hideTimer = 0, points = {}, mobile = false;
   const edges = new Map(), animations = new Set();
   const svg = document.createElementNS(svgNS, 'svg'); svg.classList.add('talent-connections'); svg.setAttribute('aria-hidden', 'true'); map.append(svg);
   for (const [branch, name] of Object.entries({ automation: '自动化', growth: '文明增益', legacy: '遗产收益' })) {
@@ -118,9 +119,9 @@ export function createTalentMap(getSession, changed) {
     animation.finished.then(() => animations.delete(animation), () => animations.delete(animation));
   }
   function feedback(key, cost) {
-    put('talent-feedback', `−${cost} Legacy · ${TALENT_TREE[key].name}已点亮`);
+    bind({ '#talent-feedback': `−${cost} Legacy · ${TALENT_TREE[key].name}已点亮` });
     animate(el(`node-${key}`), [{ transform: 'scale(1)' }, { transform: 'scale(1.16)', offset: .35 }, { transform: 'scale(1)' }], { duration: 460, easing: 'ease-out' });
-    animate(el('legacy'), [{ transform: 'translateY(0) scale(1)' }, { transform: 'translateY(-5px) scale(1.2)', color: '#f0d79d' }, { transform: 'translateY(0) scale(1)' }], { duration: 500 });
+    animate(el('legacy'), [{ transform: 'translateY(0) scale(1)' }, { transform: 'translateY(-5px) scale(1.2)', color: 'var(--purchase-flash)' }, { transform: 'translateY(0) scale(1)' }], { duration: 500 });
     for (const [child, edge] of edges) if (child === key || (key === 'autobuyer' && edge.parent === key)) {
       animate(edge.flow, [{ strokeDashoffset: 1, opacity: 0 }, { opacity: 1, offset: .12 }, { strokeDashoffset: 0, opacity: 0 }], { duration: 900, easing: 'ease-in-out' });
     }
@@ -188,28 +189,8 @@ export function createTalentMap(getSession, changed) {
     el('close-archives').focus({ preventScroll: true });
   }
   function sync() {
-    const session = getSession(), { permanent: p, run } = session;
-    const key = JSON.stringify([p.completedCycles, p.legacy, p.upgrades, p.talents, p.talentGrants, run.phase]);
-    if (treeKey === key) return;
-    treeKey = key;
-    for (const [name, config] of Object.entries(TALENT_TREE)) {
-      const upgrade = Object.hasOwn(UPGRADES, name), level = upgrade ? p.upgrades[name] : p.talents[name];
-      const state = (upgrade ? getUpgradeState : getTalentState)(session, name), button = el(`node-${name}`);
-      put(`level-${name}`, '●'.repeat(level) + '○'.repeat(config.costs.length - level));
-      put(`cost-${name}`, state === 'max' ? '完整' : `${config.costs[level]} ✧`);
-      put(`current-${name}`, config.effects[level]); put(`next-${name}`, config.effects[level + 1] ?? '已达到最高等级');
-      el(`grant-${name}`).hidden = !p.talentGrants.includes(name);
-      button.dataset.state = state; button.dataset.owned = String(level > 0);
-      button.setAttribute('aria-label', `${config.name}，${level}/${config.costs.length} 级，${state === 'max' ? '' : `下一级 ${config.costs[level]} 遗产，`}${reasons[state]}`);
-      put(`buy-${name}`, state === 'max' ? '已满级' : `${config.costs[level]} Legacy · ${level ? '升级' : '点亮'}`);
-      el(`buy-${name}`).disabled = state !== 'ready'; put(`state-${name}`, reasons[state]);
-      if (edges.has(name)) {
-        const edge = edges.get(name), rank = config.requires[edge.parent], parentLevel = p.talents[edge.parent] ?? p.upgrades[edge.parent];
-        edge.path.dataset.state = level ? 'owned' : parentLevel >= rank ? 'available' : 'locked';
-      }
-    }
-    put('root-caption', p.talents.autobuyer ? '文明的第一颗星' : '1 Legacy · 从这里开始');
-    positionDetail();
+    const changed = bind(buildTalentViewModel(getSession()));
+    if (changed) positionDetail();
   }
   return { sync, open, closeDetail };
 }

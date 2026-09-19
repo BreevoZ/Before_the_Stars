@@ -1,3 +1,4 @@
+import { isBetweenRuns } from './progression-machine.js';
 import { SURFACE, UPGRADES, UPGRADE_COSTS, CHALLENGE } from './progression-config.js';
 import { resolveStatValue, STAT_DEFINITIONS } from './stats.js';
 
@@ -43,7 +44,7 @@ export function talentLevel(session, key, active = false) {
 export function getTalentState(session, key) {
   if (!Object.hasOwn(TALENTS, key)) return 'invalid';
   if (!session.permanent.completedCycles) return 'locked';
-  if (!['destruction', 'defeat'].includes(session.run.phase)) return 'during-run';
+  if (!isBetweenRuns(session.run.phase)) return 'during-run';
   const config = TALENTS[key], level = talentLevel(session, key);
   if (level >= config.costs.length) return 'max';
   if (Object.entries(config.requires).some(([parent, required]) => talentLevel(session, parent) < required)) return 'prerequisite';

@@ -115,7 +115,7 @@ export function registerQuantityTests(test, assert, near) {
     const large = serializeSession(session());
     for (const mutate of [r => r.game.gold.player = 'Infinity', r => r.game.gold.player = '1e99999999999999999',
       r => r.game.gold.player = 180, r => r.game.bases.player.hp = '1e999', r => r.game.elapsed = '1e400',
-      r => r.permanent.legacy = '1e400', r => r.game.bonuses[0].value = { mantissa: 1, exponent: 400 }]) {
+      r => r.permanent.legacy = '1e400', r => r.run.extraBonuses[0].value = { mantissa: 1, exponent: 400 }]) {
       const record = JSON.parse(large); mutate(record); rejects(() => parseSession(JSON.stringify(record)));
     }
   });

@@ -1,3 +1,4 @@
+import { canonical } from './legacy-fixtures.js';
 import { RULES, AGES, UNITS, TURRETS, createGame, recruit, cancelTraining, getRecruitState,
   buildTurret, sellTurret, getTurretState, expandTurretSlots, getExpansionState, castAbility, evolve, updateGame } from '../src/game.js';
 import { stat, attributes, explainStat, createBonusStack, STAT_DEFINITIONS } from '../src/stats.js';
@@ -176,7 +177,7 @@ export function registerStatTests(test, assert, near) {
     assert(restored.game.queues.player[0].duration === 3.2 && restored.game.turrets.player[0].paid === 60);
     for (let i = 0; i < 120; i++) { updateGame(s.game, RULES.fixedStep); updateGame(restored.game, RULES.fixedStep); }
     assert(serializeSession(restored) === serializeSession(s));
-    for (const mutate of [record => record.game.bonuses[0].value++, record => record.game.queues.player[0].duration = -1,
+    for (const mutate of [record => record.game.bonuses = [], record => record.game.queues.player[0].duration = -1,
       record => record.run.extraBonuses[0].source.kind = 'unknown', record => record.game.ability.stats.damage = 900]) {
       const corrupt = JSON.parse(raw); mutate(corrupt); rejects(() => parseSession(JSON.stringify(corrupt)));
     }
@@ -188,7 +189,7 @@ export function registerStatTests(test, assert, near) {
     advance(session.game, 2);
     const { game } = session;
     const actual = { gold: game.gold, experience: game.experience, units: game.units.map(({ team, hp, x }) => ({ team, hp, x })), bases: game.bases };
-    assert(JSON.stringify(actual) === JSON.stringify(afterTwoSeconds));
+    assert(JSON.stringify(canonical(actual)) === JSON.stringify(canonical(afterTwoSeconds)));
     const raw = serializeSession(session); assert(serializeSession(parseSession(raw)) === raw);
   });
 

@@ -533,7 +533,7 @@ export function drawUnit(ctx, unit, time, scale = 1, reducedMotion = false, maxH
   const c = { cloth: player ? '#7faa91' : '#b48d70', trim: player ? '#b7c9a5' : '#d1bb90',
     skin: unit.hitFlash > 0 ? '#ded0ac' : MATERIAL.skin, metal: unit.hitFlash > 0 ? '#ded0ac' : MATERIAL.steel,
     energy: player ? '#b0d5bd' : '#ddbd94' };
-  ctx.save(); ctx.translate(unit.x, stats.lane === 'back' ? -7 * scale : 0); ctx.scale(scale, scale);
+  ctx.save(); ctx.translate(unit.x, 0); ctx.scale(scale, scale);
   ctx.lineJoin = 'bevel'; ctx.lineCap = 'round';
   oval(ctx, 0, 1, stats.footprint ?? 13, stats.footprint ? 3 : 2, '#1d302a38');
   ctx.save(); ctx.scale(player ? 1 : -1, 1);

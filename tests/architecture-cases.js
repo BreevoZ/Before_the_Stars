@@ -70,6 +70,20 @@ export function registerArchitectureTests(test, assert) {
     assert(!vm['#civilization-bar@hidden'] && vm['#rebuild-civilization@hidden']);
     assert(buildTalentViewModel(s)['#buy-production@disabled']);
   });
+  test('Talent view: capped nodes never show an undefined price after rebuilding or during victory', () => {
+    const s = createProgression(); finish(s); purchaseTalent(s, 'spark');
+    s.permanent.upgrades.production = 5;
+    for (const phase of ['destruction', 'battle', 'victory', 'defeat']) {
+      s.run.phase = phase;
+      const vm = buildTalentViewModel(s);
+      for (const key of ['spark', 'production']) {
+        assert(vm[`#buy-${key}`] === '已满级' && vm[`#cost-${key}`] === '完整');
+        assert(vm[`#buy-${key}@disabled`] && !vm[`#node-${key}@aria-label`].includes('下一级'));
+      }
+      assert(!JSON.stringify(vm).includes('undefined'));
+      assert(vm['#buy-bypasser'] === '尚未开放');
+    }
+  });
   test('State machine: every phase/event pair has an explicit transition and all stale tokens are rejected', () => {
     const expected = { battle: ['abandon'], victory: ['continue', 'abandon'], destruction: ['rebuild'], defeat: ['rebuild'] };
     for (const phase of Object.values(PHASE)) {

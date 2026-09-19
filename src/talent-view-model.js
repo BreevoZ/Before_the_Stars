@@ -8,7 +8,9 @@ export function buildTalentViewModel(session) {
   const put = (id, value, prop = '') => { view[`#${id}${prop ? `@${prop}` : ''}`] = value; };
   for (const [name, config] of Object.entries(TALENT_TREE)) {
     const upgrade = Object.hasOwn(UPGRADES, name), level = upgrade ? p.upgrades[name] : p.talents[name];
-    const state = (upgrade ? getUpgradeState : getTalentState)(session, name);
+    // Purchase availability and having another rank are separate facts.
+    const complete = !config.placeholder && level >= config.costs.length;
+    const state = complete ? 'max' : (upgrade ? getUpgradeState : getTalentState)(session, name);
     const reason = state === 'ready' && ['spark', 'timeAcceleration'].includes(name) ? '立即解锁速度档位' : reasons[state];
     put(`level-${name}`, '●'.repeat(level) + '○'.repeat(config.costs.length - level));
     put(`cost-${name}`, state === 'planned' ? '待开放' : state === 'max' ? '完整' : `${config.costs[level]} ✧`);

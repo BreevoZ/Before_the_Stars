@@ -327,7 +327,7 @@ function addProjectile(game, team, kind, x, target, damage, options = {}) {
   game.projectiles.push({
     team, kind, fromX: x, toX: target.x,
     fromY: options.fromY ?? -36, fromUnitX: options.fromUnitX, fromTurretX: options.fromTurretX, fromBaseX: options.fromBaseX,
-    toY: target.type ? -(UNITS[target.type].height ?? 60) * 0.52 - (UNITS[target.type].lane === 'back' ? 7 : 0) : -45,
+    toY: target.type ? -(UNITS[target.type].height ?? 60) * 0.52 : -45,
     toOffsetX: target.type ? 0 : (team === 'player' ? -1 : 1) * RULES.baseHalfWidth,
     targetId: target.id ?? null, targetBase: target.id == null ? target.team : null,
     damage, duration, remaining: duration, splash: options.splash ?? 0, ignoreArmor: options.ignoreArmor ?? false, armorPierce: options.armorPierce ?? 0,
@@ -486,7 +486,7 @@ function updateUnits(game, dt, hits) {
       const attack = prepareAttack(victim, stats.damage, stats.projectile);
       const muzzle = Math.min(stats.muzzleX ?? 0, Math.abs(victim.x - unit.x) * 0.5);
       addProjectile(game, unit.team, attack.projectile, unit.x + direction * muzzle, victim, attack.damage,
-        { ...attack, sourceId: unit.id, fromUnitX: unit.x, fromY: stats.muzzleY + (stats.lane === 'back' ? -7 : 0) });
+        { ...attack, sourceId: unit.id, fromUnitX: unit.x, fromY: stats.muzzleY });
       unit.attackAnimation = stats.attackDuration;
     };
     if (unit.burstRemaining > 0) {
@@ -565,7 +565,7 @@ function updateTurrets(game, dt) {
         continue;
       }
       if (stats.aimable) {
-        const toY = -UNITS[target.type].height * 0.52 - (UNITS[target.type].lane === 'back' ? 7 : 0);
+        const toY = -UNITS[target.type].height * 0.52;
         const aim = Math.max(-0.2, Math.min(0.55, Math.atan2(toY - y + 18, Math.abs(target.x - x))));
         turret.aim += (aim - turret.aim) * Math.min(1, dt * 12);
       }
@@ -643,7 +643,7 @@ function resolveHits(game, hits) {
       const direction = hit.team === 'player' ? 1 : -1;
       const style = { melee: 'blunt', heavy: 'bite', swordsman: 'slash', knight: 'thrust', duelist: 'thrust', commando: 'knife', blade: 'blade', superSoldier: 'blade' }[hit.attacker] ?? 'blunt';
       game.effects.push({ kind: 'impact', style, x: hit.target.x - (stats ? 0 : direction * RULES.baseHalfWidth),
-        anchorX: stats ? undefined : hit.target.x, y: stats ? -stats.height * 0.52 - (stats.lane === 'back' ? 7 : 0) : -45,
+        anchorX: stats ? undefined : hit.target.x, y: stats ? -stats.height * 0.52 : -45,
         angle: direction > 0 ? 0 : Math.PI, team: hit.team, surface: impactSurface(game, hit.target), life: 0.22, duration: 0.22 });
     }
   }

@@ -1601,6 +1601,19 @@ test('A normally trained super soldier breaks a defended future position against
   assert(!game.units.some(unit => unit.team === 'enemy' && unit.type === 'superSoldier'));
 });
 
+test.browser('All ranged infantry keep a planted foot on the shared ground at every scale', () => {
+  const canvas = document.createElement('canvas'); canvas.width = 480; canvas.height = 240;
+  const ctx = canvas.getContext('2d');
+  for (const type of ['archer','crossbow','musketeer','rifleman','blaster']) for (const team of ['player','enemy'])
+    for (const scale of [.7,1,1.6]) for (const time of [0,.2,.45]) {
+      const unit = soldier(team, 240, type); unit.moving = time > 0;
+      ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,480,240); ctx.translate(0,200);
+      drawUnit(ctx,unit,time,scale);
+      const pixels = ctx.getImageData(200,198,80,3).data;
+      assert(pixels.some((value,i)=>i%4===3 && value>200), `${type}/${team}/${scale}: boots must meet the ground, not only the shadow`);
+    }
+});
+
 test.browser('All articulated models render distinctly, animate, and respect reduced motion', () => {
   const canvas = document.createElement('canvas'); canvas.width = 480; canvas.height = 230;
   const ctx = canvas.getContext('2d'), silhouettes = new Set();

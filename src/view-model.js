@@ -29,7 +29,9 @@ export function buildViewModel(session, { selectedSlot = 0, targeting = false, m
     at(card, !unit, 'hidden');
     if (!unit) { at(card, true, 'disabled'); continue; }
     const { type } = unit, state = getRecruitState(game, type), label = type === 'superSoldier' && state === 'disabled' && !session.run?.talents.superSoldierPlan ? '需要超级士兵计划' : recruitLabels[state];
-    if (type === 'superSoldier') unit.description = unit.canRanged ? '全覆轻甲 · 远程能量点射 / 近身激光短匕首' : '全覆轻甲 · 激光短匕首，近战完全穿甲';
+    if (type === 'superSoldier') unit.description = unit.sniperRifle
+      ? `狙击激光枪 · 锁定引导 ${unit.chargeTime} 秒，开火后冷却 ${unit.attackInterval} 秒；${unit.meleeRange} 距离内改用 ${Q.format(unit.meleeDamage)} 伤害短匕首，间隔 ${unit.meleeInterval} 秒`
+      : unit.canRanged ? '全覆轻甲 · 远程能量点射 / 贴身激光短匕首' : '全覆轻甲 · 贴身短刺，近战完全穿甲';
     for (const trait of unitTraits(unit)) if (unit[trait.stat]) unit.description += ` · ${trait.name}：${TRAIT_DESCRIPTIONS[trait.id]}`;
     const attackDamage = unit.canRanged ? unit.damage : unit.meleeDamage ?? unit.damage;
     const description = `${unit.name} · ${Q.format(unit.cost)} 金币 · ${unit.trainTime} 秒训练\n${Q.format(unit.health)} 生命 / ${Q.format(attackDamage)}${unit.burst ? ` × ${unit.burst}` : ''} 攻击 / ${unit.attackInterval} 秒间隔 / ${Q.format(unit.armor)} 护甲 / ${unit.range} 对兵射程${unit.baseRange ? ` / ${unit.baseRange} 攻城射程` : ''}\n${unit.description}`;

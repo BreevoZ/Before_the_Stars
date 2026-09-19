@@ -323,7 +323,7 @@ function traitHook(game, unit, hook, hits, extra = {}) {
 
 function addProjectile(game, team, kind, x, target, damage, options = {}) {
   const speed = { sling: 460, arrow: 500, bullet: 900, rail: 1150, egg: 650, plasma: 700, 'plasma-orb': 480, rocket: 500, javelin: 620, grenade: 420, canister: 850 }[kind] ?? 420;
-  const duration = kind === 'laser' ? 0.1 : kind === 'ion' ? 0.16 : Math.max(0.12, Math.abs(target.x - x) / speed);
+  const duration = kind === 'laser' ? 0.1 : ['ion', 'sniper'].includes(kind) ? 0.16 : Math.max(0.12, Math.abs(target.x - x) / speed);
   game.projectiles.push({
     team, kind, fromX: x, toX: target.x,
     fromY: options.fromY ?? -36, fromUnitX: options.fromUnitX, fromTurretX: options.fromTurretX, fromBaseX: options.fromBaseX,
@@ -438,6 +438,13 @@ function updateAbility(game, dt, hits) {
   else game.ability = null;
 }
 
+export function getUnitChargeTarget(game, unit) {
+  return unit.chargeTargetBase ? game.bases[unit.chargeTargetBase]
+    : game.units.find(other => other.id === unit.chargeTargetId);
+}
+function clearUnitCharge(unit) {
+  for (const key of ['chargeRemaining', 'chargeDuration', 'chargeTargetId', 'chargeTargetBase']) delete unit[key];
+}
 function updateUnits(game, dt, hits) {
   const positions = new Map(game.units.map(unit => [unit.id, unit.x]));
   for (const unit of game.units) {
@@ -485,10 +492,30 @@ function updateUnits(game, dt, hits) {
     const fire = victim => {
       const attack = prepareAttack(victim, stats.damage, stats.projectile);
       const muzzle = Math.min(stats.muzzleX ?? 0, Math.abs(victim.x - unit.x) * 0.5);
-      addProjectile(game, unit.team, attack.projectile, unit.x + direction * muzzle, victim, attack.damage,
+      addProjectile(game, unit.team, stats.sniperRifle ? 'sniper' : attack.projectile, unit.x + direction * muzzle, victim, attack.damage,
         { ...attack, sourceId: unit.id, fromUnitX: unit.x, fromY: stats.muzzleY });
       unit.attackAnimation = stats.attackDuration;
     };
+    if (unit.chargeRemaining > 0) {
+      const locked = getUnitChargeTarget(game, unit);
+      const interrupted = !stats.canRanged || !stats.chargeTime || enemyDistance <= (stats.meleeRange ?? 0);
+      const inRange = locked && Q.gt(locked.hp, 0) && locked.team !== unit.team &&
+        (locked.type ? Math.abs(locked.x - unit.x) <= attackRange(stats, locked) + .01
+          : Math.abs(locked.x - unit.x) - RULES.baseHalfWidth <= baseRange + .01);
+      if (interrupted || !inRange) {
+        clearUnitCharge(unit);
+        // A replacement target needs a fresh lock. An adjacent enemy can be
+        // stabbed immediately; the unfinished beam never deals any damage.
+        if (!interrupted) continue;
+      } else {
+        unit.attackStyle = 'ranged';
+        unit.chargeRemaining = Math.max(0, unit.chargeRemaining - dt);
+        if (unit.chargeRemaining <= EPSILON) {
+          fire(locked); unit.attackCooldown = stats.attackInterval; clearUnitCharge(unit);
+        }
+        continue;
+      }
+    }
     if (unit.burstRemaining > 0) {
       const victim = unit.burstTargetBase ? game.bases[unit.burstTargetBase] : game.units.find(other => other.id === unit.burstTargetId);
       const distance = victim ? Math.abs(victim.x - origin) - (victim.type ? 0 : RULES.baseHalfWidth) : Infinity;
@@ -508,6 +535,12 @@ function updateUnits(game, dt, hits) {
         const closeCombat = !stats.canRanged || stats.meleeRange && Math.abs(target.x - origin) - (target.type ? 0 : RULES.baseHalfWidth) <= stats.meleeRange;
         if (stats.meleeRange) unit.attackStyle = closeCombat ? 'melee' : 'ranged';
         if (stats.projectile && !closeCombat) {
+          if (stats.chargeTime > 0) {
+            unit.chargeDuration = unit.chargeRemaining = stats.chargeTime;
+            unit.chargeTargetId = target.id ?? null;
+            unit.chargeTargetBase = target.type ? null : target.team;
+            continue;
+          }
           fire(target);
           if (stats.burst) {
             unit.burstRemaining = stats.burst - 1;
@@ -527,7 +560,7 @@ function updateUnits(game, dt, hits) {
           }
         }
         unit.chargeTravel = 0;
-        unit.attackCooldown = stats.attackInterval;
+        unit.attackCooldown = closeCombat ? stats.meleeInterval ?? stats.attackInterval : stats.attackInterval;
         unit.attackAnimation = stats.attackDuration;
       }
     } else {

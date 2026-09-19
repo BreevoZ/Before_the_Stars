@@ -283,11 +283,11 @@ export function registerAnimationTests(test, assert, near) {
         charged ||= source.lastAttackCharged || source.chargeRemaining > 0;
         burst ||= source.burstRemaining > 0;
       }
-      if (clip.melee) assert(shots.size === 0 && sample(0.4).game.units[0].attackStyle === 'melee', `${clip.id}: close combat must use a punch without projectiles`);
-      else if (stats.projectile) assert(shots.has(stats.projectile), `${clip.id}: missing real projectile`);
+      if (clip.melee) assert(shots.size === 0 && sample(0.4).game.units[0].attackStyle === 'melee', `${clip.id}: close combat must use a dagger without projectiles`);
+      else if (stats.projectile) assert(shots.has(clip.sniper ? 'sniper' : stats.projectile), `${clip.id}: missing real projectile`);
       assert(impacts.size > 0, `${clip.id}: missing impact`);
       if (stats.field) assert(fields, `${clip.id}: missing ground field`);
-      if (stats.chargeTime || stats.chargeDamage) assert(charged, `${clip.id}: missing charge`);
+      if (clip.sniper || stats.chargeTime || stats.chargeDamage) assert(charged, `${clip.id}: missing charge`);
       if (stats.burst) assert(burst, `${clip.id}: missing burst`);
     }
     const renewal = createClipSampler(ANIMATION_CLIPS.find(clip => clip.id === 'ability-renewal'), 'player');

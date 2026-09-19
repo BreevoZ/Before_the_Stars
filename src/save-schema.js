@@ -24,6 +24,7 @@ export const GAME_SHAPE = Object.freeze({ status: oneOf(['playing', 'won', 'lost
   ages: object, experience: object, gold: object, bases: object, queues: object, turrets: object });
 export const ORDER_SHAPE = Object.freeze({ id: positiveId, type: value => typeof value === 'string', remaining: clock });
 export const UNIT_SHAPE = Object.freeze({ id: positiveId, team: oneOf(['player', 'enemy']), moving: bool,
+  chargeRemaining: optional(clock), chargeDuration: optional(clock),
   suppressionMultiplier: optional(value => num(value, .01, 1)),
   attackCooldown: signedClock, attackAnimation: signedClock, hitFlash: signedClock,
   ...Object.fromEntries(['distanceTravelled', 'chargeTravel', 'guardFlash', 'attackApproach', 'moveMultiplier',
@@ -36,7 +37,7 @@ export const TURRET_SHAPE = Object.freeze({ team: oneOf(['player', 'enemy']),
   ...fields('cooldown flash shotSerial aim burstRemaining chargeRemaining', signedClock),
   ...fields('burstCooldown flashDuration lastBarrel', optional(signedClock)) });
 export const SHOT_SHAPE = Object.freeze({ team: oneOf(['player', 'enemy']),
-  kind: oneOf(['javelin','grenade','canister','sling','stone','boulder','arrow','bolt','egg','fireball','oil','bullet','cannon','shell','rocket','plasma','plasma-orb','rail','laser','ion']),
+  kind: oneOf(['sniper','javelin','grenade','canister','sling','stone','boulder','arrow','bolt','egg','fireball','oil','bullet','cannon','shell','rocket','plasma','plasma-orb','rail','laser','ion']),
   ...fields('fromX toX fromY toY toOffsetX originX', coordinates),
   ...fields('fromUnitX fromTurretX fromBaseX arc', optional(coordinates)),
   ...fields('duration remaining splash pierce', clock),

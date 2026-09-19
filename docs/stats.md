@@ -59,7 +59,7 @@ stat(game, 'player', 'canBuild');           // false
 
 | 对象 | 主要属性 |
 | --- | --- |
-| 部队 | `damage`、`meleeDamage`、`chargeDamage`、`health`、`armor`、`armorPierce`、`rangedReduction`、`speed`、`range`、`baseRange`、`meleeRange`、`attackInterval`、`attackSpeed`、`trainTime`、`cost`、`bounty`、`experience`、`enabled` |
+| 部队 | `damage`、`meleeDamage`、`chargeDamage`、`health`、`armor`、`armorPierce`、`rangedReduction`、`speed`、`range`、`baseRange`、`meleeRange`、`attackInterval`、`meleeInterval`、`attackSpeed`、`chargeTime`、`muzzleX`、`canRanged`、`sniperRifle`、`trainTime`、`cost`、`bounty`、`experience`、`enabled` |
 | 炮塔 | `damage`、`cost`、`range`、`attackInterval`、`attackSpeed`、`chargeTime`、`burstInterval`、`splash`、`fieldRadius`、`fieldDuration`、`tickDamage`、`tickInterval`、`slow`、`enabled` |
 | 大招 | `damage`、`baseDamage`、`radius`、`cooldown`、`healing`、`enabled` |
 | 阵营 | `startingGold`、`income`、`baseHealth`、`armyLimit`、`queueLimit`、`initialTurretSlots`、`maxTurretSlots`、`expansionCost`、`canRecruit`、`canBuild`、`canExpand`、`canEvolve`、`canCast` |

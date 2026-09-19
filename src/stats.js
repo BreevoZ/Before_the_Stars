@@ -9,12 +9,13 @@ const growth = Object.freeze({ quantity: true, min: 0 });
 const growthInteger = Object.freeze({ quantity: true, min: 0, round: 'floor' });
 const count = max => ({ min: 0, max, round: 'floor' });
 export const STAT_DEFINITIONS = Object.freeze({
-  ...TRAIT_STATS, canRanged: { boolean: true },
+  ...TRAIT_STATS, canRanged: { boolean: true }, sniperRifle: { boolean: true },
   damage: growth, meleeDamage: growth, chargeDamage: growth, tickDamage: growth, baseDamage: growth,
   health: { quantity: true, min: 1, round: 'round' }, baseHealth: { quantity: true, min: 1, round: 'round' },
   armor: growth, armorPierce: growth, rangedReduction: { min: 0, max: 1 },
-  speed: scalar, range: scalar, baseRange: scalar, meleeRange: scalar,
+  speed: scalar, range: scalar, baseRange: scalar, meleeRange: scalar, muzzleX: scalar,
   attackSpeed: { min: 0.01, max: 100 }, attackInterval: { min: RULES.fixedStep, max: 3600 },
+  meleeInterval: { min: RULES.fixedStep, max: 3600 },
   trainTime: { min: RULES.fixedStep, max: 3600 }, cost: growthInteger,
   bounty: growthInteger, experience: growthInteger, income: growth, startingGold: growthInteger,
   armyLimit: count(256), queueLimit: count(64), maxTurretSlots: count(RULES.maxTurretSlots),
@@ -94,7 +95,7 @@ function baseValues(context) {
   if (context.kind === 'reward') return { bounty: 0, experience: 0 };
   if (context.kind === 'civilization') return { legacy: 1 };
   return { ...context.base, enabled: true, attackSpeed: 1,
-    ...(context.kind === 'unit' ? { ...TRAIT_DEFAULTS, canRanged: true } : {}),
+    ...(context.kind === 'unit' ? { ...TRAIT_DEFAULTS, canRanged: true, sniperRifle: false } : {}),
     ...(context.kind === 'turret' ? { attackInterval: context.base.interval } : {}) };
 }
 function eraBonuses(context) {
@@ -134,10 +135,10 @@ function entryFor(game, subject) {
       applied.set(key, selected);
       values[key] = resolveStatValue(base[key], selected, definition);
     }
-    if (values.attackInterval !== undefined) {
-      values.attackInterval = Math.max(RULES.fixedStep, Math.min(3600, values.attackInterval / values.attackSpeed));
-      if (context.kind === 'turret') values.interval = values.attackInterval;
+    for (const key of ['attackInterval', 'meleeInterval']) if (values[key] !== undefined) {
+      values[key] = Math.max(RULES.fixedStep, Math.min(3600, values[key] / values.attackSpeed));
     }
+    if (context.kind === 'turret') values.interval = values.attackInterval;
     cache.entries.set(key, { context, base, values: Object.freeze(values), effects, applied });
   }
   return cache.entries.get(key);
@@ -163,12 +164,12 @@ export function stat(game, subject, key, base) {
   if (!Object.hasOwn(STAT_DEFINITIONS, key) || !Q.valid(base)) throw new TypeError('Invalid stat base');
   const effects = entry.applied.get(key) ?? entry.effects.filter(effect => matches(effect, entry.context, key));
   const value = resolveStatValue(base, temporary.length ? [...effects, ...temporary] : effects, STAT_DEFINITIONS[key]);
-  return key === 'attackInterval' ? Math.max(RULES.fixedStep, Math.min(3600, value / entry.values.attackSpeed)) : value;
+  return ['attackInterval', 'meleeInterval'].includes(key) ? Math.max(RULES.fixedStep, Math.min(3600, value / entry.values.attackSpeed)) : value;
 }
 export function explainStat(game, subject, key, base) {
   const entry = entryFor(game, subject);
   return { base: base ?? entry.base[key], effects: [...entry.effects.filter(effect => matches(effect, entry.context, key)), ...statusEffects(subject, key)],
-    value: stat(game, subject, key, base), ...(key === 'attackInterval' ? { attackSpeed: explainStat(game, subject, 'attackSpeed') } : {}) };
+    value: stat(game, subject, key, base), ...(['attackInterval', 'meleeInterval'].includes(key) ? { attackSpeed: explainStat(game, subject, 'attackSpeed') } : {}) };
 }
 
 // One-time adapter for pre-pipeline callers/saves. Combat never reads these bags.

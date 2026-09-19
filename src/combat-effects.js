@@ -35,12 +35,13 @@ export function drawProjectile(ctx, shot, scale = 1, reducedMotion = false) {
   if (profile.motion === 'beam') {
     const fade = reducedMotion ? 0.7 : 1 - p * 0.65;
     ctx.globalAlpha = fade;
-    if (shot.kind === 'ion') {
+    if (shot.kind === 'ion' || shot.kind === 'sniper') {
       ctx.globalAlpha *= 0.18;
       line(ctx, [[pose.fromX, pose.fromY], [pose.toX, pose.toY]], tint, 9 * scale);
       ctx.globalAlpha = fade;
     }
-    line(ctx, [[pose.fromX, pose.fromY], [pose.toX, pose.toY]], tint, (shot.kind === 'ion' ? 2.8 : 1.2) * scale);
+    line(ctx, [[pose.fromX, pose.fromY], [pose.toX, pose.toY]], tint, (shot.kind === 'sniper' ? 3.6 : shot.kind === 'ion' ? 2.8 : 1.2) * scale);
+    if (shot.kind === 'sniper') line(ctx, [[pose.fromX, pose.fromY], [pose.toX, pose.toY]], '#e2e4c9', 1.1 * scale);
     oval(ctx, pose.toX, pose.toY, 2.5 * scale, 2 * scale, '#e2e4c9');
     ctx.restore(); return;
   }

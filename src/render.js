@@ -1,6 +1,6 @@
 import { Q } from './quantity.js';
 import { drawTurret } from './turrets.js';
-import { RULES, UNITS, AGES, ABILITIES, getTurretPosition, getAbilityRadius, getAbilityImpactX, getUnitHealth } from './game.js';
+import { RULES, UNITS, AGES, ABILITIES, getTurretPosition, getAbilityRadius, getAbilityImpactX, getUnitHealth, getUnitChargeTarget, attributes } from './game.js';
 import { drawUnit } from './units.js';
 import { drawBase } from './bases.js';
 import { drawProjectile, drawImpact, drawFields, drawAbilityImpact, drawArrow, drawTraitEffect } from './combat-effects.js';
@@ -220,7 +220,7 @@ export function createRenderer(canvas) {
     drawFields(ctx, game, time, entityScale, reducedMotion.matches);
     // Draw the ranged rank behind the frontline, including when allies pass each other.
     for (const lane of ['back', 'front']) {
-      for (const unit of game.units) if (UNITS[unit.type].lane === lane) drawUnit(ctx, unit, game.elapsed, entityScale, reducedMotion.matches, getUnitHealth(game, unit.type, unit.team));
+      for (const unit of game.units) if (UNITS[unit.type].lane === lane) drawUnit(ctx, unit, game.elapsed, entityScale, reducedMotion.matches, getUnitHealth(game, unit.type, unit.team), attributes(game, unit));
     }
     for (const shot of game.projectiles) drawProjectile(ctx, shot, entityScale, reducedMotion.matches);
     if (targeting) drawTarget(ctx, targetX, getAbilityRadius(AGES[game.ages.player].ability, game));
@@ -230,8 +230,29 @@ export function createRenderer(canvas) {
 }
 
 // Shared by the battlefield and the frame-by-frame animation workshop.
+export function drawUnitTargeting(ctx, game, scale = 1, reducedMotion = false) {
+  for (const unit of game.units ?? []) {
+    if (!(unit.chargeRemaining > 0)) continue;
+    const target = getUnitChargeTarget(game, unit);
+    if (!target || Q.lte(target.hp, 0)) continue;
+    const stats = attributes(game, unit), direction = unit.team === 'player' ? 1 : -1;
+    const p = reducedMotion ? .5 : 1 - unit.chargeRemaining / unit.chargeDuration;
+    const fromX = unit.x + direction * Math.min(stats.muzzleX ?? 0, Math.abs(target.x - unit.x) * .5) * scale;
+    const x = target.x - (target.type ? 0 : direction * RULES.baseHalfWidth * scale);
+    const y = (target.type ? -UNITS[target.type].height * .52 : -45) * scale;
+    const color = unit.team === 'player' ? '#b0d5bd' : '#ddbd94', r = (12 - p * 5) * scale;
+    ctx.save(); ctx.globalAlpha = .4 + p * .4;
+    ctx.setLineDash([3 * scale, 5 * scale]);
+    line(ctx, [[fromX, (stats.muzzleY ?? -43) * scale], [x, y]], color, scale);
+    ctx.setLineDash([]); ctx.globalAlpha = .85;
+    for (const sx of [-1, 1]) for (const sy of [-1, 1])
+      line(ctx, [[x+sx*r,y+sy*(r-4*scale)],[x+sx*r,y+sy*r],[x+sx*(r-4*scale),y+sy*r]], color, 1.3 * scale);
+    ctx.restore();
+  }
+}
 export function drawBattleEffects(ctx, game, entityScale = 1, reducedMotion = false, ground = 260) {
   ctx.save();
+  drawUnitTargeting(ctx, game, entityScale, reducedMotion);
   if (game.ability) {
     const ability = game.ability;
     const stats = ability.stats ?? ABILITIES[ability.type];

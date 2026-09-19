@@ -1,3 +1,4 @@
+import { SUPER_WEAPONS } from './game-config.js';
 import { TRAITS } from './traits.js';
 import { getBonuses, getChallengeModifiers, challengeName } from './progression-config.js';
 import { getTalentBonuses, getLegacyBonuses } from './talents.js';
@@ -25,10 +26,19 @@ export function getRunBonuses(run) {
   const base = getV8RunBonuses({ ...run, extraBonuses: [] }).map(effect => effect.source.kind === 'challenge'
     ? { ...effect, source: { ...effect.source, label: challengeName(run.challengeLevel) } } : effect);
   return createBonusStack(base,
-    contribution('doctrine', 'superSoldierPlan', '超级士兵计划', { stat: 'enabled', type: 'superSoldier', team: 'player' }, 'override', Boolean(talents.superSoldierPlan)),
-    contribution('doctrine', 'superRanged', '光束投射', { stat: 'canRanged', type: 'superSoldier', team: 'player' }, 'override', Boolean(talents.superRanged)),
-    !talents.superRanged ? ['range', 'baseRange'].map(key => contribution('doctrine', 'superRanged', '激光短匕首', { stat: key, type: 'superSoldier', team: 'player' }, 'override', 60)) : [],
+    getSuperSoldierBonuses(Boolean(talents.superRanged), Boolean(talents.superSoldierPlan)),
     Object.values(TRAITS).filter(trait => talents[trait.id]).map(trait => contribution('doctrine', trait.id, trait.name,
       { stat: trait.stat, type: trait.units[0], team: 'player' }, 'override', true)),
     run.extraBonuses ?? []);
+}
+
+export function getSuperSoldierBonuses(ranged = false, enabled = true) {
+  const target = stat => ({ stat, type: 'superSoldier', team: 'player' });
+  return [
+    contribution('doctrine', 'superSoldierPlan', '超级士兵计划', target('enabled'), 'override', enabled),
+    contribution('doctrine', 'superRanged', '狙击激光枪', target('canRanged'), 'override', ranged),
+    contribution('doctrine', 'superRanged', '狙击激光枪', target('sniperRifle'), 'override', ranged),
+    ...Object.entries(ranged ? SUPER_WEAPONS.sniper : { range: SUPER_WEAPONS.meleeRange, baseRange: SUPER_WEAPONS.meleeRange }).map(([key, value]) =>
+      contribution('doctrine', 'superRanged', ranged ? '狙击激光枪' : '贴身激光匕首', target(key), 'override', value)),
+  ];
 }

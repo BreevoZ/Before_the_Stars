@@ -42,6 +42,12 @@ export function getMeleeMotion(type, { remaining = 0, duration = 1, cooldown = 0
       neckAngle: drive * 0.055, capeLift: drive * (charge ? 6 : 3) + recoil * 2,
     }, [-6, -48], [14, -61], 0.08, charge ? 22 : 18);
   }
+  if (type === 'superSoldier') {
+    const stab = active ? curve(progress, [[0, 1], [.06, 1], [.5, 0], [1, 0]]) : drive;
+    return { drive: stab, body: { x: stab * 4, y: Math.abs(stab) * .5 },
+      hand: [10 + stab * 8, -34 - stab], knifeAngle: -.2 + Math.max(0, stab) * .2,
+      guard: [-7 - stab * 2, -35 - stab * 2] };
+  }
   return { drive, body: { x: drive * 8, y: Math.abs(drive) * 1.5 },
     hand: [13 + drive * 17, -33 - drive * 6], knifeAngle: -0.95 + Math.max(0, drive) * 0.95,
     guard: [-10 - drive * 2, -34 - drive * 5] };

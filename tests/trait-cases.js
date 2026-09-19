@@ -1,7 +1,11 @@
+import { SUPER_WEAPONS } from '../src/game-config.js';
+import { getSuperSoldierBonuses } from '../src/progression-bonuses.js';
+import { drawUnitTargeting } from '../src/render.js';
+import { getMeleeMotion } from '../src/melee-motion.js';
 import { Q } from '../src/quantity.js';
 import { createGame, updateGame, stat, explainStat, attributes, UNITS, AGES, RULES, evolve, recruit, getRecruitState } from '../src/game.js';
 import { TRAITS, TRAIT_HOOKS, runTraitHook, validTraitState } from '../src/traits.js';
-import { createProgression, createCivilizationRun, resolveBattle, rebuildCivilization, purchaseUpgrade, setGameSpeed, cycleGameSpeed } from '../src/progression.js';
+import { createProgression, createCivilizationRun, resolveBattle, rebuildCivilization, purchaseUpgrade, setGameSpeed, cycleGameSpeed, updateProgression } from '../src/progression.js';
 import { TALENTS, emptyTalents, layerTalents, purchaseTalent, getTalentState } from '../src/talents.js';
 import { automationUnlocked, availableSpeeds, SAVE_VERSION } from '../src/progression-config.js';
 import { serializeSession, parseSession, mapSessionQuantities } from '../src/save.js';
@@ -33,6 +37,11 @@ function fixture(id, distance=30) {
 const ticks=(g,n)=>{for(let i=0;i<n;i++)updateGame(g,RULES.fixedStep);};
 function finish(s) { s.game.experience.enemy=AGES[5].experienceRequired;while(s.game.ages.enemy<5)evolve(s.game,'enemy');s.game.bases.enemy.hp=0;s.game.status='won';resolveBattle(s); }
 function fund(count=100) { const s=createProgression(); for(let i=0;i<count;i++){if(i)rebuildCivilization(s,s.run.runId);finish(s);}return s; }
+function sniperFixture() {
+ const g=createGame({mode:'incremental',ages:{player:5,enemy:5},bonuses:getSuperSoldierBonuses(true)});g.ai.enabled=false;
+ const player=soldier(g,'superSoldier','player',400),enemy=soldier(g,'warMachine','enemy',850,10000);
+ enemy.attackCooldown=100;g.units=[player,enemy];return {g,player,enemy};
+}
 export function registerTraitTests(test,assert,near) {
  const rejects=fn=>{let failed=false;try{fn();}catch{failed=true;}assert(failed,'Expected rejection');};
  test('V9: fire unlocks only speed; two genuine completions unlock free, disabled recruitment',()=>{
@@ -116,13 +125,73 @@ export function registerTraitTests(test,assert,near) {
   assert(Q.lt(player.hp,hp),'A cannon impact must deal damage');
   assert(!g.traitActivations?.parry&&player.traits.parry.readyAt===0,'Splash is not a melee attack');
  });
- test('Super plan: incremental recruits require plan; initial dagger is melee, ranged child unlocks snapshot shots; classic unchanged',()=>{
+ test('Super plan: incremental recruits require plan; close dagger and charged sniper unlock separately; classic ranged fire unchanged',()=>{
   const s=fund();purchaseTalent(s,'spark');rebuildCivilization(s,s.run.runId);s.game.experience.player=2200;while(s.game.ages.player<5)evolve(s.game);
   s.game.gold.player=10000;assert(getRecruitState(s.game,'superSoldier')==='disabled');finish(s);buyUnitPath(s);rebuildCivilization(s,s.run.runId);
-  const g=s.game;g.ai.enabled=false;g.ages.player=5;g.units=[soldier(g,'superSoldier','player',500),soldier(g,'tank','enemy',540)];g.units[1].attackCooldown=100;
+  const g=s.game;g.ai.enabled=false;g.ages.player=5;g.units=[soldier(g,'superSoldier','player',500),soldier(g,'tank','enemy',530)];g.units[1].attackCooldown=100;
   ticks(g,1);assert(!g.projectiles.length&&g.units[0].attackStyle==='melee'&&g.units[1].hp===UNITS.tank.health-440);
-  finish(s);assert(purchaseTalent(s,'superRanged'));rebuildCivilization(s,s.run.runId);s.game.ai.enabled=false;s.game.units=[soldier(s.game,'superSoldier','player',500),soldier(s.game,'tank','enemy',700)];ticks(s.game,1);assert(s.game.projectiles[0].kind==='plasma');
+  finish(s);assert(purchaseTalent(s,'superRanged'));rebuildCivilization(s,s.run.runId);s.game.ai.enabled=false;s.game.units=[soldier(s.game,'superSoldier','player',500),soldier(s.game,'tank','enemy',700)];ticks(s.game,67);assert(s.game.projectiles[0].kind==='sniper');
   const classic=createGame();assert(stat(classic,{type:'superSoldier',team:'player'},'enabled')&&stat(classic,{type:'superSoldier',team:'player'},'canRanged')&&stat(classic,{type:'superSoldier',team:'player'},'range')===340);
+ });
+
+ test('Sniper: resolved range, damage and cadence are player-only; charge precedes a snapshotted beam',()=>{
+  const {g,player,enemy}=sniperFixture(),cfg=SUPER_WEAPONS.sniper;
+  assert(stat(g,player,'range')===cfg.range&&stat(g,player,'damage')===cfg.damage);
+  assert(!stat(g,{type:'superSoldier',team:'enemy'},'sniperRifle'));
+  ticks(g,1);near(player.chargeRemaining,cfg.chargeTime);assert(!g.projectiles.length&&enemy.hp===10000);
+  ticks(g,60);assert(player.chargeRemaining>0&&!g.projectiles.length&&enemy.hp===10000);
+  ticks(g,6);const shot=g.projectiles[0];assert(shot.kind==='sniper'&&shot.damage===cfg.damage&&!player.chargeRemaining);
+  near(player.attackCooldown,cfg.attackInterval);
+  g.bonuses=[...g.bonuses,{target:{stat:'damage',team:'player'},type:'multiply',value:10,source:{kind:'depth',id:'later',label:'之后的伤害'}}];
+  ticks(g,12);near(enemy.hp,10000-cfg.damage);assert(!g.projectiles.length);
+  ticks(g,90);assert(!player.chargeRemaining&&!g.projectiles.length,'A high-power shot needs its full recovery');
+ });
+ test('Sniper: a lost target needs a new full lock; an adjacent enemy cancels the beam and gets a close stab',()=>{
+  for(const remove of [true,false]) {
+   const {g,player,enemy}=sniperFixture();ticks(g,35);
+   if(remove)g.units=[player];else enemy.x=1250;
+   const replacement=soldier(g,'warMachine','enemy',800);replacement.attackCooldown=100;g.units.push(replacement);
+   ticks(g,1);assert(!player.chargeRemaining&&!g.projectiles.length);
+   ticks(g,1);near(player.chargeRemaining,SUPER_WEAPONS.sniper.chargeTime);assert(player.chargeTargetId===replacement.id);
+   ticks(g,40);assert(!g.projectiles.length&&replacement.hp===UNITS.warMachine.health);
+  }
+  const {g,player,enemy}=sniperFixture();ticks(g,35);
+  const close=soldier(g,'warMachine','enemy',430);close.attackCooldown=100;g.units.push(close);
+  ticks(g,1);assert(!player.chargeRemaining&&!g.projectiles.length&&player.attackStyle==='melee');
+  near(close.hp,UNITS.warMachine.health-UNITS.superSoldier.meleeDamage);
+  near(player.attackCooldown,UNITS.superSoldier.meleeInterval);assert(enemy.hp===10000);
+ });
+ test('Sniper: mid-lock v9 saves resume once, preserve beam damage and reject invalid target/timer state',()=>{
+  const s=fund();purchaseTalent(s,'spark');buyUnitPath(s);purchaseTalent(s,'superRanged');rebuildCivilization(s,s.run.runId);
+  const g=s.game;g.ai.enabled=false;
+  for(const team of ['player','enemy']){g.experience[team]=2200;while(g.ages[team]<5)evolve(g,team);}
+  g.units=[soldier(g,'superSoldier','player',400),soldier(g,'warMachine','enemy',850)];g.units[1].attackCooldown=100;
+  ticks(g,35);const raw=serializeSession(s),resumed=parseSession(raw);assert(serializeSession(resumed)===raw);
+  updateProgression(resumed,1,{paused:true});updateProgression(resumed,1,{hidden:true});assert(serializeSession(resumed)===raw);
+  ticks(g,32);ticks(resumed.game,32);assert(g.projectiles.length===1&&JSON.stringify(g.projectiles)===JSON.stringify(resumed.game.projectiles));
+  const fired=parseSession(serializeSession(resumed));ticks(fired.game,15);assert(!fired.game.projectiles.length&&fired.game.units.length===1);
+  for(const patch of [{chargeDuration:0},{chargeRemaining:100},{chargeTargetBase:'enemy'},{chargeTargetId:9999}]) {
+   const bad=JSON.parse(raw);Object.assign(bad.game.units[0],patch);rejects(()=>parseSession(JSON.stringify(bad)));
+  }
+ });
+ test('Super dagger and sniper workshop: compact thrust reaches contact and the charge clip rewinds deterministically',()=>{
+  const pose=getMeleeMotion('superSoldier',{remaining:.4,duration:.4});
+  assert(pose.hand[0]+pose.body.x+SUPER_WEAPONS.daggerTip<=SUPER_WEAPONS.meleeRange+5);
+  assert(getMeleeMotion('superSoldier',{remaining:.2,duration:.4}).drive===0);
+  const clip=ANIMATION_CLIPS.find(c=>c.sniper),sample=createClipSampler(clip,'player');
+  assert(sample(.8).game.units[0].chargeRemaining>0);
+  assert(sample(1.5).game.projectiles.some(s=>s.kind==='sniper'));
+  const before=JSON.stringify(sample(.8).game);sample(6);assert(JSON.stringify(sample(.8).game)===before);
+ });
+ test.browser('Sniper targeting stays attached to its target, renders at mobile scale and respects reduced motion',()=>{
+  const {g,player,enemy}=sniperFixture();ticks(g,20);
+  const canvas=document.createElement('canvas');canvas.width=1000;canvas.height=150;const ctx=canvas.getContext('2d');
+  const paint=(reduced,scale=1)=>{ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,1000,150);ctx.translate(0,100);drawUnitTargeting(ctx,g,scale,reduced);return canvas.toDataURL();};
+  const before=paint(true);player.chargeRemaining-=.2;g.elapsed+=10;assert(paint(true)===before);
+  enemy.x-=30;assert(paint(true)!==before,'The lock follows the same moving target');
+  const normal=paint(false);player.chargeRemaining-=.2;assert(paint(false)!==normal,'Reticle closes as the charge completes');
+  paint(false,.7);assert(ctx.getImageData(400,50,450,40).data.some((v,i)=>i%4===3&&v>0));
+  enemy.hp=0;paint(false);assert(!ctx.getImageData(0,0,1000,150).data.some((v,i)=>i%4===3&&v>0));
  });
 
  test('Traits: every active trait state, launch snapshot and field validates and round-trips in v9',()=>{

@@ -1,4 +1,6 @@
-import { AGES, UNITS, TURRETS, ABILITIES, RULES, createGame, buildTurret, getTurretPosition, castAbility, updateGame } from './game.js';
+import { AGES, UNITS, TURRETS, ABILITIES, RULES, createGame, buildTurret, getTurretPosition, castAbility, updateGame, attributes } from './game.js';
+import { SUPER_WEAPONS } from './game-config.js';
+import { getSuperSoldierBonuses } from './progression-bonuses.js';
 import { drawUnit } from './units.js';
 import { drawTurret } from './turrets.js';
 import { drawBase } from './bases.js';
@@ -25,7 +27,8 @@ export const ANIMATION_CLIPS = [
     id: `combat-${source}-${type}`, category: 'combat', kind: 'combat', source, type, age: stats.age,
     name: `${stats.name} · ${stats.projectile ? '弹道' : '命中'}`, note: stats.description,
   }))),
-  { id: 'combat-unit-superSoldier-melee', category: 'combat', kind: 'combat', source: 'unit', type: 'superSoldier', age: 5, melee: true, name: '超级士兵 · 激光短匕首', note: '目标进入 60 距离时收枪刺出激光短匕首 · 前送、接触、迅速收回 · 完全穿甲' },
+  { id: 'combat-unit-superSoldier-melee', category: 'combat', kind: 'combat', source: 'unit', type: 'superSoldier', age: 5, melee: true, name: '超级士兵 · 激光短匕首', note: `贴身 ${SUPER_WEAPONS.meleeRange} 距离短刺 · 护住躯干、小幅前送、迅速收刀 · 完全穿甲` },
+  { id: 'combat-unit-superSoldier-sniper', category: 'combat', kind: 'combat', source: 'unit', type: 'superSoldier', age: 5, sniper: true, name: '超级士兵 · 狙击激光枪', note: `天赋武器 · 锁定连线引导 ${SUPER_WEAPONS.sniper.chargeTime} 秒 → ${SUPER_WEAPONS.sniper.damage} 穿甲激光 → 冷却 ${SUPER_WEAPONS.sniper.attackInterval} 秒` },
   ...Object.entries(AGES).map(([age, stats]) => ({ id: `ability-${stats.ability}`, category: 'ability', kind: 'ability', type: stats.ability, age: +age, name: ABILITIES[stats.ability].name, note: ABILITIES[stats.ability].description })),
   ...['fire', 'oil'].map(type => ({ id: `field-${type}`, category: 'ability', kind: 'field', type, age: 2, name: type === 'fire' ? '燃烧区域' : '沸油与蒸汽', note: '落地后持续 2.4 秒 · 末段消散' })),
   ...Object.entries(AGES).map(([age, stats]) => ({ id: `base-${age}`, category: 'scene', kind: 'base', age: +age, name: `${stats.shortName}基地 · ${BASE_DESIGNS[age].name}`, note: `${BASE_DESIGNS[age].description} 预览扩容、受损与废墟。` })),
@@ -41,7 +44,7 @@ function soldier(id, type, team, x) {
 // Quarter-second checkpoints make backward scrubbing deterministic and cheap.
 export function createClipSampler(clip, team) {
   if (clip.kind === 'trait') return createTraitSampler(clip);
-  let game = createGame(); game.ai.enabled = false;
+  let game = createGame(clip.sniper ? { mode: 'incremental', bonuses: getSuperSoldierBonuses(true).map(effect => ({ ...effect, target: { ...effect.target, team } })) } : {}); game.ai.enabled = false;
   const direction = team === 'player' ? 1 : -1, opponent = team === 'player' ? 'enemy' : 'player';
   const source = clip.source ?? clip.kind;
   const held = new Map();
@@ -70,7 +73,7 @@ export function createClipSampler(clip, team) {
     const stats = UNITS[clip.type]; sourceId = 1;
     const x = team === 'player' ? 500 : 780;
     game.units.push(soldier(sourceId, clip.type, team, x));
-    game.units.push(soldier(2, 'swordsman', opponent, x + direction * (clip.melee ? stats.meleeRange * 0.8 : Math.min(220, stats.range * 0.9))));
+    game.units.push(soldier(2, 'swordsman', opponent, x + direction * (clip.sniper ? 390 : clip.melee ? stats.meleeRange * 0.95 : Math.min(220, stats.range * 0.9))));
   }
   for (const unit of game.units) held.set(unit.id, unit.x);
   const checkpoints = new Map([[0, structuredClone(game)]]);
@@ -171,7 +174,7 @@ export function createClipPainter(canvas, clip) {
         drawBase(ctx, game.bases[team], game.ages[team], time, 1, 1);
         ctx.save(); ctx.translate(origin.x, origin.y); drawTurret(ctx, game.turrets[team][0], time, 1, false, true); ctx.restore();
       }
-      for (const unit of game.units) drawUnit(ctx, unit, time, 1, reducedMotion);
+      for (const unit of game.units) drawUnit(ctx, unit, time, 1, reducedMotion, attributes(game, unit).health, attributes(game, unit));
       for (const shot of game.projectiles) drawProjectile(ctx, shot, 1, reducedMotion);
       drawBattleEffects(ctx, game, 1, reducedMotion);
     } else if (clip.kind === 'ability') {

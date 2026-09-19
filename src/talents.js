@@ -1,3 +1,4 @@
+import { SUPER_WEAPONS } from './game-config.js';
 import { TRAITS, TRAIT_VALUES as V } from './traits.js';
 import { isBetweenRuns } from './progression-machine.js';
 import { SURFACE, UPGRADES, UPGRADE_COSTS, CHALLENGE, TALENT_LAYER_REQUIREMENT, UNIT_TALENT_COSTS } from './progression-config.js';
@@ -56,8 +57,8 @@ export const TALENTS = Object.freeze({
     effects: ['最高速度 2×', '解锁 3× 游戏速度'] },
   superSoldierPlan: { name: '超级士兵计划', branch: 'units', layer: 6, costs: [15], requires: {}, requiresLayer: 5,
     effects: ['超级士兵未开放', '未来时代可招募超级士兵 · 全覆轻甲与激光短匕首'] },
-  superRanged: { name: '光束投射', branch: 'units', layer: 7, costs: [12], requires: { superSoldierPlan: 1 },
-    effects: ['仅近战激光匕首', '解锁远程能量点射 · 近身仍使用激光匕首'] },
+  superRanged: { name: '狙击激光枪', branch: 'units', layer: 7, costs: [12], requires: { superSoldierPlan: 1 },
+    effects: ['仅贴身激光匕首', `${SUPER_WEAPONS.sniper.range} 射程 / ${SUPER_WEAPONS.sniper.damage} 穿甲伤害 · 锁定 ${SUPER_WEAPONS.sniper.chargeTime} 秒，开火后冷却 ${SUPER_WEAPONS.sniper.attackInterval} 秒 · 近身改用匕首`] },
   bypasser: { name: 'Great Filter Bypasser', branch: 'legacy', layer: 8, costs: [], requires: { superSoldierPlan: 1 }, placeholder: true,
     effects: ['地表文明的最后一道门槛', '规划中：下一轮避开毁灭，进入 VI 轨道文明。当前不可购买，尚未开放。'] },
 

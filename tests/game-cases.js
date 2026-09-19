@@ -1572,7 +1572,7 @@ test('Super soldier is a paid future-only manual unit with normal training, refu
   assert(getRecruitState(game, 'superSoldier') === 'army-full');
 });
 
-test('Super soldier switches from armor-piercing shots to contact punches without firing a second attack', () => {
+test('Super soldier switches from armor-piercing shots to close dagger thrusts without firing a second attack', () => {
   const attacker = soldier('player', 500, 'superSoldier'), target = soldier('enemy', 780, 'warMachine');
   target.attackCooldown = 1000;
   const game = isolatedGame([attacker, target]);
@@ -1580,7 +1580,7 @@ test('Super soldier switches from armor-piercing shots to contact punches withou
   assert(attacker.attackStyle === 'ranged' && game.projectiles.length === 1);
   attacker.attackCooldown = 1000; advance(game, 0.5);
   near(target.hp, UNITS.warMachine.health - UNITS.superSoldier.damage);
-  target.x = 550; attacker.attackCooldown = 0;
+  target.x = 530; attacker.attackCooldown = 0;
   updateGame(game, RULES.fixedStep);
   assert(attacker.attackStyle === 'melee' && game.projectiles.length === 0);
   near(target.hp, UNITS.warMachine.health - UNITS.superSoldier.damage - UNITS.superSoldier.meleeDamage);

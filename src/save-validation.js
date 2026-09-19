@@ -154,6 +154,12 @@ export function validateRecord(session, version = SAVE_VERSION) {
     unitIds.add(unit.id);
     check(UNITS[unit.type].age <= g.ages[unit.team] && amount(unit.hp, 0, version >= 5 ? oldHealthCap(getUnitHealth(combat, unit.type, unit.team)) : UNITS[unit.type].health) && Q.gt(unit.hp, 0) && num(unit.x, 0, RULES.width) && bool(unit.moving), '部队属性');
     if (version >= 9) check(validTraitState(unit), '兵种特性状态');
+    if (['chargeRemaining','chargeDuration','chargeTargetId','chargeTargetBase'].some(key => unit[key] !== undefined)) {
+      check(num(unit.chargeDuration, RULES.fixedStep) && num(unit.chargeRemaining, Number.EPSILON, unit.chargeDuration), '单位引导时钟');
+      check(stat(combat, unit, 'canRanged') && (attributes(combat, unit).chargeTime ?? 0) > 0, '单位引导能力');
+      check((int(unit.chargeTargetId, 1, g.nextUnitId - 1) && unit.chargeTargetBase === null) ||
+        (unit.chargeTargetId === null && teams.includes(unit.chargeTargetBase) && unit.chargeTargetBase !== unit.team), '单位锁定目标');
+    }
     if (unit.attackStyle !== undefined) check(['melee', 'ranged'].includes(unit.attackStyle), '攻击姿态');
     if (unit.lastAttackCharged !== undefined) check(bool(unit.lastAttackCharged), '冲锋');
     if (unit.burstTargetId != null) check(int(unit.burstTargetId, 1, g.nextUnitId - 1), '连发目标');

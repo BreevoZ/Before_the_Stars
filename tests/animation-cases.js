@@ -4,6 +4,7 @@ import { getMeleeMotion, rotatePoint } from '../src/melee-motion.js';
 import { ANIMATION_CLIPS, createClipSampler, createClipPainter } from '../src/animation-clips.js';
 import { drawLandscape } from '../src/render.js';
 import { drawCommandPortrait } from '../src/command-portraits.js';
+import { getRiflePose } from '../src/units.js';
 
 function sampleSky(width, height, ratio = 1, time = 83) {
   const canvas = document.createElement('canvas'), stars = [];
@@ -23,6 +24,24 @@ function sampleSky(width, height, ratio = 1, time = 83) {
 }
 
 export function registerAnimationTests(test, assert, near) {
+  test('Rifleman: fixed leg lengths and grounded boots through every gait and firing recoil; stopping never collapses the hips', () => {
+    const length = (a,b) => Math.hypot(a[0]-b[0],a[1]-b[1]);
+    for (const moving of [false,true]) for (let frame=0;frame<=100;frame++) {
+      const pose=getRiflePose({moving,gait:Math.sin(frame/100*Math.PI*2),kick:frame/100});
+      assert(pose.body.y >= -1 && pose.body.y <= 2, 'Rifle stance must not become a deep crouch');
+      assert(pose.legs.some(leg=>leg.ankle[1]===-4),'At least one boot remains planted');
+      for(const leg of pose.legs) {
+        near(length(leg.hip,leg.knee),13,'Thigh must not shorten');
+        near(length(leg.knee,leg.ankle),12,'Shin must not shorten');
+        assert(leg.hip[1] <= -24 && leg.knee[1] > leg.hip[1] && leg.knee[1] < leg.ankle[1]);
+        assert(leg.ankle[1] <= -4,'Boot must not sink into the floor');
+        near(leg.hip[1]-pose.body.y,-26,'Pelvis and torso must share an origin');
+      }
+    }
+    const idle=getRiflePose(), shot=getRiflePose({kick:1});
+    idle.legs.forEach((leg,i)=>near(length(leg.ankle,shot.legs[i].ankle),0,'Recoil cannot slide the feet'));
+    near(UNITS.rifleman.muzzleY,idle.body.y-41,'Projectiles must originate at the raised rifle');
+  });
   test.browser('Command portraits: every troop and turret stays distinct, centered and grounded without clipping; cached redraws match', () => {
     const canvas = document.createElement('canvas');
     // Keep readback on one raster path; switching from GPU to CPU mid-test

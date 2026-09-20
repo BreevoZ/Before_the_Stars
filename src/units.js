@@ -314,10 +314,28 @@ function fieldCannon(ctx, c, m) {
   shape(ctx, [[-1, -24], [12, -24], [12, -17], [-1, -17]], c.cloth);
   muzzle(ctx, 51 - r, -35, m, false, true);
 }
+// The rifle stance bends two fixed-length bones instead of moving the hips
+// down while leaving a shortened, vertical leg underneath the jacket.
+export function getRiflePose({ moving = false, gait = 0, kick = 0 } = {}) {
+  const body = { x: moving ? 0 : -kick * .7, y: moving ? -Math.abs(gait) * .65 : 1.5 };
+  const legs = [-1, 1].map(side => {
+    const step = moving ? gait * side : 0;
+    const hip = [side * 4 + body.x, -26 + body.y];
+    const ankle = [moving ? side * 6 + step * 7 : side < 0 ? -10 : 14, -4 - Math.max(0, step) * 3.5];
+    const knee = solveJoint(hip, ankle, 13, 12, -1);
+    return { side, hip, knee, ankle };
+  });
+  return { body, legs };
+}
+
 function modernInfantry(ctx, c, m, rifle) {
   const attack = getMeleeMotion('commando', m);
-  const crouch = rifle && !m.moving ? 7 : 0;
-  if (rifle || m.moving) legs(ctx, m, MATERIAL.olive, MATERIAL.leather, crouch);
+  const riflePose = rifle ? getRiflePose(m) : null;
+  if (rifle) for (const { side, hip, knee, ankle } of riflePose.legs) {
+    limb(ctx, [hip, knee, ankle], side < 0 ? MATERIAL.oliveDark : MATERIAL.olive, 5);
+    limb(ctx, [[ankle[0] - 2, ankle[1] + 1], [ankle[0] + 5, ankle[1] + 2]], MATERIAL.leather, 4);
+  }
+  else if (m.moving) legs(ctx, m, MATERIAL.olive, MATERIAL.leather);
   else for (const side of [-1, 1]) {
     // The rear leg drives the torso forward without sliding either boot.
     const hip = [side * 5 + attack.body.x, -24 + attack.body.y];
@@ -326,8 +344,10 @@ function modernInfantry(ctx, c, m, rifle) {
     limb(ctx, [hip, knee, ankle], side < 0 ? MATERIAL.oliveDark : MATERIAL.olive, 5);
     limb(ctx, [[ankle[0] - 2, -3], [ankle[0] + 5, -2]], MATERIAL.leather, 4);
   }
-  ctx.save(); ctx.translate(rifle ? -m.strike : attack.body.x, (rifle ? crouch : attack.body.y) - Math.abs(m.gait));
-  shape(ctx, [[-12, -44], [7, -46], [12, -25], [5, -20], [-13, -22]], MATERIAL.olive);
+  ctx.save(); ctx.translate(rifle ? riflePose.body.x : attack.body.x, rifle ? riflePose.body.y : attack.body.y - Math.abs(m.gait));
+  // A shorter field jacket exposes the upper leg rather than covering the knee.
+  const hem = rifle ? -3 : 0;
+  shape(ctx, [[-12, -44], [7, -46], [12, -25 + hem], [5, -20 + hem], [-13, -22 + hem]], MATERIAL.olive);
   shape(ctx, [[-16, -43], [-9, -45], [-10, -25], [-18, -27]], MATERIAL.oliveDark);
   stroke(ctx, [[-7, -43], [-6, -26]], MATERIAL.hide, 2);
   shape(ctx, [[-8, -43], [6, -45], [9, -31], [-5, -29]], c.cloth);

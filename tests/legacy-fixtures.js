@@ -12,6 +12,7 @@ export const statMultiplier = (game, key, team = 'player') => (game.bonuses ?? [
 export function v5Record(session) {
   const old = JSON.parse(JSON.stringify(parseSession(serializeSession(session)))), game = old.game;
   old.version = 5;
+  delete old.permanent.automation.ability; delete old.permanent.automation.campaign;
   for (const state of [old.permanent, old.run]) {
     // Retired talents are absent from the live tree; the old format still needs a level.
     state.talents = Object.fromEntries(Object.keys(HISTORICAL_TALENTS[5]).map(key => [key, (key === 'autobuyer' ? state.talents.spark : state.talents[key]) ?? 0]));

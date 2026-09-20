@@ -11,7 +11,7 @@ import { getRunProduction } from './legacy-machine.js';
 import { check, object, num, int, bool, id, member, numbers, list, safeTree, limit } from './save-primitives.js';
 import { HISTORICAL_TALENTS, HISTORICAL_UPGRADE_COSTS } from './save-history.js';
 import { validateShape, SESSION_SHAPE, RUN_SHAPE, GAME_SHAPE, UNIT_SHAPE, ORDER_SHAPE, TURRET_SHAPE, SHOT_SHAPE, FIELD_SHAPE, EFFECT_SHAPE, IMPACT_SHAPE, ABILITY_SHAPE, AI_SHAPE } from './save-schema.js';
-import { phaseMatchesResult } from './progression-machine.js';
+import { phaseMatchesResult, isCivilizationVictory } from './progression-machine.js';
 import { paidLegacy } from './legacy-ledger.js';
 
 import { TRAITS, validTraitState } from './traits.js';
@@ -104,7 +104,7 @@ export function validateRecord(session, version = SAVE_VERSION) {
     check(object(ledger) && Object.keys(ledger).every(key => Object.hasOwn(levels, key)), '购买账本字段');
     for (const [key, level] of Object.entries(levels)) {
       const payments = ledger[key] ?? [], current = TALENTS[key]?.costs ?? UPGRADE_COSTS;
-      const prices = [current, ...[10, 11, 12].map(old => HISTORICAL_TALENTS[old][key]?.costs ?? HISTORICAL_UPGRADE_COSTS)];
+      const prices = [current, ...[10, 11, 12, 13].map(old => HISTORICAL_TALENTS[old][key]?.costs ?? (Object.hasOwn(p.upgrades, key) ? HISTORICAL_UPGRADE_COSTS : []))];
       check(Array.isArray(payments) && payments.length === level, '购买账本等级');
       for (const [rank, cost] of payments.entries()) check(wholeAmount(cost) && (p.talentGrants.includes(key)
         ? Q.eq(cost, 0) : prices.some(list => list[rank] !== undefined && Q.eq(cost, list[rank]))), '购买账本价格');
@@ -113,11 +113,13 @@ export function validateRecord(session, version = SAVE_VERSION) {
   const spent = version >= 11 ? paidLegacy(p) : Object.values(p.upgrades).reduce((sum, level) => sum + upgradeCosts.slice(0, level).reduce((a, b) => a + b, 0), 0)
     + (oldVersion ? 0 : Object.entries(configs).reduce((sum, [key, config]) => sum +
       (!previousVersion && p.talentGrants.includes(key) ? 0 : config.costs.slice(0, p.talents[key]).reduce((a, b) => a + b, 0)), 0));
-  check(Q.eq(Q.add(p.legacy, spent), totalLegacy), '遗产收支不一致');
+  const adjustment = p.debugLegacyAdjustment ?? 0;
+  check(p.debugLegacyAdjustment === undefined || (version >= 14 && session.debug === true && Q.valid(adjustment) && Q.isInteger(adjustment)), '调试遗产账目');
+  check(Q.eq(Q.add(p.legacy, spent), Q.add(totalLegacy, adjustment)), '遗产收支不一致');
   const auto = p.automation;
   check(object(auto) && bool(auto.unlocked) && bool(auto.enabled) && AUTOMATION_TARGETS.includes(auto.target), '自动招募设置');
   check(auto.unlocked === (previousVersion ? p.completedCycles > 0 : version < 9 ? p.talents.autobuyer > 0 : automationUnlocked(p)) && (auto.unlocked || !auto.enabled), '自动招募解锁');
-  if (!oldVersion) check(validAutomation(auto, p.talents, previousVersion), '自动购买设置或解锁条件');
+  if (!oldVersion) check(validAutomation(auto, p.talents, previousVersion, version), '自动购买设置或解锁条件');
   if (version >= 9) {
     check(object(p.settings) && availableSpeeds(p).includes(p.settings.speed), '游戏速度设置');
     check(bool(p.automationRetained) && (!p.automationRetained || p.talentGrants.includes('spark')), '自动招募保留标记');
@@ -139,8 +141,8 @@ export function validateRecord(session, version = SAVE_VERSION) {
     check(run.upgrades.production === p.upgrades.production && run.upgrades.warfare === p.upgrades.warfare, '战斗中升级');
   }
   if (!oldVersion) for (const key of Object.keys(configs)) {
-    check(run.talents[key] <= p.talents[key], '本轮天赋快照');
-    if (['battle', 'victory'].includes(run.phase)) check(run.talents[key] === p.talents[key], '战斗中购买天赋');
+    check((run.talents[key] ?? 0) <= p.talents[key], '本轮天赋快照');
+    if (['battle', 'victory'].includes(run.phase)) check((run.talents[key] ?? 0) === p.talents[key], '战斗中购买天赋');
   }
   if (version < 6) {
     check(g.mode === 'incremental' && object(g.modifiers), '战斗模式');
@@ -182,8 +184,8 @@ export function validateRecord(session, version = SAVE_VERSION) {
   }
   const lost = Q.eq(g.bases.player.hp, 0), won = Q.eq(g.bases.enemy.hp, 0);
   check(g.status === (lost && won ? 'draw' : lost ? 'lost' : won ? 'won' : 'playing'), '基地与胜负不一致');
-  if (['destruction', 'orbital'].includes(run.phase)) check(g.ages.enemy === SURFACE.finalEnemyAge, '终局敌人');
-  if (run.phase === 'victory') check(g.ages.enemy < SURFACE.finalEnemyAge, '普通战役终点');
+  if (['destruction', 'orbital'].includes(run.phase)) check(version >= 14 ? isCivilizationVictory(session) : g.ages.enemy === SURFACE.finalEnemyAge, '终局敌人');
+  if (run.phase === 'victory') check(g.ages.enemy < SURFACE.finalEnemyAge && (version < 14 || !isCivilizationVictory(session)), '普通战役终点');
   list(g.units, (version >= 6 ? STAT_DEFINITIONS.armyLimit.max : RULES.armyLimit) * 2, '部队');
   for (const unit of g.units) {
     validateShape(unit, UNIT_SHAPE, 'unit');

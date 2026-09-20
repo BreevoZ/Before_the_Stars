@@ -76,7 +76,8 @@ export function registerChallengeTests(test, assert, near) {
       assert(s.permanent.completedCycles === cycles + 1 && s.permanent.legacy === legacy + s.run.earnedLegacy);
       assert(!resolveBattle(s) && !startChallenge(s, id)); roundtrip(s);
     }
-    assert(getNextChallengeLevel(s) === null && !startChallenge(s, s.run.runId));
+    assert(getNextChallengeLevel(s) === 10 && startChallenge(s, s.run.runId));
+    assert(!s.run.firstClear); finish(s);
     assert(rebuildCivilization(s, s.run.runId) && s.run.challengeLevel === 0);
     assert(statMultiplier(s.game, 'damage', 'enemy') === 1 && s.game.bases.enemy.maxHp === AGES[1].baseHealth);
   });
@@ -236,9 +237,11 @@ export function registerChallengeTests(test, assert, near) {
       assert(el('challenge-reward').textContent.startsWith(`+${getLegacyReward({ conservation: 1 }, 2, undefined, true)} Legacy`)); el('begin-challenge').click();
       assert(saved().run.challengeLevel === 2);
       frame.contentDocument.querySelector('[data-debug-command="defeat"]').click();
-      assert(el('result-challenge').textContent.includes('重返铁旗时代') && saved().permanent.legacy === afterPurchase + getLegacyReward({ conservation: 1 }, 1, undefined, true));
+      assert(el('result-challenge').textContent.includes('选关') && el('play-again').textContent.includes('重试') && saved().permanent.legacy === afterPurchase + getLegacyReward({ conservation: 1 }, 1, undefined, true));
       el('result-challenge').click(); el('begin-challenge').click(); assert(saved().run.challengeLevel === 2);
-      frame.contentDocument.querySelector('[data-debug-command="defeat"]').click(); el('play-again').click(); el('play-again').click();
+      frame.contentDocument.querySelector('[data-debug-command="defeat"]').click(); el('play-again').click();
+      assert(saved().run.challengeLevel === 2, 'Primary retry preserves the selected expedition');
+      frame.contentDocument.querySelector('[data-debug-command="defeat"]').click(); el('archives').click(); el('rebuild-civilization').click();
       next = saved(); assert(next.run.challengeLevel === 0 && statMultiplier(next.game, 'health', 'enemy') === 1);
       assert(next.permanent.legacy === afterPurchase + getLegacyReward({ conservation: 1 }, 1, undefined, true), 'A lost expedition pays nothing');
       assert(el('challenge-status').hidden && el('save-warning').hidden);

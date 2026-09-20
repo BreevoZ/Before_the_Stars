@@ -325,3 +325,17 @@ progress::-moz-progress-bar { background: var(--player); border-radius: 2px; }
   #result:has(#result-challenge:not([hidden])) #result-hint { font-size: 9px; margin-top: 8px; }
   .challenge-stats { font-size: 11px; }
 }
+
+/* Expedition choices remain readable at phone widths and keep native keyboard focus. */
+.challenge-selector { margin: 0 0 18px; padding: 0; border: 0; min-width: 0; }
+.challenge-selector legend { color: var(--muted); font-size: 11px; margin-bottom: 10px; }
+#challenge-levels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+#challenge-levels button { min-height: 44px; padding: 10px; text-align: left; font: inherit; font-size: 11px; line-height: 1.6; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 6px; }
+#challenge-levels button[aria-pressed="true"] { color: var(--gold); border-color: var(--gold); background: var(--color-home-surface); }
+#challenge-levels button:disabled { opacity: .35; cursor: default; }
+#challenge-levels button:focus-visible { outline: 2px solid var(--player); outline-offset: 2px; }
+#debug-legacy-dialog { width: min(440px, calc(100% - 24px)); max-height: 88dvh; padding: 0; border: 1px solid var(--line); border-radius: 12px; color: var(--color-text-primary); background: var(--color-battle-help-dialog-surface); }
+#debug-legacy-dialog::backdrop { background: var(--color-battle-help-dialog-surface-2); backdrop-filter: blur(5px); }
+.debug-legacy-form { display: grid; gap: 12px; font-size: 12px; }
+.debug-legacy-form input { width: 100%; min-width: 0; padding: 12px; font: inherit; color: var(--color-text-primary); border: 1px solid var(--line); border-radius: 5px; background: var(--color-home-surface); }
+.debug-legacy-form input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

@@ -73,5 +73,12 @@ const v12 = Object.fromEntries(Object.entries(v11).filter(([key]) => key !== 'co
     legacyEfficiency: [32, 128, 512], bypasser: [500] }[key] ?? unitCost ?? config.costs;
   return [key, { ...config, costs, ...(key === 'legacyMachine' ? { requires: { conservation: 1 } } : {}) }];
 }));
-export const HISTORICAL_TALENTS = freeze({ 2: v2, 3: v3, 4: v4, 5: v5, 6: v5, 7: v5, 8: v5, 9: v9, 10: v10, 11: v11, 12: v12 });
+// v13 economy, frozen before v14 adds optional automation branches.
+const v13 = Object.fromEntries(Object.entries(v12).map(([key, config]) => [key, { ...config,
+  costs: ({ challenge: [2], elite: [256], supply: [8,16,32], salvage: [16,32,64],
+    conservation: [1,4,16,64], legacyMachine: [32], legacyCapacity: [128,512,2048],
+    legacyEfficiency: [64,256,1024], timeAcceleration: [32], superSoldierPlan: [256],
+    superRanged: [512], bypasser: [10000] })[key] ?? (config.unit ? [2 ** (config.layer + 1)] : config.costs),
+}]));
+export const HISTORICAL_TALENTS = freeze({ 2: v2, 3: v3, 4: v4, 5: v5, 6: v5, 7: v5, 8: v5, 9: v9, 10: v10, 11: v11, 12: v12, 13: v13 });
 export const HISTORICAL_UPGRADE_COSTS = Object.freeze([1, 2, 4, 8, 16]);

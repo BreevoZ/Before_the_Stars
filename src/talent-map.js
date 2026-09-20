@@ -25,6 +25,9 @@ const mapData = {
   spark: { x: 550, y: 1570, kind: 'keystone', icon: glyphs.spark },
   logistics: { x: 125, y: 1350 }, formation: { x: 265, y: 1190, kind: 'keystone' },
   evolution: { x: 125, y: 990 }, defense: { x: 265, y: 845, kind: 'specialist' },
+  fireControl: { x: 125, y: 755, icon: 'M12 2v5m0 10v5M2 12h5m10 0h5M12 7a5 5 0 110 10 5 5 0 010-10' },
+  campaign: { x: 125, y: 535, icon: 'M3 8h16l-4-4m4 4-4 4M21 16H5l4 4m-4-4 4-4' },
+  extermination: { x: 125, y: 315, kind: 'keystone', icon: 'M5 20 19 4M5 4l14 16M2 17l5 5m10 0 5-5M4 6V2h4m8 0h4v4' },
   production: { x: 825, y: 1330 }, supply: { x: 825, y: 1120, kind: 'specialist' },
   warfare: { x: 955, y: 1110 }, salvage: { x: 955, y: 900, kind: 'specialist' },
   conservation: { x: 1030, y: 1350, kind: 'keystone' }, challenge: { x: 990, y: 1210, kind: 'specialist' },
@@ -81,13 +84,15 @@ export function createTalentMap(getSession, changed) {
     const parents = talentPrerequisiteText(config);
     card.innerHTML = `<p class="talent-requires">前置：${parents}${config.unit ? ` · ${['','原始','中世纪','文艺复兴','现代','未来'][config.layer]}兵种` : ''}</p><h4>${config.name}</h4><div class="talent-comparison" id="effect-${key}"><div><small>当前</small><p id="current-${key}"></p></div><span aria-hidden="true">→</span><div><small>下一级</small><p id="next-${key}"></p></div></div><p class="archive-note" id="grant-${key}" hidden>旧版前置天赋已免费保留。</p><button id="buy-${key}" type="button" aria-describedby="effect-${key} state-${key}"></button><small id="state-${key}"></small>`;
     el('talent-detail-cards').append(card);
-    el(`buy-${key}`).addEventListener('click', () => {
+    const buy = () => {
       const s = getSession(), before = s.permanent.legacy;
       if (!(Object.hasOwn(UPGRADES, key) ? purchaseUpgrade : purchaseTalent)(s, key)) return;
       if (key === 'bypasser') { closeDetail(); changed(key); sync(); return; }
       changed(key); sync(); feedback(key, Q.sub(before, s.permanent.legacy));
       if (el(`buy-${key}`).disabled) el('close-talent-detail').focus({ preventScroll: true });
-    });
+    };
+    el(`buy-${key}`).addEventListener('click', buy);
+    button.addEventListener('dblclick', event => { event.preventDefault(); buy(); });
   }
   for (const [layer, point] of Object.entries(GATES)) {
     const gate = document.createElement('div'); gate.id = `gate-${layer}`; gate.className = 'era-gate';

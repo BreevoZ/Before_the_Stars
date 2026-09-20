@@ -304,7 +304,7 @@ export function registerTalentTests(test, assert, near) {
       }
       const raw = v2(s), old = JSON.parse(raw), restored = parseSession(raw), p = restored.permanent;
       assert(restored.version === SAVE_VERSION && p.legacy === old.permanent.legacy && p.totalLegacy === old.permanent.totalLegacy);
-      assert(JSON.stringify(canonical(p.automation)) === JSON.stringify(canonical(old.permanent.automation)));
+      assert(JSON.stringify(canonical(p.automation)) === JSON.stringify(canonical({ ...old.permanent.automation, ability: false, campaign: false })));
       assert([...p.talentGrants].sort().join(',') === (phase === 'fresh' ? '' : phase === 'first-settlement' ? 'logistics,spark' : 'logistics,spark,superSoldierPlan'));
       assert(restored.run.phase === s.run.phase && restored.run.runId === s.run.runId && restored.run.earnedLegacy === s.run.earnedLegacy);
       assert(restored.game.gold.player === s.game.gold.player && !resolveBattle(restored));

@@ -37,7 +37,7 @@ export function getChallengeModifiers(level = 0, rules = 11) {
   return Object.fromEntries(Object.entries(table).filter(([key]) => key !== 'maxLevel')
     .map(([key, base]) => [key, Q.pow(base, level)]));
 }
-export const SAVE_VERSION = 13;
+export const SAVE_VERSION = 14;
 export const SAVE_INTERVAL = 10;
 export function getBonuses(levels) {
   return { income: Q.pow(UPGRADES.production.base, levels.production), experience: Q.pow(UPGRADES.warfare.base, levels.warfare) };
@@ -75,6 +75,7 @@ export const LEGACY_ECONOMY = Object.freeze({ rules: 12,
 export const TALENT_PRICES = Object.freeze({
   // Run 1 buys 2× speed, run 2 doubles the reward, run 3 opens the expedition.
   spark: tierCosts(0), challenge: tierCosts(1),
+  fireControl: tierCosts(3), campaign: tierCosts(4), extermination: tierCosts(6),
   logistics: tierCosts(1), formation: tierCosts(1),
   evolution: tierCosts(2), defense: tierCosts(2, 2), elite: tierCosts(8),
   supply: tierCosts(3, 3), salvage: tierCosts(4, 3),

@@ -180,3 +180,23 @@ test('CLI: JSON/CSV outputs are parseable, progress stays on stderr and invalid 
     assert.equal(existsSync(missing), false);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('Simulation: automatic abilities/campaign accept talent loadouts and extermination settles a real early base kill', () => {
+  const options = {
+    completedCycles: 2,
+    talents: { spark: 1, formation: 1, evolution: 1, fireControl: 1, campaign: 1 },
+    automation: { enabled: true, ability: true, campaign: true }, maxSeconds: 300,
+    bonuses: [
+      { target: { stat: 'baseHealth', team: 'enemy' }, type: 'override', value: 1, source: { kind: 'challenge', id: 'test-base', label: '快速攻城场景' } },
+      { target: { stat: 'canRecruit', team: 'enemy' }, type: 'override', value: false, source: { kind: 'challenge', id: 'test-army', label: '无守军场景' } },
+    ],
+  };
+  const normal = simulateRun(options);
+  const early = simulateRun({ ...options, talents: { ...options.talents, extermination: 1 } });
+  assert.equal(normal.outcome, 'won'); assert.equal(normal.battles.length, 5);
+  assert.equal(early.outcome, 'won'); assert.equal(early.battles.length, 1);
+  assert.equal(early.battles[0].enemyEndAge, 1); assert.equal(early.legacy, normal.legacy);
+  assert.ok(early.duration < normal.duration);
+  near(normal.battles.reduce((sum, battle) => sum + battle.duration, 0), normal.duration);
+  assert.equal(simulateRun({ ...options, automation: { ...options.automation, campaign: false } }).duration, normal.duration);
+});

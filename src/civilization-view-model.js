@@ -3,7 +3,7 @@ import { stat } from './stats.js';
 import { Q } from './quantity.js';
 import { AGES } from './game.js';
 import { describeStat } from './stat-text.js';
-import { getNextChallengeLevel, isBetweenRuns } from './progression-machine.js';
+import { getNextChallengeLevel, getChallengeLevels, canStartChallenge, isBetweenRuns } from './progression-machine.js';
 import { CHALLENGE, LEGACY_ECONOMY, getChallengeModifiers, challengeName, availableSpeeds, getVictorySupplies } from './progression-config.js';
 import { getLegacyReward } from './talents.js';
 
@@ -14,7 +14,7 @@ export function buildCivilizationViewModel(session, { debug = false } = {}) {
   const { run, permanent: p, game } = session;
   const between = isBetweenRuns(run.phase);
   const nextChallenge = getNextChallengeLevel(session);
-  const challengeLabel = run.phase === 'defeat' ? `重返${challengeName(nextChallenge)}` : `踏入${challengeName(nextChallenge)}`;
+  const challengeLabel = '余烬远征 · 选关';
   for (const id of ['result-challenge', 'archive-challenge']) {
     text(id, nextChallenge === null, 'hidden'); text(id, challengeLabel);
   }
@@ -24,6 +24,7 @@ export function buildCivilizationViewModel(session, { debug = false } = {}) {
   put('body@data-civilization-phase', run.phase);
   if (debug) {
     put('#debug-speed@value', String(session.debugSpeed));
+    put('[data-debug-command="legacy"]@disabled', !p.completedCycles || !between);
     put('[data-debug-command]:not([data-debug-command="legacy"])@disabled', run.phase !== 'battle');
   }
   text('debug-legacy', !debug || !p.completedCycles || !between, 'hidden');
@@ -35,7 +36,7 @@ export function buildCivilizationViewModel(session, { debug = false } = {}) {
   text('home-heading', run.phase === 'destruction' ? '文明未能幸存，星火仍在。' : '每一次重建，都离群星更近。');
   text('archive-run', `地表文明 · 第 ${run.battleNumber} 场冲突 · 本轮 ${Math.floor(run.elapsed / 60)} 分 ${Math.floor(run.elapsed % 60)} 秒`);
   text('cycles', p.completedCycles); text('legacy', Q.format(p.legacy));
-  text('cycle-outcome', run.phase === 'destruction' ? `敌军最后的核反扑摧毁了世界。战争胜利，文明却未能幸存。本轮 +${Q.format(run.earnedLegacy)} 文明遗产，已入账。` :
+  text('cycle-outcome', run.phase === 'destruction' && game.ages.enemy < 5 ? `赶尽杀绝：敌军已彻底覆灭，无需追击下一时代。文明走到了尽头，本轮 +${Q.format(run.earnedLegacy)} 文明遗产已入账。` : run.phase === 'destruction' ? `敌军最后的核反扑摧毁了世界。战争胜利，文明却未能幸存。本轮 +${Q.format(run.earnedLegacy)} 文明遗产，已入账。` :
     run.phase === 'defeat' ? '本轮未完成终局，无通关奖励。已生产的遗产与永久档案仍然保留。' : '击败未来时代的敌方基地，完成地表文明循环；仅进化至未来并不算通关。');
   text('archive-footer', !between, 'hidden');
   text('cycle-outcome', run.phase === 'battle' || run.phase === 'victory', 'hidden');
@@ -44,6 +45,7 @@ export function buildCivilizationViewModel(session, { debug = false } = {}) {
   let activeBonuses = `本轮收入：${describeStat(game, 'player', 'income')}；击杀经验（基础 100）：${describeStat(game, { kind: 'reward' }, 'experience', 100)}；击杀金币（基础 100）：${describeStat(game, { kind: 'reward' }, 'bounty', 100)}；起始金币：${describeStat(game, 'player', 'startingGold')}；终局遗产：${describeStat(game, { kind: 'civilization' }, 'legacy')}。阵亡经验先按 75% 向下取整，再结算加成并逐笔向下取整。`;
   if (run.challengeLevel) activeBonuses += ` 敌军收入：${describeStat(game, 'enemy', 'income')}；基地生命：${describeStat(game, 'enemy', 'baseHealth')}。`;
   if (run.talents.legacyMachine) activeBonuses += ` 生产机本轮上限：终局遗产的 ${describeStat(game, { kind: 'civilization' }, 'legacyMachineShare')}；填满耗时：${describeStat(game, { kind: 'civilization' }, 'legacyFillSeconds')} 模拟秒。`;
+  if (run.talents.extermination) activeBonuses += ' 赶尽杀绝：摧毁任意时代敌方基地即完成本轮文明，结算上方终局遗产。';
   text('active-bonuses', activeBonuses);
   text('archives', p.completedCycles === 0, 'hidden');
   text('civilization-bar', p.completedCycles === 0, 'hidden');
@@ -62,10 +64,10 @@ export function buildCivilizationViewModel(session, { debug = false } = {}) {
   text('result', run.phase === 'destruction', 'class:destruction');
   if (run.phase !== 'battle') {
     text('result-title', run.phase === 'destruction' ? '文明未能幸存' : run.phase === 'victory' ? '战役胜利' : game.status === 'draw' ? '平局' : '战败');
-    text('result-detail', run.phase === 'destruction' ? `你赢得了战争，却没能保住文明。+${Q.format(run.earnedLegacy)} 文明遗产已计入本轮结算。` :
+    text('result-detail', run.phase === 'destruction' && game.ages.enemy < 5 ? `赶尽杀绝：敌军已彻底覆灭，本轮文明提前终结。+${Q.format(run.earnedLegacy)} 文明遗产已入账。` : run.phase === 'destruction' ? `你赢得了战争，却没能保住文明。+${Q.format(run.earnedLegacy)} 文明遗产已计入本轮结算。` :
       run.phase === 'victory' ? `敌方${AGES[game.ages.enemy].name}基地已被摧毁。资产保留，下一场冲突等待着你。` : '本轮没有终局奖励。已生产的遗产与永久进度仍然保留。');
     text('play-again', run.phase === 'victory' ? '继续文明进程' : run.phase === 'destruction' ? (p.completedCycles === 1 ? '查看遗产与天赋' : '重建文明') : p.completedCycles ? '查看档案与重试' : '从原始时代重试');
-    if (run.challengeLevel && between) text('play-again', '返回初生之地');
+    if (run.challengeLevel && between) text('play-again', run.phase === 'defeat' ? `重试 · ${challengeName(run.challengeLevel)}` : '返回初生之地');
     text('result-hint', false, 'hidden');
     const supplies = getVictorySupplies(game);
     text('result-hint', run.phase === 'destruction' ? (p.completedCycles === 1 ? '第一份文明遗产 · 解锁你的第一个天赋' : '重建清空本轮资源与战场 · 保留遗产、天赋与自动购买设置') : run.phase === 'victory' ? `继续时获得战役补给：+${Q.format(supplies.gold)} 金币、+${Q.format(supplies.experience)} 经验 · 未完成订单退款 · 基地满血` : '从原始时代重新尝试');
@@ -82,9 +84,14 @@ export function buildCivilizationViewModel(session, { debug = false } = {}) {
   return view;
 }
 
-export function buildChallengeViewModel(session) {
-  const level = getNextChallengeLevel(session);
-  if (level === null) return null;
+export function buildChallengeViewModel(session, level = getNextChallengeLevel(session)) {
+  if (!canStartChallenge(session, level)) return null;
+  const levels = getChallengeLevels(session);
+  const choices = Object.fromEntries(levels.flatMap(entry => [
+    [`#challenge-level-${entry.level}`, `${String(entry.level).padStart(2, '0')} · ${challengeName(entry.level)} · ${entry.cleared ? '已通关' : entry.unlocked ? '可挑战' : '未抵达'}`],
+    [`#challenge-level-${entry.level}@disabled`, !entry.unlocked],
+    [`#challenge-level-${entry.level}@aria-pressed`, String(entry.level === level)],
+  ]));
   const bonuses = getChallengeModifiers(level), multiplier = value => `×${Q.format(value)}`;
   // Show the actual payout, not the base one: the ember and the first-arrival
   // bonus are exactly why the player is considering this run.
@@ -94,8 +101,10 @@ export function buildChallengeViewModel(session) {
   const factors = [`基础 ${Q.format(base)}`, `余烬 ×${Q.format(LEGACY_ECONOMY.challengeBase ** level)}`,
     ...(firstClear ? [`首次抵达 ×${LEGACY_ECONOMY.firstClearBonus}`] : [])];
   return { level, bindings: {
+    ...choices,
+    '#challenge-reward-label': session.permanent.talents.extermination ? '摧毁任意时代敌军基地后获得' : '击败未来敌军后获得',
     '#challenge-title': `余烬远征 · ${challengeName(level)}`,
-    '#challenge-intro': `${session.run.phase === 'defeat' ? '重试当前难度' : '废墟深处，一支更强大的文明正在集结'}。以下倍率均相对于常规文明（显示保留三位小数）。`,
+    '#challenge-intro': `${level === session.run.challengeLevel && session.run.phase === 'defeat' ? '重试当前难度' : firstClear ? '首次踏入这片余烬' : '重返已抵达的余烬，不重复领取首次抵达加成'}。以下倍率均相对于常规文明（显示保留三位小数）。`,
     '#challenge-economy': `${multiplier(bonuses.gold)} / ${multiplier(bonuses.income)}`,
     '#challenge-experience': multiplier(bonuses.experience),
     '#challenge-power': `${multiplier(bonuses.health)} / ${multiplier(bonuses.damage)}`,

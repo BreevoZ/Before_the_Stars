@@ -7,8 +7,8 @@ import { getV8RunBonuses } from './progression-bonuses.js';
 import { createAutomation } from './automation.js';
 import { HISTORICAL_TALENTS, HISTORICAL_UPGRADE_COSTS } from './save-history.js';
 import { validateRecord } from './save-validation.js';
-import { cloneRecord, toV8Record, fromV8Record, fromV9Record, fromV10Record, fromV11Record, fromV12Record } from './save-record.js';
-import { emptyTalents, TALENTS } from './talents.js';
+import { cloneRecord, toV8Record, fromV8Record, fromV9Record, fromV10Record, fromV11Record, fromV12Record, fromV13Record } from './save-record.js';
+import { TALENTS } from './talents.js';
 const teams = ['player', 'enemy'];
 
 export function migrateV1(input) {
@@ -16,7 +16,7 @@ export function migrateV1(input) {
   // Validate the complete old record before introducing any defaults. Never
   // rerun settlement or starting-resource grants while upgrading a save.
   const auto = session.permanent.automation;
-  session.permanent.automation = { ...createAutomation(), unlocked: auto.unlocked, enabled: auto.enabled, target: auto.target };
+  session.permanent.automation = { ...createAutomation(2), unlocked: auto.unlocked, enabled: auto.enabled, target: auto.target };
   session.permanent.totalLegacy = session.permanent.completedCycles * SURFACE.legacyPerCycle;
   session.permanent.talents = Object.fromEntries(Object.keys(HISTORICAL_TALENTS[2]).map(key => [key, 0]));
   session.run.talents = { ...session.permanent.talents };
@@ -118,7 +118,7 @@ export function migrateV8(input) {
 export function migrateV9(input) {
   const session = fromV9Record(input);
   session.permanent.legacyMachine = createLegacyMachine();
-  for (const state of [session.permanent, session.run]) state.talents = { ...emptyTalents(), ...state.talents };
+  for (const state of [session.permanent, session.run]) state.talents = { ...Object.fromEntries(Object.keys(HISTORICAL_TALENTS[10]).map(key => [key, 0])), ...state.talents };
   // Finish the existing run under its original reward contract, including an
   // already-settled finale. The next fresh run uses exponential rewards.
   session.run.legacyRules = 9;
@@ -137,11 +137,11 @@ export function migrateV10(input) {
 // refunded through the ledger itself: dropping a payment restores its Legacy.
 export function migrateV11(input) {
   const session = fromV11Record(input), p = session.permanent;
-  const keep = { conservation: TALENTS.conservation.costs.length, legacyCapacity: TALENTS.legacyCapacity.costs.length,
-    legacyEfficiency: TALENTS.legacyEfficiency.costs.length, continuity: 0 };
+  const keep = { conservation: HISTORICAL_TALENTS[12].conservation.costs.length, legacyCapacity: HISTORICAL_TALENTS[12].legacyCapacity.costs.length,
+    legacyEfficiency: HISTORICAL_TALENTS[12].legacyEfficiency.costs.length, continuity: 0 };
   // Only the permanent tree is retired. The active run keeps the exact snapshot
   // and reward contract it started under, settled finale included.
-  p.talents = Object.fromEntries(Object.keys(emptyTalents()).map(key =>
+  p.talents = Object.fromEntries(Object.keys(HISTORICAL_TALENTS[12]).map(key =>
     [key, Math.min(p.talents[key] ?? 0, keep[key] ?? Infinity)]));
   for (const [key, ranks] of Object.entries(keep)) {
     if (!p.purchaseCosts[key]) continue;
@@ -163,11 +163,23 @@ export function migrateV12(input) {
   session.version = 13;
   return { ...toV8Record(session), version: 13 };
 }
-export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9, 10: migrateV10, 11: migrateV11, 12: migrateV12 });
+export function migrateV13(input) {
+  const session = fromV13Record(input);
+  session.permanent.automation.ability = false;
+  session.permanent.automation.campaign = false;
+  for (const state of [session.permanent, session.run]) {
+    // Historical active contracts retain their own tree until the next rebuild.
+    if (state === session.run && state.legacyRules < LEGACY_ECONOMY.rules) continue;
+    for (const key of ['fireControl', 'campaign', 'extermination']) state.talents[key] = 0;
+  }
+  session.version = 14;
+  return { ...toV8Record(session), version: 14 };
+}
+export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9, 10: migrateV10, 11: migrateV11, 12: migrateV12, 13: migrateV13 });
 export function migrateRecord(input) {
   let record = input;
   while (record.version < SAVE_VERSION) {
-    const hydrate = { 8: fromV8Record, 9: fromV9Record, 10: fromV10Record, 11: fromV11Record, 12: fromV12Record }[record.version];
+    const hydrate = { 8: fromV8Record, 9: fromV9Record, 10: fromV10Record, 11: fromV11Record, 12: fromV12Record, 13: fromV13Record }[record.version];
     validateRecord(hydrate ? hydrate(record) : record, record.version);
     record = MIGRATIONS[record.version](record);
   }

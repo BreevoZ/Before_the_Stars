@@ -199,7 +199,7 @@ function closeHelp() {
 }
 
 function togglePause() {
-  if (game.status !== 'playing') return;
+  if (!(civilization ? civilization.canStep : game.status === 'playing')) return;
   manualPaused = !manualPaused;
   accumulator = 0; lastTime = null;
   syncUI();
@@ -286,12 +286,12 @@ byId('debug-link').addEventListener('click', () => civilization?.save());
 
 function frame(timestamp) {
   civilization?.animate(timestamp);
-  if (lastTime !== null && !manualPaused && !document.hidden && !helpDialog.open && !civilization?.paused && game.status === 'playing') {
+  if (lastTime !== null && !manualPaused && !document.hidden && !helpDialog.open && !civilization?.paused && (civilization ? civilization.canStep : game.status === 'playing')) {
     accumulator += Math.min((timestamp - lastTime) / 1000, 0.1) * (civilization?.timeScale ?? 1);
-    while (accumulator >= RULES.fixedStep && game.status === 'playing') {
+    while (accumulator >= RULES.fixedStep && (civilization ? civilization.canStep : game.status === 'playing')) {
       if (civilization) civilization.step(RULES.fixedStep);
       else updateGame(game, RULES.fixedStep);
-      accumulator -= RULES.fixedStep;
+      accumulator = Math.max(0, accumulator - RULES.fixedStep);
     }
   }
   lastTime = timestamp;

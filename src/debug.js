@@ -1,3 +1,4 @@
+import { paidLegacy } from './legacy-ledger.js';
 import { Q } from './quantity.js';
 import { AGES, evolve } from './game.js';
 import { SURFACE } from './progression-config.js';
@@ -25,14 +26,29 @@ export function createDebugProgression() {
   return session;
 }
 
+// Debug credits are separate from rewards and purchases, so setting the balance
+// down to zero never erases earned currency, production or a settlement marker.
+export function setDebugLegacy(session, value) {
+  if (session.debug !== true) return false;
+  let amount;
+  try { amount = Q.of(value); } catch { return false; }
+  if (!Q.valid(amount) || !Q.isInteger(amount) || Q.lt(amount, 0)) return false;
+  const p = session.permanent;
+  const adjustment = Q.sub(Q.add(amount, paidLegacy(p)), p.totalLegacy);
+  // Extremely different magnitudes may exceed the quantity format's precision.
+  if (!Q.eq(Q.sub(Q.add(p.totalLegacy, adjustment), paidLegacy(p)), amount)) return false;
+  p.debugLegacyAdjustment = adjustment;
+  p.legacy = amount;
+  return true;
+}
+
 // Explicit debug commands still use the normal civilization settlement logic.
 // They are unavailable to either production incremental or classic sessions.
 export function runDebugCommand(session, command) {
   if (session.debug !== true) return false;
   if (command === 'legacy') {
     if (!session.permanent.completedCycles || !['destruction', 'defeat'].includes(session.run.phase)) return false;
-    for (const key of ['legacy', 'totalLegacy']) session.permanent[key] = Q.add(session.permanent[key], 2 ** 21);
-    return true;
+    return setDebugLegacy(session, Q.add(session.permanent.legacy, 2 ** 21));
   }
   if (session.run.phase !== 'battle' || session.game.status !== 'playing') return false;
   const game = session.game;

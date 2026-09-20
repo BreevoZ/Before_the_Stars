@@ -1,23 +1,24 @@
 import { Q } from './quantity.js';
-import { AGES, UNITS, TURRETS, RULES, getRecruitState, recruit, getEvolutionState, evolve,
+import { AGES, UNITS, TURRETS, RULES, ABILITIES, castAbility, getAbilityRadius, getRecruitState, recruit, getEvolutionState, evolve,
   getTurretState, buildTurret, getExpansionState, expandTurretSlots, sellTurret } from './game.js';
 import { stat, STAT_DEFINITIONS } from './stats.js';
 import { getExpansionCost, getTurretRefund } from './game.js';
-import { AUTOMATION_INTERVAL, AUTOMATION_TARGETS, SURFACE } from './progression-config.js';
+import { AUTOMATION_INTERVAL, AUTOMATION_TARGETS, SURFACE, SAVE_VERSION } from './progression-config.js';
 
 // Reserve is a nonnegative integral quantity, bounded by the quantity format.
 export const AUTOMATION_MAX_RESERVE = Q.of("1e8999999999999999");
-export function createAutomation() {
+export function createAutomation(version = SAVE_VERSION) {
   return { unlocked: false, enabled: false, target: 'front', recruitEnabled: true,
     mode: 'single', weights: [2, 2, 1], reserve: 0, queueLimit: RULES.queueLimit,
     priority: 'balanced', evolve: false, defense: false, turretTarget: 0,
-    maxTurrets: 1, expand: false, replace: false, elite: false, eliteLimit: 1 };
+    maxTurrets: 1, expand: false, replace: false, elite: false, eliteLimit: 1,
+    ...(version >= 14 ? { ability: false, campaign: false } : {}) };
 }
 const integer = (value, min, max) => Number.isInteger(value) && value >= min && value <= max;
-export function validAutomation(auto, talents, previousVersion = false) {
+export function validAutomation(auto, talents, previousVersion = false, version = SAVE_VERSION) {
   if (!auto || typeof auto !== 'object' || Array.isArray(auto)) return false;
-  if (Object.keys(auto).length !== Object.keys(createAutomation()).length) return false;
-  if (!['unlocked', 'enabled', 'recruitEnabled', 'evolve', 'defense', 'expand', 'replace', 'elite']
+  if (Object.keys(auto).length !== Object.keys(createAutomation(version)).length) return false;
+  if (!['unlocked', 'enabled', 'recruitEnabled', 'evolve', 'defense', 'expand', 'replace', 'elite', ...(version >= 14 ? ['ability', 'campaign'] : [])]
     .every(key => typeof auto[key] === 'boolean')) return false;
   if (!AUTOMATION_TARGETS.includes(auto.target) || !['single', 'balanced'].includes(auto.mode) ||
     !['balanced', 'recruit', 'defense'].includes(auto.priority)) return false;
@@ -30,7 +31,8 @@ export function validAutomation(auto, talents, previousVersion = false) {
     (logistics || (Q.eq(auto.reserve, 0) && auto.queueLimit === RULES.queueLimit && auto.priority === 'balanced' && auto.recruitEnabled)) &&
     (auto.unlocked || !auto.enabled) && (auto.mode !== 'balanced' || talents.formation > 0) &&
     (!auto.evolve || talents.evolution > 0) && (!auto.defense || talents.defense > 0) &&
-    (!auto.expand || talents.defense > 0) && (!auto.replace || talents.defense > 1) && (!auto.elite || talents.elite > 0);
+    (!auto.expand || talents.defense > 0) && (!auto.replace || talents.defense > 1) && (!auto.elite || talents.elite > 0) &&
+    (!auto.ability || talents.fireControl > 0) && (!auto.campaign || talents.campaign > 0);
 }
 export function configureAutomation(session, patch) {
   if (!session.permanent.automation.unlocked || !patch || typeof patch !== 'object' || Array.isArray(patch) ||
@@ -98,11 +100,35 @@ function defensePlan(session) {
   return inactive('complete', '防御目标已满足');
 }
 
+// Uses the same targeting radius and cast path as manual input. Ties prefer the
+// enemy closest to our base; healing waits for a living, wounded ally.
+export function getAutomaticAbilityTarget(game) {
+  const type = AGES[game.ages.player].ability;
+  if (game.ability || game.abilityCooldown > 0 || !stat(game, 'player', 'canCast') ||
+      !stat(game, { kind: 'ability', type, team: 'player' }, 'enabled')) return null;
+  if (ABILITIES[type].targeting === 'allies') return game.units.some(unit => unit.team === 'player' &&
+    Q.gt(unit.hp, 0) && Q.lt(unit.hp, stat(game, unit, 'health'))) ? RULES.width / 2 : null;
+  const enemies = game.units.filter(unit => unit.team === 'enemy' && Q.gt(unit.hp, 0)).sort((a, b) => a.x - b.x || a.id - b.id);
+  if (!enemies.length) return null;
+  const radius = getAbilityRadius(type, game);
+  const candidates = [...enemies.map(unit => unit.x), ...enemies.map(unit => Math.min(RULES.width, unit.x + radius))];
+  let target = candidates[0], best = -1;
+  for (const x of candidates) {
+    const count = enemies.filter(unit => Math.abs(unit.x - x) <= radius).length;
+    if (count > best) { best = count; target = x; }
+  }
+  return target;
+}
+export function canAutoContinue({ run, game, permanent: { automation: auto } }) {
+  return run.phase === 'victory' && game.status === 'won' && auto.unlocked && auto.enabled && auto.campaign && run.talents.campaign > 0;
+}
+
 // Shared read-only planning keeps the controls' explanation in sync with spending.
 export function getAutomationPlan(session) {
   const auto = session.permanent.automation;
   if (!auto.unlocked) return { status: '累计通关 2 次后免费解锁自动招募', action: null };
   if (!auto.enabled) return { status: '自动购买已关闭', action: null };
+  if (canAutoContinue(session)) return { status: '恢复运行后自动继续下一场战役', action: null };
   if (session.run.phase !== 'battle' || session.game.status !== 'playing') return { status: '下一轮开始后执行', action: null };
   const plans = { recruit: recruitPlan(session), defense: defensePlan(session) };
   const first = auto.priority === 'balanced' ? session.run.autoTurn : auto.priority;
@@ -121,6 +147,10 @@ export function updateAutomation(session, dt, { paused = false, hidden = false }
   if (run.autoElapsed + 1e-9 < AUTOMATION_INTERVAL) return;
   run.autoElapsed = Math.max(0, run.autoElapsed - AUTOMATION_INTERVAL);
   if (auto.evolve && run.talents.evolution && game.ages.player < SURFACE.finalEnemyAge && getEvolutionState(game) === 'ready') evolve(game);
+  if (auto.ability && run.talents.fireControl) {
+    const target = getAutomaticAbilityTarget(game);
+    if (target !== null) castAbility(game, target);
+  }
   const { action, source } = getAutomationPlan(session);
   if (!action || action.state !== 'ready') return;
   let success = false;

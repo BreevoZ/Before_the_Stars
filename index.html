@@ -25,6 +25,7 @@
       <p id="challenge-status" class="challenge-status" hidden></p>
       <p id="save-warning" class="save-warning" role="status" hidden></p>
       <section id="debug-tools" class="debug-tools" aria-label="快速调试" hidden>
+        <button id="debug-balance" type="button">调整遗产</button>
         <span class="debug-label">调试 · 独立存档</span>
         <label>速度 <select id="debug-speed"><option value="1">1×</option><option value="5">5×</option><option value="10" selected>10×</option><option value="20">20×</option></select></label>
         <button type="button" data-debug-command="resources" title="增加 10000 金币，补足手动进化到未来所需经验">补充资源</button>
@@ -127,7 +128,7 @@
       <aside id="talent-details" class="talent-details" aria-label="所选天赋详情" hidden><button id="close-talent-detail" class="icon-button" type="button" aria-label="关闭天赋详情">×</button><div id="talent-detail-cards"></div></aside>
       <footer class="archive-footer" id="archive-footer" hidden><p id="rebuild-rules" hidden>文明会消逝，遗产不会。重建清空本轮资源与战场，保留天赋和自动购买设置。</p><button class="primary-button" id="rebuild-civilization" type="button" hidden>重建文明</button><button class="secondary-button" id="archive-challenge" type="button" hidden>挑战更强文明</button></footer>
       <p id="talent-feedback" role="status" aria-live="polite" class="talent-feedback"></p>
-      <button id="debug-legacy" class="text-button debug-legacy" data-debug-command="legacy" type="button" hidden title="仅调试存档：增加 2,097,152 Legacy，不增加通关次数">调试 · 启航预算 +2²¹</button>
+      <button id="debug-legacy" class="text-button debug-legacy" type="button" hidden>调试 · 调整遗产</button>
       <section id="destruction-presentation" class="destruction-presentation" hidden>
         <canvas id="destruction-sky" aria-hidden="true"></canvas>
         <h2 id="destruction-title" class="sr-only">最后的反扑 · 文明毁灭</h2>
@@ -150,16 +151,25 @@
         </div>
       </section>
     </dialog>
+    <dialog id="debug-legacy-dialog" aria-labelledby="debug-legacy-title">
+      <header class="help-heading"><h2 id="debug-legacy-title">调试 · 文明遗产</h2><button id="close-debug-legacy" class="icon-button" type="button" aria-label="关闭遗产调试">×</button></header>
+      <form id="debug-legacy-form" class="archive-body debug-legacy-form">
+        <label for="debug-legacy-amount">将可用遗产设为</label><input id="debug-legacy-amount" type="text" inputmode="text" maxlength="120" placeholder="例如 128 或 1e6" required autocomplete="off">
+        <p class="archive-note">仅影响独立调试存档；不改变通关次数、远征深度或天赋购买记录。支持非负整数与科学计数法。</p>
+        <button class="primary-button" type="submit">应用数量</button><button class="text-button" type="button" data-debug-command="legacy">增加启航预算 +2²¹</button>
+        <p id="debug-legacy-status" role="status" class="archive-note"></p>
+      </form>
+    </dialog>
     <dialog id="challenge-dialog" aria-labelledby="challenge-title">
       <header class="help-heading"><h2 id="challenge-title">余烬远征</h2><button id="close-challenge" class="icon-button" type="button" data-icon="close" aria-label="关闭挑战预览"></button></header>
       <div class="archive-body">
-        <p id="challenge-intro" class="archive-note"></p>
+        <fieldset class="challenge-selector"><legend>选择余烬 · 通关后开放下一关</legend><div id="challenge-levels"></div></fieldset><p id="challenge-intro" class="archive-note"></p>
         <dl class="challenge-stats">
           <div><dt>敌军起始金币 / 被动收入</dt><dd id="challenge-economy"></dd></div>
           <div><dt>敌军战斗经验</dt><dd id="challenge-experience"></dd></div>
           <div><dt>敌军部队生命 / 全部伤害</dt><dd id="challenge-power"></dd></div>
           <div><dt>敌军基地生命</dt><dd id="challenge-base"></dd></div>
-          <div class="challenge-reward"><dt>击败未来敌军后获得</dt><dd id="challenge-reward"></dd></div>
+          <div class="challenge-reward"><dt id="challenge-reward-label">击败未来敌军后获得</dt><dd id="challenge-reward"></dd></div>
         </dl>
         <p class="archive-note">从原始时代重新开始，清空本轮资源、时代、部队和防御；保留已入账遗产、天赋与自动购买设置。失败不扣已有遗产，可以重试当前难度或回到常规文明。</p>
         <button id="begin-challenge" class="primary-button" type="button">开始挑战</button>
@@ -196,7 +206,9 @@
                 <label>购买优先级<select id="auto-priority"><option value="balanced">部队与防御交替</option><option value="recruit">部队优先</option><option value="defense">防御优先</option></select></label>
                 </div><details class="auto-help"><summary>预算如何分配</summary><p class="archive-note">只使用预留金额之外的金币。目标买不起时先存钱；队列或兵力已满仍可处理防御。手动操作不受此预算限制。</p></details>
               </fieldset>
-              <fieldset class="auto-group" data-auto-talent="evolution"><legend><span data-icon="up"></span>文明发展</legend><label class="auto-check"><input type="checkbox" role="switch" id="auto-evolve"> 自动进化 <span id="auto-evolve-lock"></span></label><p class="archive-note">经验达标时依次进化。战役的继续与文明的重建，仍由你决定。</p></fieldset>
+              <fieldset class="auto-group" data-auto-talent="evolution"><legend><span data-icon="up"></span>文明发展</legend><label class="auto-check"><input type="checkbox" role="switch" id="auto-evolve"> 自动进化 <span id="auto-evolve-lock"></span></label><p class="archive-note">经验达标时依次进化，保留现有部队与订单。</p></fieldset>
+              <fieldset class="auto-group" data-auto-talent="fireControl"><legend><span data-icon="star"></span>战术火控</legend><label class="auto-check"><input type="checkbox" role="switch" id="auto-ability"> 自动释放大招 <span id="auto-ability-lock"></span></label><p class="archive-note">攻击技能瞄准敌军密集处；治疗技能等待受伤友军。遵守大招冷却与本轮禁用规则。</p></fieldset>
+              <fieldset class="auto-group" data-auto-talent="campaign"><legend><span data-icon="up"></span>连续征战</legend><label class="auto-check"><input type="checkbox" role="switch" id="auto-campaign"> 战役胜利后自动继续 <span id="auto-campaign-lock"></span></label><p class="archive-note">领取补给、退还未完成订单后进入下一场。文明终局停止，等待你购买天赋、选择远征或重建。</p></fieldset>
               <fieldset class="auto-group auto-defense-group" data-auto-talent="defense"><legend><span data-icon="shield"></span>防御工程</legend><label class="auto-check"><input type="checkbox" role="switch" id="auto-defense"> 自动建塔 <span id="auto-defense-lock"></span></label>
                 <div class="auto-fields"><label>炮塔类型<select id="auto-turret"><option value="0">第一种</option><option value="1">第二种</option><option value="2">第三种</option></select></label><label>目标炮位数<select id="auto-max-turrets"><option>1</option><option>2</option><option>3</option><option>4</option></select></label></div>
                 <div class="auto-checks"><label class="auto-check"><input type="checkbox" role="switch" id="auto-expand"> 自动扩容炮位</label><label class="auto-check" data-auto-talent="defense" data-auto-level="2"><input type="checkbox" role="switch" id="auto-replace"> 替换旧时代炮塔 <span id="auto-replace-lock"></span></label></div>

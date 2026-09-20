@@ -1,3 +1,4 @@
+import { canAutoContinue } from './automation.js';
 import { unitTraits } from './traits.js';
 import { TRAIT_DESCRIPTIONS } from './talents.js';
 import { Q } from './quantity.js';
@@ -146,7 +147,7 @@ export function buildViewModel(session, { selectedSlot = 0, targeting = false, m
   put('ability-state', abilityState); put('ability-timer', finished ? '—' : game.abilityCooldown > 0 ? `${Math.ceil(game.abilityCooldown)}s` : targeting ? '◎' : '✓');
   put('ability', `${abilityDescription}\n${abilityState} · Q`, 'title'); put('ability', ability.name, 'aria-label');
   put('target-banner', !targeting, 'hidden'); at('#battlefield', targeting, 'class:targeting');
-  put('pause-battle', manualPaused ? '继续' : '暂停'); put('pause-battle', finished, 'disabled'); put('pause-battle', String(manualPaused), 'aria-pressed'); put('pause-battle', `${manualPaused ? '继续' : '暂停'} · 空格`, 'title');
+  put('pause-battle', manualPaused ? '继续' : '暂停'); put('pause-battle', finished && !(session.run && canAutoContinue(session)), 'disabled'); put('pause-battle', String(manualPaused), 'aria-pressed'); put('pause-battle', `${manualPaused ? '继续' : '暂停'} · 空格`, 'title');
   const phase = finished ? '战斗结束' : paused || manualPaused ? '已暂停' : '交战中';
   put('phase', phase); put('phase-icon', finished ? 'check' : paused || manualPaused ? 'pause' : 'play', 'icon'); put('phase-icon', phase, 'title'); put('result', !finished, 'hidden');
   const result = { title: game.status === 'won' ? '胜利' : game.status === 'lost' ? '战败' : '平局',

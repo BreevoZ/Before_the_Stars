@@ -1,3 +1,5 @@
+import { canAutoContinue } from './automation.js';
+import { getChallengeLevels } from './progression-machine.js';
 import { createBindings } from './dom-bindings.js';
 import { Q } from './quantity.js';
 import { createOrbitalUI } from './orbital-ui.js';
@@ -7,7 +9,7 @@ import { createProgression, updateProgression, continueCivilization, rebuildCivi
 import { SAVE_INTERVAL, challengeName } from './progression-config.js';
 import { createTalentUI } from './talent-ui.js';
 import { createSaveStore, serializeSession, parseSession, MAX_SAVE_BYTES } from './save.js';
-import { createDebugProgression, supplyDebugRun, runDebugCommand, DEBUG_SPEEDS } from './debug.js';
+import { createDebugProgression, supplyDebugRun, runDebugCommand, setDebugLegacy, DEBUG_SPEEDS } from './debug.js';
 
 const el = id => document.getElementById(id);
 export { formatMultiplier } from './view-model.js';
@@ -22,12 +24,24 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   let saveElapsed = 0;
   const dialog = el('archives-dialog'), saveDialog = el('save-dialog'), autoDialog = el('automation-dialog');
   const challengeDialog = el('challenge-dialog');
-  let offeredRunId = null, challengeFromHome = false;
+  const debugDialog = el('debug-legacy-dialog');
+  let offeredRunId = null, challengeFromHome = false, selectedChallenge = null;
+  function selectChallenge(level) {
+    const model = buildChallengeViewModel(session, level);
+    if (!model) return;
+    selectedChallenge = model.level; bind(model.bindings);
+  }
+  for (const { level } of getChallengeLevels(session)) {
+    const button = document.createElement('button');
+    button.id = `challenge-level-${level}`; button.type = 'button';
+    button.addEventListener('click', () => selectChallenge(level));
+    el('challenge-levels').append(button);
+  }
   function openChallenge() {
     const model = buildChallengeViewModel(session);
     if (!model) return;
     offeredRunId = session.run.runId; challengeFromHome = dialog.open;
-    bind(model.bindings);
+    selectChallenge(model.level);
     dialog.close(); autoDialog.close();
     if (!challengeDialog.open) challengeDialog.showModal();
     changed();
@@ -92,9 +106,26 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   });
   el('begin-challenge').addEventListener('click', () => {
     const runId = offeredRunId;
-    transition(() => startChallenge(session, runId));
+    transition(() => startChallenge(session, runId, selectedChallenge));
   });
+  debugDialog.addEventListener('close', () => changed());
+  el('close-debug-legacy').addEventListener('click', () => debugDialog.close());
   if (debug) {
+    const openDebugLegacy = () => {
+      el('debug-legacy-amount').value = String(Q.encode(session.permanent.legacy));
+      text('debug-legacy-status', '');
+      if (!debugDialog.open) debugDialog.showModal();
+      el('debug-legacy-amount').select(); changed();
+    };
+    for (const id of ['debug-legacy', 'debug-balance']) el(id).addEventListener('click', openDebugLegacy);
+    el('debug-legacy-form').addEventListener('submit', event => {
+      event.preventDefault();
+      if (!setDebugLegacy(session, el('debug-legacy-amount').value.trim())) {
+        text('debug-legacy-status', '请输入非负整数，如 128 或 1e6；数量差距过大时请使用更接近现有账目的值。'); return;
+      }
+      const saved = save(); changed();
+      text('debug-legacy-status', `当前余额 ${Q.format(session.permanent.legacy)} Legacy${saved ? ' · 已保存' : ' · 保存失败，请导出存档'}。`);
+    });
     el('debug-tools').hidden = false;
     el('clear-progress').textContent = '清空调试进度';
     el('debug-speed').value = String(session.debugSpeed);
@@ -104,7 +135,9 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
       session.debugSpeed = speed; save(); changed();
     });
     document.querySelectorAll('[data-debug-command]').forEach(button => button.addEventListener('click', () => {
-      if (runDebugCommand(session, button.dataset.debugCommand)) { save(); changed(); }
+      if (runDebugCommand(session, button.dataset.debugCommand)) { save(); changed();
+        if (button.dataset.debugCommand === 'legacy') { el('debug-legacy-amount').value = String(Q.encode(session.permanent.legacy)); text('debug-legacy-status', '启航预算已加入调试余额。'); }
+      }
     }));
   }
   const talentControls = createTalentUI(() => session, key => {
@@ -178,25 +211,30 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     },
     get session() { return session; },
     get homeOpen() { return dialog.open; },
-    get paused() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open; },
-    get modalOpen() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open; },
+    get paused() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open || debugDialog.open; },
+    get modalOpen() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open || debugDialog.open; },
+    get canStep() { return session.game.status === 'playing' || canAutoContinue(session); },
     get timeScale() { return debug ? session.debugSpeed : session.permanent.settings.speed; },
     sync, save, open, cycleSpeed, animate(timestamp) {
-      const suspended = saveDialog.open || autoDialog.open || challengeDialog.open;
+      const suspended = saveDialog.open || autoDialog.open || challengeDialog.open || debugDialog.open;
       orbital.tick(timestamp, suspended); destruction.tick(timestamp, suspended);
     },
     step(dt) {
-      const resolved = updateProgression(session, dt);
+      const before = session.game;
+      const resolved = updateProgression(session, dt, { paused: this.paused, hidden: document.hidden });
       saveElapsed += dt;
       if (resolved || saveElapsed >= SAVE_INTERVAL) save();
+      if (session.game !== before) changed(true);
     },
     resultAction() {
       if (session.run.phase === 'orbital') { open(); return; }
       if (session.run.phase === 'victory') {
         const battleId = session.run.battleId;
         transition(() => continueCivilization(session, battleId));
+      } else if (session.run.phase === 'defeat' && session.run.challengeLevel) {
+        transition(() => startChallenge(session, session.run.runId, session.run.challengeLevel));
       } else if ((session.run.phase === 'destruction' && session.permanent.completedCycles > 1) ||
-          (session.run.phase === 'defeat' && (!session.permanent.completedCycles || session.run.challengeLevel))) {
+          (session.run.phase === 'defeat' && !session.permanent.completedCycles)) {
         transition(() => rebuildCivilization(session, session.run.runId));
       } else if (['destruction', 'defeat'].includes(session.run.phase)) open();
     },

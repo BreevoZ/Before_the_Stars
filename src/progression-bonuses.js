@@ -28,6 +28,7 @@ export function getRunBonuses(run) {
     ? { ...effect, source: { ...effect.source, label: challengeName(run.challengeLevel) } } : effect);
   return createBonusStack(base,
     (run.legacyRules ?? 10) < 10 ? [] : (run.legacyRules ?? 10) < 11 ? legacyProductionBonuses(talents) : legacyMachineBonuses(talents),
+    talents.extermination ? [contribution('doctrine', 'extermination', '赶尽杀绝', { stat: 'earlyFinale', kind: 'civilization', team: 'player' }, 'override', true)] : [],
     getSuperSoldierBonuses(Boolean(talents.superRanged), Boolean(talents.superSoldierPlan)),
     Object.values(TRAITS).filter(trait => talents[trait.id]).map(trait => contribution('doctrine', trait.id, trait.name,
       { stat: trait.stat, type: trait.units[0], team: 'player' }, 'override', true)),

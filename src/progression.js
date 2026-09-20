@@ -2,7 +2,7 @@ import { createLegacyMachine, updateLegacyMachine, getRunProduction } from './le
 import { Q } from './quantity.js';
 import { payLegacy } from './legacy-ledger.js';
 import { createGame, updateGame } from './game.js';
-import { updateAutomation, createAutomation, configureAutomation } from './automation.js';
+import { updateAutomation, createAutomation, configureAutomation, canAutoContinue } from './automation.js';
 import { UPGRADES, UPGRADE_COSTS, SAVE_VERSION, automationUnlocked, availableSpeeds, getVictorySupplies, LEGACY_ECONOMY } from './progression-config.js';
 import { emptyTalents, talentLevel, TALENTS, getTalentState } from './talents.js';
 import { getRunBonuses } from './progression-bonuses.js';
@@ -53,10 +53,10 @@ export function createProgression() {
 
 // Every meta event passes through the same state/token/guard table. Effects
 // are synchronous simulation work; rendering and animations never dispatch rewards.
-export function transitionCivilization(session, event, token) {
-  const transition = getTransition(session, event, token);
+export function transitionCivilization(session, event, token, payload) {
+  const transition = getTransition(session, event, token, payload);
   if (!transition) return false;
-  effects[transition.effect](session);
+  effects[transition.effect](session, payload);
   session.run.phase = transition.to;
   return true;
 }
@@ -67,6 +67,7 @@ export function resolveBattle(session) {
 
 export function updateProgression(session, dt, { paused = false, hidden = false } = {}) {
   if (paused || hidden || !Number.isFinite(dt) || dt <= 0) return false;
+  if (canAutoContinue(session)) return continueCivilization(session, session.run.battleId);
   if (resolveBattle(session)) return true;
   if (session.run.phase !== PHASE.BATTLE) return false;
   dt = Math.min(dt, 0.05);
@@ -110,7 +111,7 @@ const effects = {
   },
   continue: continueConflict,
   rebuild: session => startRun(session),
-  challenge: session => startRun(session, getNextChallengeLevel(session)),
+  challenge: (session, level) => startRun(session, level),
   abandon: session => startRun(session, session.run.challengeLevel, session.run.extraBonuses ?? []),
   launch({ permanent }) {
     payLegacy(permanent, 'bypasser', TALENTS.bypasser.costs[0]);
@@ -120,7 +121,7 @@ const effects = {
 
 export const continueCivilization = (session, battleId) => transitionCivilization(session, 'continue', battleId);
 export const rebuildCivilization = (session, runId) => transitionCivilization(session, 'rebuild', runId);
-export const startChallenge = (session, runId) => transitionCivilization(session, 'challenge', runId);
+export const startChallenge = (session, runId, level = getNextChallengeLevel(session)) => transitionCivilization(session, 'challenge', runId, level);
 // The controller confirms abandonment before dispatching this event.
 export const abandonCivilization = (session, runId) => transitionCivilization(session, 'abandon', runId);
 

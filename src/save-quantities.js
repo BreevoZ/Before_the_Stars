@@ -26,6 +26,7 @@ export function mapSessionQuantities(session, convert) {
     if (STAT_DEFINITIONS[effect.target?.stat]?.quantity && (effect.target.stat !== 'legacy' || session.version >= 10)) field(effect, 'value');
   }
   field(p.automation, 'reserve');
+  if (p.debugLegacyAdjustment !== undefined) field(p, 'debugLegacyAdjustment');
   if (session.version >= 11) {
     check(object(p.purchaseCosts), '缺少购买账本');
     for (const costs of Object.values(p.purchaseCosts)) {

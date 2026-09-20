@@ -6,7 +6,7 @@ import { TALENTS, getTalentBonuses, getLegacyReward, meetsTalentRequirements } f
 import { stat, attributes, createBonusStack, legacyBonuses, STAT_DEFINITIONS } from './stats.js';
 import { getRunBonuses, getV8RunBonuses, getV9RunBonuses } from './progression-bonuses.js';
 import { validAutomation } from './automation.js';
-import { getLegacyProduction } from './legacy-machine.js';
+import { getRunProduction } from './legacy-machine.js';
 
 import { check, object, num, int, bool, id, member, numbers, list, safeTree, limit } from './save-primitives.js';
 import { HISTORICAL_TALENTS, HISTORICAL_UPGRADE_COSTS } from './save-history.js';
@@ -89,9 +89,10 @@ export function validateRecord(session, version = SAVE_VERSION) {
     // Production is capped by the run it belongs to, so a stalled battle can
     // never persist more Legacy than its own settlement would have paid.
     // Pending production belongs to the run until its finale banks it.
-    const cap = getLegacyProduction(run.talents, g).cap;
+    // Production is capped by the deepest ember the player has actually cleared.
+    const cap = getRunProduction({ run, permanent: p, game: g }).cap;
     check(wholeAmount(run.machineLegacy) && Q.lte(run.machineLegacy, cap), '本轮生产上限');
-    check(!run.settled || Q.lte(run.machineLegacy, p.legacyMachine.produced), '已结算生产入账');
+    check(Q.lte(run.machineLegacy, p.legacyMachine.produced), '生产入账');
   }
   if (!previousVersion) {
     list(p.talentGrants, version < 9 ? 2 : 3, '旧版功能保留');

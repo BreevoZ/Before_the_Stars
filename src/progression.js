@@ -1,4 +1,4 @@
-import { createLegacyMachine, updateLegacyMachine, bankLegacyProduction } from './legacy-machine.js';
+import { createLegacyMachine, updateLegacyMachine, getRunProduction } from './legacy-machine.js';
 import { Q } from './quantity.js';
 import { payLegacy } from './legacy-ledger.js';
 import { createGame, updateGame } from './game.js';
@@ -36,7 +36,12 @@ function createConflict(run, ages = { player: 1, enemy: 1 }) {
 }
 
 function startRun(session, challengeLevel = 0, extraBonuses = []) {
+  // Production allowance belongs to the civilization, not to a single attempt:
+  // abandoning or losing carries the spent part forward, so restarting cannot
+  // refresh the machine. A finale clears it along with the run it paid for.
+  const spent = session.run?.settled ? 0 : session.run?.machineLegacy ?? 0;
   Object.assign(session, createCivilizationRun(session.permanent, challengeLevel, extraBonuses));
+  if (Q.gt(spent, 0)) session.run.machineLegacy = Q.min(spent, getRunProduction(session).cap);
 }
 
 export function createProgression() {
@@ -93,15 +98,14 @@ const effects = {
   settle(session) {
     const { run, game, permanent } = session;
     const reward = stat(game, { kind: 'civilization' }, 'legacy');
-    const produced = bankLegacyProduction(session);
     run.processedBattleId = run.battleId;
     run.settled = true;
     run.earnedLegacy = reward;
     permanent.completedCycles++;
     // Only a finished expedition proves the depth that gates the protocol.
     permanent.deepestChallenge = Math.max(permanent.deepestChallenge ?? 0, run.challengeLevel);
-    permanent.legacy = Q.sum([permanent.legacy, reward, produced]);
-    permanent.totalLegacy = Q.sum([permanent.totalLegacy, reward, produced]);
+    permanent.legacy = Q.add(permanent.legacy, reward);
+    permanent.totalLegacy = Q.add(permanent.totalLegacy, reward);
     permanent.automation.unlocked = automationUnlocked(permanent);
   },
   continue: continueConflict,

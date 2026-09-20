@@ -5,27 +5,36 @@ import { LEGACY_ECONOMY, machineShare, machineFillSeconds } from './progression-
 
 export const createLegacyMachine = () => ({ progress: 0, produced: 0 });
 
-// Production is a share of the run's own settlement reward, filled linearly.
-// The cap is what keeps a stalled battle from out-earning a finished one.
-export function getLegacyProduction(talents, game, challengeLevel = 0) {
-  const stats = game ? attributes(game, { kind: 'civilization' }) : null;
-  const unlocked = stats ? stats.legacyMachine : (talents.legacyMachine ?? 0) > 0;
-  const share = stats ? stats.legacyMachineShare : machineShare(talents);
-  const seconds = stats ? stats.legacyFillSeconds : machineFillSeconds(talents);
-  const reward = stats ? stats.legacy : getLegacyReward(talents, challengeLevel);
-  // A share of the settlement, but never nothing: the first ranks of the
-  // campaign still see the machine tick while their rewards are tiny.
-  const cap = unlocked ? Q.max(1, Q.floor(Q.mul(reward, share))) : 0;
+// Preview for a loadout that has no battle yet, used by the star map.
+export function getLegacyProduction(talents, challengeLevel = 0) {
+  const unlocked = (talents.legacyMachine ?? 0) > 0;
+  const share = machineShare(talents), seconds = machineFillSeconds(talents);
+  const cap = unlocked ? Q.max(1, Q.floor(Q.mul(getLegacyReward(talents, challengeLevel), share))) : 0;
   return { unlocked, cap, share, seconds, perSecond: Q.div(cap, seconds), perMinute: Q.div(Q.mul(cap, 60), seconds) };
 }
 
-// Called only by the active simulation. Production accrues into the run and is
-// paid out only when that civilization reaches its finale: an abandoned or lost
-// expedition banks nothing, so diving into an ember you cannot clear earns
-// nothing either. Fractional progress still survives saves and conflicts.
+// The live rate reads the run's own settled attributes, minus the part of the
+// reward this civilization has not earned yet: an ember deeper than the deepest
+// one ever cleared, and the one-off first-arrival bonus. Diving into an ember
+// you cannot beat therefore pays no more than your proven depth, and the run
+// cap still bounds a stalled battle.
+export function getRunProduction({ run, permanent, game }) {
+  const stats = attributes(game, { kind: 'civilization' });
+  const gap = Math.max(0, (run.challengeLevel ?? 0) - (permanent.deepestChallenge ?? 0));
+  const unproven = LEGACY_ECONOMY.challengeBase ** gap * (run.firstClear ? LEGACY_ECONOMY.firstClearBonus : 1);
+  const cap = stats.legacyMachine
+    ? Q.max(1, Q.floor(Q.div(Q.mul(stats.legacy, stats.legacyMachineShare), unproven))) : 0;
+  const seconds = stats.legacyFillSeconds;
+  return { unlocked: stats.legacyMachine, cap, share: stats.legacyMachineShare, seconds,
+    perSecond: Q.div(cap, seconds), perMinute: Q.div(Q.mul(cap, 60), seconds) };
+}
+
+// Called only by the active simulation. Production is credited the moment it is
+// produced, so the balance ticks up during the battle instead of waiting for a
+// settlement. Fractional progress survives saves, conflicts and rebuilds.
 export function updateLegacyMachine(session, dt) {
   if (!Number.isFinite(dt) || dt <= 0 || session.run.phase !== 'battle' || session.game.status !== 'playing') return 0;
-  const production = getLegacyProduction(session.run.talents, session.game);
+  const production = getRunProduction(session);
   if (!production.unlocked || Q.lte(production.cap, 0)) return 0;
   const { run, permanent } = session;
   const remaining = Q.sub(production.cap, run.machineLegacy ?? 0);
@@ -41,15 +50,10 @@ export function updateLegacyMachine(session, dt) {
   // remaining-amount subtraction rounds, and the cap must still hold exactly.
   const reward = Q.min(whole, remaining);
   run.machineLegacy = Q.min(production.cap, Q.add(run.machineLegacy ?? 0, reward));
+  machine.produced = Q.add(machine.produced, reward);
+  permanent.totalLegacy = Q.add(permanent.totalLegacy, reward);
+  permanent.legacy = Q.add(permanent.legacy, reward);
   return reward;
-}
-
-// Paid once, by the settlement transition that also pays the finale reward.
-export function bankLegacyProduction({ run, permanent }) {
-  const pending = run.machineLegacy ?? 0;
-  if (Q.lte(pending, 0)) return 0;
-  permanent.legacyMachine.produced = Q.add(permanent.legacyMachine.produced, pending);
-  return pending;
 }
 
 export function legacyMachineBonuses(talents) {
@@ -68,5 +72,3 @@ export function legacyProductionBonuses(talents) {
     ['legacyEfficiency', '回响加速', 'legacyProductionInterval', 'multiply', 2 ** -(talents.legacyEfficiency ?? 0)],
   ].map(([id, label, stat, type, value]) => ({ target: { stat, kind: 'civilization' }, type, value, source: { id, label, kind: 'doctrine' } }));
 }
-
-export const MACHINE_SHARES = LEGACY_ECONOMY.machineShares;

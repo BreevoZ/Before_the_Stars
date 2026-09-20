@@ -1,4 +1,4 @@
-import { getLegacyProduction } from './legacy-machine.js';
+import { getLegacyProduction, getRunProduction } from './legacy-machine.js';
 import { stat } from './stats.js';
 import { Q } from './quantity.js';
 import { AGES } from './game.js';
@@ -49,7 +49,7 @@ export function buildCivilizationViewModel(session, { debug = false } = {}) {
   text('civilization-bar', p.completedCycles === 0, 'hidden');
   text('autobuyer-menu', p.completedCycles === 0, 'hidden');
   text('legacy-balance', Q.format(p.legacy));
-  const production = getLegacyProduction(run.talents, game), nextProduction = getLegacyProduction(p.talents);
+  const production = getRunProduction(session), nextProduction = getLegacyProduction(p.talents, p.deepestChallenge ?? 0);
   text('legacy-production', !production.unlocked, 'hidden');
   text('legacy-production', `+${Q.format(production.perSecond)}/秒`);
   text('legacy-production', `遗产生产机：每模拟秒 ${Q.format(production.perSecond)} Legacy，本轮最多 ${Q.format(production.cap)}（终局遗产的 ${Math.round(production.share * 100)}%），${production.seconds} 模拟秒产满。仅交战时运转，暂停、弹窗、离线和结算时停止；产出在本轮走到终局时入账。`, 'title');

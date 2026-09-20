@@ -1,6 +1,8 @@
 // Alternate weapons share one balance source with talents, simulation and previews.
 export const SUPER_WEAPONS = Object.freeze({
-  meleeRange: 32, daggerTip: 14,
+  // The dagger reaches 32, but anything inside meleeSwitch is already too close
+  // to aim a rifle at: the soldier lowers it, steps in and stabs.
+  meleeRange: 32, meleeSwitch: 120, daggerTip: 14,
   sniper: Object.freeze({ damage: 1800, range: 520, baseRange: 620, attackInterval: 2.4, chargeTime: 1.1, muzzleX: 60 }),
 });
 
@@ -20,7 +22,7 @@ export const UNITS = Object.freeze({
   tank: Object.freeze({ name: '主战坦克', age: 4, role: 'heavy', projectile: 'shell', splash: 70, cost: 350, trainTime: 5.6, health: 720, damage: 145, armor: 14, speed: 26, range: 200, baseRange: 420, attackInterval: 1.9, bounty: 120, experience: 180, lane: 'front', description: '履带装甲 · 远距攻城 / 70 范围炮击', footprint: 47, attackDuration: 0.6, muzzleX: 67, muzzleY: -44, height: 63 }),
   blade: Object.freeze({ name: '光刃战士', age: 5, role: 'melee', ignoreArmor: true, cost: 220, trainTime: 2.6, health: 550, damage: 90, armor: 10, speed: 82, range: 40, attackInterval: 0.6, bounty: 70, experience: 140, lane: 'front', description: '光刃突进 · 近战完全无视护甲', attackDuration: 0.3, height: 73 }),
   blaster: Object.freeze({ name: '等离子射手', age: 5, role: 'archer', projectile: 'plasma', cost: 300, trainTime: 3.6, health: 300, damage: 85, armor: 5, speed: 56, range: 300, attackInterval: 0.65, bounty: 100, experience: 180, lane: 'back', description: '能量火力 · 300 射程 / 忽略 8 点护甲', armorPierce: 8, attackDuration: 0.38, muzzleX: 44, muzzleY: -43, height: 74 }),
-  superSoldier: Object.freeze({ name: '超级士兵', age: 5, role: 'heavy', playerOnly: true, projectile: 'plasma', ignoreArmor: true, cost: 3000, trainTime: 12, health: 6000, damage: 320, meleeDamage: 440, meleeRange: SUPER_WEAPONS.meleeRange, meleeInterval: 0.55, chargeTime: 0, armor: 32, speed: 48, range: 340, baseRange: 540, attackInterval: 0.55, bounty: 600, experience: 800, lane: 'front', description: '独行精锐 · 全覆轻甲，320 能量穿甲点射 / 近身 440 激光匕首', attackDuration: 0.4, muzzleX: 35, muzzleY: -43, height: 68 }),
+  superSoldier: Object.freeze({ name: '超级士兵', age: 5, role: 'heavy', playerOnly: true, projectile: 'plasma', ignoreArmor: true, cost: 3000, trainTime: 12, health: 6000, damage: 320, meleeDamage: 440, meleeRange: SUPER_WEAPONS.meleeRange, meleeSwitch: SUPER_WEAPONS.meleeSwitch, meleeInterval: 0.55, chargeTime: 0, armor: 32, speed: 48, range: 340, baseRange: 540, attackInterval: 0.55, bounty: 600, experience: 800, lane: 'front', description: '独行精锐 · 全覆轻甲，320 能量穿甲点射 / 近身 440 激光匕首', attackDuration: 0.4, muzzleX: 35, muzzleY: -43, height: 68 }),
   warMachine: Object.freeze({ name: '悬浮战争机器', age: 5, role: 'heavy', projectile: 'plasma-orb', splash: 90, cost: 580, trainTime: 6, health: 1200, damage: 235, armor: 22, speed: 23, range: 220, baseRange: 500, attackInterval: 1.8, bounty: 200, experience: 300, lane: 'front', description: '悬浮重炮 · 远距攻城 / 90 范围能量爆破', footprint: 48, attackDuration: 0.6, muzzleX: 55, muzzleY: -46, height: 74 }),
 });
 

@@ -49,7 +49,8 @@ export function validateRecord(session, version = SAVE_VERSION) {
   check(int(p.completedCycles) && (version < 10 ? int(p.legacy) : wholeAmount(p.legacy)), '遗产或循环数');
   const upgradeCosts = version < 11 ? HISTORICAL_UPGRADE_COSTS : UPGRADE_COSTS;
   levels(p.upgrades, upgradeCosts); levels(run.upgrades, upgradeCosts);
-  const runConfigs = version < 12 || (run.legacyRules ?? 0) >= LEGACY_ECONOMY.rules ? configs : HISTORICAL_TALENTS[11];
+  const runConfigs = version < 12 ? configs
+    : (run.legacyRules ?? 0) >= LEGACY_ECONOMY.rules ? configs : HISTORICAL_TALENTS[(run.legacyRules ?? 0) >= 11 ? 12 : 11];
   if (!oldVersion) { talentLevels(p.talents, p.upgrades, configs, version >= 9 ? p.talentGrants : []); talentLevels(run.talents, run.upgrades, runConfigs, version >= 9 ? p.talentGrants : []); }
   const challengeLevel = version >= 5 ? run.challengeLevel : 0;
   check(int(challengeLevel, 0, CHALLENGE.maxLevel), '挑战难度');
@@ -78,9 +79,10 @@ export function validateRecord(session, version = SAVE_VERSION) {
     check(object(machine) && Object.keys(machine).length === 2 && num(machine.progress, 0, 1) && machine.progress < 1 && wholeAmount(machine.produced) && Q.lte(machine.produced, totalLegacy), '遗产生产记录');
     check(p.talents.legacyMachine || (machine.progress === 0 && Q.eq(machine.produced, 0)), '遗产生产机未解锁');
     check(p.completedCycles > 0 || Q.eq(totalLegacy, 0), '首次通关前的遗产');
-    check(version >= 12 ? [9, 10, LEGACY_ECONOMY.rules].includes(run.legacyRules) : [9, 10].includes(run.legacyRules), '遗产规则版本');
+    check(version >= 12 ? [9, 10, 11, LEGACY_ECONOMY.rules].includes(run.legacyRules) : [9, 10].includes(run.legacyRules), '遗产规则版本');
     check(run.legacyRules !== 9 || (!run.talents.legacyMachine && run.talents.conservation <= 3 && (run.talents.continuity ?? 0) <= 2), '旧轮遗产快照');
   }
+  if (version >= 13) check(bool(run.firstClear) && (run.firstClear !== true || run.legacyRules >= LEGACY_ECONOMY.rules), '首通标记');
   if (version >= 12) {
     check(int(p.deepestChallenge, 0, CHALLENGE.maxLevel) && p.deepestChallenge <= p.completedCycles, '远征深度记录');
     check(!p.talents.bypasser || p.deepestChallenge >= LEGACY_ECONOMY.bypasserChallenge, '存续协议深度');
@@ -101,7 +103,7 @@ export function validateRecord(session, version = SAVE_VERSION) {
     check(object(ledger) && Object.keys(ledger).every(key => Object.hasOwn(levels, key)), '购买账本字段');
     for (const [key, level] of Object.entries(levels)) {
       const payments = ledger[key] ?? [], current = TALENTS[key]?.costs ?? UPGRADE_COSTS;
-      const prices = [current, HISTORICAL_TALENTS[10][key]?.costs ?? HISTORICAL_UPGRADE_COSTS, HISTORICAL_TALENTS[11][key]?.costs ?? HISTORICAL_UPGRADE_COSTS];
+      const prices = [current, ...[10, 11, 12].map(old => HISTORICAL_TALENTS[old][key]?.costs ?? HISTORICAL_UPGRADE_COSTS)];
       check(Array.isArray(payments) && payments.length === level, '购买账本等级');
       for (const [rank, cost] of payments.entries()) check(wholeAmount(cost) && (p.talentGrants.includes(key)
         ? Q.eq(cost, 0) : prices.some(list => list[rank] !== undefined && Q.eq(cost, list[rank]))), '购买账本价格');

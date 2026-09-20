@@ -65,5 +65,6 @@ export const fromV8Record = input => hydrateRecord(input, 8);
 export const fromV9Record = input => hydrateRecord(input, 9);
 export const fromV10Record = input => hydrateRecord(input, 10);
 export const fromV11Record = input => hydrateRecord(input, 11);
+export const fromV12Record = input => hydrateRecord(input, 12);
 export const fromSaveRecord = input => hydrateRecord(input, SAVE_VERSION);
 export function toSaveRecord(session) { const record = toV8Record(session); record.version = SAVE_VERSION; return record; }

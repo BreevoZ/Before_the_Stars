@@ -481,8 +481,12 @@ function updateUnits(game, dt, hits) {
       } });
     if (unit.x !== origin) { origin = unit.x; positions.set(unit.id, origin); enemyDistance = Math.abs(closestEnemy.x - origin); }
     const baseDistance = Math.abs(base.x - origin) - RULES.baseHalfWidth;
-    const baseRange = stats.baseRange ?? stats.range;
-    const reach = attackRange(stats, closestEnemy);
+    // An enemy inside the switch band is too close for the rifle: the soldier
+    // draws the dagger, walks the remaining gap and keeps its melee cadence.
+    const pointBlank = Boolean(stats.canRanged && stats.meleeRange &&
+      enemyDistance <= (stats.meleeSwitch ?? stats.meleeRange) + 0.01);
+    const baseRange = pointBlank ? stats.meleeRange : stats.baseRange ?? stats.range;
+    const reach = pointBlank ? stats.meleeRange : attackRange(stats, closestEnemy);
     const target = enemyDistance <= reach + 0.01 ? closestEnemy : baseDistance <= baseRange + 0.01 ? base : null;
     const prepareAttack = (victim, damage, projectile) => {
       const attack = { damage, projectile, splash: stats.splash, ignoreArmor: stats.ignoreArmor, armorPierce: stats.armorPierce };
@@ -498,7 +502,7 @@ function updateUnits(game, dt, hits) {
     };
     if (unit.chargeRemaining > 0) {
       const locked = getUnitChargeTarget(game, unit);
-      const interrupted = !stats.canRanged || !stats.chargeTime || enemyDistance <= (stats.meleeRange ?? 0);
+      const interrupted = !stats.canRanged || !stats.chargeTime || pointBlank;
       const inRange = locked && Q.gt(locked.hp, 0) && locked.team !== unit.team &&
         (locked.type ? Math.abs(locked.x - unit.x) <= attackRange(stats, locked) + .01
           : Math.abs(locked.x - unit.x) - RULES.baseHalfWidth <= baseRange + .01);
@@ -532,7 +536,8 @@ function updateUnits(game, dt, hits) {
     }
     if (target) {
       if (unit.attackCooldown === 0) {
-        const closeCombat = !stats.canRanged || stats.meleeRange && Math.abs(target.x - origin) - (target.type ? 0 : RULES.baseHalfWidth) <= stats.meleeRange;
+        const closeCombat = !stats.canRanged || pointBlank ||
+          stats.meleeRange && Math.abs(target.x - origin) - (target.type ? 0 : RULES.baseHalfWidth) <= stats.meleeRange;
         if (stats.meleeRange) unit.attackStyle = closeCombat ? 'melee' : 'ranged';
         if (stats.projectile && !closeCombat) {
           if (stats.chargeTime > 0) {

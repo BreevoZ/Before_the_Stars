@@ -18,7 +18,7 @@ const signedClock = value => num(value, -1);
 export const SESSION_SHAPE = Object.freeze({ version: positiveId, permanent: object, run: object, game: object,
   debug: optional(value => value === true), debugSpeed: optional(clock) });
 export const RUN_SHAPE = Object.freeze({ runId: id, battleNumber: positiveId, phase: oneOf(Object.values(PHASE)),
-  elapsed: clock, autoElapsed: clock, settled: bool, upgrades: object });
+  elapsed: clock, autoElapsed: clock, settled: bool, firstClear: optional(bool), upgrades: object });
 export const GAME_SHAPE = Object.freeze({ status: oneOf(['playing', 'won', 'lost', 'draw']), elapsed: clock,
   abilityCooldown: clock, nextUnitId: positiveId, nextOrderId: positiveId,
   ages: object, experience: object, gold: object, bases: object, queues: object, turrets: object });

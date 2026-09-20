@@ -19,7 +19,7 @@ export function getV8RunBonuses(run) {
     ...Object.entries(getChallengeModifiers(run.challengeLevel, run.legacyRules ?? 9)).map(([key, value]) => contribution('challenge',
       `challenge:${run.challengeLevel}`, `挑战 ${run.challengeLevel}`, { stat: key === 'gold' ? 'startingGold' : key, team: 'enemy',
         ...(key === 'experience' ? { kind: 'reward' } : {}) }, 'multiply', value)),
-  ], getLegacyBonuses(run.talents, run.challengeLevel, run.legacyRules ?? 9), run.extraBonuses ?? []);
+  ], getLegacyBonuses(run.talents, run.challengeLevel, run.legacyRules ?? 9, run.firstClear === true), run.extraBonuses ?? []);
 }
 
 export function getRunBonuses(run) {

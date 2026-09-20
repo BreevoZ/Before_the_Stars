@@ -121,15 +121,15 @@ export function registerTalentTests(test, assert, near) {
   });
   test('Talents: legacy scales from run snapshots, rounds once and settles exactly once across refresh/purchase/rebuild', () => {
     let s = funded(2000); purchaseTalent(s, 'spark'); purchaseTalent(s, 'conservation'); purchaseTalent(s, 'conservation'); purchaseTalent(s, 'conservation');
-    assert(s.run.earnedLegacy === 1 && getLegacyReward(s.permanent.talents) === 3);
+    assert(s.run.earnedLegacy === 1 && getLegacyReward(s.permanent.talents) === 8);
     const before = s.permanent.totalLegacy; start(s); finish(s);
-    assert(s.run.earnedLegacy === 3 && s.permanent.totalLegacy === before + 3);
+    assert(s.run.earnedLegacy === 8 && s.permanent.totalLegacy === before + 8);
     s = parseSession(serializeSession(s)); const balance = s.permanent.legacy;
     for (let i = 0; i < 10; i++) { resolveBattle(s); updateProgression(s, 0.05); }
     assert(s.permanent.legacy === balance);
-    purchaseTalent(s, 'salvage'); assert(s.run.earnedLegacy === 3 && parseSession(serializeSession(s)).run.earnedLegacy === 3);
-    start(s); finish(s, 5, 'draw'); assert(s.run.earnedLegacy === 0 && s.permanent.totalLegacy === before + 3);
-    start(s); finish(s); assert(s.run.earnedLegacy === 3);
+    purchaseTalent(s, 'salvage'); assert(s.run.earnedLegacy === 8 && parseSession(serializeSession(s)).run.earnedLegacy === 8);
+    start(s); finish(s, 5, 'draw'); assert(s.run.earnedLegacy === 0 && s.permanent.totalLegacy === before + 8);
+    start(s); finish(s); assert(s.run.earnedLegacy === 8);
   });
   test('Autobuyer: reserve, custom queue limit, army cap and manual override all use normal payment', () => {
     const s = funded(3); purchaseTalent(s, 'spark'); purchaseTalent(s, 'logistics'); start(s); configureAutomation(s, { enabled: true, target: 'heavy', reserve: 150, queueLimit: 1 });
@@ -260,7 +260,7 @@ export function registerTalentTests(test, assert, near) {
     assert(el('legacy').textContent === '995' && !el('buy-evolution').disabled);  // 1000 − 火种 1 − 后勤 2 − 编队 2
     el('node-evolution').click(); el('buy-evolution').click(); el('node-defense').click(); el('buy-defense').click();
     el('node-conservation').click(); el('buy-conservation').click();
-    assert(el('talent-legacy-preview').textContent.includes('本轮终局 +1 · 常规重建终局 +1'));
+    assert(el('talent-legacy-preview').textContent.includes('本轮终局 +1 · 常规重建终局 +2'));
     el('close-archives').click(); el('autobuyer-menu').click(); assert(el('automation-dialog').open && !el('archives-dialog').open);
     el('auto-enabled').click(); el('auto-evolve').click(); el('auto-defense').click();
     const setting = (id, value) => { el(id).value = value; el(id).dispatchEvent(new frame.contentWindow.Event('change')); };

@@ -60,8 +60,8 @@ export function registerTraitTests(test,assert,near) {
   // The protocol now needs the deepest expedition behind it, not only Legacy.
   const before=s.permanent.legacy;assert(!purchaseTalent(s,'bypasser')&&s.permanent.legacy===before&&getTalentState(s,'bypasser')==='depth-required');
   s.permanent.deepestChallenge=LEGACY_ECONOMY.bypasserChallenge;s.permanent.completedCycles=Math.max(s.permanent.completedCycles,LEGACY_ECONOMY.bypasserChallenge);
-  // Proving the depth is what opens it; taking that proof away closes it again.
-  assert(getTalentState(s,'bypasser')==='ready');
+  // Proving the depth changes the blocker to price; removing it closes it again.
+  assert(getTalentState(s,'bypasser')==='legacy');
   s.permanent.deepestChallenge=0;
   assert(getTalentState(s,'bypasser')==='depth-required'&&!purchaseTalent(s,'bypasser')&&s.permanent.legacy===before);
   rebuildCivilization(s,s.run.runId);finish(s);assert(s.run.phase==='destruction');parseSession(serializeSession(s));
@@ -97,7 +97,7 @@ export function registerTraitTests(test,assert,near) {
   }
  });
  test('Traits: opener snapshots damage, only launches once and cannot replay after a v9 save',()=>{
-  const s=fund(3);purchaseTalent(s,'spark');purchaseTalent(s,'openingStone');rebuildCivilization(s,s.run.runId);
+  const s=fund(8);assert(purchaseTalent(s,'spark')&&purchaseTalent(s,'openingStone'));rebuildCivilization(s,s.run.runId);
   const g=s.game;g.ai.enabled=false;g.units=[soldier(g,'melee','player',500),soldier(g,'melee','enemy',630)];g.units[1].attackCooldown=100;
   ticks(g,1);const shot=g.projectiles[0];near(shot.damage,UNITS.melee.damage*.45);assert(g.units[0].traits.openingStone.used);
   const resumed=parseSession(serializeSession(s));ticks(resumed.game,120);assert(resumed.game.traitActivations.openingStone===1);

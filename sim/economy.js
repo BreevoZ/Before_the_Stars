@@ -1,13 +1,13 @@
 import { pathToFileURL } from 'node:url';
 import { TALENT_TREE, TALENTS, emptyTalents, getLegacyReward, meetsTalentRequirements } from '../src/talents.js';
-import { LEGACY_ECONOMY as ECONOMY, CHALLENGE, UPGRADES, UPGRADE_COSTS } from '../src/progression-config.js';
+import { LEGACY_ECONOMY as ECONOMY, CHALLENGE, UPGRADES, UPGRADE_COSTS, AUTOMATION_MILESTONE } from '../src/progression-config.js';
 import { simulateRun } from './simulate.js';
 
 // Purchase order of a reasonable player: automation first because it is cheap
 // and runs the army, then the unit spine that makes deeper embers survivable,
 // then the reward multipliers and the producer.
-const PRIORITY = ['spark', 'logistics', 'formation', 'evolution', 'defense',
-  'conservation', 'challenge', 'production', 'warfare',
+const PRIORITY = ['spark', 'conservation', 'challenge',
+  'logistics', 'formation', 'evolution', 'defense', 'production', 'warfare',
   'openingStone', 'ricochet', 'devour', 'shieldWall', 'fireArrow', 'javelin', 'parry', 'volley', 'canister',
   'legacyMachine', 'legacyEfficiency', 'legacyCapacity',
   'grenade', 'suppression', 'coaxial', 'blink', 'overload', 'forceField',
@@ -16,11 +16,12 @@ const PRIORITY = ['spark', 'logistics', 'formation', 'evolution', 'defense',
 const priceOf = (key, level) => (Object.hasOwn(UPGRADES, key) ? UPGRADE_COSTS : TALENT_TREE[key].costs)[level];
 const ranksOf = key => (Object.hasOwn(UPGRADES, key) ? UPGRADE_COSTS : TALENT_TREE[key].costs).length;
 
-// Before 技术托管/防御工程 the Autobuyer cannot evolve or build, so those runs
-// are played by hand. They are modelled as a manual win of MANUAL_SECONDS
-// rather than simulated, since the simulator has no manual commands.
-export const MANUAL_SECONDS = 300;
+// Before 技术托管/防御工程 the Autobuyer cannot evolve or build, but a player
+// does both by hand. Those runs are still simulated: the battle uses a
+// manual-equivalent loadout, while the ledger only spends what was bought.
+const MANUAL_EQUIVALENT = Object.freeze({ spark: 1, logistics: 1, formation: 1, evolution: 1, defense: 1 });
 const playsItself = levels => levels.evolution > 0 && levels.defense > 0;
+const battleLevels = levels => playsItself(levels) ? levels : { ...levels, ...MANUAL_EQUIVALENT };
 function automationFor(levels) {
   return { enabled: true, recruitEnabled: Boolean(levels.logistics), queueLimit: levels.logistics ? 2 : 5,
     mode: levels.formation ? 'balanced' : 'single', weights: [2, 2, 1],
@@ -52,6 +53,8 @@ function spend(levels, wallet, log) {
  * probing the next ember. Returns the full run-by-run history. */
 export function simulateEconomy({ maxRuns = 60, maxSeconds = 1800, verbose = false } = {}) {
   const levels = { ...emptyTalents(), production: 0, warfare: 0 };
+  // completedCycles gates the free recruitment milestone, so the first runs
+  // still start from zero just like a new save.
   const history = [];
   let wallet = 0, total = 0, seconds = 0, depth = 0, completedCycles = 0, deepest = 0, launchRun = null;
   // A player retries a failed ember only after buying something new.
@@ -59,9 +62,11 @@ export function simulateEconomy({ maxRuns = 60, maxSeconds = 1800, verbose = fal
   for (let run = 1; run <= maxRuns; run++) {
     if (depth >= blockedDepth && !boughtSinceFailure) depth = Math.max(0, blockedDepth - 1);
     const level = levels.challenge ? Math.min(depth, CHALLENGE.maxLevel, completedCycles) : 0;
-    const result = playsItself(levels)
-      ? simulateRun({ talents: levels, challengeLevel: level, completedCycles, automation: automationFor(levels), maxSeconds })
-      : { outcome: 'won', duration: MANUAL_SECONDS, legacy: getLegacyReward(levels, level), settlementLegacy: getLegacyReward(levels, level), producedLegacy: 0 };
+    const played = battleLevels(levels);
+    // The free recruitment milestone only matters to the Autobuyer; a player is
+    // already commanding by hand, so the battle always gets a working loadout.
+    const result = simulateRun({ talents: played, challengeLevel: level, maxSeconds,
+      completedCycles: Math.max(AUTOMATION_MILESTONE, completedCycles), automation: automationFor(played) });
     const earned = Number(result.legacy);
     seconds += result.duration;
     if (result.outcome === 'won') {

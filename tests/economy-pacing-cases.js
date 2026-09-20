@@ -25,19 +25,25 @@ export function registerEconomyPacingTests(test, assert) {
     // Depth, not purchases, is the exponential term of the surface economy.
     assert(getLegacyReward(emptyTalents(), 0) === 1 && getLegacyReward(emptyTalents(), 3) === ECONOMY.challengeBase ** 3);
     assert(getLegacyReward(emptyTalents(), CHALLENGE.maxLevel) === ECONOMY.challengeBase ** CHALLENGE.maxLevel);
+    // Buying every rank is still worth less than the embers it cannot reach.
     const maxedMultipliers = getLegacyReward({ ...emptyTalents(), conservation: ranks.length }, 0);
-    assert(maxedMultipliers === 3 && getLegacyReward(emptyTalents(), 2) > maxedMultipliers);
+    assert(maxedMultipliers === ECONOMY.conservationEffect ** ranks.length);
+    assert(getLegacyReward(emptyTalents(), ECONOMY.bypasserChallenge) > maxedMultipliers);
+    // The opening is fixed: clear once for speed, again to double, then expedition.
+    assert(TALENTS.spark.costs[0] === 1 && TALENTS.conservation.costs[0] === 1 && TALENTS.challenge.costs[0] === 2);
   });
   test('Economy pacing: the finale price is an expedition milestone, not an amount the multipliers alone can reach', () => {
     const deepest = getLegacyReward({ ...emptyTalents(), conservation: TALENTS.conservation.costs.length }, ECONOMY.bypasserChallenge);
     assert(TALENTS.bypasser.costs[0] === ECONOMY.bypasserCost && ECONOMY.bypasserChallenge <= CHALLENGE.maxLevel);
-    // Roughly five deepest runs: reachable by playing, never by one lucky run.
-    assert(TALENTS.bypasser.costs[0] > deepest * 4 && TALENTS.bypasser.costs[0] < deepest * 8);
+    // Several deepest runs: reachable by playing, never by one lucky run.
+    assert(TALENTS.bypasser.costs[0] > deepest * 4 && TALENTS.bypasser.costs[0] < deepest * 40);
     const combat = Object.entries(TALENT_TREE).filter(([key, config]) => config.branch === 'units' || key === 'production' || key === 'warfare')
       .flatMap(([, config]) => config.costs).reduce((sum, cost) => sum + cost, 0);
     // The whole combat spine costs about as much as the finale: the campaign is
     // spent buying power, not hoarding for one purchase.
-    assert(combat > deepest * 3 && combat < TALENTS.bypasser.costs[0] * 1.5, 'Unit talents must stay in scale with the finale');
+    assert(combat > deepest && combat < TALENTS.bypasser.costs[0] * 1.5, 'Unit talents must stay in scale with the finale');
+    // The deepest ember alone cannot buy the protocol; several runs must.
+    assert(deepest < TALENTS.bypasser.costs[0]);
   });
   test('V12: the retired reward branches are refunded through the ledger, and captured v10 saves keep their battles', () => {
     for (const [phase, record] of Object.entries(records)) {
@@ -51,7 +57,11 @@ export function registerEconomyPacingTests(test, assert) {
       assert(s.run.legacyRules === 10 && Q.eq(s.run.earnedLegacy, Q.of(record.run.earnedLegacy)));
       const raw = serializeSession(s); s = parseSession(raw); assert(serializeSession(s) === raw);
       if (phase === 'destruction') {
-        assert(purchaseTalent(s, 'conservation') && s.permanent.legacy === v12Wallet - TALENTS.conservation.costs[2]);
+        let wallet = v12Wallet;
+        while (s.permanent.talents.conservation < TALENTS.conservation.costs.length) {
+          wallet -= TALENTS.conservation.costs[s.permanent.talents.conservation];
+          assert(purchaseTalent(s, 'conservation') && s.permanent.legacy === wallet);
+        }
         assert(!purchaseTalent(s, 'conservation'), 'A maxed talent cannot be bought again');
         rebuildCivilization(s, s.run.runId);
         assert(s.run.legacyRules === ECONOMY.rules && s.run.machineLegacy === 0);

@@ -66,5 +66,12 @@ const v11 = Object.fromEntries(Object.entries(v10).map(([key, config]) => {
     timeAcceleration: [16], superSoldierPlan: [64], superRanged: [128], bypasser: [1048576] }[key] ?? unitCost ?? config.costs;
   return [key, { ...config, costs, ...(key === 'bypasser' ? { placeholder: false } : {}) }];
 }));
-export const HISTORICAL_TALENTS = freeze({ 2: v2, 3: v3, 4: v4, 5: v5, 6: v5, 7: v5, 8: v5, 9: v9, 10: v10, 11: v11 });
+// v12 retired the eight-rank reward branches and repriced the legacy branch.
+const v12 = Object.fromEntries(Object.entries(v11).filter(([key]) => key !== 'continuity').map(([key, config]) => {
+  const unitCost = config.unit ? [2 ** config.layer] : null;
+  const costs = { conservation: [4, 16, 64], legacyMachine: [16], legacyCapacity: [64, 256, 1024],
+    legacyEfficiency: [32, 128, 512], bypasser: [500] }[key] ?? unitCost ?? config.costs;
+  return [key, { ...config, costs, ...(key === 'legacyMachine' ? { requires: { conservation: 1 } } : {}) }];
+}));
+export const HISTORICAL_TALENTS = freeze({ 2: v2, 3: v3, 4: v4, 5: v5, 6: v5, 7: v5, 8: v5, 9: v9, 10: v10, 11: v11, 12: v12 });
 export const HISTORICAL_UPGRADE_COSTS = Object.freeze([1, 2, 4, 8, 16]);

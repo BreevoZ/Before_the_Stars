@@ -14,7 +14,7 @@ export const STAT_DEFINITIONS = Object.freeze({
   damage: growth, meleeDamage: growth, chargeDamage: growth, tickDamage: growth, baseDamage: growth,
   health: { quantity: true, min: 1, round: 'round' }, baseHealth: { quantity: true, min: 1, round: 'round' },
   armor: growth, armorPierce: growth, rangedReduction: { min: 0, max: 1 },
-  speed: scalar, range: scalar, baseRange: scalar, meleeRange: scalar, muzzleX: scalar,
+  speed: scalar, range: scalar, baseRange: scalar, meleeRange: scalar, meleeSwitch: scalar, muzzleX: scalar,
   attackSpeed: { min: 0.01, max: 100 }, attackInterval: { min: RULES.fixedStep, max: 3600 },
   meleeInterval: { min: RULES.fixedStep, max: 3600 },
   trainTime: { min: RULES.fixedStep, max: 3600 }, cost: growthInteger,
@@ -28,7 +28,7 @@ export const STAT_DEFINITIONS = Object.freeze({
   enabled: { boolean: true }, canRecruit: { boolean: true }, canBuild: { boolean: true },
   canExpand: { boolean: true }, canEvolve: { boolean: true }, canCast: { boolean: true },
   legacy: growthInteger, legacyMachine: { boolean: true },
-  legacyMachineShare: { min: 0, max: 1 }, legacyFillSeconds: { min: .25, max: 36000 },
+  legacyMachineShare: { min: 0, max: 8 }, legacyFillSeconds: { min: .25, max: 36000 },
   // Retired rules-10 production stats; old saved stacks still resolve.
   legacyProduction: growthInteger, legacyProductionInterval: { min: .25, max: 3600 },
 });

@@ -31,7 +31,7 @@ export function buildViewModel(session, { selectedSlot = 0, targeting = false, m
     if (!unit) { at(card, true, 'disabled'); continue; }
     const { type } = unit, state = getRecruitState(game, type), label = type === 'superSoldier' && state === 'disabled' && !session.run?.talents.superSoldierPlan ? '需要超级士兵计划' : recruitLabels[state];
     if (type === 'superSoldier') unit.description = unit.sniperRifle
-      ? `狙击激光枪 · 锁定引导 ${unit.chargeTime} 秒，开火后冷却 ${unit.attackInterval} 秒；${unit.meleeRange} 距离内改用 ${Q.format(unit.meleeDamage)} 伤害短匕首，间隔 ${unit.meleeInterval} 秒`
+      ? `狙击激光枪 · 锁定引导 ${unit.chargeTime} 秒，开火后冷却 ${unit.attackInterval} 秒；敌人进入 ${unit.meleeSwitch} 距离即收枪贴近，用 ${Q.format(unit.meleeDamage)} 伤害短匕首在 ${unit.meleeRange} 距离连刺，间隔 ${unit.meleeInterval} 秒`
       : unit.canRanged ? '全覆轻甲 · 远程能量点射 / 贴身激光短匕首' : '全覆轻甲 · 贴身短刺，近战完全穿甲';
     for (const trait of unitTraits(unit)) if (unit[trait.stat]) unit.description += ` · ${trait.name}：${TRAIT_DESCRIPTIONS[trait.id]}`;
     const attackDamage = unit.canRanged ? unit.damage : unit.meleeDamage ?? unit.damage;

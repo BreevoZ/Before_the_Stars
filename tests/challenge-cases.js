@@ -35,12 +35,12 @@ function spawn(game, type, team) {
 function roundtrip(s) { return parseSession(serializeSession(s)); }
 
 export function registerChallengeTests(test, assert, near) {
-  test('Challenge: legacy subtree costs 4, requires conservation, unlocks next run after settlement without retroactive rewards', () => {
+  test('Challenge: the expedition needs the reward rank, unlocks the next run after settlement and pays nothing retroactively', () => {
     const s = createProgression(); finish(s);
     assert(!purchaseTalent(s, 'challenge') && !startChallenge(s, s.run.runId));
     const seed = challengeSeed(false), legacy = seed.permanent.legacy, reward = seed.run.earnedLegacy;
     assert(TALENTS.challenge.requires.conservation === 1 && purchaseTalent(seed, 'challenge'));
-    assert(seed.permanent.legacy === legacy - 4 && seed.run.earnedLegacy === reward && !seed.run.talents.challenge);
+    assert(seed.permanent.legacy === legacy - TALENTS.challenge.costs[0] && seed.run.earnedLegacy === reward && !seed.run.talents.challenge);
     assert(!purchaseTalent(seed, 'challenge') && getNextChallengeLevel(seed) === 1);
     const runId = seed.run.runId;
     assert(startChallenge(seed, runId) && !startChallenge(seed, runId));
@@ -68,9 +68,11 @@ export function registerChallengeTests(test, assert, near) {
       const id = s.run.runId, cycles = s.permanent.completedCycles, legacy = s.permanent.legacy;
       assert(startChallenge(s, id)); ageTo(s.game, 5, 'player');
       assert(!resolveBattle(s) && s.run.phase === 'battle');
-      finish(s); assert(s.run.challengeLevel === level && s.run.earnedLegacy === getLegacyReward(s.run.talents, level));
-      // Depth is the exponential term: one rank of 遗产保存 times the ember factor.
-      assert(s.run.earnedLegacy === Math.floor(1.5 * LEGACY_ECONOMY.challengeBase ** level) && s.permanent.deepestChallenge === level);
+      // Every level here is a first arrival, so each pays its one-off bonus.
+      finish(s); assert(s.run.challengeLevel === level && s.run.firstClear === true);
+      assert(s.run.earnedLegacy === getLegacyReward(s.run.talents, level, undefined, true));
+      const base = LEGACY_ECONOMY.conservationEffect * LEGACY_ECONOMY.challengeBase ** level;
+      assert(s.run.earnedLegacy === base * LEGACY_ECONOMY.firstClearBonus && s.permanent.deepestChallenge === level);
       assert(s.permanent.completedCycles === cycles + 1 && s.permanent.legacy === legacy + s.run.earnedLegacy);
       assert(!resolveBattle(s) && !startChallenge(s, id)); roundtrip(s);
     }
@@ -140,8 +142,8 @@ export function registerChallengeTests(test, assert, near) {
   });
   test('Challenge: expedition depth multiplies the reward exponentially while purchased ranks stay linear', () => {
     const talents = { ...challengeSeed().permanent.talents, conservation: 2 };
-    assert(getLegacyReward(talents) === 2 && getLegacyReward(talents, 2) === 9 && getLegacyReward(talents, 6) === 144);
-    assert(getLegacyReward({ ...talents, conservation: 3 }, 0) === 3, 'Multipliers alone cannot outgrow one extra layer');
+    assert(getLegacyReward(talents) === 4 && getLegacyReward(talents, 2) === 16 && getLegacyReward(talents, 6) === 256);
+    assert(getLegacyReward({ ...talents, conservation: 3 }, 0) === 8, 'One rank equals exactly one ember');
   });
   test('Challenge: an actual paid future army defeats enhanced AI and settles the larger reward', () => {
     const s = challengeSeed(); s.permanent.talents.superSoldierPlan = 1; s.permanent.talentGrants.push('superSoldierPlan'); s.permanent.purchaseCosts.superSoldierPlan = [0]; startChallenge(s, s.run.runId);
@@ -155,7 +157,7 @@ export function registerChallengeTests(test, assert, near) {
       sawSoldier ||= s.game.units.some(u => u.type === 'superSoldier');
     }
     assert(sawEnemy && sawSoldier && s.game.status === 'won' && s.run.phase === 'destruction');
-    assert(s.run.earnedLegacy === getLegacyReward(s.run.talents, 1) && s.permanent.completedCycles === 13);
+    assert(s.run.earnedLegacy === getLegacyReward(s.run.talents, 1, undefined, s.run.firstClear) && s.permanent.completedCycles === 13);
     roundtrip(s);
   });
   test('Challenge: enemy evolution preserves damage taken and automation/pause follow normal simulation time', () => {
@@ -177,7 +179,7 @@ export function registerChallengeTests(test, assert, near) {
     s = roundtrip(s); assert(!resolveBattle(s) && s.run.earnedLegacy === reward && s.permanent.totalLegacy === total);
     assert(startChallenge(s, s.run.runId)); const raw = serializeSession(s);
     assert(serializeSession(roundtrip(s)) === raw && s.run.challengeLevel === 2);
-    assert(statMultiplier(s.game, 'health', 'enemy') === CHALLENGE.health ** 2 && getLegacyReward(s.run.talents, 2) === 6);
+    assert(statMultiplier(s.game, 'health', 'enemy') === CHALLENGE.health ** 2 && getLegacyReward(s.run.talents, 2) === 8);
   });
   test('Save v5: all v4 phases migrate to normal challenge with no resource, reward, or upgrade changes; backup preserved', () => {
     for (const phase of ['battle', 'victory', 'destruction', 'defeat']) {
@@ -208,33 +210,37 @@ export function registerChallengeTests(test, assert, near) {
   });
   test.browser('Challenge browser: purchase → preview → start → refresh → win → stronger civilization → defeat/retry → normal rebuild', async () => {
     const seed = challengeSeed(false); seed.debug = true; seed.debugSpeed = 1;
+    const afterPurchase = seed.permanent.legacy - TALENTS.challenge.costs[0];
     let frame = await mountFixture(serializeSession(seed), false, 'debug');
     const el = id => frame.contentDocument.getElementById(id);
     const saved = () => parseSession(frame.contentWindow.__storage.getItem(DEBUG_SAVE_KEY));
     try {
       assert(el('result-challenge').hidden); el('archives').click(); el('node-challenge').click(); el('buy-challenge').click();
-      assert(!el('archive-challenge').hidden && el('legacy-balance').textContent === '1');
+      assert(!el('archive-challenge').hidden && el('legacy-balance').textContent === String(afterPurchase));
       el('archive-challenge').click(); assert(el('challenge-dialog').open && !el('archives-dialog').open);
-      assert(el('challenge-reward').textContent === `+${getLegacyReward({ conservation: 1 }, 1)} Legacy` && el('challenge-power').textContent === `×${CHALLENGE.damage} / ×${CHALLENGE.health}`);
+      // The preview shows the real payout and the factors behind it.
+      assert(el('challenge-reward').textContent.startsWith(`+${getLegacyReward({ conservation: 1 }, 1, undefined, true)} Legacy`));
+      assert(el('challenge-reward').textContent.includes('首次抵达') && el('challenge-power').textContent === `×${CHALLENGE.damage} / ×${CHALLENGE.health}`);
       const previous = saved();
       frame.contentWindow.__testFrame(0); frame.contentWindow.__testFrame(60000);
       frame.contentDocument.body.dispatchEvent(new frame.contentWindow.KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
       assert(saved().run.runId === previous.run.runId && !el('pause-battle').getAttribute('aria-pressed').includes('true'));
       el('begin-challenge').click(); el('begin-challenge').click();
-      let next = saved(); assert(next.run.challengeLevel === 1 && next.permanent.legacy === 1 && !el('challenge-dialog').open);
+      let next = saved(); assert(next.run.challengeLevel === 1 && next.permanent.legacy === afterPurchase && !el('challenge-dialog').open);
       frame.remove(); frame = await mountFixture(serializeSession(next), false, 'debug');
-      assert(el('challenge-status').textContent.includes('纷争余烬') && el('challenge-status').textContent.includes(`+${getLegacyReward({ conservation: 1 }, 1)}`));
+      assert(el('challenge-status').textContent.includes('纷争余烬') && el('challenge-status').textContent.includes(`+${getLegacyReward({ conservation: 1 }, 1, undefined, true)}`));
       frame.contentDocument.querySelector('[data-debug-command="finale"]').click();
-      next = saved(); assert(next.run.earnedLegacy === getLegacyReward({ conservation: 1 }, 1) && next.permanent.legacy === 1 + next.run.earnedLegacy);
+      next = saved(); assert(next.run.earnedLegacy === getLegacyReward({ conservation: 1 }, 1, undefined, true) && next.permanent.legacy === afterPurchase + next.run.earnedLegacy);
       frame.remove(); frame = await mountFixture(serializeSession(next), false, 'debug');
-      assert(saved().permanent.legacy === 1 + getLegacyReward({ conservation: 1 }, 1)); el('result-challenge').click();
-      assert(el('challenge-reward').textContent === `+${getLegacyReward({ conservation: 1 }, 2)} Legacy`); el('begin-challenge').click();
+      assert(saved().permanent.legacy === afterPurchase + getLegacyReward({ conservation: 1 }, 1, undefined, true)); el('result-challenge').click();
+      assert(el('challenge-reward').textContent.startsWith(`+${getLegacyReward({ conservation: 1 }, 2, undefined, true)} Legacy`)); el('begin-challenge').click();
       assert(saved().run.challengeLevel === 2);
       frame.contentDocument.querySelector('[data-debug-command="defeat"]').click();
-      assert(el('result-challenge').textContent.includes('重返铁旗时代') && saved().permanent.legacy === 1 + getLegacyReward({ conservation: 1 }, 1));
+      assert(el('result-challenge').textContent.includes('重返铁旗时代') && saved().permanent.legacy === afterPurchase + getLegacyReward({ conservation: 1 }, 1, undefined, true));
       el('result-challenge').click(); el('begin-challenge').click(); assert(saved().run.challengeLevel === 2);
       frame.contentDocument.querySelector('[data-debug-command="defeat"]').click(); el('play-again').click(); el('play-again').click();
-      next = saved(); assert(next.run.challengeLevel === 0 && next.permanent.legacy === 5 && statMultiplier(next.game, 'health', 'enemy') === 1);
+      next = saved(); assert(next.run.challengeLevel === 0 && statMultiplier(next.game, 'health', 'enemy') === 1);
+      assert(next.permanent.legacy === afterPurchase + getLegacyReward({ conservation: 1 }, 1, undefined, true), 'A lost expedition pays nothing');
       assert(el('challenge-status').hidden && el('save-warning').hidden);
     } finally { frame.remove(); }
   });

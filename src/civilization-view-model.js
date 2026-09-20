@@ -4,7 +4,7 @@ import { Q } from './quantity.js';
 import { AGES } from './game.js';
 import { describeStat } from './stat-text.js';
 import { getNextChallengeLevel, isBetweenRuns } from './progression-machine.js';
-import { CHALLENGE, getChallengeModifiers, challengeName, availableSpeeds, getVictorySupplies } from './progression-config.js';
+import { CHALLENGE, LEGACY_ECONOMY, getChallengeModifiers, challengeName, availableSpeeds, getVictorySupplies } from './progression-config.js';
 import { getLegacyReward } from './talents.js';
 
 export function buildCivilizationViewModel(session, { debug = false } = {}) {
@@ -19,7 +19,8 @@ export function buildCivilizationViewModel(session, { debug = false } = {}) {
     text(id, nextChallenge === null, 'hidden'); text(id, challengeLabel);
   }
   text('challenge-status', !run.challengeLevel, 'hidden');
-  text('challenge-status', `余烬 · ${challengeName(run.challengeLevel)} · 通关 +${Q.format(stat(game, { kind: 'civilization' }, 'legacy'))} Legacy${run.challengeLevel === CHALLENGE.maxLevel ? ' · 最高难度' : ''}`);
+  text('challenge-status', `余烬 · ${challengeName(run.challengeLevel)} · 通关 +${Q.format(stat(game, { kind: 'civilization' }, 'legacy'))} Legacy` +
+    `${run.firstClear ? ` · 首次抵达 ×${LEGACY_ECONOMY.firstClearBonus}` : ''}${run.challengeLevel === CHALLENGE.maxLevel ? ' · 最高难度' : ''}`);
   put('body@data-civilization-phase', run.phase);
   if (debug) {
     put('#debug-speed@value', String(session.debugSpeed));
@@ -50,10 +51,10 @@ export function buildCivilizationViewModel(session, { debug = false } = {}) {
   text('legacy-balance', Q.format(p.legacy));
   const production = getLegacyProduction(run.talents, game), nextProduction = getLegacyProduction(p.talents);
   text('legacy-production', !production.unlocked, 'hidden');
-  text('legacy-production', `+${Q.format(production.perMinute)}/模拟分`);
-  text('legacy-production', `遗产生产机：本轮最多生产 ${Q.format(production.cap)} Legacy（终局遗产的 ${Math.round(production.share * 100)}%），${production.seconds} 模拟秒填满；仅交战时运转，暂停、弹窗、离线和结算时停止。`, 'title');
+  text('legacy-production', `+${Q.format(production.perSecond)}/秒`);
+  text('legacy-production', `遗产生产机：每模拟秒 ${Q.format(production.perSecond)} Legacy，本轮最多 ${Q.format(production.cap)}（终局遗产的 ${Math.round(production.share * 100)}%），${production.seconds} 模拟秒产满。仅交战时运转，暂停、弹窗、离线和结算时停止；产出在本轮走到终局时入账。`, 'title');
   text('legacy-machine-status', !p.talents.legacyMachine, 'hidden');
-  text('legacy-machine-status', `遗产生产机 · 本轮已生产 ${Q.format(run.machineLegacy ?? 0)} / 上限 ${Q.format(production.cap)}（${Q.format(production.perMinute)}/模拟分）· 重建后上限 ${Q.format(nextProduction.cap)} · 累计生产 ${Q.format(p.legacyMachine.produced)} Legacy。仅交战时运转，产量上限按本轮终局遗产计算。`);
+  text('legacy-machine-status', `遗产生产机 · 本轮已产 ${Q.format(run.machineLegacy ?? 0)} / 上限 ${Q.format(production.cap)} · 每模拟秒 ${Q.format(production.perSecond)}（${production.seconds} 秒产满）· 重建后上限 ${Q.format(nextProduction.cap)} · 累计 ${Q.format(p.legacyMachine.produced)} Legacy。仅交战时运转，走到终局才入账。`);
   text('autobuyer-label', !p.automation.unlocked ? '未解锁' : p.automation.enabled ? '已开启' : '已关闭');
   text('autobuyer-menu', String(p.automation.enabled), 'data-enabled');
   text('archives', `天赋树，${Q.format(p.legacy)} 文明遗产`, 'aria-label');
@@ -85,6 +86,13 @@ export function buildChallengeViewModel(session) {
   const level = getNextChallengeLevel(session);
   if (level === null) return null;
   const bonuses = getChallengeModifiers(level), multiplier = value => `×${Q.format(value)}`;
+  // Show the actual payout, not the base one: the ember and the first-arrival
+  // bonus are exactly why the player is considering this run.
+  const firstClear = level > (session.permanent.deepestChallenge ?? 0);
+  const base = getLegacyReward(session.permanent.talents);
+  const reward = getLegacyReward(session.permanent.talents, level, undefined, firstClear);
+  const factors = [`基础 ${Q.format(base)}`, `余烬 ×${Q.format(LEGACY_ECONOMY.challengeBase ** level)}`,
+    ...(firstClear ? [`首次抵达 ×${LEGACY_ECONOMY.firstClearBonus}`] : [])];
   return { level, bindings: {
     '#challenge-title': `余烬远征 · ${challengeName(level)}`,
     '#challenge-intro': `${session.run.phase === 'defeat' ? '重试当前难度' : '废墟深处，一支更强大的文明正在集结'}。以下倍率均相对于常规文明（显示保留三位小数）。`,
@@ -92,7 +100,7 @@ export function buildChallengeViewModel(session) {
     '#challenge-experience': multiplier(bonuses.experience),
     '#challenge-power': `${multiplier(bonuses.health)} / ${multiplier(bonuses.damage)}`,
     '#challenge-base': multiplier(bonuses.baseHealth),
-    '#challenge-reward': `+${Q.format(getLegacyReward(session.permanent.talents, level))} Legacy`,
+    '#challenge-reward': `+${Q.format(reward)} Legacy · ${factors.join(' × ')}`,
     '#begin-challenge': `踏入${challengeName(level)}`,
   } };
 }

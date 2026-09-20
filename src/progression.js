@@ -20,8 +20,12 @@ export function createCivilizationRun(permanent, challengeLevel = 0, extraBonuse
   const runId = uniqueId();
   const upgrades = { ...permanent.upgrades };
   const talents = { ...permanent.talents };
+  // Reaching an ember for the first time pays a one-off multiplier. It is part
+  // of the run's own contract, so a save replays the same settlement.
+  const firstClear = challengeLevel > (permanent.deepestChallenge ?? 0);
   const run = { runId, legacyRules: LEGACY_ECONOMY.rules, challengeLevel, battleNumber: 1, battleId: `${runId}:1`, phase: PHASE.BATTLE,
-    processedBattleId: null, settled: false, earnedLegacy: 0, machineLegacy: 0, upgrades, talents, autoElapsed: 0, autoTurn: 'recruit', elapsed: 0 };
+    processedBattleId: null, settled: false, earnedLegacy: 0, machineLegacy: 0, firstClear,
+    upgrades, talents, autoElapsed: 0, autoTurn: 'recruit', elapsed: 0 };
   if (extraBonuses.length) run.extraBonuses = createBonusStack(extraBonuses);
   const game = createConflict(run);
   return { run, game };

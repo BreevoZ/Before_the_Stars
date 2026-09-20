@@ -7,7 +7,7 @@ import { getV8RunBonuses } from './progression-bonuses.js';
 import { createAutomation } from './automation.js';
 import { HISTORICAL_TALENTS, HISTORICAL_UPGRADE_COSTS } from './save-history.js';
 import { validateRecord } from './save-validation.js';
-import { cloneRecord, toV8Record, fromV8Record, fromV9Record, fromV10Record, fromV11Record } from './save-record.js';
+import { cloneRecord, toV8Record, fromV8Record, fromV9Record, fromV10Record, fromV11Record, fromV12Record } from './save-record.js';
 import { emptyTalents, TALENTS } from './talents.js';
 const teams = ['player', 'enemy'];
 
@@ -155,11 +155,19 @@ export function migrateV11(input) {
   session.version = 12;
   return { ...toV8Record(session), version: 12 };
 }
-export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9, 10: migrateV10, 11: migrateV11 });
+// v13 doubles the reward per rank and pays a first-clear bonus. The active run
+// keeps its own rules, so it never gains a bonus it did not start with.
+export function migrateV12(input) {
+  const session = fromV12Record(input);
+  session.run.firstClear = false;
+  session.version = 13;
+  return { ...toV8Record(session), version: 13 };
+}
+export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9, 10: migrateV10, 11: migrateV11, 12: migrateV12 });
 export function migrateRecord(input) {
   let record = input;
   while (record.version < SAVE_VERSION) {
-    const hydrate = { 8: fromV8Record, 9: fromV9Record, 10: fromV10Record, 11: fromV11Record }[record.version];
+    const hydrate = { 8: fromV8Record, 9: fromV9Record, 10: fromV10Record, 11: fromV11Record, 12: fromV12Record }[record.version];
     validateRecord(hydrate ? hydrate(record) : record, record.version);
     record = MIGRATIONS[record.version](record);
   }

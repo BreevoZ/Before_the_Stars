@@ -16,7 +16,7 @@ export function getLegacyProduction(talents, game, challengeLevel = 0) {
   // A share of the settlement, but never nothing: the first ranks of the
   // campaign still see the machine tick while their rewards are tiny.
   const cap = unlocked ? Q.max(1, Q.floor(Q.mul(reward, share))) : 0;
-  return { unlocked, cap, share, seconds, perMinute: Q.div(Q.mul(cap, 60), seconds) };
+  return { unlocked, cap, share, seconds, perSecond: Q.div(cap, seconds), perMinute: Q.div(Q.mul(cap, 60), seconds) };
 }
 
 // Called only by the active simulation. Production accrues into the run and is
@@ -37,8 +37,10 @@ export function updateLegacyMachine(session, dt) {
   const whole = Q.floor(filled);
   machine.progress = Math.max(0, Q.toNumber(Q.sub(filled, whole)) - 1e-10);
   if (Q.lte(whole, 0)) return 0;
+  // Clamp the stored total, not just the step: at large magnitudes the
+  // remaining-amount subtraction rounds, and the cap must still hold exactly.
   const reward = Q.min(whole, remaining);
-  run.machineLegacy = Q.add(run.machineLegacy ?? 0, reward);
+  run.machineLegacy = Q.min(production.cap, Q.add(run.machineLegacy ?? 0, reward));
   return reward;
 }
 

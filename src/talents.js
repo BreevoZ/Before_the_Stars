@@ -50,12 +50,12 @@ export const TALENTS = Object.freeze({
   challenge: { name: '余烬远征', branch: 'legacy', costs: PRICES.challenge, requires: { conservation: 1 },
     effects: ['初生之地循环', `通关后踏入下一片余烬；敌军逐步强化，通关遗产 ×${ECONOMY.challengeBase} 每深入一层，最多 ${CHALLENGE.maxLevel} 次深入`] },
   legacyMachine: { name: '遗产生产机', branch: 'legacy', costs: PRICES.legacyMachine, requires: { conservation: 1 }, requiresLayer: 3,
-    effects: ['尚未生产遗产', `交战中按时间积累遗产 · 本轮上限为终局遗产的 ${ECONOMY.machineShares[0] * 100}%，${ECONOMY.fillSeconds} 模拟秒填满`] },
+    effects: ['尚未生产遗产', `交战中持续产出遗产 · 本轮上限为终局遗产的 ${ECONOMY.machineShares[0] * 100}%，${ECONOMY.fillSeconds} 模拟秒产满`] },
   legacyCapacity: { name: '平行档案', branch: 'legacy', costs: PRICES.legacyCapacity, requires: { legacyMachine: 1 },
-    effects: ECONOMY.machineShares.map(share => `本轮生产上限 ${share * 100}% 终局遗产`) },
+    effects: ECONOMY.machineShares.map(share => `本轮产量上限 ${share * 100}% 终局遗产`) },
   legacyEfficiency: { name: '回响加速', branch: 'legacy', costs: PRICES.legacyEfficiency, requires: { legacyMachine: 1 },
     effects: Array.from({ length: PRICES.legacyEfficiency.length + 1 }, (_, level) =>
-      `生产速度 ×${2 ** level} · ${ECONOMY.fillSeconds / 2 ** level} 模拟秒填满上限`) },
+      `生产速度 ×${2 ** level} · ${ECONOMY.fillSeconds / 2 ** level} 模拟秒产满上限`) },
   ...Object.fromEntries(Object.values(TRAITS).map(trait => {
     const layer = ['melee', 'archer', 'heavy'].includes(trait.units[0]) ? 1 : ['swordsman', 'crossbow', 'knight'].includes(trait.units[0]) ? 2 : ['duelist', 'musketeer', 'cannoneer'].includes(trait.units[0]) ? 3 : ['commando', 'rifleman', 'tank'].includes(trait.units[0]) ? 4 : 5;
     return [trait.id, { name: trait.name, branch: 'units', layer, unit: trait.units[0], costs: [UNIT_TALENT_COSTS[layer - 1]], requires: layer === 1 ? { spark: 1 } : {}, requiresLayer: layer > 1 ? layer - 1 : undefined,
@@ -99,20 +99,22 @@ export function getTalentBonuses(talents) {
   return { startingGold: talents.supply * TALENT_VALUES.startingGold,
     bounty: 1 + talents.salvage * TALENT_VALUES.bountyPerLevel };
 }
-// Rules 11: depth is the exponential term and purchases are the linear one.
+// Rules 11+: depth is the exponential term and purchases are the smaller one.
 // Older runs keep the contract they started under, including retired talents.
-export function getLegacyBonuses(talents, challengeLevel = 0, rules = ECONOMY.rules) {
+export function getLegacyBonuses(talents, challengeLevel = 0, rules = ECONOMY.rules, firstClear = false) {
   const conservation = rules < 10 ? talents.conservation ?? 0
-    : rules < 11 ? 2 ** (talents.conservation ?? 0) : ECONOMY.conservationEffect ** (talents.conservation ?? 0);
+    : rules < 11 ? 2 ** (talents.conservation ?? 0)
+    : (rules < 12 ? 1.5 : ECONOMY.conservationEffect) ** (talents.conservation ?? 0);
   return [
+    ...(rules >= 12 && firstClear ? [['depth:first', '首次抵达', 'depth', 'multiply', ECONOMY.firstClearBonus]] : []),
     ['conservation', '遗产保存', 'doctrine', rules < 10 ? 'add' : 'multiply', conservation],
     ...(rules < 11 ? [['continuity', '文明传承', 'doctrine', 'multiply', rules < 10 ? 1 + (talents.continuity ?? 0) * 0.5 : 2 ** (talents.continuity ?? 0)]] : []),
     ['challenge:legacy', rules < 11 ? '挑战遗产' : '远征深度', 'challenge', 'multiply',
       rules < 11 ? challengeLevel + 1 : Math.round(ECONOMY.challengeBase ** challengeLevel * 1e6) / 1e6],
   ].map(([id, label, kind, type, value]) => ({ target: { stat: 'legacy', kind: 'civilization' }, type, value, source: { id, label, kind } }));
 }
-export function getLegacyReward(talents, challengeLevel = 0, rules = ECONOMY.rules) {
-  return resolveStatValue(SURFACE.legacyPerCycle, getLegacyBonuses(talents, challengeLevel, rules), STAT_DEFINITIONS.legacy);
+export function getLegacyReward(talents, challengeLevel = 0, rules = ECONOMY.rules, firstClear = false) {
+  return resolveStatValue(SURFACE.legacyPerCycle, getLegacyBonuses(talents, challengeLevel, rules, firstClear), STAT_DEFINITIONS.legacy);
 }
 export function getTalentSpending(talents, grants = []) {
   return Object.entries(TALENTS).reduce((sum, [key, config]) =>

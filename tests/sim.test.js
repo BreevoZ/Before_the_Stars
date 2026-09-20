@@ -45,9 +45,9 @@ test('Simulation: challenge modifiers affect actual combat; only completed runs 
   const options = { ...example, automation: { ...example.automation, weights: [1,1,3] } };
   const normal = simulateRun(options), challenge = simulateRun({ ...options, challengeLevel: 1 });
   assert.equal(challenge.outcome, 'won');
-  // One ember deeper pays the ember multiplier on the same settlement.
-  assert.equal(challenge.legacy, getLegacyReward(example.talents, 1));
-  assert.equal(normal.legacy, getLegacyReward(example.talents, 0));
+  // One ember deeper pays the ember multiplier, plus the first-arrival bonus.
+  assert.equal(challenge.settlementLegacy, getLegacyReward(example.talents, 1, undefined, true));
+  assert.equal(normal.settlementLegacy, getLegacyReward(example.talents, 0));
   assert.notEqual(challenge.duration, normal.duration);
   const failed = simulateRun({ ...example, challengeLevel: 10, completedCycles: 10 });
   assert.equal(failed.outcome, 'lost');

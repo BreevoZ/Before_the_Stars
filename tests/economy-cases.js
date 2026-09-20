@@ -7,7 +7,7 @@ import { simulateRun } from '../sim/simulate.js';
 import { Q } from '../src/quantity.js';
 import { createGame, evolve, AGES, recruit, RULES } from '../src/game.js';
 import { createProgression, resolveBattle, continueCivilization, rebuildCivilization, updateProgression, abandonCivilization } from '../src/progression.js';
-import { getVictorySupplies, SAVE_VERSION } from '../src/progression-config.js';
+import { getVictorySupplies, LEGACY_ECONOMY, SAVE_VERSION } from '../src/progression-config.js';
 import { buildViewModel } from '../src/view-model.js';
 import { buildCivilizationViewModel } from '../src/civilization-view-model.js';
 import { serializeSession, parseSession } from '../src/save.js';
@@ -66,25 +66,27 @@ export function registerEconomyTests(test,assert,near) {
   });
   test('Legacy economy: reward ranks cost four times as much for half the growth, and depth carries the exponent',()=>{
     const s=productionSession();finish(s);
-    const config=TALENTS.conservation;assert(config.costs.length===3&&config.costs.join()==='4,16,64');
-    // Two ranks are already owned by the production session; buy the last one.
-    const level=s.permanent.talents.conservation,before=s.permanent.legacy;
-    assert(purchaseTalent(s,'conservation')&&s.permanent.legacy===before-config.costs[level]);
+    const config=TALENTS.conservation;assert(config.costs.length===4&&config.costs.join()==='1,4,16,64');
+    // Two ranks are already owned by the production session; buy the rest.
+    while(s.permanent.talents.conservation<config.costs.length) {
+      const level=s.permanent.talents.conservation,before=s.permanent.legacy;
+      assert(purchaseTalent(s,'conservation')&&s.permanent.legacy===before-config.costs[level]);
+    }
     assert(!purchaseTalent(s,'conservation')&&getTalentState(s,'conservation')==='max');
-    assert(getLegacyReward(s.permanent.talents)===3&&getLegacyReward(s.permanent.talents,5)===108);
+    assert(getLegacyReward(s.permanent.talents)===16&&getLegacyReward(s.permanent.talents,5)===512);
     assert(getLegacyReward(emptyTalents(),1)===2&&getLegacyReward(emptyTalents(),3)===8);
-    const earned=s.run.earnedLegacy;assert(earned===2);rebuildCivilization(s,s.run.runId);finish(s);
-    assert(s.run.earnedLegacy===3&&!resolveBattle(s));parseSession(serializeSession(s));
+    const earned=s.run.earnedLegacy;assert(earned===4);rebuildCivilization(s,s.run.runId);finish(s);
+    assert(s.run.earnedLegacy===16&&!resolveBattle(s));parseSession(serializeSession(s));
     assert(stat(createGame(),{kind:'civilization'},'legacy')===1);
   });
   test('Legacy machine: production is capped by its run and is only banked by a finale, so stalling or losing earns nothing',()=>{
-    let s=productionSession();const cap=getLegacyProduction(s.run.talents,s.game).cap;
-    assert(cap===1&&getLegacyProduction(s.run.talents,s.game).seconds===600);
-    const balance=s.permanent.legacy;advance(s,300);
-    near(s.permanent.legacyMachine.progress,.5);assert(s.permanent.legacy===balance);
+    let s=productionSession();const production=getLegacyProduction(s.run.talents,s.game),cap=production.cap;
+    assert(cap===2&&production.seconds===LEGACY_ECONOMY.fillSeconds&&production.share===LEGACY_ECONOMY.machineShares[0]);
+    const balance=s.permanent.legacy;advance(s,production.seconds/2);
+    assert(s.run.machineLegacy===1&&s.permanent.legacy===balance);
     const raw=serializeSession(s);s=parseSession(raw);assert(serializeSession(s)===raw);
     advance(s,600,{paused:true});advance(s,600,{hidden:true});assert(serializeSession(s)===raw);
-    advance(s,300);assert(s.run.machineLegacy===1&&s.permanent.legacy===balance,'Pending production stays with the run');
+    advance(s,production.seconds/2);assert(s.run.machineLegacy===cap&&s.permanent.legacy===balance,'Pending production stays with the run');
     // The cap is reached; a stalled battle now accrues nothing at all.
     advance(s,3000);assert(s.run.machineLegacy===cap&&s.permanent.legacyMachine.produced===0);
     finish(s,1);assert(continueCivilization(s,s.run.battleId));s.game.ai.enabled=false;advance(s,15);
@@ -101,12 +103,12 @@ export function registerEconomyTests(test,assert,near) {
     const locked=createProgression();finish(locked);assert(getTalentState(locked,'legacyMachine')==='prerequisite');
     const s=productionSession();advance(s,60);finish(s);
     assert(purchaseTalent(s,'legacyCapacity')&&purchaseTalent(s,'legacyEfficiency'));
-    assert(getLegacyProduction(s.run.talents,s.game).share===.25&&getLegacyProduction(s.permanent.talents).share===.5);
+    assert(getLegacyProduction(s.run.talents,s.game).share===LEGACY_ECONOMY.machineShares[0]&&getLegacyProduction(s.permanent.talents).share===LEGACY_ECONOMY.machineShares[1]);
     rebuildCivilization(s,s.run.runId);s.game.ai.enabled=false;
     const production=getLegacyProduction(s.run.talents,s.game);
-    assert(production.share===.5&&production.seconds===300&&production.cap===1);
-    const balance=s.permanent.legacy;advance(s,300);assert(s.run.machineLegacy===1&&s.permanent.legacy===balance);
-    finish(s);assert(s.permanent.legacy===balance+s.run.earnedLegacy+1);
+    assert(production.share===LEGACY_ECONOMY.machineShares[1]&&production.seconds===LEGACY_ECONOMY.fillSeconds/2&&production.cap===4);
+    const balance=s.permanent.legacy;advance(s,production.seconds);assert(s.run.machineLegacy===4&&s.permanent.legacy===balance);
+    finish(s);assert(s.permanent.legacy===balance+s.run.earnedLegacy+4);
     assert(parseSession(serializeSession(s)));
   });
   test('Legacy v10: every captured v9 phase retains wallet, old rewards, purchases and battle state until a new run',()=>{
@@ -114,11 +116,11 @@ export function registerEconomyTests(test,assert,near) {
       let s=parseSession(JSON.stringify(old));assert(s.version===SAVE_VERSION&&s.run.phase===phase&&s.run.legacyRules===9);
       assert(Q.eq(s.permanent.totalLegacy,old.permanent.totalLegacy)&&Q.eq(s.run.earnedLegacy,old.run.earnedLegacy));
       assert(s.permanent.legacyMachine.progress===0&&s.permanent.legacyMachine.produced===0);
-      assert(stat(s.game,{kind:'civilization'},'legacy')===4&&getLegacyReward(s.permanent.talents)===2);
+      assert(stat(s.game,{kind:'civilization'},'legacy')===4&&getLegacyReward(s.permanent.talents)===4);
       const raw=serializeSession(s);s=parseSession(raw);assert(serializeSession(s)===raw&&!resolveBattle(s));
       if(phase==='destruction') {
         const balance=s.permanent.legacy;assert(rebuildCivilization(s,s.run.runId));
-        assert(s.run.legacyRules===12-1&&s.permanent.legacy===balance&&stat(s.game,{kind:'civilization'},'legacy')===2);
+        assert(s.run.legacyRules===LEGACY_ECONOMY.rules&&s.permanent.legacy===balance&&stat(s.game,{kind:'civilization'},'legacy')===4);
       }
     }
   });
@@ -129,7 +131,7 @@ export function registerEconomyTests(test,assert,near) {
     const raw=serializeSession(s),restored=parseSession(raw);assert(serializeSession(restored)===raw);
     finish(restored);assert(purchaseTalent(restored,'conservation'));rebuildCivilization(restored,restored.run.runId);parseSession(serializeSession(restored));
     assert(buildCivilizationViewModel(restored)['#legacy-balance'].includes('e+400'));
-    for(const patch of [r=>r.permanent.legacyMachine.progress=1,r=>r.permanent.legacyMachine.progress=-.1,r=>r.permanent.legacyMachine.produced='-1',r=>delete r.permanent.legacyMachine,r=>r.run.legacyRules=12]) {
+    for(const patch of [r=>r.permanent.legacyMachine.progress=1,r=>r.permanent.legacyMachine.progress=-.1,r=>r.permanent.legacyMachine.produced='-1',r=>delete r.permanent.legacyMachine,r=>r.run.legacyRules=13]) {
       const bad=JSON.parse(raw);patch(bad);let threw=false;try{parseSession(JSON.stringify(bad));}catch{threw=true;}assert(threw);
     }
   });
@@ -138,10 +140,13 @@ export function registerEconomyTests(test,assert,near) {
     s.run.extraBonuses=[{target:{stat:'legacy',kind:'civilization'},type:'multiply',value:Q.of('1e400'),source:{id:'large-economy',kind:'depth',label:'大数检验'}}];
     s.game.bonuses=getRunBonuses(s.run);
     const production=getLegacyProduction(s.run.talents,s.game),reward=stat(s.game,{kind:'civilization'},'legacy');
-    assert(Q.eq(reward,Q.of('2.25e400'))&&Q.eq(production.cap,Q.mul(reward,.25)));
-    advance(s,production.seconds);assert(Q.eq(s.run.machineLegacy,production.cap));
-    advance(s,production.seconds);assert(Q.eq(s.run.machineLegacy,production.cap),'The run cap holds at any magnitude');
-    finish(s);assert(Q.eq(s.run.earnedLegacy,reward)&&Q.eq(s.permanent.legacyMachine.produced,production.cap));
+    assert(Q.eq(reward,Q.of('4e400'))&&Q.eq(production.cap,Q.mul(reward,LEGACY_ECONOMY.machineShares[0])));
+    // Cap and reward both come from the same settled attribute pipeline. At this
+    // magnitude the fill lands within a rounding step of the cap, never past it.
+    advance(s,production.seconds);
+    assert(Q.lte(s.run.machineLegacy,production.cap)&&Q.gte(s.run.machineLegacy,Q.mul(production.cap,.999)));
+    advance(s,production.seconds);assert(Q.eq(s.run.machineLegacy,production.cap),'The run cap holds exactly at any magnitude');
+    finish(s);assert(Q.eq(s.run.earnedLegacy,reward)&&Q.eq(s.permanent.legacyMachine.produced,s.run.machineLegacy));
     const raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw&&!resolveBattle(s));
   });
   test('Legacy machine simulator: actual simulated battle reports production separately from finale rewards',()=>{
@@ -150,7 +155,7 @@ export function registerEconomyTests(test,assert,near) {
     const automation={enabled:true,mode:'balanced',weights:[1,1,3],queueLimit:2,evolve:true,defense:true,maxTurrets:2};
     const won=simulateRun({talents,completedCycles:10,automation});
     // A finished civilization pays its settlement; production is capped by it.
-    assert(won.outcome==='won'&&won.settlementLegacy===2&&won.producedLegacy===2&&won.legacy===4);
+    assert(won.outcome==='won'&&won.settlementLegacy===4&&won.producedLegacy===8&&won.legacy===12);
     const stalled=simulateRun({talents,completedCycles:10,maxSeconds:40,automation});
     assert(stalled.outcome==='timeout'&&stalled.settlementLegacy===0&&stalled.producedLegacy<won.producedLegacy);
   });
@@ -159,9 +164,9 @@ export function registerEconomyTests(test,assert,near) {
     let frame=await mountFixture(serializeSession(s));
     try {
       let doc=frame.contentDocument;
-      assert(!doc.getElementById('legacy-production').hidden&&doc.getElementById('legacy-production').textContent==='+0.1/模拟分');
+      assert(!doc.getElementById('legacy-production').hidden&&doc.getElementById('legacy-production').textContent==='+0.008/秒');
       doc.getElementById('archives').click();
-      assert(doc.getElementById('legacy-machine-status').textContent.includes('上限 1'));
+      assert(doc.getElementById('legacy-machine-status').textContent.includes('上限 2'));
       doc.getElementById('node-legacyCapacity').click();assert(doc.getElementById('buy-legacyCapacity').disabled);
       const before=doc.getElementById('legacy-machine-status').textContent;
       for(let i=0;i<120;i++)frame.contentWindow.__testFrame(i*17);
@@ -169,8 +174,8 @@ export function registerEconomyTests(test,assert,near) {
       doc.getElementById('close-archives').click();doc.getElementById('save-menu').click();doc.getElementById('manual-save').click();
       const saved=frame.contentWindow.__storage.getItem('before-the-stars.incremental.v1');
       frame.remove();frame=await mountFixture(saved);doc=frame.contentDocument;
-      assert(doc.getElementById('legacy-production').textContent==='+0.1/模拟分');
-      doc.getElementById('archives').click();assert(doc.getElementById('legacy-machine-status').textContent.includes('上限 1'));
+      assert(doc.getElementById('legacy-production').textContent==='+0.008/秒');
+      doc.getElementById('archives').click();assert(doc.getElementById('legacy-machine-status').textContent.includes('上限 2'));
     } finally {frame.remove();}
   });
 

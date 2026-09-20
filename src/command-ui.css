@@ -3,23 +3,21 @@
 .section-heading h2 { display: flex; align-items: center; gap: 7px; color: var(--color-home-text); letter-spacing: 3px; }
 .section-heading h2 svg { color: var(--route-automation); stroke-width: 1.2; }
 .command-grid .unit-card, .command-grid .turret-card {
-  isolation: isolate; height: 108px; padding: 6px 4px 9px; gap: 5px;
+  height: 100px; padding: 6px 4px 9px; gap: 5px;
   border: 1px solid transparent; border-bottom-color: var(--color-home-home-header-border-bottom);
   border-radius: 2px; background: transparent; color: var(--route-root);
   transition: border-color .2s, background .2s;
 }
-.command-frame { position: absolute; z-index: -1; top: 2px; left: 50%; transform: translateX(-50%); width: min(120px, 100%); height: 80px; stroke: var(--color-command-frame); stroke-width: .8; overflow: visible; transition: stroke .2s; }
-.command-frame circle { fill: var(--route-automation); stroke: none; }
-.command-orbit { stroke: var(--color-home-home-header-border-bottom); }
-.command-grid :is(.unit-card, .turret-card):is(:hover, :focus-visible):not(:disabled) { background: var(--color-home-star-halo-fill); border-color: var(--color-command-frame); }
-.command-grid :is(.unit-card, .turret-card):is(:hover, :focus-visible):not(:disabled) .command-frame { stroke: var(--route-root); }
+.command-grid :is(.unit-card, .turret-card):is(:hover, :focus-visible):not(:disabled) { background: var(--color-home-star-halo-fill); border-color: transparent; border-bottom-color: var(--route-automation); }
 .command-grid :is(.unit-card, .turret-card):disabled { background: transparent; border-color: transparent; border-bottom-color: var(--color-home-home-header-border-bottom); }
-.command-grid :is(.unit-card, .turret-card):disabled :is(.unit-icon, .turret-icon, .command-frame) { opacity: .42; }
 .command-grid .price { color: var(--color-home-home-wallet-text); font-size: 11px; }
 .command-grid :disabled .price { color: var(--color-home-map-yield-text); }
 .command-grid kbd { top: 7px; right: 8px; color: var(--color-home-home-wallet-small-text); }
 .command-grid .unit-card.special-unit { height: 72px; padding: 2px 18px; gap: 20px; }
-.special-unit .command-frame { left: calc(50% - 35px); height: 66px; width: 100px; top: 2px; }
+.command-grid :is(.unit-icon, .turret-icon) { height: 64px; }
+.command-grid :is(.unit-icon, .turret-icon) canvas { width: 108px; max-width: 100%; height: 64px; margin-inline: auto; }
+.command-grid :is(.unit-card, .turret-card):disabled :is(.unit-icon, .turret-icon) { opacity: .4; }
+.command-grid .unit-card.special-unit :is(.unit-icon, .unit-icon canvas) { width: 104px; height: 62px; }
 .training-queue { gap: 6px; margin-top: 12px; }
 .queue-slot { height: 44px; border-radius: 2px; border-color: var(--color-home-home-header-border-bottom); }
 .queue-slot:disabled:not(.occupied) { border-style: solid; border-color: transparent; border-bottom-color: var(--color-command-frame); opacity: .45; }
@@ -87,8 +85,7 @@
 #automation-to-talents svg { width: 14px; height: 14px; stroke-width: 1.2; }
 @media (max-width: 560px) {
   .command-grid { gap: 20px; }
-  .command-grid :is(.unit-card, .turret-card) { height: 98px; }
-  .command-frame { height: 70px; width: 106px; max-width: 100%; }
+  .command-grid :is(.unit-card, .turret-card) { height: 94px; }
   #automation-dialog { width: calc(100% - 20px); max-height: 92dvh; }
   .automation-heading { padding: 14px 16px; }
   .automation-wordmark { gap: 10px; }
@@ -104,5 +101,5 @@
   #automation-dialog :is(select, input:not([type="checkbox"])) { font-size: 16px; padding-inline: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .command-grid button, .command-frame, #automation-dialog input, #automation-dialog input::before { transition: none; }
+  .command-grid button, #automation-dialog input, #automation-dialog input::before { transition: none; }
 }

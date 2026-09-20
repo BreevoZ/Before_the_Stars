@@ -65,18 +65,20 @@ export function registerOrbitalTests(test, assert) {
     assert(previous.complete && previous.camera===1 && previous.treeOpacity===0 && previous.arrival===1);
     assert(JSON.stringify(orbitalFrame(0,true))===JSON.stringify(orbitalFrame(ORBITAL_SECONDS)));
   });
-  test('Orbital launch wells: hulls begin underground, shutters open before lift, ignition follows emergence, and takeoff is continuous', () => {
+  test('Orbital departure: ships begin behind the ground, rise continuously and keep the same trajectory across camera movement', () => {
     for (const [width, height] of [[390, 844], [1280, 800]]) for (const ship of ORBITAL_FLEET) {
       const pose = time => orbitalLaunchPose(ship, time, width, height);
-      const start = pose(0), raised = pose(ship.delay), ignited = pose(ship.delay + .8);
-      assert(start.y - 37 * start.scale > start.padY && start.ignition === 0 && start.flight === 0);
-      assert(pose(ship.delay - 1.8).doors > .9 && pose(ship.delay - 1.8).lift < 1e-12);
-      assert(raised.lift === 1 && raised.ignition === 0 && raised.y === raised.padY);
-      assert(Math.abs(ignited.ignition - 1) < 1e-12 && ignited.flight < 1e-12);
-      for (const t of [ship.delay - 1.8, ship.delay, ship.delay + .8]) {
-        assert(Math.abs(pose(t + .001).y - pose(t - .001).y) < .1, 'Hull must not jump between launch stages');
+      const start = pose(0), ignition = pose(ship.delay);
+      assert(start.y - 37 * start.scale > start.ground + 6 && start.flight === 0);
+      assert(ignition.rise === 0 && ignition.ignition === 0);
+      assert(Math.abs(pose(ship.delay + .001).y - pose(ship.delay - .001).y) < .1);
+      let previous = start.y - start.ground;
+      for (let time = 0; time <= 20; time += .1) {
+        const current = pose(time), relative = current.y - current.ground;
+        assert(relative <= previous + 1e-9, 'Camera movement must not reverse the ascent');
+        previous = relative;
       }
-      assert(pose(ship.delay + 2).y < pose(ship.delay + 2).padY);
+      assert(pose(ship.delay + 4).y < pose(ship.delay + 4).ground - 37 * start.scale);
     }
   });
   test.browser('Orbital arrival: action fade reserves layout at desktop and phone sizes; invisible controls cannot take focus', async () => {
@@ -139,6 +141,11 @@ export function registerOrbitalTests(test, assert) {
         const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d');
         drawOrbitalScene(ctx,w,h,10);const middle=canvas.toDataURL();drawOrbitalScene(ctx,w,h,24);assert(canvas.toDataURL()!==middle);
         drawOrbitalScene(ctx,w,h,10);assert(canvas.toDataURL()===middle);
+        for (const time of [4, 7, 10]) {
+          drawOrbitalScene(ctx,w,h,time);
+          const ground = ctx.getImageData(0,h-2,w,1).data;
+          for (let i=0;i<ground.length;i+=4) assert(ground[i]===13 && ground[i+1]===25 && ground[i+2]===25 && ground[i+3]===255, 'Hull or exhaust leaked through the opaque foreground');
+        }
         drawOrbitalScene(ctx,w,h,0,{reducedMotion:true});const reduced=canvas.toDataURL();drawOrbitalScene(ctx,w,h,24);assert(canvas.toDataURL()===reduced);
       }
     } finally { frame.remove(); }

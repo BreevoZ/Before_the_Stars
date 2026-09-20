@@ -3,6 +3,7 @@ import { getMountPose, solveJoint } from '../src/mount-motion.js';
 import { getMeleeMotion, rotatePoint } from '../src/melee-motion.js';
 import { ANIMATION_CLIPS, createClipSampler, createClipPainter } from '../src/animation-clips.js';
 import { drawLandscape } from '../src/render.js';
+import { drawCommandPortrait } from '../src/command-portraits.js';
 
 function sampleSky(width, height, ratio = 1, time = 83) {
   const canvas = document.createElement('canvas'), stars = [];
@@ -22,6 +23,28 @@ function sampleSky(width, height, ratio = 1, time = 83) {
 }
 
 export function registerAnimationTests(test, assert, near) {
+  test.browser('Command portraits: every troop and turret stays distinct, centered and grounded without clipping; cached redraws match', () => {
+    const canvas = document.createElement('canvas');
+    // Keep readback on one raster path; switching from GPU to CPU mid-test
+    // can change subpixel rounding even when the cached source is identical.
+    canvas.getContext('2d', { willReadFrequently: true });
+    for (const [turret, types] of [[false, UNITS], [true, TURRETS]]) {
+      const images = new Set();
+      for (const type of Object.keys(types)) {
+        drawCommandPortrait(canvas, type, turret);
+        const image = canvas.toDataURL(), pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+        images.add(image);
+        let left = canvas.width, right = 0, top = canvas.height, bottom = 0, count = 0;
+        for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) if (pixels[(y * canvas.width + x) * 4 + 3] > 128) {
+          left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y); count++;
+        }
+        assert(count > 250 && left >= 32 && right < canvas.width - 32 && top >= 16, `${type}: empty or clipped study`);
+        assert(Math.abs((left + right) / 2 - canvas.width / 2) < 3 && bottom >= 122 && bottom <= 130, `${type}: model is not centered or grounded`);
+        drawCommandPortrait(canvas, type, turret); assert(canvas.toDataURL() === image, `${type}: cache changed the drawing`);
+      }
+      assert(images.size === Object.keys(types).length, 'Era/type silhouettes must remain distinct');
+    }
+  });
   test.browser('Star positions stay scattered and stable across phone, desktop, zoom and pixel ratios', () => {
     const reference = sampleSky(1280, 370);
     // The old modulo distribution collapsed to three rows at this sky height.

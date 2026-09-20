@@ -1,4 +1,4 @@
-import { drawBase } from './bases.js';
+import { drawBaseRuins } from './bases.js';
 
 export const ORBITAL_SECONDS = 24;
 const clamp = x => Math.max(0, Math.min(1, x));
@@ -18,21 +18,22 @@ export function orbitalFrame(seconds, reducedMotion = false) {
     arrival: ease((time - 20) / 3), actions: ease((time - 22) / 2), complete: time >= ORBITAL_SECONDS };
 }
 
-// Each ship has a permanent launch well. Doors open before its lift brings the
-// nose above ground; ignition and free flight start only after the hull clears.
+// Ships start entirely behind the ground. Acceleration reveals them through
+// the opaque foreground, never by spawning/fading a hull into open sky.
 export function orbitalLaunchPose(ship, seconds, width, height) {
   const { time, camera } = orbitalFrame(seconds);
-  const scale = ship.scale * (width < 700 ? .74 : 1.1);
-  const doors = ease((time - ship.delay + 2.8) / 1.2);
-  const lift = ease((time - ship.delay + 1.8) / 1.8);
-  const ignition = ease((time - ship.delay) / .8);
-  const flight = Math.max(0, time - ship.delay - .8);
-  const padX = width * ship.x, padY = height * .87 + (.3 + ship.row * .9) * Math.min(16, height * .035) + camera * height * 1.15;
-  return { scale, doors, lift, ignition, flight, padX, padY,
-    x: padX + width * ship.drift * ease(flight / 15),
-    y: padY + 42 * scale * (1 - lift) - height * (.01 * flight ** 2 + .015 * flight * ease(flight)),
+  const scale = ship.scale * (width < 700 ? .7 : 1);
+  const flight = Math.max(0, time - ship.delay);
+  const ground = height * .87 + camera * height * 1.15;
+  const rise = (7 + height * .004) * flight ** 2;
+  return { scale, flight, ground, rise, ignition: ease(flight / 1.2),
+    x: width * (ship.x + ship.drift * ease(flight / 15)),
+    y: ground + 56 * scale + 8 + ship.row * 4 - rise,
   };
 }
+
+const mix = (a, b, t) => `rgb(${a.map((value, i) => Math.round(value + (b[i] - value) * t)).join(',')})`;
+function departureLight(time) { return ease((time - 2) / 7) * (1 - ease((time - 12) / 7)); }
 
 function sky(ctx, width, height, camera) {
   const wash = ctx.createLinearGradient(0, 0, 0, height);
@@ -49,58 +50,61 @@ function sky(ctx, width, height, camera) {
   }
   ctx.globalAlpha = 1;
 }
-function ruins(ctx, width, height, camera) {
-  const ground = height * .87, random = randomSource(87);
-  ctx.save(); ctx.translate(0, camera * height * 1.15);
+function dawn(ctx, width, height, frame) {
+  const light = departureLight(frame.time);
+  if (!light) return;
+  const ground = height * .87 + frame.camera * height * 1.15;
+  // A broad, warm horizon opens behind the silhouettes as the fleet leaves.
+  // The glow belongs to the distance; it never washes out the foreground.
+  ctx.save(); ctx.translate(width * .5, ground); ctx.scale(width / height * 1.6, .65);
+  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, height * .8);
+  glow.addColorStop(0, '#ddcf9c'); glow.addColorStop(.22, '#9d9b78');
+  glow.addColorStop(.6, '#647969'); glow.addColorStop(1, '#64796900');
+  ctx.globalAlpha = light * .38; ctx.fillStyle = glow;
+  ctx.fillRect(-height, -height, height * 2, height * 2); ctx.restore();
+}
+
+function ruins(ctx, width, height, frame) {
+  const ground = height * .87, random = randomSource(87), light = departureLight(frame.time);
+  const material = {
+    body: mix([29, 43, 39], [55, 65, 51], light), shade: '#14221f', dark: '#101d1c',
+    roof: mix([35, 46, 39], [67, 72, 53], light), light: mix([46, 58, 48], [96, 97, 70], light),
+  };
+  ctx.save(); ctx.translate(0, frame.camera * height * 1.15);
+  // Solid material, not translucent ruins: rockets and exhaust are genuinely
+  // hidden by walls and earth until they emerge above them.
+  ctx.save(); ctx.translate(0, ground); ctx.lineCap = 'butt'; ctx.lineJoin = 'bevel';
+  for (const [x, age, scale] of [[.12,2,1.2], [.32,4,1.1], [.65,5,1.6], [.88,3,1.2]]) {
+    ctx.save(); ctx.translate(width * x, 0); ctx.scale(scale * (width < 700 ? .7 : 1), scale * (width < 700 ? .7 : 1));
+    drawBaseRuins(ctx, age, material); ctx.restore();
+  }
+  ctx.restore();
   ctx.fillStyle = '#0d1919'; ctx.beginPath(); ctx.moveTo(0, height + 100); ctx.lineTo(0, ground);
   for (let x = 0; x <= width + 60; x += 60) ctx.lineTo(x, ground + 6 - random() * 20);
-  ctx.lineTo(width, height + 100); ctx.fill();
-  ctx.translate(0, ground); ctx.globalAlpha = .35;
-  for (const [x, age, scale] of [[.12,2,1.2], [.32,4,1.1], [.65,5,1.6], [.88,3,1.2]]) {
-    drawBase(ctx, { x: width * x, team: 'player', hp: 0, maxHp: 1 }, age, 0, scale * (width < 700 ? .7 : 1));
-  }
-  ctx.restore(); return ground;
+  ctx.lineTo(width, height + 100); ctx.fill(); ctx.restore();
 }
+
 function rocket(ctx, ship, time, width, height) {
-  const { x, y, scale, padX, padY, doors, lift, ignition, flight } = orbitalLaunchPose(ship, time, width, height);
-  // Recessed foundations and service lights exist from the opening frame.
-  ctx.save(); ctx.translate(padX, padY); ctx.scale(scale, scale);
-  ctx.fillStyle = '#243431'; ctx.beginPath(); ctx.moveTo(-14, -2); ctx.lineTo(-10, -7);
-  ctx.lineTo(10, -7); ctx.lineTo(14, -2); ctx.lineTo(14, 4); ctx.lineTo(-14, 4); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#080f11'; ctx.fillRect(-8, -5, 16, 7);
-  ctx.fillStyle = '#859a86'; ctx.globalAlpha = .35 + doors * .35; ctx.fillRect(-12, -2, 2, 1); ctx.fillRect(10, -2, 2, 1);
+  const { x, y, scale, ignition, flight } = orbitalLaunchPose(ship, time, width, height);
+  if (y < -240 || y > height + 100) return;
+  ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale);
+  ctx.globalAlpha = (.45 + ship.scale * .35) * (1 - ease((time - 22) / 2));
+  const plume = 24 + ease(flight / 5) * 110;
+  ctx.save(); ctx.globalAlpha *= ignition;
+  const halo = ctx.createRadialGradient(0, 5, 0, 0, 5, 22);
+  halo.addColorStop(0, '#e4d9ac60'); halo.addColorStop(1, '#d4c89100');
+  ctx.fillStyle = halo; ctx.fillRect(-22, -17, 44, 44);
+  const exhaust = ctx.createLinearGradient(0, 0, 0, plume);
+  exhaust.addColorStop(0, '#eee2bbd0'); exhaust.addColorStop(.2, '#c4c9ac70'); exhaust.addColorStop(1, '#809c9500');
+  ctx.fillStyle = exhaust; ctx.beginPath(); ctx.moveTo(-2.5, 0); ctx.quadraticCurveTo(-5, plume * .25, -1, plume);
+  ctx.quadraticCurveTo(5, plume * .25, 2.5, 0); ctx.fill();
+  ctx.fillStyle = '#ede4c5'; ctx.beginPath(); ctx.moveTo(-1.6, 0); ctx.lineTo(0, 15 + ignition * 14); ctx.lineTo(1.6,0); ctx.fill();
   ctx.restore();
-  if (y >= -200 && y <= height + 100) {
-    ctx.save(); ctx.beginPath(); ctx.rect(0, -200, width, padY + 200); ctx.clip();
-    ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale);
-    ctx.globalAlpha = (.4 + ship.scale * .35) * (1 - ease((time - 22) / 2));
-    const plume = 18 + ignition * 30;
-    ctx.save(); ctx.globalAlpha *= ignition;
-    const exhaust = ctx.createLinearGradient(0, 0, 0, plume + 80);
-    exhaust.addColorStop(0, '#c3d8ce90'); exhaust.addColorStop(.24, '#85a9a658'); exhaust.addColorStop(1, '#52757500');
-    ctx.fillStyle = exhaust; ctx.beginPath(); ctx.moveTo(-3, 0); ctx.quadraticCurveTo(-7, 42, -2, plume + 80);
-    ctx.quadraticCurveTo(8, 38, 3, 0); ctx.fill();
-    ctx.fillStyle = '#b6cac0'; ctx.beginPath(); ctx.moveTo(-2.4, 0); ctx.lineTo(0, plume * (.85 + Math.sin(time * 4 + ship.phase) * .06)); ctx.lineTo(2.4,0); ctx.fill();
-    ctx.restore();
-    // Slim armored hull, offset service spine, split fins and a recessed blue lens.
-    ctx.fillStyle = '#819a92'; ctx.beginPath(); ctx.moveTo(0,-37); ctx.lineTo(4,-26); ctx.lineTo(4,-5); ctx.lineTo(7,2); ctx.lineTo(2,0); ctx.lineTo(-2,0); ctx.lineTo(-7,2); ctx.lineTo(-4,-5); ctx.lineTo(-4,-26); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#c0cbc0'; ctx.beginPath(); ctx.moveTo(0,-37); ctx.lineTo(1,-26); ctx.lineTo(1,-4); ctx.lineTo(-3,-4); ctx.lineTo(-3,-26); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#364d4b'; ctx.fillRect(1,-23,2,14); ctx.fillRect(-3,-6,6,2);
-    ctx.fillStyle = '#a8d4cd'; ctx.fillRect(-1.5,-24,2,3);
-    ctx.restore(); ctx.restore();
-  }
-  // The front lip masks the lift and exhaust below ground. Sliding shutters
-  // remain attached to the same foundation throughout the launch.
-  ctx.save(); ctx.translate(padX, padY); ctx.scale(scale, scale);
-  ctx.fillStyle = '#708174'; ctx.fillRect(-7, Math.min(0, 42 * (1 - lift) - 1), 14, 1);
-  ctx.fillStyle = '#40534c';
-  ctx.fillRect(-8 - doors * 7, -5, 8, 3); ctx.fillRect(doors * 7, -5, 8, 3);
-  ctx.fillStyle = '#192723'; ctx.fillRect(-14, 0, 28, 4);
-  const dust = ignition * (1 - ease(flight / 3));
-  ctx.globalAlpha = dust * .23; ctx.fillStyle = '#889385';
-  for (const direction of [-1, 1]) {
-    ctx.beginPath(); ctx.ellipse(direction * (8 + flight * 7), 0, 6 + flight * 7, 2 + flight, 0, 0, Math.PI * 2); ctx.fill();
-  }
+  // Quiet hulls, one lit edge, and a bright engine. The light carries the scene.
+  ctx.fillStyle = '#7c958c'; ctx.beginPath(); ctx.moveTo(0,-37); ctx.lineTo(4,-26); ctx.lineTo(4,-5); ctx.lineTo(7,2); ctx.lineTo(2,0); ctx.lineTo(-2,0); ctx.lineTo(-7,2); ctx.lineTo(-4,-5); ctx.lineTo(-4,-26); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#c4cbb5'; ctx.beginPath(); ctx.moveTo(0,-37); ctx.lineTo(1,-26); ctx.lineTo(1,-4); ctx.lineTo(-3,-4); ctx.lineTo(-3,-26); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#364d4b'; ctx.fillRect(1,-23,2,14); ctx.fillRect(-3,-6,6,2);
+  ctx.fillStyle = '#c5dbcf'; ctx.fillRect(-1.5,-24,2,3);
   ctx.restore();
 }
 function horizon(ctx, width, height, amount) {
@@ -117,8 +121,9 @@ function horizon(ctx, width, height, amount) {
 export function drawOrbitalScene(ctx, width, height, seconds, { reducedMotion = false } = {}) {
   const frame = orbitalFrame(seconds, reducedMotion);
   ctx.save(); sky(ctx, width, height, frame.camera);
-  ruins(ctx, width, height, frame.camera);
+  dawn(ctx, width, height, frame);
   for (const ship of ORBITAL_FLEET) rocket(ctx, ship, frame.time, width, height);
+  ruins(ctx, width, height, frame);
   horizon(ctx, width, height, ease((frame.time - 17) / 7)); ctx.restore();
   return frame;
 }

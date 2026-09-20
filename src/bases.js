@@ -232,7 +232,7 @@ function damage(ctx, age, m) {
     polygon(ctx, [[-21, 0], [-13, -7], [-6, -1]], m.light);
   }
 }
-function ruins(ctx, age, m) {
+export function drawBaseRuins(ctx, age, m = ERA_MATERIALS[age]) {
   if (age === 1) {
     polygon(ctx, [[-74, 0], [-60, -20], [-37, -11], [-14, -34], [14, -20], [28, -27], [68, 0]], m.shade);
     polygon(ctx, [[-67, 0], [-46, -21], [-22, -4]], m.roof);
@@ -269,6 +269,6 @@ export function drawBase(ctx, base, age, time = 0, scale = 1, slots = 1) {
     MODELS[age](ctx, mounts, m, time);
     for (const { x, y } of mounts) oval(ctx, x, y + 1, 12, 1.3, m.dark);
     if (m.damaged) damage(ctx, age, m);
-  } else ruins(ctx, age, m);
+  } else drawBaseRuins(ctx, age, m);
   ctx.restore();
 }

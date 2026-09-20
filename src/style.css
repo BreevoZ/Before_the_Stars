@@ -250,9 +250,6 @@ progress::-moz-progress-bar { background: var(--player); border-radius: 2px; }
 .upgrade-row button, .save-actions button { border: 1px solid var(--color-battle-debug-tools-button-border); background: var(--color-battle-debug-tools-button-surface); border-radius: 5px; min-height: 40px; padding: 6px 12px; font-size: 12px; color: var(--player); }
 .upgrade-row button { flex-shrink: 0; }
 .upgrade-row button:disabled { opacity: .5; }
-.automation-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; margin-bottom: 20px; }
-.automation-controls input { accent-color: var(--player); }
-.automation-controls select { margin-left: 8px; }
 .archive-body select, .archive-body textarea { font: inherit; color: var(--color-battle-upgrade-row-h4-text); background: var(--color-battle-archive-body-select-surface); border: 1px solid var(--color-battle-debug-tools-button-border); border-radius: 4px; padding: 7px; }
 .archive-body textarea { width: 100%; display: block; margin: 8px 0; resize: vertical; font-size: 11px; }
 .archive-body :is(select, input, textarea):focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
@@ -294,27 +291,11 @@ progress::-moz-progress-bar { background: var(--player); border-radius: 2px; }
 .civilization-actions button[data-enabled="true"] small { color: var(--player); }
 #result-talents { margin-left: 12px; padding-inline: 10px; min-height: 44px; text-decoration: underline; text-underline-offset: 4px; }
 
-#automation-dialog { width: min(570px, calc(100% - 24px)); max-height: 88dvh; padding: 0; border: 1px solid var(--color-battle-help-dialog-border); border-radius: 12px; color: var(--color-text-primary); background: var(--color-battle-help-dialog-surface); }
-#automation-dialog::backdrop { background: var(--color-battle-help-dialog-surface-2); backdrop-filter: blur(5px); }
-#automation-panel { border: 0; margin: 0; padding: 0; }
-#automation-to-talents { margin-bottom: 16px; }
 .civilization-actions button:focus-visible, .secondary-button:focus-visible, .talent-node:focus-visible, .talent-detail button:focus-visible, .bonus-details summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .bonus-details { margin-block: 18px; font-size: 12px; }
 .bonus-details summary { cursor: pointer; padding-block: 8px; }
 .bonus-details p { margin-top: 8px; }
-.auto-group { min-width: 0; border: 1px solid var(--line); border-radius: 7px; padding: 16px; margin: 16px 0; }
-.auto-group legend { padding: 0 8px; color: var(--color-battle-auto-group-legend-text); }
-.auto-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; margin: 10px 0; }
-.auto-fields label { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
-.auto-fields :is(input, select) { width: 100%; min-width: 0; }
 .archive-body input[type="number"] { font: inherit; color: var(--color-battle-upgrade-row-h4-text); background: var(--color-battle-archive-body-select-surface); border: 1px solid var(--color-battle-debug-tools-button-border); border-radius: 4px; padding: 8px; }
-.auto-check { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 44px; }
-.auto-check input, #auto-enabled { width: 18px; height: 18px; accent-color: var(--player); }
-.auto-check span { font-size: 11px; color: var(--muted); }
-.auto-group .archive-note { margin-top: 10px; margin-bottom: 0; }
-.auto-group input:disabled, .auto-group select:disabled { opacity: .5; }
-.auto-fields.weights { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.automation-status { padding: 10px 12px; border-left: 2px solid var(--color-battle-automation-status-border-left); background: var(--color-battle-automation-status-surface); font-size: 12px; }
 @media (max-width: 740px) {
   .civilization-bar { flex-wrap: wrap; padding: 9px 10px; }
   .civilization-actions { margin-left: auto; }
@@ -322,8 +303,6 @@ progress::-moz-progress-bar { background: var(--player); border-radius: 2px; }
   .civilization-actions button small { display: block; margin-left: 0; }
   .legacy-wallet { gap: 6px; }
   .legacy-wallet > span:first-child { display: none; }
-  .auto-fields { grid-template-columns: 1fr; }
-  .auto-group { padding: 12px; }
 }
 #save-dialog .save-tools { margin: 0; border: 0; }
 

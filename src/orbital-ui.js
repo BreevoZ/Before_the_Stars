@@ -19,10 +19,14 @@ export function createOrbitalUI({ review, save }) {
     const frame = drawOrbitalScene(ctx, width, height, time);
     panel.style.setProperty('--scene-opacity', String(1 - frame.treeOpacity));
     panel.style.setProperty('--arrival-opacity', String(frame.arrival));
+    panel.style.setProperty('--actions-opacity', String(frame.actions));
     dialog.dataset.orbital = frame.complete ? 'arrived' : 'launching';
     el('orbital-departure').hidden = time > 15 || frame.complete;
     el('orbital-arrival').hidden = time < 20;
-    el('orbital-actions').hidden = !frame.complete;
+    // Keep the space reserved from the first arrival frame. Only visibility
+    // and interaction change, so the title never jumps when actions appear.
+    el('orbital-actions').inert = !frame.complete;
+    el('orbital-actions').setAttribute('aria-hidden', String(!frame.complete));
     el('skip-orbital').hidden = frame.complete;
   }
   function finish() {

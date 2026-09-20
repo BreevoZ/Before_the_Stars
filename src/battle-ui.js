@@ -18,6 +18,11 @@ function portrait(holder, type, turret = false) {
   }
 }
 export function createBattleUI(root = document) {
+  // The portrait and its star-map frame are separate: drawing a new era's unit
+  // must not rebuild the button or disturb keyboard focus.
+  root.querySelectorAll('.unit-card, .turret-card').forEach(card => {
+    card.insertAdjacentHTML('afterbegin', '<svg class="command-frame" viewBox="0 0 120 80" fill="none" aria-hidden="true"><path d="M60 4 98 22v36L60 76 22 58V22Z"/><path class="command-orbit" d="M36 13a43 33 0 0 1 48 0M84 67a43 33 0 0 1-48 0"/><circle cx="60" cy="4" r="1.8"/></svg>');
+  });
   root.querySelectorAll('[data-unit]').forEach((card, index) => { card.dataset.unitSlot = index; });
   root.querySelectorAll('[data-turret]').forEach((card, index) => { card.dataset.turretSlot = index; });
   const help = root.querySelector('#help-roster');

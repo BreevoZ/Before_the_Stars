@@ -1,0 +1,108 @@
+/* Battle commands and automation share the constellation's visual language. */
+.command-panel { background: var(--color-home-surface); }
+.section-heading h2 { display: flex; align-items: center; gap: 7px; color: var(--color-home-text); letter-spacing: 3px; }
+.section-heading h2 svg { color: var(--route-automation); stroke-width: 1.2; }
+.command-grid .unit-card, .command-grid .turret-card {
+  isolation: isolate; height: 108px; padding: 6px 4px 9px; gap: 5px;
+  border: 1px solid transparent; border-bottom-color: var(--color-home-home-header-border-bottom);
+  border-radius: 2px; background: transparent; color: var(--route-root);
+  transition: border-color .2s, background .2s;
+}
+.command-frame { position: absolute; z-index: -1; top: 2px; left: 50%; transform: translateX(-50%); width: min(120px, 100%); height: 80px; stroke: var(--color-command-frame); stroke-width: .8; overflow: visible; transition: stroke .2s; }
+.command-frame circle { fill: var(--route-automation); stroke: none; }
+.command-orbit { stroke: var(--color-home-home-header-border-bottom); }
+.command-grid :is(.unit-card, .turret-card):is(:hover, :focus-visible):not(:disabled) { background: var(--color-home-star-halo-fill); border-color: var(--color-command-frame); }
+.command-grid :is(.unit-card, .turret-card):is(:hover, :focus-visible):not(:disabled) .command-frame { stroke: var(--route-root); }
+.command-grid :is(.unit-card, .turret-card):disabled { background: transparent; border-color: transparent; border-bottom-color: var(--color-home-home-header-border-bottom); }
+.command-grid :is(.unit-card, .turret-card):disabled :is(.unit-icon, .turret-icon, .command-frame) { opacity: .42; }
+.command-grid .price { color: var(--color-home-home-wallet-text); font-size: 11px; }
+.command-grid :disabled .price { color: var(--color-home-map-yield-text); }
+.command-grid kbd { top: 7px; right: 8px; color: var(--color-home-home-wallet-small-text); }
+.command-grid .unit-card.special-unit { height: 72px; padding: 2px 18px; gap: 20px; }
+.special-unit .command-frame { left: calc(50% - 35px); height: 66px; width: 100px; top: 2px; }
+.training-queue { gap: 6px; margin-top: 12px; }
+.queue-slot { height: 44px; border-radius: 2px; border-color: var(--color-home-home-header-border-bottom); }
+.queue-slot:disabled:not(.occupied) { border-style: solid; border-color: transparent; border-bottom-color: var(--color-command-frame); opacity: .45; }
+.queue-slot.occupied { background: var(--color-home-star-frame-fill); }
+.queue-slot.active { border-color: var(--color-command-frame); }
+.queue-fill { inset: auto 0 0; height: 2px; background: var(--route-automation); }
+.defense-tools :is(.turret-slot, .compact-button) { border-radius: 2px; height: 44px; background: transparent; }
+.civilization-bar { border-color: var(--color-command-frame); border-radius: 3px; background: var(--color-home-surface); }
+.civilization-actions button { border-color: var(--color-command-frame); border-radius: 2px; background: transparent; color: var(--color-home-text); letter-spacing: 1px; }
+.civilization-actions button:hover { background: var(--color-home-star-halo-fill); border-color: var(--route-growth); }
+
+#automation-dialog { width: min(700px, calc(100% - 32px)); max-height: 90dvh; padding: 0; border: 1px solid var(--color-command-frame); border-radius: 4px; color: var(--color-home-text); background: var(--color-home-surface); scrollbar-color: var(--color-home-home-scroll-scrollbar-color) transparent; }
+#automation-dialog::backdrop { background: var(--color-battle-help-dialog-surface-2); backdrop-filter: blur(6px); }
+.automation-heading { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 24px; background: var(--color-home-surface); border-bottom: 1px solid var(--color-home-home-header-border-bottom); }
+.automation-wordmark { display: flex; align-items: center; gap: 14px; }
+.automation-emblem { color: var(--route-automation); }
+.automation-emblem svg { width: 40px; height: 40px; stroke: currentColor; stroke-width: 1; }
+.automation-emblem circle { fill: var(--color-home-surface); }
+.command-eyebrow { margin: 0 0 5px; font-size: 8px; letter-spacing: 2px; color: var(--color-home-home-wordmark-small-text); }
+.automation-heading h2 { margin: 0; font-size: 19px; font-weight: 400; letter-spacing: 5px; }
+#automation-dialog .archive-body { padding: 22px 24px 12px; color: var(--color-home-talent-details-text); font-size: 12px; }
+#automation-panel { border: 0; margin: 0; padding: 0; }
+.auto-master { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 52px; cursor: pointer; }
+.auto-master strong { display: block; font-size: 14px; letter-spacing: 2px; font-weight: 500; color: var(--color-home-text); }
+.auto-master small { display: block; margin-top: 5px; color: var(--color-home-home-wallet-small-text); font-size: 11px; }
+#automation-dialog input[type="checkbox"] { appearance: none; flex: 0 0 auto; position: relative; width: 30px; height: 18px; margin: 0; border: 1px solid var(--color-command-frame); border-radius: 12px; background: transparent; cursor: pointer; transition: border-color .2s, background .2s; }
+#automation-dialog input[type="checkbox"]::before { content: ''; position: absolute; width: 10px; height: 10px; left: 3px; top: 3px; border-radius: 50%; background: var(--color-home-home-wallet-small-text); transition: transform .2s, background .2s; }
+#automation-dialog input[type="checkbox"]:checked { background: var(--color-home-talent-node-fill); border-color: var(--route-automation); }
+#automation-dialog input[type="checkbox"]:checked::before { transform: translateX(12px); background: var(--route-root); }
+#automation-dialog #auto-enabled { width: 42px; height: 24px; }
+#automation-dialog #auto-enabled::before { width: 14px; height: 14px; top: 4px; left: 4px; }
+#automation-dialog #auto-enabled:checked::before { transform: translateX(18px); }
+#automation-dialog .automation-status { display: flex; align-items: center; gap: 9px; min-height: 42px; margin: 14px 0 24px; padding-block: 10px; border-block: 1px solid var(--color-home-home-header-border-bottom); font-size: 11px; color: var(--color-home-home-wallet-small-text); }
+.automation-status::before { content: ''; flex: 0 0 5px; height: 5px; border-radius: 50%; background: var(--color-home-map-yield-text); }
+#automation-settings:has(#auto-enabled:checked) .automation-status::before { background: var(--route-root); box-shadow: 0 0 8px var(--color-command-glow); }
+.automation-modules { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.auto-group { min-width: 0; border: 0; border-top: 1px solid var(--color-command-frame); padding: 10px 0 0; margin: 0; }
+.auto-group legend { padding: 0 12px 0 0; color: var(--color-home-text); font-size: 12px; letter-spacing: 2px; }
+.auto-group legend span { display: inline-block; vertical-align: middle; margin-right: 8px; color: var(--route-automation); }
+.auto-group legend svg { width: 15px; height: 15px; stroke-width: 1.2; }
+.auto-recruit-group, .auto-defense-group { grid-column: 1 / -1; }
+.auto-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 8px 0; }
+.auto-recruit-group > .auto-fields:not(.weights) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#automation-settings:not(:has([data-auto-talent="formation"]:not([hidden]))) #auto-target-field { grid-column: 1 / -1; }
+.auto-group:not(.auto-recruit-group, .auto-defense-group) .auto-fields { grid-template-columns: 1fr; }
+.auto-fields label { display: flex; flex-direction: column; gap: 6px; min-width: 0; color: var(--color-home-home-wallet-small-text); font-size: 11px; }
+#automation-dialog :is(select, input:not([type="checkbox"])) { width: 100%; min-width: 0; min-height: 44px; padding: 9px 11px; border: 1px solid var(--color-command-frame); border-radius: 2px; color: var(--color-home-text); background: var(--color-home-star-frame-fill); font: inherit; }
+#automation-dialog select { padding-right: 24px; }
+#automation-dialog :is(input, select):focus-visible { outline: 1px solid var(--route-legacy); outline-offset: 3px; }
+.auto-fields.weights { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.auto-check { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-height: 44px; cursor: pointer; }
+.auto-check span { font-size: 10px; color: var(--color-home-home-wallet-small-text); }
+.auto-checks { display: flex; flex-wrap: wrap; gap: 0 24px; }
+.auto-inline-field { display: flex; align-items: center; gap: 12px; }
+#automation-dialog .auto-inline-field select { width: 76px; }
+.auto-elite { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--color-home-home-header-border-bottom); }
+.auto-elite p { flex-basis: 100%; }
+#automation-dialog .archive-note { color: var(--color-home-home-wallet-small-text); font-size: 11px; line-height: 1.8; margin: 8px 0 0; }
+.auto-help { margin-top: 8px; font-size: 10px; color: var(--color-home-home-wallet-small-text); }
+.auto-help summary { cursor: pointer; min-height: 36px; padding-block: 8px; }
+#automation-dialog #automation-hint { margin-top: 24px; font-size: 10px; }
+#automation-dialog #automation-error { min-height: 20px; color: var(--route-legacy); }
+.automation-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--color-home-home-header-border-bottom); color: var(--color-home-home-wallet-small-text); font-size: 10px; }
+#automation-to-talents { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; color: var(--route-legacy); font-size: 11px; }
+#automation-to-talents svg { width: 14px; height: 14px; stroke-width: 1.2; }
+@media (max-width: 560px) {
+  .command-grid { gap: 20px; }
+  .command-grid :is(.unit-card, .turret-card) { height: 98px; }
+  .command-frame { height: 70px; width: 106px; max-width: 100%; }
+  #automation-dialog { width: calc(100% - 20px); max-height: 92dvh; }
+  .automation-heading { padding: 14px 16px; }
+  .automation-wordmark { gap: 10px; }
+  .automation-emblem svg { width: 32px; height: 32px; }
+  .command-eyebrow { font-size: 7px; letter-spacing: 1.4px; }
+  .automation-heading h2 { font-size: 17px; }
+  #automation-dialog .archive-body { padding: 16px; }
+  .automation-modules { grid-template-columns: 1fr; gap: 24px; }
+  .auto-recruit-group, .auto-defense-group { grid-column: auto; }
+  .auto-group:not(.auto-recruit-group, .auto-defense-group) .auto-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .auto-recruit-group > .auto-fields:not(.weights) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .automation-footer { flex-wrap: wrap; gap: 0 12px; }
+  #automation-dialog :is(select, input:not([type="checkbox"])) { font-size: 16px; padding-inline: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .command-grid button, .command-frame, #automation-dialog input, #automation-dialog input::before { transition: none; }
+}

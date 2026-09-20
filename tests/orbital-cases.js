@@ -3,7 +3,7 @@ import { records } from './fixtures/v10-save.js';
 import { parseSession, serializeSession, SAVE_KEY } from '../src/save.js';
 import { purchaseTalent, TALENTS, getTalentState } from '../src/talents.js';
 import { transitionCivilization, rebuildCivilization, updateProgression, resolveBattle } from '../src/progression.js';
-import { ORBITAL_SECONDS, ORBITAL_FLEET, orbitalFrame, drawOrbitalScene } from '../src/orbital-scene.js';
+import { ORBITAL_SECONDS, ORBITAL_FLEET, orbitalFrame, orbitalLaunchPose, drawOrbitalScene } from '../src/orbital-scene.js';
 import { mountFixture } from './progression-cases.js';
 import { runDebugCommand } from '../src/debug.js';
 import { LEGACY_ECONOMY } from '../src/progression-config.js';
@@ -64,6 +64,47 @@ export function registerOrbitalTests(test, assert) {
     }
     assert(previous.complete && previous.camera===1 && previous.treeOpacity===0 && previous.arrival===1);
     assert(JSON.stringify(orbitalFrame(0,true))===JSON.stringify(orbitalFrame(ORBITAL_SECONDS)));
+  });
+  test('Orbital launch wells: hulls begin underground, shutters open before lift, ignition follows emergence, and takeoff is continuous', () => {
+    for (const [width, height] of [[390, 844], [1280, 800]]) for (const ship of ORBITAL_FLEET) {
+      const pose = time => orbitalLaunchPose(ship, time, width, height);
+      const start = pose(0), raised = pose(ship.delay), ignited = pose(ship.delay + .8);
+      assert(start.y - 37 * start.scale > start.padY && start.ignition === 0 && start.flight === 0);
+      assert(pose(ship.delay - 1.8).doors > .9 && pose(ship.delay - 1.8).lift < 1e-12);
+      assert(raised.lift === 1 && raised.ignition === 0 && raised.y === raised.padY);
+      assert(Math.abs(ignited.ignition - 1) < 1e-12 && ignited.flight < 1e-12);
+      for (const t of [ship.delay - 1.8, ship.delay, ship.delay + .8]) {
+        assert(Math.abs(pose(t + .001).y - pose(t - .001).y) < .1, 'Hull must not jump between launch stages');
+      }
+      assert(pose(ship.delay + 2).y < pose(ship.delay + 2).padY);
+    }
+  });
+  test.browser('Orbital arrival: action fade reserves layout at desktop and phone sizes; invisible controls cannot take focus', async () => {
+    const frame = await mountFixture(serializeSession(launchReady()));
+    try {
+      const doc = frame.contentDocument, win = frame.contentWindow, el = id => doc.getElementById(id);
+      el('node-bypasser').click(); el('buy-bypasser').click();
+      let now = 0;
+      const tick = n => { for (let i = 0; i < n; i++) win.__testFrame(now += 100); };
+      for (const [width, height] of [[1100, 844], [390, 844], [320, 844], [844, 390]]) {
+        frame.style.width = `${width}px`; frame.style.height = `${height}px`;
+        await new Promise(resolve => setTimeout(resolve, 35));
+        el('replay-orbital').click(); tick(215);
+        const before = el('orbital-title').getBoundingClientRect();
+        assert(before.height > 0 && el('orbital-actions').inert && el('orbital-actions').getAttribute('aria-hidden') === 'true');
+        el('review-surface').focus(); assert(doc.activeElement.id !== 'review-surface');
+        tick(15);
+        const fading = Number(win.getComputedStyle(el('orbital-actions')).opacity);
+        assert(fading > 0 && fading < 1, 'Actions must fade over several frames');
+        tick(20);
+        const after = el('orbital-title').getBoundingClientRect();
+        assert(before.top === after.top && before.left === after.left && before.height === after.height, 'Arrival title moved when buttons appeared');
+        assert(!el('orbital-actions').inert && Number(win.getComputedStyle(el('orbital-actions')).opacity) === 1);
+        for (const button of el('orbital-actions').querySelectorAll('button')) {
+          const rect = button.getBoundingClientRect(); assert(rect.left >= 0 && rect.right <= width && rect.height >= 44 && rect.bottom <= height);
+        }
+      }
+    } finally { frame.remove(); }
   });
   test.browser('Orbital browser: purchase saves immediately, Escape skips, review/replay never pay twice and refresh restores VI', async () => {
     let frame=await mountFixture(serializeSession(launchReady()));

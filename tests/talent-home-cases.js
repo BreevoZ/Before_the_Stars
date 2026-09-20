@@ -29,7 +29,7 @@ export function registerTalentHomeTests(test, assert, near) {
     const frame = await mountFixture(serializeSession(challengeSeed(false))), page = frame.contentDocument, el = id => page.getElementById(id);
     try {
       assert(el('node-formation').dataset.state === 'ready' && el('cost-formation').textContent === '2 ✧');
-      assert(el('level-conservation').textContent === '●○○' && el('node-legacyMachine').dataset.state === 'prerequisite');
+      assert(el('level-conservation').textContent === '●○○○' && el('node-legacyMachine').dataset.state === 'prerequisite');
       assert(el('link-conservation').dataset.state === 'owned' && el('link-evolution').dataset.state === 'locked');
       el('node-formation').click(); assert(!el('talent-details').hidden && el('talent-formation').textContent.includes('→'));
       assert(el('current-formation').textContent === '单一兵种' && el('next-formation').textContent.includes('比例'));

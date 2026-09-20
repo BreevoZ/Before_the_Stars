@@ -219,4 +219,6 @@
   --route-root: #bfd2b5; --route-automation: #8ab2a1;
   --route-growth: #b7c7a0; --route-legacy: #cbb685;
   --purchase-flash: #f0d79d;
+  --color-command-frame: #41584c;
+  --color-command-glow: #bfd2b540;
 }

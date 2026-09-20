@@ -8,6 +8,7 @@
     <title>Before the Stars</title>
     <link rel="stylesheet" href="./src/style.css" />
     <link rel="stylesheet" href="./src/talent-map.css" />
+    <link rel="stylesheet" href="./src/command-ui.css" />
     <script type="module" src="./src/main.js"></script>
   </head>
   <body>
@@ -70,7 +71,7 @@
           </div>
           <div class="command-grid">
             <div class="recruit-section">
-              <div class="section-heading"><h2>部队</h2><span class="sr-only" id="queue-count">0 / 5</span><a class="roster-link" href="./units.html" target="_blank" rel="noopener">兵种图鉴 ↗</a></div>
+              <div class="section-heading"><h2><span data-icon="sword" aria-hidden="true"></span>部队</h2><span class="sr-only" id="queue-count">0 / 5</span><a class="roster-link" href="./units.html" target="_blank" rel="noopener">兵种图鉴 ↗</a></div>
               <div class="unit-cards">
                 <button class="unit-card" id="recruit" data-unit="melee" type="button"><span class="unit-icon"></span><kbd>1</kbd><strong class="sr-only unit-name">棍棒人</strong><span class="sr-only unit-role"></span><span class="price"><span data-icon="coin"></span><span data-cost></span></span><span class="sr-only" data-training></span><span class="sr-only" data-state></span></button>
                 <button class="unit-card" id="recruit-archer" data-unit="archer" type="button"><span class="unit-icon"></span><kbd>2</kbd><strong class="sr-only unit-name">弹弓手</strong><span class="sr-only unit-role"></span><span class="price"><span data-icon="coin"></span><span data-cost></span></span><span class="sr-only" data-training></span><span class="sr-only" data-state></span></button>
@@ -80,7 +81,7 @@
               <div class="training-queue" id="training-queue" aria-label="训练队列；点击订单取消并退款"></div>
             </div>
             <div class="support-section">
-              <div class="section-heading"><h2>炮塔</h2><span id="turret-capacity" aria-label="已建造与已解锁炮位">0 / 1</span><a class="roster-link" href="./turrets.html" target="_blank" rel="noopener">炮塔图鉴 ↗</a></div>
+              <div class="section-heading"><h2><span data-icon="shield" aria-hidden="true"></span>炮塔</h2><span id="turret-capacity" aria-label="已建造与已解锁炮位">0 / 1</span><a class="roster-link" href="./turrets.html" target="_blank" rel="noopener">炮塔图鉴 ↗</a></div>
               <div class="turret-cards">
                 <button class="turret-card" id="build-turret" data-turret="rockSling" type="button"><span class="turret-icon"></span><strong class="sr-only">弹石器</strong><span class="sr-only" data-turret-role></span><span class="price"><span data-icon="coin"></span><span data-turret-cost></span></span><span class="sr-only" data-turret-state></span></button>
                 <button class="turret-card" data-turret="egg" type="button"><span class="turret-icon"></span><strong class="sr-only">自动蛋塔</strong><span class="sr-only" data-turret-role></span><span class="price"><span data-icon="coin"></span><span data-turret-cost></span></span><span class="sr-only" data-turret-state></span></button>
@@ -136,9 +137,9 @@
           <p class="orbital-eyebrow">BEYOND THE GREAT FILTER</p>
           <h2 id="orbital-title" tabindex="-1">VI <span>轨道文明</span></h2>
           <p>我们终于走出了那片废墟。</p>
-          <div id="orbital-actions" hidden>
+          <div id="orbital-actions" inert aria-hidden="true">
             <p class="orbital-note">地表篇已完成 · 轨道建设将在后续版本开放</p>
-            <nav aria-label="轨道文明"><button id="review-surface" class="secondary-button" type="button">回望星图</button><button id="replay-orbital" class="text-button" type="button">重播启航</button><button id="orbital-save" class="text-button" type="button">存档</button></nav>
+            <nav aria-label="轨道文明"><button id="review-surface" class="orbit-action" type="button"><span data-icon="star"></span>回望星图</button><button id="replay-orbital" class="orbit-action" type="button"><span data-icon="restart"></span>重播启航</button><button id="orbital-save" class="orbit-action" type="button"><span data-icon="base"></span>存档</button></nav>
           </div>
         </div>
       </section>
@@ -159,34 +160,47 @@
       </div>
     </dialog>
     <dialog id="automation-dialog" aria-labelledby="automation-title">
-      <header class="help-heading"><h2 id="automation-title">自动购买</h2><button id="close-automation" class="icon-button" type="button" data-icon="close" aria-label="关闭自动购买"></button></header>
+      <header class="automation-heading">
+        <div class="automation-wordmark"><span class="automation-emblem" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M20 6 7 29h26L20 6Zm0 0v15m-13 8 13-8 13 8"/><circle cx="20" cy="6" r="3"/><circle cx="7" cy="29" r="3"/><circle cx="33" cy="29" r="3"/><circle cx="20" cy="21" r="4"/></svg></span><div><p class="command-eyebrow">CIVILIZATION / AUTOMATION</p><h2 id="automation-title">自动购买</h2></div></div>
+        <button id="close-automation" class="icon-button" type="button" data-icon="close" aria-label="关闭自动购买"></button>
+      </header>
       <div class="archive-body">
         <section id="automation-panel" aria-labelledby="automation-title">
-          <p id="automation-locked" class="archive-note" hidden>累计通关 2 次，免费解锁基础自动招募。</p><button id="automation-to-talents" type="button" class="secondary-button">前往天赋树</button><div id="automation-settings"><p id="automation-hint" class="archive-note"></p>
-          <div class="automation-controls"><label><input type="checkbox" id="auto-enabled"> 启用自动购买</label></div>
-          <p id="automation-status" class="automation-status"></p><p id="automation-error" class="archive-note" role="status"></p>
-          <fieldset class="auto-group" data-auto-talent="logistics"><legend>预算与调度</legend><div class="auto-fields">
-            <label>预留金币<input id="auto-reserve" type="text" inputmode="text" maxlength="120" placeholder="例如 100 或 1e400" value="0"></label>
-            <label>购买优先级<select id="auto-priority"><option value="balanced">部队与防御交替</option><option value="recruit">部队优先</option><option value="defense">防御优先</option></select></label>
-          </div><p class="archive-note">只使用预留金额之外的金币。当前目标买不起时先存钱；队列或兵力已满时，仍可处理防御。手动操作不受此预算限制。</p></fieldset>
-          <fieldset class="auto-group"><legend>部队</legend>
-            <label class="auto-check" data-auto-talent="logistics"><input type="checkbox" id="auto-recruit"> 自动招募</label>
-            <div class="auto-fields"><label data-auto-talent="logistics">训练队列上限<select id="auto-queue"><option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option></select></label>
-            <label data-auto-talent="formation">招募方式<select id="auto-mode"><option value="single">单一兵种</option><option value="balanced">编队比例</option></select></label>
-            <label id="auto-target-field">目标 <select id="auto-target"><option value="front">前排</option><option value="ranged">远程</option><option value="heavy">重型</option></select></label></div>
-            <div id="auto-weights" class="auto-fields weights" hidden><label>前排比例<input id="auto-weight-front" type="number" min="0" max="10" step="1" value="2" inputmode="numeric"></label><label>远程比例<input id="auto-weight-ranged" type="number" min="0" max="10" step="1" value="2" inputmode="numeric"></label><label>重型比例<input id="auto-weight-heavy" type="number" min="0" max="10" step="1" value="1" inputmode="numeric"></label></div>
-            <p class="archive-note" id="auto-roster-hint"></p>
-            <div data-auto-talent="elite"><label class="auto-check"><input id="auto-elite" type="checkbox"> 维持超级士兵数量 <span id="auto-elite-lock"></span></label>
-            <label>精锐目标数量<select id="auto-elite-limit"><option>1</option><option>2</option><option>3</option></select></label>
-            <p class="archive-note">仅未来时代生效，优先存钱补足精锐；已出场与训练中的精锐一起计数，占用正常兵力。</p></div>
-          </fieldset>
-          <fieldset class="auto-group" data-auto-talent="evolution"><legend>文明发展</legend><label class="auto-check"><input type="checkbox" id="auto-evolve"> 自动进化 <span id="auto-evolve-lock"></span></label><p class="archive-note">经验达标时依次进化；不自动继续战役或重建。</p></fieldset>
-          <fieldset class="auto-group" data-auto-talent="defense"><legend>防御</legend><label class="auto-check"><input type="checkbox" id="auto-defense"> 自动建塔 <span id="auto-defense-lock"></span></label>
-            <div class="auto-fields"><label>炮塔类型<select id="auto-turret"><option value="0">第一种</option><option value="1">第二种</option><option value="2">第三种</option></select></label><label>目标炮位数<select id="auto-max-turrets"><option>1</option><option>2</option><option>3</option><option>4</option></select></label></div>
-            <label class="auto-check"><input type="checkbox" id="auto-expand"> 自动扩容炮位</label><label class="auto-check" data-auto-talent="defense" data-auto-level="2"><input type="checkbox" id="auto-replace"> 替换旧时代炮塔 <span id="auto-replace-lock"></span></label>
-            <p class="archive-note" id="auto-defense-hint"></p>
-          </fieldset>
-          <p class="archive-note">更多功能随天赋解锁后出现。</p></div>
+          <p id="automation-locked" class="archive-note" hidden>累计通关 2 次，免费解锁基础自动招募。</p>
+          <div id="automation-settings">
+            <label class="auto-master"><span><strong>自动购买</strong><small>按你的安排，让文明持续运转</small></span><input type="checkbox" role="switch" id="auto-enabled" aria-label="启用自动购买"></label>
+            <p id="automation-status" class="automation-status"></p>
+            <div class="automation-modules">
+              <fieldset class="auto-group auto-recruit-group"><legend><span data-icon="sword"></span>部队招募</legend>
+                <label class="auto-check" data-auto-talent="logistics"><input type="checkbox" role="switch" id="auto-recruit"> 自动招募</label>
+                <div class="auto-fields">
+                  <label data-auto-talent="formation">招募方式<select id="auto-mode"><option value="single">单一兵种</option><option value="balanced">编队比例</option></select></label>
+                  <label id="auto-target-field">招募目标<select id="auto-target"><option value="front">前排</option><option value="ranged">远程</option><option value="heavy">重型</option></select></label>
+                  <label data-auto-talent="logistics">训练队列上限<select id="auto-queue"><option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option></select></label>
+                </div>
+                <div id="auto-weights" class="auto-fields weights" hidden><label>前排比例<input id="auto-weight-front" type="number" min="0" max="10" step="1" value="2" inputmode="numeric"></label><label>远程比例<input id="auto-weight-ranged" type="number" min="0" max="10" step="1" value="2" inputmode="numeric"></label><label>重型比例<input id="auto-weight-heavy" type="number" min="0" max="10" step="1" value="1" inputmode="numeric"></label></div>
+                <p class="archive-note" id="auto-roster-hint"></p>
+                <div class="auto-elite" data-auto-talent="elite"><label class="auto-check"><input id="auto-elite" type="checkbox" role="switch"> 维持超级士兵 <span id="auto-elite-lock"></span></label>
+                  <label class="auto-inline-field">目标数量<select id="auto-elite-limit"><option>1</option><option>2</option><option>3</option></select></label>
+                  <p class="archive-note">仅未来时代生效，优先存钱补足精锐；出场与训练中的精锐一起计数。</p>
+                </div>
+              </fieldset>
+              <fieldset class="auto-group" data-auto-talent="logistics"><legend><span data-icon="coin"></span>预算与调度</legend><div class="auto-fields">
+                <label>预留金币<input id="auto-reserve" type="text" inputmode="text" maxlength="120" placeholder="例如 100 或 1e400" value="0"></label>
+                <label>购买优先级<select id="auto-priority"><option value="balanced">部队与防御交替</option><option value="recruit">部队优先</option><option value="defense">防御优先</option></select></label>
+                </div><details class="auto-help"><summary>预算如何分配</summary><p class="archive-note">只使用预留金额之外的金币。目标买不起时先存钱；队列或兵力已满仍可处理防御。手动操作不受此预算限制。</p></details>
+              </fieldset>
+              <fieldset class="auto-group" data-auto-talent="evolution"><legend><span data-icon="up"></span>文明发展</legend><label class="auto-check"><input type="checkbox" role="switch" id="auto-evolve"> 自动进化 <span id="auto-evolve-lock"></span></label><p class="archive-note">经验达标时依次进化。战役的继续与文明的重建，仍由你决定。</p></fieldset>
+              <fieldset class="auto-group auto-defense-group" data-auto-talent="defense"><legend><span data-icon="shield"></span>防御工程</legend><label class="auto-check"><input type="checkbox" role="switch" id="auto-defense"> 自动建塔 <span id="auto-defense-lock"></span></label>
+                <div class="auto-fields"><label>炮塔类型<select id="auto-turret"><option value="0">第一种</option><option value="1">第二种</option><option value="2">第三种</option></select></label><label>目标炮位数<select id="auto-max-turrets"><option>1</option><option>2</option><option>3</option><option>4</option></select></label></div>
+                <div class="auto-checks"><label class="auto-check"><input type="checkbox" role="switch" id="auto-expand"> 自动扩容炮位</label><label class="auto-check" data-auto-talent="defense" data-auto-level="2"><input type="checkbox" role="switch" id="auto-replace"> 替换旧时代炮塔 <span id="auto-replace-lock"></span></label></div>
+                <details class="auto-help"><summary>扩容与替换规则</summary><p class="archive-note" id="auto-defense-hint"></p></details>
+              </fieldset>
+            </div>
+            <p id="automation-hint" class="archive-note"></p>
+            <p id="automation-error" class="archive-note" role="status"></p>
+          </div>
+          <footer class="automation-footer"><span>更多指令，在星图中点亮。</span><button id="automation-to-talents" type="button" class="text-button"><span data-icon="star"></span>前往天赋树 <span aria-hidden="true">↗</span></button></footer>
         </section>
       </div>
     </dialog>

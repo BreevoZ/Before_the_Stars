@@ -1,11 +1,12 @@
 import { Q } from './quantity.js';
 import { RULES, AGES, UNITS, TURRETS, ABILITIES, getBaseHealth, getUnitHealth } from './game.js';
-import { SAVE_VERSION, SURFACE, UPGRADE_COSTS, AUTOMATION_TARGETS, AUTOMATION_INTERVAL, CHALLENGE, getChallengeModifiers, getBonuses, automationUnlocked, availableSpeeds } from './progression-config.js';
+import { SAVE_VERSION, SURFACE, UPGRADE_COSTS, LEGACY_ECONOMY, AUTOMATION_TARGETS, AUTOMATION_INTERVAL, CHALLENGE, getChallengeModifiers, getBonuses, automationUnlocked, availableSpeeds } from './progression-config.js';
 import { DEBUG_SPEEDS } from './debug.js';
 import { TALENTS, getTalentBonuses, getLegacyReward, meetsTalentRequirements } from './talents.js';
 import { stat, attributes, createBonusStack, legacyBonuses, STAT_DEFINITIONS } from './stats.js';
 import { getRunBonuses, getV8RunBonuses, getV9RunBonuses } from './progression-bonuses.js';
 import { validAutomation } from './automation.js';
+import { getLegacyProduction } from './legacy-machine.js';
 
 import { check, object, num, int, bool, id, member, numbers, list, safeTree, limit } from './save-primitives.js';
 import { HISTORICAL_TALENTS, HISTORICAL_UPGRADE_COSTS } from './save-history.js';
@@ -48,7 +49,8 @@ export function validateRecord(session, version = SAVE_VERSION) {
   check(int(p.completedCycles) && (version < 10 ? int(p.legacy) : wholeAmount(p.legacy)), '遗产或循环数');
   const upgradeCosts = version < 11 ? HISTORICAL_UPGRADE_COSTS : UPGRADE_COSTS;
   levels(p.upgrades, upgradeCosts); levels(run.upgrades, upgradeCosts);
-  if (!oldVersion) { talentLevels(p.talents, p.upgrades, configs, version >= 9 ? p.talentGrants : []); talentLevels(run.talents, run.upgrades, configs, version >= 9 ? p.talentGrants : []); }
+  const runConfigs = version < 12 || (run.legacyRules ?? 0) >= LEGACY_ECONOMY.rules ? configs : HISTORICAL_TALENTS[11];
+  if (!oldVersion) { talentLevels(p.talents, p.upgrades, configs, version >= 9 ? p.talentGrants : []); talentLevels(run.talents, run.upgrades, runConfigs, version >= 9 ? p.talentGrants : []); }
   const challengeLevel = version >= 5 ? run.challengeLevel : 0;
   check(int(challengeLevel, 0, CHALLENGE.maxLevel), '挑战难度');
   check(!challengeLevel || (run.talents.challenge === 1 && p.completedCycles >= challengeLevel), '挑战未解锁');
@@ -76,8 +78,18 @@ export function validateRecord(session, version = SAVE_VERSION) {
     check(object(machine) && Object.keys(machine).length === 2 && num(machine.progress, 0, 1) && machine.progress < 1 && wholeAmount(machine.produced) && Q.lte(machine.produced, totalLegacy), '遗产生产记录');
     check(p.talents.legacyMachine || (machine.progress === 0 && Q.eq(machine.produced, 0)), '遗产生产机未解锁');
     check(p.completedCycles > 0 || Q.eq(totalLegacy, 0), '首次通关前的遗产');
-    check([9, 10].includes(run.legacyRules), '遗产规则版本');
-    check(run.legacyRules !== 9 || (!run.talents.legacyMachine && run.talents.conservation <= 3 && run.talents.continuity <= 2), '旧轮遗产快照');
+    check(version >= 12 ? [9, 10, LEGACY_ECONOMY.rules].includes(run.legacyRules) : [9, 10].includes(run.legacyRules), '遗产规则版本');
+    check(run.legacyRules !== 9 || (!run.talents.legacyMachine && run.talents.conservation <= 3 && (run.talents.continuity ?? 0) <= 2), '旧轮遗产快照');
+  }
+  if (version >= 12) {
+    check(int(p.deepestChallenge, 0, CHALLENGE.maxLevel) && p.deepestChallenge <= p.completedCycles, '远征深度记录');
+    check(!p.talents.bypasser || p.deepestChallenge >= LEGACY_ECONOMY.bypasserChallenge, '存续协议深度');
+    // Production is capped by the run it belongs to, so a stalled battle can
+    // never persist more Legacy than its own settlement would have paid.
+    // Pending production belongs to the run until its finale banks it.
+    const cap = getLegacyProduction(run.talents, g).cap;
+    check(wholeAmount(run.machineLegacy) && Q.lte(run.machineLegacy, cap), '本轮生产上限');
+    check(!run.settled || Q.lte(run.machineLegacy, p.legacyMachine.produced), '已结算生产入账');
   }
   if (!previousVersion) {
     list(p.talentGrants, version < 9 ? 2 : 3, '旧版功能保留');
@@ -89,10 +101,10 @@ export function validateRecord(session, version = SAVE_VERSION) {
     check(object(ledger) && Object.keys(ledger).every(key => Object.hasOwn(levels, key)), '购买账本字段');
     for (const [key, level] of Object.entries(levels)) {
       const payments = ledger[key] ?? [], current = TALENTS[key]?.costs ?? UPGRADE_COSTS;
-      const historical = HISTORICAL_TALENTS[10][key]?.costs ?? HISTORICAL_UPGRADE_COSTS;
+      const prices = [current, HISTORICAL_TALENTS[10][key]?.costs ?? HISTORICAL_UPGRADE_COSTS, HISTORICAL_TALENTS[11][key]?.costs ?? HISTORICAL_UPGRADE_COSTS];
       check(Array.isArray(payments) && payments.length === level, '购买账本等级');
       for (const [rank, cost] of payments.entries()) check(wholeAmount(cost) && (p.talentGrants.includes(key)
-        ? Q.eq(cost, 0) : [current[rank], historical[rank]].some(price => price !== undefined && Q.eq(cost, price))), '购买账本价格');
+        ? Q.eq(cost, 0) : prices.some(list => list[rank] !== undefined && Q.eq(cost, list[rank]))), '购买账本价格');
     }
   }
   const spent = version >= 11 ? paidLegacy(p) : Object.values(p.upgrades).reduce((sum, level) => sum + upgradeCosts.slice(0, level).reduce((a, b) => a + b, 0), 0)
@@ -133,7 +145,7 @@ export function validateRecord(session, version = SAVE_VERSION) {
     check(g.modifiers.income === bonuses.income && g.modifiers.experience === bonuses.experience, '本轮倍率');
     if (!oldVersion) check(g.modifiers.bounty === getTalentBonuses(run.talents).bounty, '本轮战利品倍率');
     if (version >= 5) {
-      const expected = getChallengeModifiers(challengeLevel);
+      const expected = getChallengeModifiers(challengeLevel, run.legacyRules ?? 9);
       check(object(g.enemyModifiers) && Object.keys(g.enemyModifiers).length === Object.keys(expected).length &&
         Object.entries(expected).every(([key, value]) => g.enemyModifiers[key] === value), '敌军挑战倍率');
     }

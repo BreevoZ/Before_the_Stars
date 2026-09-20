@@ -7,7 +7,7 @@ import { createGame, updateGame, stat, explainStat, attributes, UNITS, AGES, RUL
 import { TRAITS, TRAIT_HOOKS, runTraitHook, validTraitState } from '../src/traits.js';
 import { createProgression, createCivilizationRun, resolveBattle, rebuildCivilization, purchaseUpgrade, setGameSpeed, cycleGameSpeed, updateProgression } from '../src/progression.js';
 import { TALENTS, emptyTalents, layerTalents, purchaseTalent, getTalentState } from '../src/talents.js';
-import { automationUnlocked, availableSpeeds, SAVE_VERSION } from '../src/progression-config.js';
+import { LEGACY_ECONOMY, automationUnlocked, availableSpeeds, SAVE_VERSION } from '../src/progression-config.js';
 import { serializeSession, parseSession, mapSessionQuantities } from '../src/save.js';
 import { record as capturedV8 } from './fixtures/v8-save.js';
 import { fromV8Record, toV8Record } from '../src/save-record.js';
@@ -57,7 +57,13 @@ export function registerTraitTests(test,assert,near) {
   assert(purchaseTalent(s,'ricochet')&&purchaseTalent(s,'fireArrow')&&purchaseTalent(s,'volley'));
   assert(purchaseTalent(s,'timeAcceleration'));assert(availableSpeeds(s.permanent).join(',')==='1,2,3'&&setGameSpeed(s,3));
   assert(getTalentState(s,'superSoldierPlan')==='prerequisite');assert(purchaseTalent(s,'coaxial')&&purchaseTalent(s,'overload')&&purchaseTalent(s,'superSoldierPlan'));
-  const before=s.permanent.legacy;assert(!purchaseTalent(s,'bypasser')&&s.permanent.legacy===before&&getTalentState(s,'bypasser')==='legacy');
+  // The protocol now needs the deepest expedition behind it, not only Legacy.
+  const before=s.permanent.legacy;assert(!purchaseTalent(s,'bypasser')&&s.permanent.legacy===before&&getTalentState(s,'bypasser')==='depth-required');
+  s.permanent.deepestChallenge=LEGACY_ECONOMY.bypasserChallenge;s.permanent.completedCycles=Math.max(s.permanent.completedCycles,LEGACY_ECONOMY.bypasserChallenge);
+  // Proving the depth is what opens it; taking that proof away closes it again.
+  assert(getTalentState(s,'bypasser')==='ready');
+  s.permanent.deepestChallenge=0;
+  assert(getTalentState(s,'bypasser')==='depth-required'&&!purchaseTalent(s,'bypasser')&&s.permanent.legacy===before);
   rebuildCivilization(s,s.run.runId);finish(s);assert(s.run.phase==='destruction');parseSession(serializeSession(s));
  });
  test('V9: paid and free v8 roots migrate by ledger, retaining automation without duplicate grants or reward',()=>{

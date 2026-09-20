@@ -36,6 +36,7 @@ export function mapSessionQuantities(session, convert) {
   if (session.version >= 10) {
     field(p, 'totalLegacy'); if (p.legacy !== undefined) field(p, 'legacy');
     field(run, 'earnedLegacy');
+    if (session.version >= 12) field(run, 'machineLegacy');
     if (p.legacyMachine) field(p.legacyMachine, 'produced');
   }
   return session;

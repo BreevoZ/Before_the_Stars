@@ -55,5 +55,16 @@ const v10 = { ...v9,
   legacyCapacity: { costs: [8,16,32,64,128,256,512,1024], requires: { legacyMachine: 1 }, branch: 'legacy' },
   legacyEfficiency: { costs: [8,16,32,64,128,256], requires: { legacyMachine: 1 }, branch: 'legacy' },
 };
-export const HISTORICAL_TALENTS = freeze({ 2: v2, 3: v3, 4: v4, 5: v5, 6: v5, 7: v5, 8: v5, 9: v9, 10: v10 });
+// v11 doubled every surface price into power-of-two tiers and added the
+// eight-rank reward branches that v12 retired.
+const double = (first, ranks) => Array.from({ length: ranks }, (_, rank) => first * 2 ** rank);
+const v11 = Object.fromEntries(Object.entries(v10).map(([key, config]) => {
+  const unitCost = config.unit ? [2 ** config.layer] : null;
+  const costs = { spark: [1], logistics: [2], formation: [2], evolution: [4], defense: [4, 8], elite: [128],
+    supply: [4, 8, 16], salvage: [8, 16, 32], challenge: [4], conservation: double(2, 8), continuity: double(512, 8),
+    legacyMachine: [8], legacyCapacity: double(16, 8), legacyEfficiency: double(32, 6),
+    timeAcceleration: [16], superSoldierPlan: [64], superRanged: [128], bypasser: [1048576] }[key] ?? unitCost ?? config.costs;
+  return [key, { ...config, costs, ...(key === 'bypasser' ? { placeholder: false } : {}) }];
+}));
+export const HISTORICAL_TALENTS = freeze({ 2: v2, 3: v3, 4: v4, 5: v5, 6: v5, 7: v5, 8: v5, 9: v9, 10: v10, 11: v11 });
 export const HISTORICAL_UPGRADE_COSTS = Object.freeze([1, 2, 4, 8, 16]);

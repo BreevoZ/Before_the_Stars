@@ -1,14 +1,14 @@
 import { createLegacyMachine } from './legacy-machine.js';
 import { Q } from './quantity.js';
 import { UNITS, TURRETS, getBaseHealth, projectileField } from './game.js';
-import { SAVE_VERSION, SURFACE, getChallengeModifiers } from './progression-config.js';
+import { SAVE_VERSION, SURFACE, LEGACY_ECONOMY, getChallengeModifiers } from './progression-config.js';
 import { attributes } from './stats.js';
 import { getV8RunBonuses } from './progression-bonuses.js';
 import { createAutomation } from './automation.js';
 import { HISTORICAL_TALENTS, HISTORICAL_UPGRADE_COSTS } from './save-history.js';
 import { validateRecord } from './save-validation.js';
-import { cloneRecord, toV8Record, fromV8Record, fromV9Record, fromV10Record } from './save-record.js';
-import { emptyTalents } from './talents.js';
+import { cloneRecord, toV8Record, fromV8Record, fromV9Record, fromV10Record, fromV11Record } from './save-record.js';
+import { emptyTalents, TALENTS } from './talents.js';
 const teams = ['player', 'enemy'];
 
 export function migrateV1(input) {
@@ -133,11 +133,34 @@ export function migrateV10(input) {
   session.version = 11;
   return { ...toV8Record(session), version: 11 };
 }
-export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9, 10: migrateV10 });
+// v12 retires the doubling reward branches. Ranks that no longer exist are
+// refunded through the ledger itself: dropping a payment restores its Legacy.
+export function migrateV11(input) {
+  const session = fromV11Record(input), p = session.permanent;
+  const keep = { conservation: TALENTS.conservation.costs.length, legacyCapacity: TALENTS.legacyCapacity.costs.length,
+    legacyEfficiency: TALENTS.legacyEfficiency.costs.length, continuity: 0 };
+  // Only the permanent tree is retired. The active run keeps the exact snapshot
+  // and reward contract it started under, settled finale included.
+  p.talents = Object.fromEntries(Object.keys(emptyTalents()).map(key =>
+    [key, Math.min(p.talents[key] ?? 0, keep[key] ?? Infinity)]));
+  for (const [key, ranks] of Object.entries(keep)) {
+    if (!p.purchaseCosts[key]) continue;
+    if (ranks) p.purchaseCosts[key] = p.purchaseCosts[key].slice(0, ranks);
+    else delete p.purchaseCosts[key];
+  }
+  p.talentGrants = p.talentGrants.filter(key => Object.hasOwn(TALENTS, key));
+  // Depth has to be re-proven; an already launched civilization keeps its gate.
+  p.deepestChallenge = p.talents.bypasser ? LEGACY_ECONOMY.bypasserChallenge : session.run.settled ? session.run.challengeLevel : 0;
+  session.run.machineLegacy = 0;
+  session.version = 12;
+  return { ...toV8Record(session), version: 12 };
+}
+export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9, 10: migrateV10, 11: migrateV11 });
 export function migrateRecord(input) {
   let record = input;
   while (record.version < SAVE_VERSION) {
-    validateRecord(record.version === 8 ? fromV8Record(record) : record.version === 9 ? fromV9Record(record) : record.version === 10 ? fromV10Record(record) : record, record.version);
+    const hydrate = { 8: fromV8Record, 9: fromV9Record, 10: fromV10Record, 11: fromV11Record }[record.version];
+    validateRecord(hydrate ? hydrate(record) : record, record.version);
     record = MIGRATIONS[record.version](record);
   }
   return record;

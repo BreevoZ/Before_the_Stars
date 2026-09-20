@@ -1,7 +1,7 @@
 import { serializeSession, parseSession } from '../src/save.js';
 import { getBonuses, getChallengeModifiers, UPGRADE_COSTS } from '../src/progression-config.js';
 import { HISTORICAL_TALENTS, HISTORICAL_UPGRADE_COSTS } from '../src/save-history.js';
-import { getTalentBonuses } from '../src/talents.js';
+import { getTalentBonuses, getLegacyReward } from '../src/talents.js';
 
 export const statMultiplier = (game, key, team = 'player') => (game.bonuses ?? [])
   .filter(effect => effect.target.stat === key && effect.target.team === team && effect.type === 'multiply')
@@ -13,12 +13,16 @@ export function v5Record(session) {
   const old = JSON.parse(JSON.stringify(parseSession(serializeSession(session)))), game = old.game;
   old.version = 5;
   for (const state of [old.permanent, old.run]) {
-    state.talents = Object.fromEntries(Object.keys(HISTORICAL_TALENTS[5]).map(key => [key, key === 'autobuyer' ? state.talents.spark : state.talents[key]]));
+    // Retired talents are absent from the live tree; the old format still needs a level.
+    state.talents = Object.fromEntries(Object.keys(HISTORICAL_TALENTS[5]).map(key => [key, (key === 'autobuyer' ? state.talents.spark : state.talents[key]) ?? 0]));
   }
   old.permanent.talentGrants = old.permanent.talentGrants.map(key => key === 'spark' ? 'autobuyer' : key);
   old.permanent.automation.unlocked = old.permanent.talents.autobuyer > 0;
   old.permanent.legacy = old.permanent.totalLegacy - Object.values(old.permanent.upgrades).reduce((sum,level)=>sum+HISTORICAL_UPGRADE_COSTS.slice(0,level).reduce((a,b)=>a+b,0),0) - Object.entries(HISTORICAL_TALENTS[5]).reduce((sum,[key,c])=>sum+(old.permanent.talentGrants.includes(key)?0:c.costs.slice(0,old.permanent.talents[key]).reduce((a,b)=>a+b,0)),0);
   delete old.permanent.purchaseCosts; delete old.permanent.settings; delete old.permanent.automationRetained; delete old.permanent.legacyMachine; delete old.run.legacyRules;
+  delete old.permanent.deepestChallenge; delete old.run.machineLegacy;
+  // A historical record also carries the reward its own rules would have paid.
+  if (old.run.settled) old.run.earnedLegacy = getLegacyReward(old.run.talents, old.run.challengeLevel ?? 0, 9);
 
   game.modifiers = { ...getBonuses(old.run.upgrades), bounty: getTalentBonuses(old.run.talents).bounty };
   game.enemyModifiers = getChallengeModifiers(old.run.challengeLevel);

@@ -3,6 +3,7 @@ import { Q } from '../src/quantity.js';
 import { buildViewModel } from '../src/view-model.js';
 import { buildCivilizationViewModel } from '../src/civilization-view-model.js';
 import { buildAutomationViewModel } from '../src/automation-view-model.js';
+import { TALENTS } from '../src/talents.js';
 import { buildTalentViewModel } from '../src/talent-view-model.js';
 import { createBindings } from '../src/dom-bindings.js';
 import { PHASE, TRANSITIONS, getTransition, phaseMatchesResult } from '../src/progression-machine.js';
@@ -11,7 +12,7 @@ import { purchaseTalent } from '../src/talents.js';
 import { createGame, recruit, evolve, getIncomeRate, AGES } from '../src/game.js';
 import { serializeSession, parseSession, createSaveStore, SAVE_KEY, BACKUP_KEY } from '../src/save.js';
 import { MIGRATIONS } from '../src/save-migrations.js';
-import { cloneRecord, fromSaveRecord, fromV8Record, fromV9Record, fromV10Record } from '../src/save-record.js';
+import { cloneRecord, fromSaveRecord, fromV8Record, fromV9Record, fromV10Record, fromV11Record } from '../src/save-record.js';
 import { validateRecord } from '../src/save-validation.js';
 import { SAVE_VERSION } from '../src/progression-config.js';
 import { record as capturedV7 } from './fixtures/v7-save.js';
@@ -82,7 +83,7 @@ export function registerArchitectureTests(test, assert) {
         assert(vm[`#buy-${key}@disabled`] && !vm[`#node-${key}@aria-label`].includes('下一级'));
       }
       assert(!JSON.stringify(vm).includes('undefined'));
-      assert(vm['#buy-bypasser'].includes('1.048576e+6'));
+      assert(vm['#buy-bypasser'].includes(String(TALENTS.bypasser.costs[0])));
     }
   });
   test('State machine: every phase/event pair has an explicit transition and all stale tokens are rejected', () => {
@@ -126,7 +127,8 @@ export function registerArchitectureTests(test, assert) {
     delete old.run.talents; delete old.run.challengeLevel; delete old.run.autoTurn;
     delete old.game.modifiers.bounty; delete old.game.enemyModifiers;
     for (let version = 1; version < SAVE_VERSION; version++) {
-      validateRecord(version === 8 ? fromV8Record(old) : version === 9 ? fromV9Record(old) : version === 10 ? fromV10Record(old) : old, version);
+      const hydrate = { 8: fromV8Record, 9: fromV9Record, 10: fromV10Record, 11: fromV11Record }[version];
+      validateRecord(hydrate ? hydrate(old) : old, version);
       const source = freeze(old), before = json(source), next = MIGRATIONS[version](source);
       assert(next.version === version + 1 && next !== source && next.game !== source.game);
       assert(json(MIGRATIONS[version](source)) === json(next));

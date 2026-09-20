@@ -42,7 +42,7 @@ export function buildCivilizationViewModel(session, { debug = false } = {}) {
   text('rebuild-civilization', run.challengeLevel ? '返回初生之地' : run.phase === 'defeat' ? '从原始时代重试' : '重建文明');
   let activeBonuses = `本轮收入：${describeStat(game, 'player', 'income')}；击杀经验（基础 100）：${describeStat(game, { kind: 'reward' }, 'experience', 100)}；击杀金币（基础 100）：${describeStat(game, { kind: 'reward' }, 'bounty', 100)}；起始金币：${describeStat(game, 'player', 'startingGold')}；终局遗产：${describeStat(game, { kind: 'civilization' }, 'legacy')}。阵亡经验先按 75% 向下取整，再结算加成并逐笔向下取整。`;
   if (run.challengeLevel) activeBonuses += ` 敌军收入：${describeStat(game, 'enemy', 'income')}；基地生命：${describeStat(game, 'enemy', 'baseHealth')}。`;
-  if (run.talents.legacyMachine) activeBonuses += ` 生产机单次产量：${describeStat(game, { kind: 'civilization' }, 'legacyProduction')}；生产周期：${describeStat(game, { kind: 'civilization' }, 'legacyProductionInterval')} 秒。`;
+  if (run.talents.legacyMachine) activeBonuses += ` 生产机本轮上限：终局遗产的 ${describeStat(game, { kind: 'civilization' }, 'legacyMachineShare')}；填满耗时：${describeStat(game, { kind: 'civilization' }, 'legacyFillSeconds')} 模拟秒。`;
   text('active-bonuses', activeBonuses);
   text('archives', p.completedCycles === 0, 'hidden');
   text('civilization-bar', p.completedCycles === 0, 'hidden');
@@ -51,9 +51,9 @@ export function buildCivilizationViewModel(session, { debug = false } = {}) {
   const production = getLegacyProduction(run.talents, game), nextProduction = getLegacyProduction(p.talents);
   text('legacy-production', !production.unlocked, 'hidden');
   text('legacy-production', `+${Q.format(production.perMinute)}/模拟分`);
-  text('legacy-production', `遗产生产机：每 ${production.seconds} 模拟秒产出 ${Q.format(production.amount)} Legacy；仅交战时运转，暂停、弹窗、离线和结算时停止。`, 'title');
+  text('legacy-production', `遗产生产机：本轮最多生产 ${Q.format(production.cap)} Legacy（终局遗产的 ${Math.round(production.share * 100)}%），${production.seconds} 模拟秒填满；仅交战时运转，暂停、弹窗、离线和结算时停止。`, 'title');
   text('legacy-machine-status', !p.talents.legacyMachine, 'hidden');
-  text('legacy-machine-status', `遗产生产机 · 本轮 ${Q.format(production.perMinute)}/模拟分 → 重建后 ${Q.format(nextProduction.perMinute)}/模拟分 · 生产进度 ${Math.min(99, Math.floor(p.legacyMachine.progress * 100 + 1e-8))}% · 累计生产 ${Q.format(p.legacyMachine.produced)} Legacy。仅交战时运转；进度跨轮保留。`);
+  text('legacy-machine-status', `遗产生产机 · 本轮已生产 ${Q.format(run.machineLegacy ?? 0)} / 上限 ${Q.format(production.cap)}（${Q.format(production.perMinute)}/模拟分）· 重建后上限 ${Q.format(nextProduction.cap)} · 累计生产 ${Q.format(p.legacyMachine.produced)} Legacy。仅交战时运转，产量上限按本轮终局遗产计算。`);
   text('autobuyer-label', !p.automation.unlocked ? '未解锁' : p.automation.enabled ? '已开启' : '已关闭');
   text('autobuyer-menu', String(p.automation.enabled), 'data-enabled');
   text('archives', `天赋树，${Q.format(p.legacy)} 文明遗产`, 'aria-label');
@@ -72,7 +72,7 @@ export function buildCivilizationViewModel(session, { debug = false } = {}) {
   text('return-orbit', run.phase !== 'orbital', 'hidden');
   if (run.phase === 'orbital') {
     text('home-heading', '地表的星火，已经抵达轨道。');
-    text('cycle-outcome', 'Great Filter Bypasser 已建成。地表天赋、遗产与通关记录均已保留。');
+    text('cycle-outcome', '存续协议已生效。地表天赋、遗产与通关记录均已保留。');
     text('result-title', 'VI · 轨道文明');
     text('result-detail', '人类已越过大过滤器。轨道建设将在后续版本开放。');
     text('play-again', '返回轨道');

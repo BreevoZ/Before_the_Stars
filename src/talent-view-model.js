@@ -1,8 +1,8 @@
-import { UPGRADES } from './progression-config.js';
+import { UPGRADES, LEGACY_ECONOMY } from './progression-config.js';
 import { Q } from './quantity.js';
 import { getUpgradeState } from './progression.js';
 import { TALENT_TREE, getTalentState, layerTalents, meetsTalentRequirements } from './talents.js';
-const reasons = { locked: '首次通关后解锁', 'during-run': '本轮已启程 · 重建前可购买', 'victory-required': '完成一次未来终局后启航', prerequisite: '先点亮前置星辰', legacy: '遗产不足', max: '已满级', ready: '新文明开始时生效', planned: '规划中 · 轨道文明尚未开放' };
+const reasons = { locked: '首次通关后解锁', 'during-run': '本轮已启程 · 重建前可购买', 'victory-required': '完成一次未来终局后启航', 'depth-required': `通关余烬远征第 ${LEGACY_ECONOMY.bypasserChallenge} 层后开放`, prerequisite: '先点亮前置星辰', legacy: '遗产不足', max: '已满级', ready: '新文明开始时生效', planned: '规划中 · 轨道文明尚未开放' };
 
 export function buildTalentViewModel(session) {
   const { permanent: p } = session, view = {};

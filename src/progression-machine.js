@@ -1,4 +1,4 @@
-import { SURFACE, CHALLENGE, TALENT_PRICES } from './progression-config.js';
+import { SURFACE, CHALLENGE, TALENT_PRICES, LEGACY_ECONOMY } from './progression-config.js';
 import { Q } from './quantity.js';
 
 export const PHASE = Object.freeze({ BATTLE: 'battle', VICTORY: 'victory', DESTRUCTION: 'destruction', DEFEAT: 'defeat', ORBITAL: 'orbital' });
@@ -15,7 +15,8 @@ export function getNextChallengeLevel({ run, permanent }) {
 export const TRANSITIONS = Object.freeze([
   { event: 'launch', from: [PHASE.DESTRUCTION], to: PHASE.ORBITAL, token: 'runId', effect: 'launch',
     guard: ({ run, game, permanent: p }) => run.settled && game.status === 'won' && game.ages.enemy === SURFACE.finalEnemyAge &&
-      p.talents.superSoldierPlan === 1 && p.talents.bypasser === 0 && Q.gte(p.legacy, TALENT_PRICES.bypasser[0]) },
+      p.talents.superSoldierPlan === 1 && p.talents.bypasser === 0 && Q.gte(p.legacy, TALENT_PRICES.bypasser[0]) &&
+      (p.deepestChallenge ?? 0) >= LEGACY_ECONOMY.bypasserChallenge },
   { event: 'resolve', from: [PHASE.BATTLE], to: PHASE.DEFEAT, token: 'battleId', effect: 'finishBattle',
     guard: ({ game }) => ['lost', 'draw'].includes(game.status) },
   { event: 'resolve', from: [PHASE.BATTLE], to: PHASE.VICTORY, token: 'battleId', effect: 'finishBattle',

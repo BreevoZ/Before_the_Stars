@@ -6,12 +6,16 @@ import { transitionCivilization, rebuildCivilization, updateProgression, resolve
 import { ORBITAL_SECONDS, ORBITAL_FLEET, orbitalFrame, drawOrbitalScene } from '../src/orbital-scene.js';
 import { mountFixture } from './progression-cases.js';
 import { runDebugCommand } from '../src/debug.js';
+import { LEGACY_ECONOMY } from '../src/progression-config.js';
 
 export function launchReady() {
   const s = parseSession(JSON.stringify(records.destruction));
-  // Endgame budget fixture; actual purchases still use the production API.
+  // Endgame fixture: the protocol needs the deepest expedition behind it and a
+  // wallet to match. Actual purchases still use the production API.
   s.permanent.totalLegacy = Q.add(s.permanent.totalLegacy, 2 ** 21);
   s.permanent.legacy = Q.add(s.permanent.legacy, 2 ** 21);
+  s.permanent.deepestChallenge = LEGACY_ECONOMY.bypasserChallenge;
+  s.permanent.completedCycles = Math.max(s.permanent.completedCycles, LEGACY_ECONOMY.bypasserChallenge);
   return s;
 }
 export function registerOrbitalTests(test, assert) {
@@ -65,7 +69,7 @@ export function registerOrbitalTests(test, assert) {
     let frame=await mountFixture(serializeSession(launchReady()));
     try {
       let doc=frame.contentDocument, el=id=>doc.getElementById(id);
-      el('node-bypasser').click();assert(!el('buy-bypasser').disabled && el('buy-bypasser').textContent.includes('1.048576e+6'));
+      el('node-bypasser').click();assert(!el('buy-bypasser').disabled && el('buy-bypasser').textContent.includes(String(TALENTS.bypasser.costs[0])));
       el('buy-bypasser').click();const raw=frame.contentWindow.__storage.getItem(SAVE_KEY);
       assert(parseSession(raw).run.phase==='orbital' && !el('orbital-presentation').hidden);
       assert(el('home-scroll').inert && !el('archives-dialog').querySelector(':focus')?.closest('.talent-details'));

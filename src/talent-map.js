@@ -28,7 +28,7 @@ const mapData = {
   production: { x: 825, y: 1330 }, supply: { x: 825, y: 1120, kind: 'specialist' },
   warfare: { x: 955, y: 1110 }, salvage: { x: 955, y: 900, kind: 'specialist' },
   conservation: { x: 1030, y: 1350, kind: 'keystone' }, challenge: { x: 990, y: 1210, kind: 'specialist' },
-  continuity: { x: 1040, y: 1000, kind: 'keystone' }, timeAcceleration: { x: 830, y: 690, icon: glyphs.clock },
+  timeAcceleration: { x: 830, y: 690, icon: glyphs.clock },
   legacyMachine: { x: 1030, y: 780, kind: 'keystone', icon: glyphs.automation },
   legacyCapacity: { x: 930, y: 530, kind: 'specialist', icon: glyphs.heavy },
   legacyEfficiency: { x: 1050, y: 320, kind: 'specialist', icon: glyphs.clock },

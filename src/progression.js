@@ -1,4 +1,4 @@
-import { createLegacyMachine, updateLegacyMachine } from './legacy-machine.js';
+import { createLegacyMachine, updateLegacyMachine, bankLegacyProduction } from './legacy-machine.js';
 import { Q } from './quantity.js';
 import { payLegacy } from './legacy-ledger.js';
 import { createGame, updateGame } from './game.js';
@@ -21,7 +21,7 @@ export function createCivilizationRun(permanent, challengeLevel = 0, extraBonuse
   const upgrades = { ...permanent.upgrades };
   const talents = { ...permanent.talents };
   const run = { runId, legacyRules: LEGACY_ECONOMY.rules, challengeLevel, battleNumber: 1, battleId: `${runId}:1`, phase: PHASE.BATTLE,
-    processedBattleId: null, settled: false, earnedLegacy: 0, upgrades, talents, autoElapsed: 0, autoTurn: 'recruit', elapsed: 0 };
+    processedBattleId: null, settled: false, earnedLegacy: 0, machineLegacy: 0, upgrades, talents, autoElapsed: 0, autoTurn: 'recruit', elapsed: 0 };
   if (extraBonuses.length) run.extraBonuses = createBonusStack(extraBonuses);
   const game = createConflict(run);
   return { run, game };
@@ -36,7 +36,7 @@ function startRun(session, challengeLevel = 0, extraBonuses = []) {
 }
 
 export function createProgression() {
-  const session = { version: SAVE_VERSION, permanent: { completedCycles: 0, legacy: 0, totalLegacy: 0,
+  const session = { version: SAVE_VERSION, permanent: { completedCycles: 0, deepestChallenge: 0, legacy: 0, totalLegacy: 0,
     purchaseCosts: {}, legacyMachine: createLegacyMachine(), upgrades: { production: 0, warfare: 0 }, talents: emptyTalents(), talentGrants: [], settings: { speed: 1 }, automationRetained: false, automation: createAutomation() } };
   startRun(session);
   return session;
@@ -89,12 +89,15 @@ const effects = {
   settle(session) {
     const { run, game, permanent } = session;
     const reward = stat(game, { kind: 'civilization' }, 'legacy');
+    const produced = bankLegacyProduction(session);
     run.processedBattleId = run.battleId;
     run.settled = true;
     run.earnedLegacy = reward;
     permanent.completedCycles++;
-    permanent.legacy = Q.add(permanent.legacy, reward);
-    permanent.totalLegacy = Q.add(permanent.totalLegacy, reward);
+    // Only a finished expedition proves the depth that gates the protocol.
+    permanent.deepestChallenge = Math.max(permanent.deepestChallenge ?? 0, run.challengeLevel);
+    permanent.legacy = Q.sum([permanent.legacy, reward, produced]);
+    permanent.totalLegacy = Q.sum([permanent.totalLegacy, reward, produced]);
     permanent.automation.unlocked = automationUnlocked(permanent);
   },
   continue: continueConflict,

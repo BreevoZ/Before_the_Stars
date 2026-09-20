@@ -1,4 +1,4 @@
-import { legacyMachineBonuses } from './legacy-machine.js';
+import { legacyMachineBonuses, legacyProductionBonuses } from './legacy-machine.js';
 import { SUPER_WEAPONS } from './game-config.js';
 import { TRAITS } from './traits.js';
 import { getBonuses, getChallengeModifiers, challengeName } from './progression-config.js';
@@ -16,7 +16,7 @@ export function getV8RunBonuses(run) {
     contribution('doctrine', 'warfare', '战争档案', { stat: 'experience', kind: 'reward', team: 'player' }, 'multiply', archives.experience),
     contribution('doctrine', 'supply', '重建储备', { stat: 'startingGold', team: 'player' }, 'add', growth.startingGold),
     contribution('doctrine', 'salvage', '战利品回收', { stat: 'bounty', kind: 'reward', team: 'player' }, 'multiply', growth.bounty),
-    ...Object.entries(getChallengeModifiers(run.challengeLevel)).map(([key, value]) => contribution('challenge',
+    ...Object.entries(getChallengeModifiers(run.challengeLevel, run.legacyRules ?? 9)).map(([key, value]) => contribution('challenge',
       `challenge:${run.challengeLevel}`, `挑战 ${run.challengeLevel}`, { stat: key === 'gold' ? 'startingGold' : key, team: 'enemy',
         ...(key === 'experience' ? { kind: 'reward' } : {}) }, 'multiply', value)),
   ], getLegacyBonuses(run.talents, run.challengeLevel, run.legacyRules ?? 9), run.extraBonuses ?? []);
@@ -27,7 +27,7 @@ export function getRunBonuses(run) {
   const base = getV8RunBonuses({ ...run, legacyRules: run.legacyRules ?? 10, extraBonuses: [] }).map(effect => effect.source.kind === 'challenge'
     ? { ...effect, source: { ...effect.source, label: challengeName(run.challengeLevel) } } : effect);
   return createBonusStack(base,
-    (run.legacyRules ?? 10) >= 10 ? legacyMachineBonuses(talents) : [],
+    (run.legacyRules ?? 10) < 10 ? [] : (run.legacyRules ?? 10) < 11 ? legacyProductionBonuses(talents) : legacyMachineBonuses(talents),
     getSuperSoldierBonuses(Boolean(talents.superRanged), Boolean(talents.superSoldierPlan)),
     Object.values(TRAITS).filter(trait => talents[trait.id]).map(trait => contribution('doctrine', trait.id, trait.name,
       { stat: trait.stat, type: trait.units[0], team: 'player' }, 'override', true)),

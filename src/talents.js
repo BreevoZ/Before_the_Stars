@@ -3,7 +3,7 @@ export { purchaseTalent } from './progression.js';
 import { SUPER_WEAPONS } from './game-config.js';
 import { TRAITS, TRAIT_VALUES as V } from './traits.js';
 import { isBetweenRuns } from './progression-machine.js';
-import { SURFACE, UPGRADES, UPGRADE_COSTS, TALENT_PRICES as PRICES, CHALLENGE, TALENT_LAYER_REQUIREMENT, UNIT_TALENT_COSTS, LEGACY_ECONOMY as ECONOMY, doublingCosts } from './progression-config.js';
+import { SURFACE, UPGRADES, UPGRADE_COSTS, TALENT_PRICES as PRICES, CHALLENGE, TALENT_LAYER_REQUIREMENT, UNIT_TALENT_COSTS, LEGACY_ECONOMY as ECONOMY } from './progression-config.js';
 import { resolveStatValue, STAT_DEFINITIONS } from './stats.js';
 
 export const TALENT_VALUES = Object.freeze({ startingGold: 150, bountyPerLevel: 0.25 });
@@ -44,18 +44,18 @@ export const TALENTS = Object.freeze({
     effects: Array.from({ length: 4 }, (_, level) => `起始金币 +${level * TALENT_VALUES.startingGold}`) },
   salvage: { name: '战利品回收', branch: 'growth', costs: PRICES.salvage, requires: { warfare: 1 },
     effects: Array.from({ length: 4 }, (_, level) => `击杀金币 ×${1 + level * TALENT_VALUES.bountyPerLevel}`) },
-  conservation: { name: '遗产保存', branch: 'legacy', costs: doublingCosts(ECONOMY.conservationCost, ECONOMY.rewardRanks), requires: { spark: 1 },
-    effects: Array.from({ length: ECONOMY.rewardRanks + 1 }, (_, level) => `终局遗产 ×${2 ** level} · 与文明传承相乘`) },
+  conservation: { name: '遗产保存', branch: 'legacy', costs: PRICES.conservation, requires: { spark: 1 },
+    effects: Array.from({ length: PRICES.conservation.length + 1 }, (_, level) =>
+      `终局遗产 ×${Math.round(ECONOMY.conservationEffect ** level * 100) / 100}`) },
   challenge: { name: '余烬远征', branch: 'legacy', costs: PRICES.challenge, requires: { conservation: 1 },
-    effects: ['初生之地循环', `通关后踏入下一片余烬；敌军逐步强化，通关遗产随远征深度提升，最多 ${CHALLENGE.maxLevel} 次深入`] },
-  continuity: { name: '文明传承', branch: 'legacy', costs: doublingCosts(ECONOMY.continuityCost, ECONOMY.rewardRanks), requires: { conservation: 2 },
-    effects: Array.from({ length: ECONOMY.rewardRanks + 1 }, (_, level) => `终局遗产 ×${2 ** level} · 与遗产保存相乘`) },
-  legacyMachine: { name: '遗产生产机', branch: 'legacy', costs: [ECONOMY.producerCost], requires: { conservation: 2 }, requiresLayer: 3,
-    effects: ['尚未生产遗产', `战斗中每 ${ECONOMY.productionSeconds} 模拟秒生产 1 Legacy · 暂停／离线／结算时停止`] },
-  legacyCapacity: { name: '平行档案', branch: 'legacy', costs: doublingCosts(ECONOMY.capacityCost, ECONOMY.capacityRanks), requires: { legacyMachine: 1 },
-    effects: Array.from({ length: ECONOMY.capacityRanks + 1 }, (_, level) => `单次产量 ${2 ** level} Legacy · 每级翻倍`) },
-  legacyEfficiency: { name: '回响加速', branch: 'legacy', costs: doublingCosts(ECONOMY.efficiencyCost, ECONOMY.efficiencyRanks), requires: { legacyMachine: 1 },
-    effects: Array.from({ length: ECONOMY.efficiencyRanks + 1 }, (_, level) => `生产速度 ×${2 ** level} · 每 ${ECONOMY.productionSeconds / 2 ** level} 模拟秒生产一次`) },
+    effects: ['初生之地循环', `通关后踏入下一片余烬；敌军逐步强化，通关遗产 ×${ECONOMY.challengeBase} 每深入一层，最多 ${CHALLENGE.maxLevel} 次深入`] },
+  legacyMachine: { name: '遗产生产机', branch: 'legacy', costs: PRICES.legacyMachine, requires: { conservation: 1 }, requiresLayer: 3,
+    effects: ['尚未生产遗产', `交战中按时间积累遗产 · 本轮上限为终局遗产的 ${ECONOMY.machineShares[0] * 100}%，${ECONOMY.fillSeconds} 模拟秒填满`] },
+  legacyCapacity: { name: '平行档案', branch: 'legacy', costs: PRICES.legacyCapacity, requires: { legacyMachine: 1 },
+    effects: ECONOMY.machineShares.map(share => `本轮生产上限 ${share * 100}% 终局遗产`) },
+  legacyEfficiency: { name: '回响加速', branch: 'legacy', costs: PRICES.legacyEfficiency, requires: { legacyMachine: 1 },
+    effects: Array.from({ length: PRICES.legacyEfficiency.length + 1 }, (_, level) =>
+      `生产速度 ×${2 ** level} · ${ECONOMY.fillSeconds / 2 ** level} 模拟秒填满上限`) },
   ...Object.fromEntries(Object.values(TRAITS).map(trait => {
     const layer = ['melee', 'archer', 'heavy'].includes(trait.units[0]) ? 1 : ['swordsman', 'crossbow', 'knight'].includes(trait.units[0]) ? 2 : ['duelist', 'musketeer', 'cannoneer'].includes(trait.units[0]) ? 3 : ['commando', 'rifleman', 'tank'].includes(trait.units[0]) ? 4 : 5;
     return [trait.id, { name: trait.name, branch: 'units', layer, unit: trait.units[0], costs: [UNIT_TALENT_COSTS[layer - 1]], requires: layer === 1 ? { spark: 1 } : {}, requiresLayer: layer > 1 ? layer - 1 : undefined,
@@ -67,8 +67,8 @@ export const TALENTS = Object.freeze({
     effects: ['超级士兵未开放', '未来时代可招募超级士兵 · 全覆轻甲与激光短匕首'] },
   superRanged: { name: '狙击激光枪', branch: 'units', layer: 7, costs: PRICES.superRanged, requires: { superSoldierPlan: 1 },
     effects: ['仅贴身激光匕首', `${SUPER_WEAPONS.sniper.range} 射程 / ${SUPER_WEAPONS.sniper.damage} 穿甲伤害 · 锁定 ${SUPER_WEAPONS.sniper.chargeTime} 秒，开火后冷却 ${SUPER_WEAPONS.sniper.attackInterval} 秒 · 近身改用匕首`] },
-  bypasser: { name: 'Great Filter Bypasser', branch: 'legacy', layer: 8, costs: PRICES.bypasser, requires: { superSoldierPlan: 1 },
-    effects: ['地表文明的最后一道门槛', '终局后购买，立即启航至 VI 轨道文明 · 地表篇完成，轨道建设待后续开放'] },
+  bypasser: { name: '存续协议', branch: 'legacy', layer: 8, costs: PRICES.bypasser, requires: { superSoldierPlan: 1 },
+    effects: ['地表文明的最后一道门槛', `通关余烬远征第 ${ECONOMY.bypasserChallenge} 层后，于终局购买即刻启航至 VI 轨道文明 · 地表篇完成，轨道建设待后续开放`] },
 
 });
 // The diagram and purchasing rules share the same prerequisites. Branch names
@@ -90,19 +90,25 @@ export function getTalentState(session, key) {
   if (!isBetweenRuns(session.run.phase)) return 'during-run';
   const config = TALENTS[key], level = talentLevel(session, key);
   if (level >= config.costs.length) return 'max';
-  if (key === 'bypasser' && session.run.phase !== 'destruction') return 'victory-required';
   if (!meetsTalentRequirements({ ...session.permanent.talents, ...session.permanent.upgrades }, config)) return 'prerequisite';
+  if (key === 'bypasser' && (session.permanent.deepestChallenge ?? 0) < ECONOMY.bypasserChallenge) return 'depth-required';
+  if (key === 'bypasser' && session.run.phase !== 'destruction') return 'victory-required';
   return Q.gte(session.permanent.legacy, config.costs[level]) ? 'ready' : 'legacy';
 }
 export function getTalentBonuses(talents) {
   return { startingGold: talents.supply * TALENT_VALUES.startingGold,
     bounty: 1 + talents.salvage * TALENT_VALUES.bountyPerLevel };
 }
+// Rules 11: depth is the exponential term and purchases are the linear one.
+// Older runs keep the contract they started under, including retired talents.
 export function getLegacyBonuses(talents, challengeLevel = 0, rules = ECONOMY.rules) {
+  const conservation = rules < 10 ? talents.conservation ?? 0
+    : rules < 11 ? 2 ** (talents.conservation ?? 0) : ECONOMY.conservationEffect ** (talents.conservation ?? 0);
   return [
-    ['conservation', '遗产保存', 'doctrine', rules < 10 ? 'add' : 'multiply', rules < 10 ? talents.conservation : 2 ** talents.conservation],
-    ['continuity', '文明传承', 'doctrine', 'multiply', (rules < 10 ? 1 + talents.continuity * 0.5 : 2 ** talents.continuity)],
-    ['challenge:legacy', '挑战遗产', 'challenge', 'multiply', challengeLevel + 1],
+    ['conservation', '遗产保存', 'doctrine', rules < 10 ? 'add' : 'multiply', conservation],
+    ...(rules < 11 ? [['continuity', '文明传承', 'doctrine', 'multiply', rules < 10 ? 1 + (talents.continuity ?? 0) * 0.5 : 2 ** (talents.continuity ?? 0)]] : []),
+    ['challenge:legacy', rules < 11 ? '挑战遗产' : '远征深度', 'challenge', 'multiply',
+      rules < 11 ? challengeLevel + 1 : Math.round(ECONOMY.challengeBase ** challengeLevel * 1e6) / 1e6],
   ].map(([id, label, kind, type, value]) => ({ target: { stat: 'legacy', kind: 'civilization' }, type, value, source: { id, label, kind } }));
 }
 export function getLegacyReward(talents, challengeLevel = 0, rules = ECONOMY.rules) {

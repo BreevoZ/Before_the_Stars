@@ -27,8 +27,10 @@ export const STAT_DEFINITIONS = Object.freeze({
   tickInterval: { min: RULES.fixedStep, max: 10 }, slow: { min: 0.01, max: 1 },
   enabled: { boolean: true }, canRecruit: { boolean: true }, canBuild: { boolean: true },
   canExpand: { boolean: true }, canEvolve: { boolean: true }, canCast: { boolean: true },
-  legacy: growthInteger, legacyProduction: growthInteger, legacyMachine: { boolean: true },
-  legacyProductionInterval: { min: .25, max: 3600 },
+  legacy: growthInteger, legacyMachine: { boolean: true },
+  legacyMachineShare: { min: 0, max: 1 }, legacyFillSeconds: { min: .25, max: 36000 },
+  // Retired rules-10 production stats; old saved stacks still resolve.
+  legacyProduction: growthInteger, legacyProductionInterval: { min: .25, max: 3600 },
 });
 const kinds = ['team', 'unit', 'turret', 'ability', 'reward', 'civilization'];
 const sources = ['doctrine', 'challenge', 'depth', 'milestone', 'age', 'status', 'legacy'];
@@ -95,7 +97,8 @@ function baseValues(context) {
     expansionCost: RULES.turretExpansionCosts[Math.max(0, context.slot ?? 0)] ?? 0,
     canRecruit: true, canBuild: true, canExpand: true, canEvolve: true, canCast: true };
   if (context.kind === 'reward') return { bounty: 0, experience: 0 };
-  if (context.kind === 'civilization') return { legacy: 1, legacyProduction: 1, legacyProductionInterval: LEGACY_ECONOMY.productionSeconds, legacyMachine: false };
+  if (context.kind === 'civilization') return { legacy: 1, legacyMachine: false,
+    legacyMachineShare: LEGACY_ECONOMY.machineShares[0], legacyFillSeconds: LEGACY_ECONOMY.fillSeconds };
   return { ...context.base, enabled: true, attackSpeed: 1,
     ...(context.kind === 'unit' ? { ...TRAIT_DEFAULTS, canRanged: true, sniperRifle: false } : {}),
     ...(context.kind === 'turret' ? { attackInterval: context.base.interval } : {}) };

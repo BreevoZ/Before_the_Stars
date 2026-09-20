@@ -106,7 +106,8 @@ export function registerTalentHomeTests(test, assert, near) {
       assert(el('archives-dialog').open && el('legacy').textContent === '1');
       const s = parseSession(frame.contentWindow.__storage.getItem(DEBUG_SAVE_KEY));
       assert(s.run.settled && s.permanent.completedCycles === 1);
-      el('skip-home-intro').click(); assert(el('archives-dialog').dataset.cinematic === 'false');
+      assert(!el('destruction-presentation').hidden && el('home-scroll').inert);
+      el('skip-destruction').click(); assert(el('destruction-presentation').hidden && !el('home-scroll').inert);
       assert(frame.contentWindow.__storage.getItem(DEBUG_SAVE_KEY) === serializeSession(s));
       frame.remove(); frame = await mountFixture(serializeSession(s), false, 'debug');
       assert(el('archives-dialog').open && el('archives-dialog').dataset.cinematic === 'false' && el('legacy').textContent === '1');
@@ -121,7 +122,7 @@ export function registerTalentHomeTests(test, assert, near) {
     const el = id => frame.contentDocument.getElementById(id);
     try {
       frame.contentDocument.querySelector('[data-debug-command="finale"]').click();
-      assert(el('archives-dialog').open && el('archives-dialog').dataset.cinematic === 'false' && el('skip-home-intro').hidden);
+      assert(el('archives-dialog').open && el('archives-dialog').dataset.cinematic === 'false' && el('skip-home-intro').hidden && el('destruction-presentation').hidden);
       el('node-spark').click(); el('buy-spark').click();
       assert(el('legacy').textContent === '0' && el('talent-feedback').textContent.includes('文明火种'));
       assert(el('legacy').getAnimations().length === 0 && el('node-spark').getAnimations().length === 0);

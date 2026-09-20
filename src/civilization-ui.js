@@ -1,6 +1,7 @@
 import { createBindings } from './dom-bindings.js';
 import { Q } from './quantity.js';
 import { createOrbitalUI } from './orbital-ui.js';
+import { createDestructionUI } from './destruction-ui.js';
 import { buildCivilizationViewModel, buildChallengeViewModel } from './civilization-view-model.js';
 import { createProgression, updateProgression, continueCivilization, rebuildCivilization, abandonCivilization, startChallenge, cycleGameSpeed } from './progression.js';
 import { SAVE_INTERVAL, challengeName } from './progression-config.js';
@@ -53,7 +54,8 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     if (!autoDialog.open) autoDialog.showModal(); changed();
   }
   function openSave() { if (!saveDialog.open) saveDialog.showModal(); changed(); }
-  function replace(next) { orbital.dismiss(); session = next; saveElapsed = 0; shownFinaleRunId = null;
+  function replace(next) { destruction.dismiss(); orbital.dismiss(); session = next; saveElapsed = 0; shownFinaleRunId = null;
+    restoredFinale = next.run.phase === 'destruction' ? next.run.runId : null;
     dialog.close(); autoDialog.close(); challengeDialog.close(); offeredRunId = null;
     changed(true); }
   function transition(action) {
@@ -111,6 +113,7 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     if (key === 'bypasser') orbital.present(true);
   });
   const orbital = createOrbitalUI({ review: () => talentControls.open(false), save: openSave });
+  const destruction = createDestructionUI();
   el('return-orbit').addEventListener('click', () => orbital.present(false));
   el('rebuild-civilization').addEventListener('click', () => {
     const runId = session.run.runId;
@@ -162,20 +165,26 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
   else if (!loaded.session) save();
   else text('save-status', '已恢复上次保存的完整进度，没有离线推进。');
   let shownFinaleRunId = null;
-  const restoredFinale = loaded.session?.run.phase === 'destruction' ? loaded.session.run.runId : null;
+  let restoredFinale = loaded.session?.run.phase === 'destruction' ? loaded.session.run.runId : null;
   return {
     presentEnd() {
       const key = `${session.run.runId}:${session.run.phase}`;
       if (!['destruction', 'orbital'].includes(session.run.phase) || shownFinaleRunId === key) return;
       shownFinaleRunId = key;
-      open({ cinematic: session.run.runId !== restoredFinale });
+      const fresh = session.run.runId !== restoredFinale;
+      const firstDestruction = fresh && session.run.phase === 'destruction' && session.permanent.completedCycles === 1;
+      open({ cinematic: fresh && !firstDestruction });
+      if (firstDestruction) destruction.present(session.game);
     },
     get session() { return session; },
     get homeOpen() { return dialog.open; },
     get paused() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open; },
     get modalOpen() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open; },
     get timeScale() { return debug ? session.debugSpeed : session.permanent.settings.speed; },
-    sync, save, open, cycleSpeed, animate: timestamp => orbital.tick(timestamp, saveDialog.open || autoDialog.open || challengeDialog.open),
+    sync, save, open, cycleSpeed, animate(timestamp) {
+      const suspended = saveDialog.open || autoDialog.open || challengeDialog.open;
+      orbital.tick(timestamp, suspended); destruction.tick(timestamp, suspended);
+    },
     step(dt) {
       const resolved = updateProgression(session, dt);
       saveElapsed += dt;

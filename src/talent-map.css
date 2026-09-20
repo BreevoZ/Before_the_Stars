@@ -181,3 +181,19 @@
 #archives-dialog[data-orbital] .talent-feedback { opacity: 0 !important; }
 .debug-legacy { position: absolute; left: 16px; bottom: 110px; z-index: 4; font-size: 10px; min-height: 44px; background: var(--color-home-surface); }
 #orbital-save-warning { position: absolute; bottom: max(16px, env(safe-area-inset-bottom)); left: 20px; right: 20px; margin: 0 auto; max-width: 640px; font-size: 11px; line-height: 1.8; color: var(--route-legacy); }
+
+/* The first defeat of the final base grows into the home's existing scene.
+   Only opacity changes as the tree returns: its scroll position stays fixed. */
+#archives-dialog[data-destruction] { background: transparent; }
+#archives-dialog[data-destruction]::backdrop { background: transparent; }
+#archives-dialog[data-destruction] > :is(.home-header, .home-scroll, .archive-footer, .debug-legacy) { opacity: var(--destruction-tree, 0); }
+#archives-dialog[data-destruction] #home-sky { opacity: var(--destruction-ruins, 0); }
+#archives-dialog[data-destruction] .home-nav { opacity: var(--destruction-actions, 0); }
+body:has(#archives-dialog[data-destruction]) #result { visibility: hidden; }
+body:has(#archives-dialog[data-destruction]) #civilization-bar { display: none; }
+.destruction-presentation { position: absolute; inset: 0; z-index: 10; isolation: isolate; }
+.destruction-presentation[hidden] { display: none; }
+#destruction-sky { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; }
+#destruction-caption { position: absolute; top: 23%; left: 24px; right: 24px; max-width: 660px; margin: 0 auto; text-align: center; font-size: clamp(13px, 1.6vw, 18px); font-weight: 400; letter-spacing: 3px; line-height: 2; color: var(--color-home-text); text-wrap: balance; text-shadow: 0 2px 18px var(--color-home-surface); }
+#skip-destruction { position: absolute; top: max(16px, env(safe-area-inset-top)); right: max(18px, env(safe-area-inset-right)); min-height: 44px; padding: 10px 12px; font-size: 11px; letter-spacing: 1px; color: var(--color-home-text); }
+@media (max-width: 740px) { #destruction-caption { top: 29%; left: 28px; right: 28px; font-size: 14px; letter-spacing: 2px; } }

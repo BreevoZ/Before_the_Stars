@@ -35,7 +35,7 @@ export function buildCivilizationViewModel(session, { debug = false } = {}) {
   text('home-heading', run.phase === 'destruction' ? '文明未能幸存，星火仍在。' : '每一次重建，都离群星更近。');
   text('archive-run', `地表文明 · 第 ${run.battleNumber} 场冲突 · 本轮 ${Math.floor(run.elapsed / 60)} 分 ${Math.floor(run.elapsed % 60)} 秒`);
   text('cycles', p.completedCycles); text('legacy', Q.format(p.legacy));
-  text('cycle-outcome', run.phase === 'destruction' ? `战争胜利，高科技失控与内战却终结了文明。本轮 +${Q.format(run.earnedLegacy)} 文明遗产，已入账。` :
+  text('cycle-outcome', run.phase === 'destruction' ? `敌军最后的核反扑摧毁了世界。战争胜利，文明却未能幸存。本轮 +${Q.format(run.earnedLegacy)} 文明遗产，已入账。` :
     run.phase === 'defeat' ? '本轮未完成终局，无通关奖励。已生产的遗产与永久档案仍然保留。' : '击败未来时代的敌方基地，完成地表文明循环；仅进化至未来并不算通关。');
   text('archive-footer', !between, 'hidden');
   text('cycle-outcome', run.phase === 'battle' || run.phase === 'victory', 'hidden');

@@ -208,25 +208,31 @@ export function createRenderer(canvas) {
   resize();
 
   return function render(game, { targeting = false, targetX = RULES.width / 2 } = {}) {
-    const ground = sceneHeight * 0.738;
-    const time = reducedMotion.matches ? 0 : game.elapsed;
-    drawLandscape(ctx, sceneHeight, ground, time);
-    ctx.save();
-    ctx.translate(0, ground);
-    drawBase(ctx, game.bases.player, game.ages.player, time, entityScale, game.turrets.player.length);
-    drawBase(ctx, game.bases.enemy, game.ages.enemy, time, entityScale, game.turrets.enemy.length);
-    drawDefenses(ctx, game, 'player', entityScale, reducedMotion.matches);
-    drawDefenses(ctx, game, 'enemy', entityScale, reducedMotion.matches);
-    drawFields(ctx, game, time, entityScale, reducedMotion.matches);
-    // Draw the ranged rank behind the frontline, including when allies pass each other.
-    for (const lane of ['back', 'front']) {
-      for (const unit of game.units) if (UNITS[unit.type].lane === lane) drawUnit(ctx, unit, game.elapsed, entityScale, reducedMotion.matches, getUnitHealth(game, unit.type, unit.team), attributes(game, unit));
-    }
-    for (const shot of game.projectiles) drawProjectile(ctx, shot, entityScale, reducedMotion.matches);
-    if (targeting) drawTarget(ctx, targetX, getAbilityRadius(AGES[game.ages.player].ability, game));
-    drawBattleEffects(ctx, game, entityScale, reducedMotion.matches, ground);
-    ctx.restore();
+    drawBattleScene(ctx, game, { height: sceneHeight, entityScale, time: reducedMotion.matches ? 0 : game.elapsed,
+      reducedMotion: reducedMotion.matches, targeting, targetX });
   };
+}
+
+// One painter for live combat and its final frame in the destruction sequence.
+// Presentation callers supply their camera/clock; this never advances combat.
+export function drawBattleScene(ctx, game, { height = RULES.height, ground = height * .738,
+  time = game.elapsed, entityScale = 1, reducedMotion = false, targeting = false, targetX = RULES.width / 2 } = {}) {
+  drawLandscape(ctx, height, ground, time);
+  ctx.save();
+  ctx.translate(0, ground);
+  drawBase(ctx, game.bases.player, game.ages.player, time, entityScale, game.turrets.player.length);
+  drawBase(ctx, game.bases.enemy, game.ages.enemy, time, entityScale, game.turrets.enemy.length);
+  drawDefenses(ctx, game, 'player', entityScale, reducedMotion);
+  drawDefenses(ctx, game, 'enemy', entityScale, reducedMotion);
+  drawFields(ctx, game, time, entityScale, reducedMotion);
+  // Draw the ranged rank behind the frontline, including when allies pass each other.
+  for (const lane of ['back', 'front']) {
+    for (const unit of game.units) if (UNITS[unit.type].lane === lane) drawUnit(ctx, unit, game.elapsed, entityScale, reducedMotion, getUnitHealth(game, unit.type, unit.team), attributes(game, unit));
+  }
+  for (const shot of game.projectiles) drawProjectile(ctx, shot, entityScale, reducedMotion);
+  if (targeting) drawTarget(ctx, targetX, getAbilityRadius(AGES[game.ages.player].ability, game));
+  drawBattleEffects(ctx, game, entityScale, reducedMotion, ground);
+  ctx.restore();
 }
 
 // Shared by the battlefield and the frame-by-frame animation workshop.

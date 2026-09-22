@@ -1,3 +1,5 @@
+import { validateOrbital } from './orbital-save.js';
+import { orbitalLegacySpent } from './orbital-game.js';
 import { Q } from './quantity.js';
 import { RULES, AGES, UNITS, TURRETS, ABILITIES, getBaseHealth, getUnitHealth } from './game.js';
 import { SAVE_VERSION, SURFACE, UPGRADE_COSTS, LEGACY_ECONOMY, AUTOMATION_TARGETS, AUTOMATION_INTERVAL, CHALLENGE, getChallengeModifiers, getBonuses, automationUnlocked, availableSpeeds } from './progression-config.js';
@@ -110,12 +112,13 @@ export function validateRecord(session, version = SAVE_VERSION) {
         ? Q.eq(cost, 0) : prices.some(list => list[rank] !== undefined && Q.eq(cost, list[rank]))), '购买账本价格');
     }
   }
+  validateOrbital(session, version);
   const spent = version >= 11 ? paidLegacy(p) : Object.values(p.upgrades).reduce((sum, level) => sum + upgradeCosts.slice(0, level).reduce((a, b) => a + b, 0), 0)
     + (oldVersion ? 0 : Object.entries(configs).reduce((sum, [key, config]) => sum +
       (!previousVersion && p.talentGrants.includes(key) ? 0 : config.costs.slice(0, p.talents[key]).reduce((a, b) => a + b, 0)), 0));
   const adjustment = p.debugLegacyAdjustment ?? 0;
   check(p.debugLegacyAdjustment === undefined || (version >= 14 && session.debug === true && Q.valid(adjustment) && Q.isInteger(adjustment)), '调试遗产账目');
-  check(Q.eq(Q.add(p.legacy, spent), Q.add(totalLegacy, adjustment)), '遗产收支不一致');
+  check(Q.eq(Q.sum([p.legacy, spent, version >= 15 ? orbitalLegacySpent(session.orbital) : 0]), Q.add(totalLegacy, adjustment)), '遗产收支不一致');
   const auto = p.automation;
   check(object(auto) && bool(auto.unlocked) && bool(auto.enabled) && AUTOMATION_TARGETS.includes(auto.target), '自动招募设置');
   check(auto.unlocked === (previousVersion ? p.completedCycles > 0 : version < 9 ? p.talents.autobuyer > 0 : automationUnlocked(p)) && (auto.unlocked || !auto.enabled), '自动招募解锁');

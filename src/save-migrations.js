@@ -1,3 +1,4 @@
+import { createOrbitalState } from './orbital-game.js';
 import { createLegacyMachine } from './legacy-machine.js';
 import { Q } from './quantity.js';
 import { UNITS, TURRETS, getBaseHealth, projectileField } from './game.js';
@@ -7,7 +8,7 @@ import { getV8RunBonuses } from './progression-bonuses.js';
 import { createAutomation } from './automation.js';
 import { HISTORICAL_TALENTS, HISTORICAL_UPGRADE_COSTS } from './save-history.js';
 import { validateRecord } from './save-validation.js';
-import { cloneRecord, toV8Record, fromV8Record, fromV9Record, fromV10Record, fromV11Record, fromV12Record, fromV13Record } from './save-record.js';
+import { cloneRecord, toV8Record, fromV8Record, fromV9Record, fromV10Record, fromV11Record, fromV12Record, fromV13Record, fromV14Record } from './save-record.js';
 import { TALENTS } from './talents.js';
 const teams = ['player', 'enemy'];
 
@@ -175,11 +176,17 @@ export function migrateV13(input) {
   session.version = 14;
   return { ...toV8Record(session), version: 14 };
 }
-export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9, 10: migrateV10, 11: migrateV11, 12: migrateV12, 13: migrateV13 });
+export function migrateV14(input) {
+  const record = cloneRecord(input);
+  if (record.run.phase === 'orbital') record.orbital = createOrbitalState();
+  record.version = 15;
+  return record;
+}
+export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9, 10: migrateV10, 11: migrateV11, 12: migrateV12, 13: migrateV13, 14: migrateV14 });
 export function migrateRecord(input) {
   let record = input;
   while (record.version < SAVE_VERSION) {
-    const hydrate = { 8: fromV8Record, 9: fromV9Record, 10: fromV10Record, 11: fromV11Record, 12: fromV12Record, 13: fromV13Record }[record.version];
+    const hydrate = { 8: fromV8Record, 9: fromV9Record, 10: fromV10Record, 11: fromV11Record, 12: fromV12Record, 13: fromV13Record, 14: fromV14Record }[record.version];
     validateRecord(hydrate ? hydrate(record) : record, record.version);
     record = MIGRATIONS[record.version](record);
   }

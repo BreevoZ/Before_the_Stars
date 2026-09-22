@@ -1,6 +1,6 @@
 # 界面、存档与文明流程
 
-继续使用原生 ES modules、Canvas 和静态服务器；本轮没有引入 UI 框架、构建步骤或新玩法。
+继续使用原生 ES modules、Canvas 和静态服务器；没有引入 UI 框架或构建步骤。
 
 ## 状态 → 视图模型 → DOM
 
@@ -107,3 +107,18 @@ node sim/batch.js --out sim/results/scan.csv
 `orbital` 保留已结算的地表 run 与奖励凭据，必须与永久 Bypasser 等级、支付账目一致。当前终点不再接受重建或重复 launch。购买控制器先立即保存，再启动 `orbital-ui.js`；其时钟复用页面 RAF，仅改变画面，隐藏页面与存档弹窗时停止。刷新直接呈现抵达状态，不存演出帧，不依赖结束回调提交进度。
 
 `orbital-scene.js` 是可按时间寻址的纯 Canvas 表现，星图背景与动画工坊共用它。36 艘飞船由固定种子生成，镜头位移和尾焰使用演出时间；减少动态效果直接选最终帧。
+
+
+### VI 可玩家园（v15）
+
+`launch` 在原子购买中创建 `session.orbital`，`started: false`。抵达画面的进入按钮调用幂等的 `enterOrbital` 才开始建设模拟；动画结束仍不推进游戏。进入后沿用主循环的固定步长、倍速、手动暂停、可见性与模态窗口守卫。地表 run 和最后一场战斗保留结算凭据，但不再更新地表战斗、自动招募或遗产生产机。
+
+- `orbital-config.js`：阶段版本、建设费用与时间、天体定义、政策和干预数据。当前配置按 1× 首次 20–30 分钟设定。
+- `celestial-economy.js`：通用的天体／文明成长、纷争、事件与干预计算，无 DOM、战斗或存档依赖。
+- `orbital-game.js`：建设前置和支付、当前能源容量与产出、全局 Legacy 记账。建筑和订单价格由明确的轨道规则版本约束；以后改价需要迁移，不能用新价重算旧支出。
+- `orbital-save.js`：轨道 schema、建设前置、支付凭据、文明字段与完成标记；`save-quantities.js` 显式编解码能源和 Legacy。
+- `orbital-view-model.js` / `orbital-colony-ui.js`：纯视图投影与一次性控件绑定；`orbital-render.js` 只读模拟状态绘制地球、家园和月面。
+
+v14 → v15 为已有抵达存档创建未开始的家园，无收入补发、无离线快进。永久账本、活动订单、文明状态与完成时间仍同记录提交。`orbitalLegacySpent` 汇总已建与在建费用，余额在恢复时统一扣除；工程完工不会再次扣费。家园共享 Legacy 钱包，使用新的有限储能资源，不新增轨道 prestige 或 VII 状态机。
+
+`tests/orbital-colony-cases.js` 同时用于 Node 与浏览器，覆盖实际经济和存档；浏览器还从空钱包按真实建设按钮建到月球航行港，并验证暂停、读档与窄屏布局。`sim/orbital.js` 为无 DOM 的固定路线模拟，`sim/orbital-run.js` 仅是 Node 输出入口。独立试玩页使用隔离的内存存储。

@@ -1,3 +1,5 @@
+import { enterOrbital } from './orbital-game.js';
+import { createOrbitalColonyUI } from './orbital-colony-ui.js';
 import { canAutoContinue } from './automation.js';
 import { getChallengeLevels } from './progression-machine.js';
 import { createBindings } from './dom-bindings.js';
@@ -50,6 +52,8 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     text('save-status', result.ok ? success : result.error);
     el('save-warning').hidden = Boolean(result.ok);
     el('orbital-save-warning').hidden = Boolean(result.ok);
+    el('colony-save-warning').hidden = Boolean(result.ok);
+    if (!result.ok) text('colony-save-warning', `尚未保存：${result.error} 请通过存档入口导出进度。`);
     if (!result.ok) text('orbital-save-warning', `尚未写入本地存档：${result.error} 请通过「存档」导出当前进度。`);
     if (!result.ok) text('save-warning', `存档提示：${result.error} 当前可继续试玩并导出进度；请在「存档」处理。`);
     return result.ok;
@@ -145,7 +149,12 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     save(); changed();
     if (key === 'bypasser') orbital.present(true);
   });
-  const orbital = createOrbitalUI({ review: () => talentControls.open(false), save: openSave });
+  const colony = createOrbitalColonyUI(() => session, { commit: () => { save(); changed(); },
+    archive: () => { if (!dialog.open) dialog.showModal(); talentControls.open(false); changed(); }, save: openSave, speed: cycleSpeed });
+  const orbital = createOrbitalUI({ review: () => talentControls.open(false), save: openSave, enter: () => {
+    if (enterOrbital(session)) save();
+    if (session.orbital?.started) { dialog.close(); changed(true); colony.paint(); el('colony-pause').focus({ preventScroll: true }); }
+  } });
   const destruction = createDestructionUI();
   el('return-orbit').addEventListener('click', () => orbital.present(false));
   el('rebuild-civilization').addEventListener('click', () => {
@@ -189,7 +198,11 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     if (report(store.clear(next), '全部进度已清空。')) { replace(next); dialog.close(); saveDialog.close(); }
   });
 
-  function sync() {
+  let manualPause = false;
+  function sync({ manualPaused = manualPause } = {}) {
+    manualPause = manualPaused;
+    colony.sync({ paused: manualPause || document.hidden });
+    text('enter-orbital', session.orbital?.started ? '返回轨道家园' : '建立轨道家园');
     bind(buildCivilizationViewModel(session, { debug }));
     talentControls.sync();
   }
@@ -204,20 +217,22 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
       const key = `${session.run.runId}:${session.run.phase}`;
       if (!['destruction', 'orbital'].includes(session.run.phase) || shownFinaleRunId === key) return;
       shownFinaleRunId = key;
+      if (session.run.phase === 'orbital' && session.orbital?.started) return;
       const fresh = session.run.runId !== restoredFinale;
       const firstDestruction = fresh && session.run.phase === 'destruction' && session.permanent.completedCycles === 1;
       open({ cinematic: fresh && !firstDestruction });
       if (firstDestruction) destruction.present(session.game);
     },
     get session() { return session; },
-    get homeOpen() { return dialog.open; },
+    get homeOpen() { return dialog.open || Boolean(session.orbital?.started); },
     get paused() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open || debugDialog.open; },
     get modalOpen() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open || debugDialog.open; },
-    get canStep() { return session.game.status === 'playing' || canAutoContinue(session); },
+    get canStep() { return session.game.status === 'playing' || canAutoContinue(session) || Boolean(session.orbital?.started); },
     get timeScale() { return debug ? session.debugSpeed : session.permanent.settings.speed; },
     sync, save, open, cycleSpeed, animate(timestamp) {
       const suspended = saveDialog.open || autoDialog.open || challengeDialog.open || debugDialog.open;
       orbital.tick(timestamp, suspended); destruction.tick(timestamp, suspended);
+      if (!dialog.open) colony.paint();
     },
     step(dt) {
       const before = session.game;

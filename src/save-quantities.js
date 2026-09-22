@@ -40,5 +40,9 @@ export function mapSessionQuantities(session, convert) {
     if (session.version >= 12) field(run, 'machineLegacy');
     if (p.legacyMachine) field(p.legacyMachine, 'produced');
   }
+  if (session.version >= 15 && session.orbital) {
+    field(session.orbital, 'energy'); field(session.orbital, 'legacyEarned');
+    if (session.orbital.project) { field(session.orbital.project, 'legacy'); field(session.orbital.project, 'energy'); }
+  }
   return session;
 }

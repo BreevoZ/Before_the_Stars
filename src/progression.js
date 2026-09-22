@@ -1,3 +1,4 @@
+import { createOrbitalState, updateOrbital } from './orbital-game.js';
 import { createLegacyMachine, updateLegacyMachine, getRunProduction } from './legacy-machine.js';
 import { Q } from './quantity.js';
 import { payLegacy } from './legacy-ledger.js';
@@ -67,6 +68,7 @@ export function resolveBattle(session) {
 
 export function updateProgression(session, dt, { paused = false, hidden = false } = {}) {
   if (paused || hidden || !Number.isFinite(dt) || dt <= 0) return false;
+  if (session.run.phase === PHASE.ORBITAL) return updateOrbital(session, dt);
   if (canAutoContinue(session)) return continueCivilization(session, session.run.battleId);
   if (resolveBattle(session)) return true;
   if (session.run.phase !== PHASE.BATTLE) return false;
@@ -113,7 +115,9 @@ const effects = {
   rebuild: session => startRun(session),
   challenge: (session, level) => startRun(session, level),
   abandon: session => startRun(session, session.run.challengeLevel, session.run.extraBonuses ?? []),
-  launch({ permanent }) {
+  launch(session) {
+    const { permanent } = session;
+    session.orbital = createOrbitalState();
     payLegacy(permanent, 'bypasser', TALENTS.bypasser.costs[0]);
     permanent.talents.bypasser = 1;
   },

@@ -88,6 +88,7 @@ for (const card of cards) card.addEventListener('click', () => train(card.datase
 for (const card of towerCards) card.addEventListener('click', () => constructTurret(card.dataset.turret));
 
 function syncUI() {
+  if (civilization?.session.orbital?.started) { civilization.sync({ manualPaused }); return; }
   const vm = buildViewModel(civilization?.session ?? { game }, {
     selectedSlot, targeting, manualPaused, queueSlots: queueSlots.length,
     paused: document.hidden || helpDialog.open || civilization?.paused,
@@ -206,6 +207,7 @@ function togglePause() {
 }
 byId('pause-battle').hidden = false;
 byId('pause-battle').addEventListener('click', togglePause);
+byId('colony-pause').addEventListener('click', togglePause);
 byId('help').addEventListener('click', openHelp);
 byId('close-help').addEventListener('click', closeHelp);
 helpDialog.addEventListener('cancel', event => {
@@ -258,6 +260,7 @@ window.addEventListener('keydown', event => {
     return;
   }
   if (event.code === 'KeyR' && civilization) { event.preventDefault(); if (!event.repeat) civilization.cycleSpeed(); return; }
+  if (civilization?.session.orbital?.started) return;
   if (event.code === 'Enter' && event.target.closest('button')) return;
   if (targeting && ['ArrowLeft', 'ArrowRight', 'Enter', 'Escape'].includes(event.code)) {
     event.preventDefault();

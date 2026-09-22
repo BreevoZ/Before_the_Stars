@@ -2,7 +2,7 @@ import { drawOrbitalScene, ORBITAL_SECONDS } from './orbital-scene.js';
 
 // This controller owns presentation time only. The purchase/state transition
 // has already committed and saved before present() is called.
-export function createOrbitalUI({ review, save }) {
+export function createOrbitalUI({ review, save, enter }) {
   const el = id => document.getElementById(id), dialog = el('archives-dialog');
   const panel = el('orbital-presentation'), canvas = el('orbital-sky');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
@@ -48,6 +48,7 @@ export function createOrbitalUI({ review, save }) {
   el('skip-orbital').addEventListener('click', finish);
   el('replay-orbital').addEventListener('click', () => present(true));
   el('review-surface').addEventListener('click', () => { dismiss(); review(); });
+  el('enter-orbital').addEventListener('click', enter);
   el('orbital-save').addEventListener('click', save);
   dialog.addEventListener('cancel', event => { if (shown && time < ORBITAL_SECONDS) { event.preventDefault(); finish(); } });
   dialog.addEventListener('close', () => { if (!dialog.open) dismiss(); });

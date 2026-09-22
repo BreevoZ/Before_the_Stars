@@ -1,0 +1,72 @@
+/* Shared muted roles keep the orbital home in the same family as the star map. */
+.colony-shell { --colony-panel: var(--color-home-surface); --colony-ink: var(--color-home-text); --colony-accent: var(--route-automation); max-width: 1380px; margin: 0 auto; padding: 0 28px 40px; color: var(--colony-ink); animation: colony-arrive .8s ease-out; }
+body[data-orbital-active="true"] .game-shell { display: none; }
+.colony-shell [hidden] { display:none !important; }
+.colony-shell button, .colony-shell select { min-height: 40px; border: 1px solid var(--line); background: transparent; color: var(--colony-ink); font: inherit; font-size: 12px; border-radius: 4px; padding: 8px 13px; cursor: pointer; }
+.colony-shell button:hover:not(:disabled), .colony-shell button[aria-pressed="true"] { background: var(--color-home-talent-node-fill); border-color: var(--colony-accent); }
+.colony-shell button:disabled { opacity: .46; cursor: default; }
+.colony-shell :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.colony-shell select { background: var(--colony-panel); }
+.colony-header { display:flex; align-items:center; justify-content:space-between; gap:24px; min-height:100px; border-bottom:1px solid var(--line); }
+.colony-wordmark small,.colony-eyebrow { font-size:10px;letter-spacing:.16em;color:var(--muted); }
+.colony-wordmark h1 { font-weight:400; margin:5px 0 0; font-size:24px; color:var(--colony-accent); }
+.colony-wordmark h1 span { font-size:16px; color:var(--colony-ink); margin-left:10px; }
+.colony-resources { display:flex; gap:40px; }
+.colony-resources>div { display:grid; grid-template-columns:auto auto; gap:4px 12px; }
+.colony-resources small { grid-column:1/-1; font-size:10px;letter-spacing:.1em;color:var(--muted); }
+.colony-resources strong { color:var(--color-home-home-wallet-text);font-weight:400;font-variant-numeric:tabular-nums;font-size:19px; }
+.colony-resources span { align-self:center;font-size:11px;color:var(--muted); }
+.colony-header nav,.colony-map-heading nav { display:flex;gap:6px; }
+.colony-heading { display:flex;justify-content:space-between;align-items:center;padding:22px 0 18px;gap:20px; }
+.colony-heading h2 { font-weight:400;font-size:21px;margin:7px 0; }
+.colony-heading p:not(.colony-eyebrow) { color:var(--muted);font-size:12px;line-height:1.7;margin:5px 0; }
+#colony-complete { max-width:220px;color:var(--gold); }
+.colony-layout { display:grid; grid-template-columns:minmax(0,1fr) 335px;gap:28px;align-items:start; }
+.colony-observation { min-width:0; }
+.colony-map-heading { display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px; }
+.colony-map-heading small { font-size:11px;color:var(--muted); }
+#colony-world { display:block;width:100%;height:430px;border:1px solid var(--line);border-radius:7px 7px 0 0; }
+.colony-civ-tabs { display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-top:0; }
+.colony-civ-tabs button { font-size:11px;padding:10px 5px;border:0;border-radius:0;min-height:48px; }
+.colony-civ-detail { padding:20px;background:var(--colony-panel);border:1px solid var(--line);border-top:0; }
+.colony-civ-detail header { display:flex;justify-content:space-between;align-items:center;gap:12px; }
+.colony-shell h3 { font-size:13px;font-weight:500;letter-spacing:.06em; }
+.colony-civ-detail h3 { margin:0; }
+.colony-civ-detail header span { font-size:11px;color:var(--muted); }
+.colony-shell progress { display:block;appearance:none;border:0;height:3px;width:100%;background:var(--line);accent-color:var(--colony-accent); }
+.colony-shell progress::-webkit-progress-bar { background:var(--line); }
+.colony-shell progress::-webkit-progress-value { background:var(--colony-accent); }
+#colony-research { margin:14px 0 18px; }
+.colony-civ-detail dl { display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:0 0 20px; }
+.colony-civ-detail dt { font-size:10px;color:var(--muted); }
+.colony-civ-detail dd { font-size:14px;margin:5px 0 0;font-variant-numeric:tabular-nums; }
+.at-war { color:var(--enemy); }
+.colony-policy-label { display:flex;align-items:center;gap:16px;font-size:12px; }
+.colony-policy-label select { flex:1;max-width:160px; }
+.colony-civ-detail p { font-size:11px;color:var(--muted);line-height:1.8; }
+#colony-interventions { display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px; }
+#colony-interventions button { text-align:left;padding:12px; }
+#colony-interventions strong { font-size:12px;font-weight:400;display:block; }
+#colony-interventions small { display:block;font-size:10px;color:var(--muted);margin-top:7px; }
+#colony-auto-row { display:block;font-size:11px;color:var(--muted);line-height:1.7;margin-top:18px; }
+#colony-auto { accent-color:var(--colony-accent);vertical-align:middle; }
+.colony-event { min-height:2.5em;font-size:12px;color:var(--colony-accent);padding:10px 0; }
+.colony-journal { font-size:12px;color:var(--muted);line-height:1.9; }
+.colony-journal summary { cursor:pointer; }
+.colony-journal ol { padding-left:20px;font-size:11px; }
+.colony-project { padding:16px;background:var(--colony-panel);border-top:1px solid var(--colony-accent);position:sticky;top:0;z-index:1; }
+.colony-project small { display:block;font-size:10px;color:var(--muted); }
+.colony-project strong { display:block;font-size:12px;font-weight:400;margin:10px 0 15px; }
+.colony-construction>h3 { margin:24px 0 12px;color:var(--muted); }
+.colony-build { padding:14px 0;border-bottom:1px solid var(--line); }
+.colony-build header { display:flex;justify-content:space-between;gap:10px; }
+.colony-build h4 { font-weight:400;font-size:13px;margin:0; }
+.colony-build small { font-size:10px;color:var(--muted); }
+.colony-build p { font-size:11px;color:var(--muted);line-height:1.7;margin:8px 0; }
+.colony-build>button { margin-top:12px;width:100%;font-size:11px;line-height:1.5; }
+.colony-build.is-built { opacity:.6; }
+#colony-save-warning { color:var(--gold);font-size:12px;line-height:1.6; }
+@keyframes colony-arrive { from { opacity:0; } to { opacity:1; } }
+@media(max-width:1000px) { .colony-header { flex-wrap:wrap;gap:16px;padding:20px 0; }.colony-header nav { margin-left:auto; }.colony-layout { grid-template-columns:minmax(0,1fr) 285px;gap:20px; } #colony-world{height:350px;} .colony-resources{gap:24px;} }
+@media(max-width:740px) { .colony-shell{padding:0 16px 30px;} .colony-layout { grid-template-columns:1fr;gap:12px; }.colony-header{gap:18px 12px;} .colony-resources{margin-left:auto;gap:16px;} .colony-resources>div{display:block;}.colony-resources small,.colony-resources span{display:block;} .colony-resources strong{font-size:16px;display:block;margin:4px 0;} .colony-header nav{width:100%;margin:0;}.colony-header nav button{flex:1;} .colony-map-heading{align-items:flex-start;} .colony-map-heading small{max-width:145px;line-height:1.6;text-align:right;} #colony-world{height:340px;} .colony-heading{display:block;} .colony-civ-detail{padding:16px;} .colony-civ-detail dl{gap:8px;} .colony-civ-detail dd{font-size:12px;} #colony-interventions{gap:6px;} #colony-interventions button{padding:10px 6px;} .colony-build { display:grid;grid-template-columns:1fr 95px;gap:0 14px;}.colony-build header,.colony-build p,.colony-build>small{grid-column:1;} .colony-build>button{grid-column:2;grid-row:1/4;align-self:center;min-height:48px;margin:0;} }
+@media(prefers-reduced-motion:reduce){ .colony-shell{animation:none;} }

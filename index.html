@@ -9,9 +9,40 @@
     <link rel="stylesheet" href="./src/style.css" />
     <link rel="stylesheet" href="./src/talent-map.css" />
     <link rel="stylesheet" href="./src/command-ui.css" />
+    <link rel="stylesheet" href="./src/orbital.css" />
     <script type="module" src="./src/main.js"></script>
   </head>
   <body>
+
+    <section id="orbital-game" class="colony-shell" aria-label="轨道家园" hidden>
+      <header class="colony-header">
+        <div class="colony-wordmark"><small>BEFORE THE STARS</small><h1>VI <span>轨道家园</span></h1></div>
+        <div class="colony-resources"><div><small>LEGACY</small><strong id="colony-legacy"></strong><span id="colony-income"></span></div><div><small>能量</small><strong id="colony-energy"></strong><span id="colony-power"></span></div></div>
+        <nav aria-label="家园控制"><button id="colony-pause" title="暂停 / 继续 · 空格" type="button">暂停</button><button id="colony-speed" title="切换速度 · R" type="button">1×</button><select id="colony-debug-speed" aria-label="轨道调试速度" hidden><option value="1">1×</option><option value="5">5×</option><option value="10">10×</option><option value="20">20×</option></select><button id="colony-archive" type="button">星图</button><button id="colony-save" type="button">存档</button></nav>
+      </header>
+      <div class="colony-heading"><div><p class="colony-eyebrow">ORBITAL HABITAT · <span id="colony-time">0:00</span></p><h2 id="colony-objective"></h2><p id="colony-objective-detail"></p></div><p id="colony-complete" role="status" hidden></p></div>
+      <p id="colony-save-warning" role="status" hidden></p>
+      <div class="colony-layout">
+        <div class="colony-observation">
+          <div class="colony-map-heading"><nav aria-label="观测天体"><button id="observe-earth" type="button">地球</button><button id="observe-moon" type="button" title="完成月面测绘后开放">月球</button></nav><small id="colony-body-name"></small></div>
+          <canvas id="colony-world" aria-label="轨道家园与地表文明的实时观测图"></canvas>
+          <div id="colony-civilizations" class="colony-civ-tabs" role="group" aria-label="选择地表文明"></div>
+          <section id="colony-civilization" class="colony-civ-detail">
+            <header><h3 id="colony-civ-name"></h3><span id="colony-civ-age"></span></header>
+            <progress id="colony-research" max="1" value="0" aria-label="文明发展"></progress>
+            <dl><div><dt>人口</dt><dd id="colony-population"></dd></div><div><dt>影响力</dt><dd id="colony-influence"></dd></div><div><dt>纷争</dt><dd id="colony-unrest"></dd></div><div><dt>遗产</dt><dd id="colony-civ-income"></dd></div></dl>
+            <label class="colony-policy-label">治理政策 <select id="colony-policy"></select></label><p id="colony-policy-detail"></p>
+            <div id="colony-interventions"></div>
+            <label id="colony-auto-row" hidden><input id="colony-auto" type="checkbox" />自动调停 · 纷争 ≥65 时支付 40 能量，预留 100 能量</label>
+          </section>
+          <section id="colony-lunar" class="colony-civ-detail" hidden><h3>月面开发</h3><p id="colony-lunar-detail"></p><p>从右侧建设月球前哨、聚变堆和航行港。月球电力直接接入家园的能源网络。</p></section>
+          <p id="colony-event" class="colony-event" role="status"></p>
+          <details class="colony-journal"><summary>观测日志与操作说明</summary><p>空格暂停，R 切换倍速；切换页面和打开星图或存档时自动暂停，没有离线收益。首次建设约需 20–30 分钟模拟时间。</p><p>先建设太阳翼和居住舱；地表人口、时代与影响力决定遗产收入。扶植利于成长，征贡增加收益也增加纷争。纷争 ≥65 时，收入降为 40%、人口增速降为 30%、研究速度减半。干预会消耗能量，并有独立冷却。</p><ol id="colony-log"></ol></details>
+        </div>
+        <aside class="colony-construction" aria-label="家园建设"><div class="colony-project"><small>建造船 · 单项施工</small><strong id="colony-project"></strong><progress id="colony-project-progress" max="1" value="0"></progress></div><h3>轨道设施</h3><div id="colony-build-orbit"></div><h3>月面计划</h3><div id="colony-build-moon"></div></aside>
+      </div>
+    </section>
+
     <main class="game-shell">
       <header class="masthead">
         <div class="wordmark"><span class="brand-mark" aria-hidden="true">✳</span> BEFORE THE STARS</div>
@@ -145,8 +176,8 @@
           <h2 id="orbital-title" tabindex="-1">VI <span>轨道文明</span></h2>
           <p>我们终于走出了那片废墟。</p>
           <div id="orbital-actions" inert aria-hidden="true">
-            <p class="orbital-note">地表篇已完成 · 轨道建设将在后续版本开放</p>
-            <nav aria-label="轨道文明"><button id="review-surface" class="orbit-action" type="button"><span data-icon="star"></span>回望星图</button><button id="replay-orbital" class="orbit-action" type="button"><span data-icon="restart"></span>重播启航</button><button id="orbital-save" class="orbit-action" type="button"><span data-icon="base"></span>存档</button></nav>
+            <p class="orbital-note">地表篇已完成 · 轨道建设从这里开始</p>
+            <nav aria-label="轨道文明"><button id="enter-orbital" class="orbit-action" type="button">建立轨道家园</button><button id="review-surface" class="orbit-action" type="button"><span data-icon="star"></span>回望星图</button><button id="replay-orbital" class="orbit-action" type="button"><span data-icon="restart"></span>重播启航</button><button id="orbital-save" class="orbit-action" type="button"><span data-icon="base"></span>存档</button></nav>
           </div>
         </div>
       </section>

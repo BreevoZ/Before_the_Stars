@@ -77,7 +77,7 @@ export function buildCivilizationViewModel(session, { debug = false } = {}) {
     text('home-heading', '地表的星火，已经抵达轨道。');
     text('cycle-outcome', '存续协议已生效。地表天赋、遗产与通关记录均已保留。');
     text('result-title', 'VI · 轨道文明');
-    text('result-detail', '人类已越过大过滤器。轨道建设将在后续版本开放。');
+    text('result-detail', '人类已越过大过滤器。建设轨道家园，俯瞰地表的新文明。');
     text('play-again', '返回轨道');
     text('result-hint', '启航已保存 · 可回望地表星图或重播演出');
   }

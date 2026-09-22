@@ -1,3 +1,4 @@
+import { orbitalLegacySpent } from './orbital-game.js';
 import { paidLegacy } from './legacy-ledger.js';
 import { Q } from './quantity.js';
 import { AGES, evolve } from './game.js';
@@ -33,10 +34,10 @@ export function setDebugLegacy(session, value) {
   let amount;
   try { amount = Q.of(value); } catch { return false; }
   if (!Q.valid(amount) || !Q.isInteger(amount) || Q.lt(amount, 0)) return false;
-  const p = session.permanent;
-  const adjustment = Q.sub(Q.add(amount, paidLegacy(p)), p.totalLegacy);
+  const p = session.permanent, spent = Q.add(paidLegacy(p), orbitalLegacySpent(session.orbital));
+  const adjustment = Q.sub(Q.add(amount, spent), p.totalLegacy);
   // Extremely different magnitudes may exceed the quantity format's precision.
-  if (!Q.eq(Q.sub(Q.add(p.totalLegacy, adjustment), paidLegacy(p)), amount)) return false;
+  if (!Q.eq(Q.sub(Q.add(p.totalLegacy, adjustment), spent), amount)) return false;
   p.debugLegacyAdjustment = adjustment;
   p.legacy = amount;
   return true;

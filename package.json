@@ -9,6 +9,7 @@
     "test": "node --test tests/node.test.js tests/sim.test.js",
     "sim": "node sim/run.js",
     "sim:batch": "node sim/batch.js",
+    "sim:orbital": "node sim/orbital-run.js",
     "sim:traits": "node sim/traits.js"
   }
 }

@@ -1,3 +1,4 @@
+import { orbitalLegacySpent } from './orbital-game.js';
 import { Q, isLargeQuantity } from './quantity.js';
 import { RULES } from './game-config.js';
 import { SAVE_VERSION, automationUnlocked } from './progression-config.js';
@@ -47,7 +48,7 @@ function hydrateRecord(input, version) {
   check(object(p.upgrades) && object(p.talents) && object(p.automation) && (version < 10 ? int(p.totalLegacy) : Q.valid(p.totalLegacy) && Q.gte(p.totalLegacy, 0) && Q.isInteger(p.totalLegacy)), '永久输入');
   check(!Object.hasOwn(p, 'legacy') && !Object.hasOwn(p.automation, 'unlocked') && !Object.hasOwn(s.run, 'battleId') &&
     !Object.hasOwn(g, 'mode') && !Object.hasOwn(g, 'bonuses'), '存档包含派生字段');
-  p.legacy = Q.sub(Q.add(p.totalLegacy, version >= 14 ? p.debugLegacyAdjustment ?? 0 : 0), spentLegacy(p, version));
+  p.legacy = Q.sub(Q.add(p.totalLegacy, version >= 14 ? p.debugLegacyAdjustment ?? 0 : 0), Q.add(spentLegacy(p, version), version >= 15 ? orbitalLegacySpent(s.orbital) : 0));
   p.automation.unlocked = version < 9 ? p.talents.autobuyer > 0 : automationUnlocked(p);
   s.run.battleId = `${s.run.runId}:${s.run.battleNumber}`;
   if (s.run.extraBonuses) s.run.extraBonuses = createBonusStack(s.run.extraBonuses);
@@ -67,5 +68,6 @@ export const fromV10Record = input => hydrateRecord(input, 10);
 export const fromV11Record = input => hydrateRecord(input, 11);
 export const fromV12Record = input => hydrateRecord(input, 12);
 export const fromV13Record = input => hydrateRecord(input, 13);
+export const fromV14Record = input => hydrateRecord(input, 14);
 export const fromSaveRecord = input => hydrateRecord(input, SAVE_VERSION);
 export function toSaveRecord(session) { const record = toV8Record(session); record.version = SAVE_VERSION; return record; }

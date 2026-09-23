@@ -58,6 +58,9 @@ const paths = {
   star: '<path d="m12 2 3 6 7 1-5 5 1 8-6-4-6 4 1-8-5-5 7-1 3-6Z"/>',
   // The ark leaving for the stars: a long hull climbing away from a trail,
   // toward a small spark on the horizon.
+  parachute: '<path d="M3 10a9 7 0 0 1 18 0"/><path d="M3 10q1.5-2 3 0q1.5-2 3 0q1.5-2 3 0q1.5-2 3 0q1.5-2 3 0q1.5-2 3 0"/><path d="m3 10 7 8M21 10l-7 8M12 10v8"/><path d="M9.5 18h5v3.5h-5z"/>',
+  radar: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5" opacity=".6"/><path d="M12 12 18.4 5.6"/><circle cx="15.5" cy="15" r="1" fill="currentColor"/><circle cx="8" cy="9" r=".8" fill="currentColor"/>',
+  truce: '<path d="M6 22V3"/><path d="M6 4c3-2 5 2 8 0s4-1 5 0v8c-1-1-2-2-5 0s-5-2-8 0"/>',
   ark: '<path d="M5 19C8 14 12 10 18 7C16 12 11 16 5 19Z"/><path d="m8 13-3 .5M11 16l-.5 3"/><path d="M2.5 21.5 4 20" stroke-dasharray="1 1.6"/><path d="M20.5 1.5v3.5M18.75 3.25h3.5"/>',
   up: '<path d="m5 11 7-7 7 7M12 4v17"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',

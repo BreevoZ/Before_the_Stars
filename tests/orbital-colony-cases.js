@@ -2,9 +2,9 @@ import { SAVE_VERSION } from '../src/progression-config.js';
 import { Q } from '../src/quantity.js';
 import { launchReady } from './orbital-cases.js';
 import { purchaseTalent, updateProgression } from '../src/progression.js';
-import { createOrbitalState, enterOrbital, startOrbitalWar, updateOrbital, resolveOrbitalWar, findCivilization, purchaseOrbitalTalent, getOrbitalTalentState, getInterventionState, intervene, orbitalLegacySpent } from '../src/orbital-game.js';
-import { syncWarCivilizations } from '../src/orbital-war.js';
-import { ORBITAL_RULES as R, ORBITAL_RULES, ORBITAL_TALENTS as T, SITES } from '../src/orbital-config.js';
+import { createOrbitalState, enterOrbital, startOrbitalWar, updateOrbital, resolveOrbitalWar, findCivilization, purchaseOrbitalTalent, getOrbitalTalentState, getInterventionState, intervene, orbitalLegacySpent, interventionCost } from '../src/orbital-game.js';
+import { syncWarCivilizations, warOdds } from '../src/orbital-war.js';
+import { ORBITAL_RULES as R, ORBITAL_RULES, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as ACTIONS, SITES } from '../src/orbital-config.js';
 import { civilizationValue, rebirthDelay, lunarLegacyRate, bondRate, nuclearMultiplier, doomsdayMultiplier, orbitalYieldMultiplier } from '../src/celestial-economy.js';
 import { serializeSession, parseSession, DEBUG_SAVE_KEY, createSaveStore, mapSessionQuantities } from '../src/save.js';
 import { oldOrbitalSpent } from '../src/orbital-history.js';
@@ -92,6 +92,33 @@ export function registerOrbitalColonyTests(test,assert,near){
     assert(doomsdayMultiplier(s.orbital)===2);s.orbital.elapsed=R.doomsdaySeconds/2;near(doomsdayMultiplier(s.orbital),1.5);
     s.orbital.elapsed=R.doomsdaySeconds*3;assert(doomsdayMultiplier(s.orbital)===1);
   });
+  test('Surface diplomacy: boosts escalate ×4 with worth, airdrops pay gold into the war, a ceasefire freezes it without income',()=>{
+    const s=colonyFixture({legacy:100000000,talents:['monitor','patronage','airdrop','intel','ceasefire','bonds']}),o=s.orbital;pair(s);
+    const war=o.wars[0],[a,b]=war.participants.map(id=>findCivilization(o,id));
+    const costs=[];for(let i=0;i<R.maximumPower;i++){const wallet=s.permanent.legacy;assert(intervene(s,a.id,'boost'));costs.push(Q.toNumber(Q.sub(wallet,s.permanent.legacy)));}
+    assert(JSON.stringify(costs)===JSON.stringify([64,256,1024,4096,16384])&&getInterventionState(s,a.id,'boost')==='max');
+    purchaseOrbitalTalent(s,'recovery');assert(interventionCost(o,b,'boost')===128,'The ring raises intervention prices with rewards');
+    const gold=war.game.gold.enemy;assert(intervene(s,b.id,'airdrop'));assert(Q.eq(war.game.gold.enemy,Q.add(gold,AGES[b.age].startingGold*R.airdropGold))&&Q.eq(b.gold,war.game.gold.enemy)&&b.airdrops===1);
+    assert(interventionCost(o,b,'airdrop')===2*ACTIONS.airdrop.baseCost*2);
+    const odds=buildOrbitalViewModel(s)['#colony-war-player'];assert(/胜率 \d+%/.test(odds));
+    assert(warOdds(a,b)>.9&&Math.abs(warOdds(a,b)+warOdds(b,a)-1)<1e-9,'Five boosts make a clear favourite');
+    advance(s,1);const frozen=JSON.stringify(war.game),earned=o.legacyEarned;
+    assert(intervene(s,a.id,'ceasefire')&&war.ceasefire===R.ceasefireSeconds&&getInterventionState(s,b.id,'ceasefire')==='truce');
+    const raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw);
+    advance(s,R.ceasefireSeconds/2);assert(JSON.stringify(war.game)===frozen&&Q.eq(o.legacyEarned,earned),'A frozen war neither fights nor pays');
+    assert(/停火中/.test(buildOrbitalViewModel(s)['#colony-solar-time']));
+    advance(s,R.ceasefireSeconds);assert(war.ceasefire===0&&JSON.stringify(war.game)!==frozen);
+    const bad=JSON.parse(raw);bad.orbital.wars[0].ceasefire=R.ceasefireSeconds+1;throws(()=>parseSession(JSON.stringify(bad)));
+    const plain=colonyFixture({legacy:10000,talents:['monitor']});pair(plain);
+    const untalented=JSON.parse(serializeSession(plain));untalented.orbital.wars[0].ceasefire=5;throws(()=>parseSession(JSON.stringify(untalented)));
+    const supplied=JSON.parse(serializeSession(plain));supplied.orbital.civilizations[0].airdrops=1;throws(()=>parseSession(JSON.stringify(supplied)));
+  });
+  test('Intel: the pre-war estimate shows only with 情报网络 and favours the older, boosted side',()=>{
+    const plain=colonyFixture({legacy:10000,talents:['monitor']});assert(!/情报预估/.test(buildOrbitalViewModel(plain)['#colony-war-hint']));
+    const s=colonyFixture({legacy:10000,talents:['monitor','intel']});assert(/情报预估：.*\d+%.*\d+%/.test(buildOrbitalViewModel(s)['#colony-war-hint']));
+    const base={age:1,power:0,tendency:0,doctrine:0,superSoldiers:0};
+    assert(warOdds(base,base)===.5&&warOdds({...base,age:2},base)>.8&&warOdds({...base,power:1},{...base,age:2})>.5);
+  });
   test('Lunar economy: locked production is zero, outpost and each industry rank pay the displayed rate',()=>{
     const locked=colonyFixture({legacy:10000,talents:['recovery']});advance(locked,1);assert(lunarLegacyRate(locked.orbital)===0&&locked.orbital.lunarProduced===0);
     const s=lunarFixture();let rate=R.lunarBaseIncome;assert(lunarLegacyRate(s.orbital)===rate);
@@ -117,7 +144,8 @@ export function registerOrbitalColonyTests(test,assert,near){
     assert(s.version===SAVE_VERSION&&s.orbital.version===ORBITAL_RULES.version&&s.orbital.lunarProduced===0&&s.orbital.lunarFraction===0&&s.orbital.talents.lunarIndustry===0);
     assert(s.orbital.talents.recovery===v16Orbital.orbital.talents.recovery&&s.orbital.wars.length===1);
     assert(JSON.stringify(v16Orbital)===source&&serializeSession(s)===serializeSession(r));
-    assert(JSON.stringify(JSON.parse(serializeSession(s)).orbital.wars)===JSON.stringify(v16Orbital.orbital.wars));
+    // v21 adds only a stopped truce clock to each war.
+    const wars=JSON.parse(serializeSession(s)).orbital.wars;assert(wars.every(w=>w.ceasefire===0)&&JSON.stringify(wars.map(({ceasefire,...w})=>w))===JSON.stringify(v16Orbital.orbital.wars));
     for(const edit of [o=>o.lunarProduced='-1',o=>o.lunarFraction=1,o=>o.talents.lunarIndustry=1,o=>o.lunarProduced='1',o=>delete o.lunarProduced,o=>o.version=2]){
       const bad=JSON.parse(serializeSession(s));edit(bad.orbital);throws(()=>parseSession(JSON.stringify(bad)));
     }
@@ -175,7 +203,7 @@ export function registerOrbitalColonyTests(test,assert,near){
     const troop=war.game.units.find(u=>u.team==='player');assert(troop);troop.hp=Q.mul(troop.hp,.5);
     const before=stat(war.game,troop,'damage'),ratio=Q.toNumber(Q.div(troop.hp,stat(war.game,troop,'health'))),wallet=s.permanent.legacy;
     assert(intervene(s,c.id,'boost'));near(Q.toNumber(Q.div(stat(war.game,troop,'damage'),before)),1.25);near(Q.toNumber(Q.div(troop.hp,stat(war.game,troop,'health'))),ratio);
-    assert(Q.eq(s.permanent.legacy,Q.sub(wallet,16)));assert(JSON.stringify(shot)===snapshot&&Q.eq(stat(war.game,enemy,'damage'),enemyDamage)&&Q.eq(enemy.hp,enemyHealth));assert(stat(createGame(),{type:troop.type,team:'player'},'damage')===before);
+    assert(Q.eq(s.permanent.legacy,Q.sub(wallet,64)));assert(JSON.stringify(shot)===snapshot&&Q.eq(stat(war.game,enemy,'damage'),enemyDamage)&&Q.eq(enemy.hp,enemyHealth));assert(stat(createGame(),{type:troop.type,team:'player'},'damage')===before);
     const raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw);
   });
   test('Orbital intervention: technology advances both AI sides; suppression removes advanced units and resets XP without producing rewards',()=>{
@@ -213,7 +241,7 @@ export function registerOrbitalColonyTests(test,assert,near){
     for(const edit of [r=>r.orbital.rng=-1,r=>r.orbital.wars[0].participants[1]=r.orbital.wars[0].participants[0],r=>r.orbital.phase='winter',r=>r.orbital.settledCycle=99,r=>r.orbital.nuclearCycles=1,r=>r.orbital.talents.monitor=1,r=>r.orbital.wars[0].game.gold.enemy=-1,r=>r.orbital.wars[0].game.bonuses=[],r=>r.orbital.wars[0].commanders.player.enabled=false,r=>r.orbital.civilizations[0].age=9,r=>r.orbital.interventionSpent=-1,r=>r.orbital.selectedWar='missing',r=>r.orbital.autoWar=true,r=>r.orbital.legacyFraction=1]){const bad=JSON.parse(raw);edit(bad);throws(()=>parseSession(JSON.stringify(bad)));}
   });
   test('Orbital v16: backup and debug accounting include talent and intervention spending',()=>{
-    const s=colonyFixture({legacy:10000,talents:['monitor','patronage']});intervene(s,s.orbital.civilizations[0].id,'boost');assert(orbitalLegacySpent(s.orbital)===128+256+16);
+    const s=colonyFixture({legacy:10000,talents:['monitor','patronage']});intervene(s,s.orbital.civilizations[0].id,'boost');assert(orbitalLegacySpent(s.orbital)===128+256+64);
     assert(setDebugLegacy(s,123)&&parseSession(serializeSession(s)).permanent.legacy===123);
     const data=new Map(),storage={getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)},store=createSaveStore(()=>storage,{debug:true});store.load();assert(store.save(s).ok);advance(s,1);assert(store.save(s).ok);
     data.set(DEBUG_SAVE_KEY,'broken');assert(!store.load().ok&&store.recover().ok);

@@ -85,6 +85,7 @@ export const fromV16Record = input => hydrateRecord(input, 16);
 export const fromV17Record = input => hydrateRecord(input, 17);
 export const fromV18Record = input => hydrateRecord(input, 18);
 export const fromV19Record = input => hydrateRecord(input, 19);
+export const fromV20Record = input => hydrateRecord(input, 20);
 export const fromSaveRecord = input => hydrateRecord(input, SAVE_VERSION);
 export function toSaveRecord(session) { const record = toV8Record(session); record.version = SAVE_VERSION;
   if (record.orbital) for (const war of record.orbital.wars) {

@@ -1,4 +1,4 @@
-import { V17_ORBITAL_TALENTS as OLD, v18OrbitalTalents, v19OrbitalTalents } from './orbital-save-history.js';
+import { V17_ORBITAL_TALENTS as OLD, v18OrbitalTalents, v19OrbitalTalents, v20OrbitalTalents } from './orbital-save-history.js';
 import { Q } from './quantity.js';
 import { check, object, num, int, bool, id } from './save-primitives.js';
 import { validateShape, AI_SHAPE } from './save-schema.js';
@@ -15,10 +15,10 @@ const whole=v=>amount(v)&&Q.isInteger(v);
 export function validateOrbital(s,version){
   if(version<=15)return validateOldOrbital(s,version);
   const o=s.orbital;if(s.run.phase!=='orbital'){check(o===undefined,'轨道阶段状态');return;}
-  const V18=v18OrbitalTalents(T),V19=v19OrbitalTalents(T);
-  const configs=version===16?Object.fromEntries(Object.entries(OLD).filter(([key])=>key!=='lunarIndustry')):version===17?OLD:version===18?V18:version===19?V19:T;
+  const V18=v18OrbitalTalents(T),V19=v19OrbitalTalents(T),V20=v20OrbitalTalents(T);
+  const configs=version===16?Object.fromEntries(Object.entries(OLD).filter(([key])=>key!=='lunarIndustry')):version===17?OLD:version===18?V18:version===19?V19:version===20?V20:T;
   keys(o,Object.keys(createOrbitalState(1)).filter(key=>version>=17||!['lunarProduced','lunarFraction'].includes(key)),'轨道字段');
-  check(o.version===(version===16?2:version===17?3:version===18?4:version===19?5:6)&&bool(o.started)&&num(o.elapsed)&&int(o.rng,0,4294967295),'轨道时钟与随机源');
+  check(o.version===(version===16?2:version===17?3:version===18?4:version===19?5:version===20?6:7)&&bool(o.started)&&num(o.elapsed)&&int(o.rng,0,4294967295),'轨道时钟与随机源');
   for(const key of ['cycle','settledCycle','nuclearCycles','nextCivilization','nextWar'])check(int(o[key]),key);
   check(o.nuclearCycles===o.settledCycle&&o.settledCycle<=o.cycle,'核毁灭凭据');
   check(['dormant','living','winter'].includes(o.phase)&&o.started===(o.phase!=='dormant'),'萌芽阶段');
@@ -46,7 +46,8 @@ export function validateOrbital(s,version){
   check(Array.isArray(o.civilizations)&&o.civilizations.length<=SITES.length,'地表文明数量');
   const ids=new Set(),sites=new Set();
   for(const c of o.civilizations){
-    keys(c,['id','site','name','alive','age','experience','gold','power','profile','warId',...(version>=18?['doctrine','superSoldiers']:[]),...(version>=20?['tendency']:[])],'文明字段');
+    keys(c,['id','site','name','alive','age','experience','gold','power','profile','warId',...(version>=18?['doctrine','superSoldiers']:[]),...(version>=20?['tendency']:[]),...(version>=21?['airdrops']:[])],'文明字段');
+    if(version>=21)check(int(c.airdrops,0,R.maximumAirdrops)&&(!c.airdrops||o.talents.airdrop>0),'资源空投');
     if(version>=20)check(int(c.tendency,0,3)&&(!c.tendency||o.talents.tendency>0),'文明倾向');
     check(id(c.id)&&!ids.has(c.id)&&c.id.startsWith(`c${o.cycle}-`)&&SITES.some(p=>p.id===c.site)&&!sites.has(c.site),'文明点位与标识');ids.add(c.id);sites.add(c.site);
     check(typeof c.name==='string'&&c.name.length>0&&c.name.length<=24&&bool(c.alive)&&int(c.age,1,R.finalAge)&&int(c.power,0,R.maximumPower)&&int(c.profile,0,2),'文明状态');
@@ -61,7 +62,8 @@ export function validateOrbital(s,version){
   }
   check(Array.isArray(o.wars)&&o.wars.length<=3,'战争数量');const wars=new Set(),participants=new Set();
   for(const w of o.wars){
-    keys(w,['id','participants','game','commanders'],'战争字段');
+    keys(w,['id','participants','game','commanders',...(version>=21?['ceasefire']:[])],'战争字段');
+    if(version>=21)check(num(w.ceasefire,0,R.ceasefireSeconds)&&(w.ceasefire===0||o.talents.ceasefire>0),'停火协议');
     check(id(w.id)&&!wars.has(w.id)&&w.id.startsWith(`w${o.cycle}-`)&&Array.isArray(w.participants)&&w.participants.length===2&&new Set(w.participants).size===2,'战争标识');wars.add(w.id);
     const civs=w.participants.map(id=>o.civilizations.find(c=>c.id===id));
     check(civs.every(c=>c?.alive&&c.warId===w.id&&!participants.has(c.id)),'战争双方');civs.forEach(c=>participants.add(c.id));

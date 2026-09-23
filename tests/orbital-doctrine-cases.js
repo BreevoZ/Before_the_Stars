@@ -104,7 +104,7 @@ export function registerOrbitalDoctrineTests(test,assert,near){
     assert(s.version===SAVE_VERSION&&s.orbital.version===ORBITAL_RULES.version&&s.orbital.talents.recovery===3&&s.orbital.talents.lunarIndustry===1);
     // v19 grants the route free to anyone who already ran the outpost without it.
     const {transit,...paid}=wire.orbital.payments;assert(JSON.stringify(transit)==='["0"]'&&s.orbital.talents.transit===1);
-    assert(JSON.stringify(paid)===JSON.stringify(v17Orbital.orbital.payments)&&JSON.stringify(wire.orbital.wars)===JSON.stringify(v17Orbital.orbital.wars));
+    assert(JSON.stringify(paid)===JSON.stringify(v17Orbital.orbital.payments)&&JSON.stringify(wire.orbital.wars.map(({ceasefire,...w})=>w))===JSON.stringify(v17Orbital.orbital.wars));
     assert(s.orbital.civilizations.every(c=>c.doctrine===0&&c.superSoldiers===0));
     const before=s.permanent.legacy;assert(purchaseOrbitalTalent(s,'recovery')&&Q.eq(s.permanent.legacy,Q.sub(before,T.recovery.costs[3])));
     assert(JSON.stringify(v17Orbital)===raw);const saved=serializeSession(s);assert(serializeSession(parseSession(saved))===saved);

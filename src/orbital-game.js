@@ -2,6 +2,7 @@ import { Q } from './quantity.js';
 import { ORBITAL_RULES as R, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as ACTIONS } from './orbital-config.js';
 import { seedCivilizations, seedRefugee, orbitalYieldMultiplier, civilizationValue, rebirthDelay, refugeeDelay, lunarLegacyRate, nuclearMultiplier, bondRate } from './celestial-economy.js';
 import { createWar, updateWar, syncWarCivilizations, refreshWarBonuses, changeTechnology } from './orbital-war.js';
+import { AGES } from './game-config.js';
 
 export function createOrbitalState(seed = (Math.random()*4294967296)>>>0) {
   return {version:R.version,started:false,elapsed:0,rng:seed>>>0,cycle:0,settledCycle:0,nuclearCycles:0,
@@ -63,7 +64,17 @@ export function resolveOrbitalWar(s,id){
   let reward=0;for(const i of loserTeams){const c=findCivilization(o,war.participants[i]);reward=Q.add(reward,civilizationValue(o,c,'defeat'));c.alive=false;}
   endWar(o,war);award(s,reward);log(o,`一场地表战争结束，收获 ${Q.format(reward)} Legacy。幸存者保留时代与经验。`);return true;
 }
-export function interventionCost(o,c,key){if(key==='doctrines')return ACTIONS[key].costs[Math.min(4,c.doctrine)];return ACTIONS[key].baseCost*2**(key==='boost'?c.power:key==='regress'?Math.max(0,c.age-2):key==='advance'?c.age-1:0);}
+export const warOf=(o,c)=>o.wars.find(w=>w.id===c?.warId);
+export function interventionCost(o,c,key){
+  if(key==='doctrines')return ACTIONS[key].costs[Math.min(4,c.doctrine)];
+  // Priced against the civilization's worth, so they stay a decision as the
+  // ring multiplies every reward.
+  const worth=2**(c.age-1)*orbitalYieldMultiplier(o);
+  if(key==='boost')return ACTIONS.boost.baseCost*4**c.power*worth;
+  if(key==='airdrop')return ACTIONS.airdrop.baseCost*2**c.airdrops*worth;
+  if(key==='ceasefire'){const w=warOf(o,c),top=w?Math.max(...w.participants.map(id=>findCivilization(o,id).age)):c.age;return ACTIONS.ceasefire.baseCost*2**(top-1)*orbitalYieldMultiplier(o);}
+  return ACTIONS[key].baseCost*2**(key==='regress'?Math.max(0,c.age-2):key==='advance'?c.age-1:0);
+}
 export function getInterventionState(s,id,key){
   const o=s.orbital,c=findCivilization(o,id),a=ACTIONS[key];if(!active(s)||o.phase!=='living'||!a||!o.talents[a.talent]||!o.talents.monitor)return 'locked';
   if(!c?.alive)return 'dead';
@@ -73,7 +84,8 @@ export function getInterventionState(s,id,key){
     if(key==='doctrines'&&c.age<c.doctrine+1||key!=='doctrines'&&c.age<5)return 'age';
     if(key==='superSoldiers'&&c.doctrine<5||key==='sniper'&&c.superSoldiers<1)return 'doctrine';
   }
-  if((key==='boost'&&c.power>=R.maximumPower)||(key==='advance'&&c.age>=R.finalAge)||(key==='regress'&&c.age<=1))return 'max';
+  if(key==='ceasefire'){if(!c.warId)return 'war';if(warOf(o,c).ceasefire>0)return 'truce';}
+  if((key==='airdrop'&&c.airdrops>=R.maximumAirdrops)||(key==='boost'&&c.power>=R.maximumPower)||(key==='advance'&&c.age>=R.finalAge)||(key==='regress'&&c.age<=1))return 'max';
   return Q.gte(s.permanent.legacy,interventionCost(o,c,key))?'ready':'legacy';
 }
 export function intervene(s,id,key){
@@ -84,6 +96,12 @@ export function intervene(s,id,key){
     if(key==='doctrines')c.doctrine++;else c.superSoldiers=key==='sniper'?2:1;
     refreshWarBonuses(o,o.wars.find(w=>w.id===c.warId));
   }
+  if(key==='airdrop'){
+    // Gold lands in the treasury the civilization is actually spending from.
+    const war=warOf(o,c),gold=AGES[c.age].startingGold*R.airdropGold;c.airdrops++;
+    if(war){const team=['player','enemy'][war.participants.indexOf(c.id)];war.game.gold[team]=Q.add(war.game.gold[team],gold);syncWarCivilizations(o,war);}else c.gold=Q.add(c.gold,gold);
+  }
+  if(key==='ceasefire')warOf(o,c).ceasefire=R.ceasefireSeconds;
   if(key==='advance'||key==='regress'){changeTechnology(o,c,key==='advance'?1:-1);const war=o.wars.find(w=>w.id===c.warId);if(war)syncWarCivilizations(o,war);}
   if(key==='harvest'){
     const reward=civilizationValue(o,c);c.alive=false;const war=o.wars.find(w=>w.id===c.warId);if(war){syncWarCivilizations(o,war);endWar(o,war);}award(s,reward);
@@ -99,6 +117,8 @@ export function updateOrbital(s,dt,{paused=false,hidden=false}={}){
   if(lunarWhole){o.lunarProduced=Q.add(o.lunarProduced,lunarWhole);award(s,lunarWhole);}
   if(o.phase==='winter'){o.remaining=Math.max(0,o.remaining-dt);if(o.remaining<=1e-8){beginCycle(o);return true;}return false;}
   for(const war of [...o.wars]){
+    // A frozen war neither fights nor pays; only its truce clock runs.
+    if(war.ceasefire>0){war.ceasefire=Math.max(0,war.ceasefire-dt);if(war.ceasefire<=1e-8){war.ceasefire=0;changed=true;}continue;}
     // Every paid launch owns a damage snapshot; live modifiers affect only new attacks.
     const xp=updateWar(war,dt);syncWarCivilizations(o,war);
     o.legacyFraction+=Q.toNumber(xp)*R.legacyPerExperience*orbitalYieldMultiplier(o)+bondRate(o,war)*dt;

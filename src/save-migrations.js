@@ -10,7 +10,7 @@ import { getV8RunBonuses } from './progression-bonuses.js';
 import { createAutomation } from './automation.js';
 import { HISTORICAL_TALENTS, HISTORICAL_UPGRADE_COSTS } from './save-history.js';
 import { validateRecord } from './save-validation.js';
-import { cloneRecord, toV8Record, fromV8Record, fromV9Record, fromV10Record, fromV11Record, fromV12Record, fromV13Record, fromV14Record, fromV15Record, fromV16Record, fromV17Record, fromV18Record, fromV19Record } from './save-record.js';
+import { cloneRecord, toV8Record, fromV8Record, fromV9Record, fromV10Record, fromV11Record, fromV12Record, fromV13Record, fromV14Record, fromV15Record, fromV16Record, fromV17Record, fromV18Record, fromV19Record, fromV20Record } from './save-record.js';
 import { TALENTS } from './talents.js';
 const teams = ['player', 'enemy'];
 
@@ -194,8 +194,8 @@ export function migrateV15(input) {
     record.orbital=createOrbitalState(seed);record.orbital.version=2;delete record.orbital.talents.lunarIndustry;delete record.orbital.lunarProduced;delete record.orbital.lunarFraction;record.orbital.legacyEarned=old.legacyEarned;
     if(old.started)enterOrbital(record);
     // Talents added by later versions are introduced by their own migrations.
-    for(const key of ['doctrines','superSoldiers','sniper','massDriver','shipyard','voyage','tendency','nuclearResearch','chain','doomsday','bonds'])delete record.orbital.talents[key];
-    for(const c of record.orbital.civilizations){delete c.doctrine;delete c.superSoldiers;delete c.tendency;}
+    for(const key of ['doctrines','superSoldiers','sniper','massDriver','shipyard','voyage','tendency','nuclearResearch','chain','doomsday','bonds','airdrop','intel','ceasefire'])delete record.orbital.talents[key];
+    for(const c of record.orbital.civilizations){delete c.doctrine;delete c.superSoldiers;delete c.tendency;delete c.airdrops;}
     record.orbital.log.push({time:0,text:`轨道重构：旧设施与在建费用 ${Q.format(refunded)} Legacy 已退回余额，已获得的遗产保留。`});
   }
   record.version=16;return record;
@@ -240,11 +240,23 @@ export function migrateV19(input) {
   }
   record.version=20;return record;
 }
-export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9, 10: migrateV10, 11: migrateV11, 12: migrateV12, 13: migrateV13, 14: migrateV14, 15: migrateV15, 16: migrateV16, 17: migrateV17, 18: migrateV18, 19: migrateV19 });
+// v21 adds 资源空投, 情报网络 and 停火协议. No civilization has been supplied
+// and no war is frozen; 军备扶持 simply costs more from now on.
+export function migrateV20(input) {
+  const record=cloneRecord(input);
+  if(record.orbital){
+    const o=record.orbital;o.version=7;
+    for(const key of ['airdrop','intel','ceasefire'])o.talents[key]=0;
+    for(const c of o.civilizations)c.airdrops=0;
+    for(const w of o.wars)w.ceasefire=0;
+  }
+  record.version=21;return record;
+}
+export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9, 10: migrateV10, 11: migrateV11, 12: migrateV12, 13: migrateV13, 14: migrateV14, 15: migrateV15, 16: migrateV16, 17: migrateV17, 18: migrateV18, 19: migrateV19, 20: migrateV20 });
 export function migrateRecord(input) {
   let record = input;
   while (record.version < SAVE_VERSION) {
-    const hydrate = { 8: fromV8Record, 9: fromV9Record, 10: fromV10Record, 11: fromV11Record, 12: fromV12Record, 13: fromV13Record, 14: fromV14Record, 15: fromV15Record, 16: fromV16Record, 17: fromV17Record, 18: fromV18Record, 19: fromV19Record }[record.version];
+    const hydrate = { 8: fromV8Record, 9: fromV9Record, 10: fromV10Record, 11: fromV11Record, 12: fromV12Record, 13: fromV13Record, 14: fromV14Record, 15: fromV15Record, 16: fromV16Record, 17: fromV17Record, 18: fromV18Record, 19: fromV19Record, 20: fromV20Record }[record.version];
     validateRecord(hydrate ? hydrate(record) : record, record.version);
     record = MIGRATIONS[record.version](record);
   }

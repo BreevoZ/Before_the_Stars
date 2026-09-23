@@ -4,6 +4,7 @@ import { SITES, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as A, ORBITAL_RULES as R, 
 import { findCivilization, getWarState, getInterventionState, interventionCost, getOrbitalTalentState } from './orbital-game.js';
 import { civilizationValue, orbitalYieldMultiplier, lunarLegacyRate, cycleStartedAt, doomsdayMultiplier } from './celestial-economy.js';
 import { TRAITS } from './traits.js';
+import { warOdds } from './orbital-war.js';
 import { siteDaylight } from './celestial-clock.js';
 export const orbitalTime = seconds => `${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`;
 export function orbitalTalentEffect(o,key,rank=o.talents[key]){
@@ -22,6 +23,9 @@ export function orbitalTalentEffect(o,key,rank=o.talents[key]){
   if(key==='massDriver')return rank?`货运加速 · ${lunar(undefined,rank)} Legacy/s`:'货运舱按常规节奏发射';
   if(key==='shipyard')return rank?'方舟正在船坞中成形':'尚无远航船坞';
   if(key==='voyage')return rank?'方舟已驶离地月系统':'等待启航';
+  if(key==='airdrop')return rank?`空投 ${R.airdropGold}× 时代起始金币，每个文明最多 ${R.maximumAirdrops} 次`:'无法向地表投送物资';
+  if(key==='intel')return rank?'显示开战前与交战中的胜率预估':'战局只能凭经验判断';
+  if(key==='ceasefire')return rank?`可冻结一场战争 ${R.ceasefireSeconds} 秒`:'战争一旦开始便无法中止';
   if(key==='doctrines')return rank?'可授予 I–V 五档兵种特性':'未开放兵种学说';
   if(key==='superSoldiers')return rank?'可授权近战超级士兵':'未开放精锐授权';
   if(key==='sniper')return rank?'可授权引导狙击激光枪':'未开放远程强化';
@@ -48,11 +52,11 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
     '#colony-complete@hidden':o.completionAt===null,'#colony-complete':`VI · 远航协议已生效。方舟驶离地月系统；VII 行星际阶段尚未开放，地表观测与月面生产继续运行。`,
     '#colony-first@value':first?.site??'', '#colony-opponent@value':second?.site??'',
     '#colony-start-war@disabled':getWarState(s,first?.id,second?.id)!=='ready',
-    '#colony-war-hint':{waiting:'等待文明重新萌芽。',selection:'请选择两个存活文明。',busy:'所选文明正在交战；每个文明同时参与一场战争。',ready:'免费挑起战争 · 战斗中的金币属于地面文明。'}[getWarState(s,first?.id,second?.id)],
+    '#colony-war-hint':{waiting:'等待文明重新萌芽。',selection:'请选择两个存活文明。',busy:'所选文明正在交战；每个文明同时参与一场战争。',ready:'免费挑起战争 · 战斗中的金币属于地面文明。'}[getWarState(s,first?.id,second?.id)]+(o.talents.intel&&first?.alive&&second?.alive&&first!==second&&!first.warId&&!second.warId?` 情报预估：${first.name} ${Math.round(warOdds(first,second)*100)}% · ${second.name} ${Math.round(warOdds(second,first)*100)}%`:''),
     '#colony-auto-row@hidden':!o.talents.weaving,'#colony-auto@checked':o.autoWar,
     '#colony-refugees@hidden':winter||alive.length>=2,'#colony-refugees':`幸存者正在等待新的对手。新聚落即将从空闲点位萌芽。`,
     '#colony-selected-name':first?`${first.name} · ${first.alive?AGES[first.age].numeral+' '+AGES[first.age].shortName:'废墟'}`:'选择一个文明',
-    '#colony-selected-stats':first?.alive?`${first.tendency?`${TENDENCIES[first.tendency].name}倾向 · `:''}军备扶持 ${first.power}/5 · 部队伤害与生命 ×${(1.25**first.power).toFixed(2)} · 收割价值 ${Q.format(civilizationValue(o,first))} Legacy`:'废墟没有可收割的遗产。',
+    '#colony-selected-stats':first?.alive?`${first.tendency?`${TENDENCIES[first.tendency].name}倾向 · `:''}军备扶持 ${first.power}/5 · 部队伤害与生命 ×${(1.25**first.power).toFixed(2)}${first.airdrops?` · 空投 ${first.airdrops}/${R.maximumAirdrops}`:''} · 收割价值 ${Q.format(civilizationValue(o,first))} Legacy`:'废墟没有可收割的遗产。',
     '#colony-monitor-locked@hidden':Boolean(o.talents.monitor),'#colony-monitor@hidden':!o.talents.monitor,
     '#colony-event':o.log.at(-1)?.text??'',
   });
@@ -73,13 +77,14 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
     v[`#intervene-${key}@disabled`]=status!=='ready';
     v[`#intervene-${key}-name`]=key==='doctrines'&&first?.doctrine<5?`授予 ${AGES[first.doctrine+1].numeral} · ${AGES[first.doctrine+1].shortName}学说`:a.name;
     if(['superSoldiers','sniper'].includes(key))v[`#intervene-${key}@hidden`]=!o.talents[a.talent];v[`#intervene-${key}-cost`]=key==='harvest'&&first?.alive?`+${Q.format(civilizationValue(o,first))}`:`${Q.format(cost)}`;
-    v[`#intervene-${key}-state`]={locked:`需要「${T[a.talent].name}」`,dead:'文明已消亡',max:'已完成',legacy:'遗产不足',war:'需要交战中的文明',age:'文明时代不足',doctrine:key==='sniper'?'先授予超级士兵':'先完成五档学说',ready:key==='doctrines'?Object.values(TRAITS).filter(t=>UNITS[t.units[0]].age===(first?.doctrine??0)+1).map(t=>t.name).join(' · '):'执行'}[status];
+    v[`#intervene-${key}-state`]={locked:`需要「${T[a.talent].name}」`,dead:'文明已消亡',max:'已完成',truce:'所在战争停火中',legacy:'遗产不足',war:'需要交战中的文明',age:'文明时代不足',doctrine:key==='sniper'?'先授予超级士兵':'先完成五档学说',ready:key==='doctrines'?Object.values(TRAITS).filter(t=>UNITS[t.units[0]].age===(first?.doctrine??0)+1).map(t=>t.name).join(' · '):'执行'}[status];
   }
   for(let i=0;i<3;i++){const w=o.wars[i];v[`#watch-war-${i}@hidden`]=!w;v[`#watch-war-${i}`]=w?w.participants.map(id=>findCivilization(o,id).name).join(' ↔ '):'';v[`#watch-war-${i}@aria-pressed`]=String(w?.id===o.selectedWar);}
   const w=o.wars.find(w=>w.id===o.selectedWar);v['#colony-battle@hidden']=!w;v['#colony-no-war@hidden']=Boolean(w);
   const host=w&&findCivilization(o,w.participants[0]),site=host&&SITES.find(s=>s.id===host.site);
-  v['#colony-solar-time']=site?`${host.name}战区 · ${siteDaylight(o.elapsed,site).label} · 双方 AI 接管`:'等待地面信号';
-  for(const [i,team]of ['player','enemy'].entries())v[`#colony-war-${team}`]=w?`${findCivilization(o,w.participants[i]).name} · ${AGES[w.game.ages[team]].numeral} · 基地 ${Q.format(w.game.bases[team].hp)}/${Q.format(w.game.bases[team].maxHp)} · 金币 ${Q.format(Q.floor(w.game.gold[team]))} · 经验 ${Q.format(w.game.experience[team])}`:'';
+  v['#colony-solar-time']=site?`${host.name}战区 · ${siteDaylight(o.elapsed,site).label} · ${w.ceasefire>0?`停火中 ${Math.ceil(w.ceasefire)} 秒`:'双方 AI 接管'}`:'等待地面信号';
+  const odds=w&&o.talents.intel?warOdds(...w.participants.map(id=>findCivilization(o,id)),w):null;
+  for(const [i,team]of ['player','enemy'].entries())v[`#colony-war-${team}`]=w?`${findCivilization(o,w.participants[i]).name} · ${AGES[w.game.ages[team]].numeral} · 基地 ${Q.format(w.game.bases[team].hp)}/${Q.format(w.game.bases[team].maxHp)} · 金币 ${Q.format(Q.floor(w.game.gold[team]))} · 经验 ${Q.format(w.game.experience[team])}${odds===null?'':` · 胜率 ${Math.round((i?1-odds:odds)*100)}%`}`:'';
   for(const [key,t]of Object.entries(T)){
     const rank=o.talents[key],status=getOrbitalTalentState(s,key);
     v[`#orbit-node-${key}@data-state`]=status;v[`#orbit-node-${key}@aria-pressed`]=String(selected&&key===talent);v[`#orbit-node-${key}@aria-expanded`]=String(selected&&key===talent);v[`#orbit-node-${key}@aria-label`]=`${t.name}，${rank}/${t.costs.length} 级，${status==='max'?'已完成':`${t.costs[rank]} Legacy`}`;

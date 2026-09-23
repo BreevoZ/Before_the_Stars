@@ -1,5 +1,5 @@
 // Orbital wars reuse the surface simulation; Legacy is the only orbital wallet.
-export const ORBITAL_RULES = Object.freeze({ version: 6, finalAge: 5, historyLimit: 12,
+export const ORBITAL_RULES = Object.freeze({ version: 7, finalAge: 5, historyLimit: 12,
   winterSeconds: 60, refugeeSeconds: 30, nuclearVisualSeconds: 7, minCivilizations: 4, maxCivilizations: 6,
   habitatSections: 7, lunarRotationSeconds: 180, lunarBaseIncome: 512, warIncome: 2.5, warBaseHealth: 3,
   // A civilization should take minutes, not one, to climb from I to V: each
@@ -8,6 +8,9 @@ export const ORBITAL_RULES = Object.freeze({ version: 6, finalAge: 5, historyLim
   warExperience: .6, legacyPerExperience: 1 / 20,
   // War bonds pay per second per war, doubling with the lower age of the two.
   bondRate: .5, chainShare: .5, doomsdaySeconds: 600,
+  // A ceasefire freezes one war; an airdrop hands a civilization twice the
+  // gold its age starts with. Both are capped so they stay tactical.
+  ceasefireSeconds: 60, airdropGold: 2, maximumAirdrops: 5,
   defeatLegacy: 64, harvestLegacy: 192, nuclearLegacy: 96, maximumPower: 5 });
 export const SITES = Object.freeze([
   {id:'delta',name:'河口',x:.585,y:.38}, {id:'ridge',name:'山脊',x:.755,y:.27},
@@ -42,25 +45,33 @@ export const ORBITAL_TALENTS = Object.freeze({
   outpost: talent('月球前哨',[65536],{transit:1},'建立 VI 月面生产基地，货运舱沿地月航线运回遗产；战争与核毁灭遗产再翻倍。',660,615,'moon',{branch:'home',kind:'keystone'}),
   lunarIndustry: talent('月面自动工场',[131072,524288,2097152,8388608],{outpost:1},'每级月面产能翻倍；扩建采掘场、太阳翼与自动生产枢纽。',565,460,'industry',{branch:'home'}),
   massDriver: talent('质量投射器',[1048576],{outpost:1},'在月面铺设电磁发射轨道，货运舱发射更快，月面产能 ×2。',755,460,'up',{branch:'home',kind:'specialist'}),
-  shipyard: talent('深空船坞',[4194304],{lunarIndustry:2,massDriver:1},'在月面建造远航方舟的船坞。',660,300,'rocket',{cycles:3,branch:'home'}),
+  shipyard: talent('深空船坞',[4194304],{lunarIndustry:2,massDriver:1},'在月面建造远航方舟的船坞。',660,285,'rocket',{cycles:3,branch:'home'}),
   // The full ring is a stated condition rather than an edge: a drawn link from
   // the ring would cut straight through the route, outpost and shipyard nodes.
-  voyage: talent('远航协议',[16777216],{shipyard:1},'带上历次轮回中观测到的全部文明，驶离地月系统。需要完整星环，只能在核冬天期间启航，完成 VI。',660,105,'ark',{cycles:4,ring:7,branch:'home',kind:'keystone'}),
-  // WAR · 地表干预
-  monitor: talent('地面监控',[128],{protocol:1},'接入地表实况，观看双方 AI 的真实战争；开启干预路线。',980,935,'eye',{branch:'war'}),
-  weaving: talent('争端编织',[1024],{monitor:1},'可选自动配对空闲文明开战，优先匹配相近时代。',1210,780,'link',{branch:'war',kind:'specialist'}),
-  bonds: talent('战争债券',[2048,32768],{monitor:1},'每场进行中的战争持续产出遗产，随双方中较低的时代翻倍；二级再翻倍。',1070,780,'legacy',{branch:'war'}),
-  patronage: talent('代理人战争',[256],{monitor:1},'花费 Legacy 强化指定文明的部队生命与伤害。',920,780,'sword',{branch:'war'}),
+  voyage: talent('远航协议',[16777216],{shipyard:1},'带上历次轮回中观测到的全部文明，驶离地月系统。需要完整星环，只能在核冬天期间启航，完成 VI。',660,70,'ark',{cycles:4,ring:7,branch:'home',kind:'keystone',finale:true}),
+  // WAR · 地表干预: observation along the bottom row, then two columns —
+  // proxy war rising under 代理人战争, intelligence and truce beside it.
+  monitor: talent('地面监控',[128],{protocol:1},'接入地表实况，观看双方 AI 的真实战争；开启干预路线。',1020,935,'eye',{branch:'war'}),
+  airdrop: talent('资源空投',[128],{monitor:1},'花费 Legacy 向选中文明空投金币，数额为其时代起始金币的两倍；每个文明最多五次，价格逐次翻倍。',850,935,'parachute',{branch:'war'}),
+  weaving: talent('争端编织',[1024],{monitor:1},'可选自动配对空闲文明开战，优先匹配相近时代。',1200,935,'link',{branch:'war',kind:'specialist'}),
+  patronage: talent('代理人战争',[256],{monitor:1},'花费 Legacy 强化指定文明的部队生命与伤害。',900,780,'sword',{branch:'war'}),
+  bonds: talent('战争债券',[2048,32768],{monitor:1},'每场进行中的战争持续产出遗产，随双方中较低的时代翻倍；二级再翻倍。',1040,780,'legacy',{branch:'war'}),
+  intel: talent('情报网络',[1024],{monitor:1},'挑起战争前显示双方胜率预估；交战中随基地与兵力实时更新。',1180,780,'radar',{branch:'war'}),
   // Advancing and blocking technology are two sides of one lever.
-  technology: talent('技术馈赠',[512],{patronage:1},'让选中文明进化一个时代；技术馈赠不产生战争经验收益。',850,615,'spark',{branch:'war'}),
-  regression: talent('知识封锁',[512],{patronage:1},'使文明倒退一个时代，销毁超时代部队、炮塔与订单。',990,615,'lock',{branch:'war'}),
-  harvest: talent('轨道收割',[2048],{patronage:1},'直接毁灭选中文明并收获 Legacy；废墟不能重复收割。',1150,615,'beam',{branch:'war',kind:'keystone'}),
-  doctrines: talent('战争学说',[4096],{patronage:1},'向交战文明逐档授予 I–V 的全部兵种特性；每档对应该时代的三个兵种，最多五档。',920,455,'shield',{branch:'war',kind:'keystone'}),
-  superSoldiers: talent('超限战士',[32768],{doctrines:1},'为完成五档学说的未来文明开放超级士兵。AI 使用自己的金币招募，初始使用激光匕首。',920,285,'elite',{branch:'war',kind:'specialist'}),
-  sniper: talent('天穹狙击',[131072],{superSoldiers:1},'为已获得超级士兵的文明授予狙击激光枪：远程锁定、引导后贯穿射击。',920,105,'rifle',{branch:'war',kind:'specialist'}),
+  technology: talent('技术馈赠',[512],{patronage:1},'让选中文明进化一个时代；技术馈赠不产生战争经验收益。',830,615,'spark',{branch:'war'}),
+  regression: talent('知识封锁',[512],{patronage:1},'使文明倒退一个时代，销毁超时代部队、炮塔与订单。',970,615,'lock',{branch:'war'}),
+  harvest: talent('轨道收割',[2048],{patronage:1},'直接毁灭选中文明并收获 Legacy；废墟不能重复收割。',1090,615,'beam',{branch:'war',kind:'keystone'}),
+  ceasefire: talent('停火协议',[8192],{intel:1},'花费 Legacy 冻结一场战争 60 秒：双方停止行动，也不产生经验与债券收益。用来决定核毁灭何时到来。',1210,615,'truce',{branch:'war',kind:'specialist'}),
+  doctrines: talent('战争学说',[4096],{patronage:1},'向交战文明逐档授予 I–V 的全部兵种特性；每档对应该时代的三个兵种，最多五档。',900,455,'shield',{branch:'war',kind:'keystone'}),
+  superSoldiers: talent('超限战士',[32768],{doctrines:1},'为完成五档学说的未来文明开放超级士兵。AI 使用自己的金币招募，初始使用激光匕首。',900,300,'elite',{branch:'war',kind:'specialist'}),
+  sniper: talent('天穹狙击',[131072],{superSoldiers:1},'为已获得超级士兵的文明授予狙击激光枪：远程锁定、引导后贯穿射击。',900,160,'rifle',{branch:'war',kind:'specialist'}),
 });
 export const ORBITAL_ACTIONS = Object.freeze({
-  boost: {name:'军备扶持',talent:'patronage',baseCost:16,description:'部队生命与伤害 ×1.25，最多 5 次；现存部队按生命比例同步。'},
+  // One boost all but decides a war between equals, so the first costs what
+  // the win pays — the loser's defeat value — and each further boost ×4.
+  boost: {name:'军备扶持',talent:'patronage',baseCost:64,description:'部队生命与伤害 ×1.25，最多 5 次；价格随文明时代、轨道收益倍率上涨，每次 ×4。'},
+  airdrop: {name:'资源空投',talent:'airdrop',baseCost:4,description:'空投其时代起始金币两倍的金币；价格随时代与收益倍率上涨，每次翻倍，最多 5 次。'},
+  ceasefire: {name:'停火协议',talent:'ceasefire',baseCost:64,description:'冻结所在战争 60 秒；双方停止行动，不产生经验与债券收益。价格为较先进一方的击败价值。'},
   advance: {name:'技术馈赠',talent:'technology',baseCost:64,description:'进化一个时代，加入相应经验；不产生战争遗产。'},
   regress: {name:'知识封锁',talent:'regression',baseCost:128,description:'倒退一个时代；销毁超时代部队、炮塔和订单，原有经验归零至该时代门槛。'},
   doctrines: {name:'兵种学说',talent:'doctrines',costs:[128,512,2048,8192,32768],baseCost:128,description:'逐档开启对应时代三个兵种的全部特性；需要文明已到该时代且正在交战。'},

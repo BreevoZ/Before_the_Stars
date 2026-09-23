@@ -35,7 +35,7 @@ export function createOrbitalColonyUI(getSession,{commit,archive,save,speed,view
   el('colony-start-war').addEventListener('click',()=>{const s=getSession(),o=s.orbital;if(startOrbitalWar(s,o.selectedCivilization,o.selectedOpponent))commit();});
   for(const [key,a]of Object.entries(A)){
     const button=document.createElement('button');button.id=`intervene-${key}`;button.type='button';button.title=a.description;
-    button.innerHTML=`<span class="intervention-icon">${icon({boost:'shield',advance:'spark',regress:'lock',harvest:'beam',doctrines:'shield',superSoldiers:'elite',sniper:'rifle'}[key])}</span><span><strong id="intervene-${key}-name">${a.name}</strong><small id="intervene-${key}-state"></small></span><span class="orbit-price"><small id="intervene-${key}-cost"></small>${icon("legacy")}</span>`;
+    button.innerHTML=`<span class="intervention-icon">${icon({boost:'shield',airdrop:'parachute',ceasefire:'truce',advance:'spark',regress:'lock',harvest:'beam',doctrines:'shield',superSoldiers:'elite',sniper:'rifle'}[key])}</span><span><strong id="intervene-${key}-name">${a.name}</strong><small id="intervene-${key}-state"></small></span><span class="orbit-price"><small id="intervene-${key}-cost"></small>${icon("legacy")}</span>`;
     button.addEventListener('click',()=>{const s=getSession();if(intervene(s,s.orbital.selectedCivilization,key))commit();});el(military.includes(key)?'colony-military-actions':'colony-interventions').append(button);
   }
   for(let age=1;age<=5;age++){
@@ -58,12 +58,13 @@ export function createOrbitalColonyUI(getSession,{commit,archive,save,speed,view
   for(const [key,t]of Object.entries(T)){
     for(const parent of Object.keys(t.requires)){
       const from=T[parent],path=document.createElementNS(NS,'path');path.id=`orbit-edge-${parent}-${key}`;
-      path.setAttribute('d',`M${from.x} ${from.y} C${from.x} ${(from.y+t.y)/2} ${t.x} ${(from.y+t.y)/2} ${t.x} ${t.y}`);
-      path.setAttribute('class',parent==='protocol'?'trunk':'branch');path.dataset.route=branch(key);el('orbit-tree-edges').append(path);
+      // The summit's edge stops at its rim instead of crossing the large disc.
+      const end=t.y+(t.finale?52:0);path.setAttribute('d',`M${from.x} ${from.y} C${from.x} ${(from.y+end)/2} ${t.x} ${(from.y+end)/2} ${t.x} ${end}`);
+      path.setAttribute('class',parent==='protocol'?'trunk':t.finale?'trunk finale':'branch');path.dataset.route=branch(key);el('orbit-tree-edges').append(path);
     }
-    const node=document.createElement('button');node.id=`orbit-node-${key}`;node.type='button';node.className=`orbit-node ${t.kind??'ordinary'}`;
+    const node=document.createElement('button');node.id=`orbit-node-${key}`;node.type='button';node.className=`orbit-node ${t.kind??'ordinary'}${t.finale?' finale':''}`;
     node.dataset.route=branch(key);node.style.left=`${t.x}px`;node.style.top=`${t.y}px`;node.setAttribute('aria-controls','orbit-detail');
-    const shape=t.kind==='specialist'?'<path d="M32 2 62 32 32 62 2 32Z"/>':t.kind==='keystone'?'<circle class="orbit-halo" cx="32" cy="32" r="31"/><circle cx="32" cy="32" r="26"/>':'<path d="M32 2 58 17v30L32 62 6 47V17Z"/>';
+    const shape=t.finale?'<circle class="orbit-finale-ring" cx="32" cy="32" r="31.5"/><circle class="orbit-halo" cx="32" cy="32" r="29"/><circle cx="32" cy="32" r="24"/>':t.kind==='specialist'?'<path d="M32 2 62 32 32 62 2 32Z"/>':t.kind==='keystone'?'<circle class="orbit-halo" cx="32" cy="32" r="31"/><circle cx="32" cy="32" r="26"/>':'<path d="M32 2 58 17v30L32 62 6 47V17Z"/>';
     node.innerHTML=`<svg class="orbit-node-frame" viewBox="0 0 64 64" aria-hidden="true">${shape}</svg><span class="orbit-node-glyph">${icon(t.icon)}</span><span id="orbit-rank-${key}" class="orbit-rank"></span><small class="orbit-node-price"><span id="orbit-cost-${key}"></span>${icon("legacy")}</small><span class="orbit-node-name">${t.name}</span>`;
     node.addEventListener('click',()=>selectTalent(key,true));node.addEventListener('dblclick',()=>buy(key));
     node.addEventListener('pointerenter',e=>{if(innerWidth>740&&e.pointerType==='mouse'&&!pinned)selectTalent(key);});

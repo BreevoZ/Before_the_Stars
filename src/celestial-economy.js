@@ -15,7 +15,7 @@ export function seedCivilizations(state) {
 export function createCivilization(state,site) {
   return { id:`c${state.cycle}-${++state.nextCivilization}`, site:site.id,
     name:site.name+CIVILIZATION_NAMES[Math.floor(nextRandom(state)*CIVILIZATION_NAMES.length)],
-    alive:true,age:1,experience:0,gold:180,power:0,doctrine:0,superSoldiers:0,profile:Math.floor(nextRandom(state)*3),warId:null,
+    alive:true,age:1,experience:0,gold:180,power:0,airdrops:0,doctrine:0,superSoldiers:0,profile:Math.floor(nextRandom(state)*3),warId:null,
     // Drawn only once the talent exists, so older random sequences are unchanged.
     tendency:state.talents.tendency?1+Math.floor(nextRandom(state)*3):0 };
 }

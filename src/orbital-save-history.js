@@ -14,7 +14,8 @@ export const V17_ORBITAL_TALENTS = Object.freeze({
   lunarIndustry: {"costs":[8192,32768,131072,524288],"requires":{"outpost":1}},
   transit: {"costs":[262144],"requires":{"outpost":1,"harvest":1},"cycles":4},
 });
-const V20_KEYS=['tendency','nuclearResearch','chain','doomsday','bonds'];
+const V21_KEYS=['airdrop','intel','ceasefire'];
+const V20_KEYS=['tendency','nuclearResearch','chain','doomsday','bonds',...V21_KEYS];
 // v18: the moon produced before the route existed and 地月航线 completed VI.
 export function v18OrbitalTalents(current){
   const talents=Object.fromEntries(Object.entries(current).filter(([key])=>!['massDriver','shipyard','voyage',...V20_KEYS].includes(key))
@@ -27,9 +28,14 @@ export function v18OrbitalTalents(current){
 }
 // v19: no cycle or war-bond talents; 知识封锁 and 轨道收割 hung under 技术馈赠.
 export function v19OrbitalTalents(current){
-  const talents=Object.fromEntries(Object.entries(current).filter(([key])=>!['tendency','nuclearResearch','chain','doomsday','bonds'].includes(key))
+  const talents=Object.fromEntries(Object.entries(current).filter(([key])=>!V20_KEYS.includes(key))
     .map(([key,t])=>[key,{costs:t.costs,requires:t.requires,...(t.cycles?{cycles:t.cycles}:{}),...(t.ring?{ring:t.ring}:{})}]));
   talents.regression={costs:[1024],requires:{technology:1}};
   talents.harvest={costs:[2048],requires:{technology:1}};
   return Object.freeze(talents);
+}
+// v20: no airdrop, intelligence or truce. Every surviving node kept its price.
+export function v20OrbitalTalents(current){
+  return Object.freeze(Object.fromEntries(Object.entries(current).filter(([key])=>!V21_KEYS.includes(key))
+    .map(([key,t])=>[key,{costs:t.costs,requires:t.requires,...(t.cycles?{cycles:t.cycles}:{}),...(t.ring?{ring:t.ring}:{})}])));
 }

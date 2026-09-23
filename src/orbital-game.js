@@ -1,6 +1,6 @@
 import { Q } from './quantity.js';
 import { ORBITAL_RULES as R, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as ACTIONS } from './orbital-config.js';
-import { seedCivilizations, seedRefugee, orbitalYieldMultiplier, civilizationValue, rebirthDelay, refugeeDelay, lunarLegacyRate } from './celestial-economy.js';
+import { seedCivilizations, seedRefugee, orbitalYieldMultiplier, civilizationValue, rebirthDelay, refugeeDelay, lunarLegacyRate, nuclearMultiplier, bondRate } from './celestial-economy.js';
 import { createWar, updateWar, syncWarCivilizations, refreshWarBonuses, changeTechnology } from './orbital-war.js';
 
 export function createOrbitalState(seed = (Math.random()*4294967296)>>>0) {
@@ -47,7 +47,10 @@ export function startOrbitalWar(s,a,b){
 function endWar(o,war){for(const id of war.participants){const c=findCivilization(o,id);c.warId=null;}o.wars=o.wars.filter(w=>w!==war);if(o.selectedWar===war.id)o.selectedWar=o.wars[0]?.id??null;}
 function settleNuclear(s){
   const o=s.orbital;if(o.phase!=='living'||o.settledCycle===o.cycle)return false;
-  const reward=Q.sum(o.civilizations.filter(c=>c.alive).map(c=>civilizationValue(o,c,'nuclear')));
+  // Survivors pay in full; with 连锁反扑, this cycle's ruins pay half their final age.
+  const survivors=Q.sum(o.civilizations.filter(c=>c.alive).map(c=>civilizationValue(o,c,'nuclear')));
+  const ruins=o.talents.chain?Q.mul(Q.sum(o.civilizations.filter(c=>!c.alive).map(c=>civilizationValue(o,c,'nuclear'))),R.chainShare):0;
+  const reward=Q.floor(Q.mul(Q.add(survivors,ruins),nuclearMultiplier(o)));
   o.settledCycle=o.cycle;o.nuclearCycles++;o.phase='winter';o.remaining=o.winterDuration=rebirthDelay(o);o.lastCatastropheAt=o.elapsed;o.lastReward=reward;
   for(const c of o.civilizations){c.alive=false;c.warId=null;}o.wars=[];o.selectedWar=null;award(s,reward);
   log(o,`未来战争触发全球核毁灭。所有文明消亡，收获 ${Q.format(reward)} Legacy。`);return true;
@@ -98,7 +101,7 @@ export function updateOrbital(s,dt,{paused=false,hidden=false}={}){
   for(const war of [...o.wars]){
     // Every paid launch owns a damage snapshot; live modifiers affect only new attacks.
     const xp=updateWar(war,dt);syncWarCivilizations(o,war);
-    o.legacyFraction+=Q.toNumber(xp)*R.legacyPerExperience*orbitalYieldMultiplier(o);
+    o.legacyFraction+=Q.toNumber(xp)*R.legacyPerExperience*orbitalYieldMultiplier(o)+bondRate(o,war)*dt;
     const whole=Math.floor(o.legacyFraction+1e-10);o.legacyFraction=Math.max(0,o.legacyFraction-whole);award(s,whole);
     if(resolveOrbitalWar(s,war.id)){changed=true;if(o.phase==='winter')return true;}
   }

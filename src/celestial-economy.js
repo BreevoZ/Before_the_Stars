@@ -15,7 +15,9 @@ export function seedCivilizations(state) {
 export function createCivilization(state,site) {
   return { id:`c${state.cycle}-${++state.nextCivilization}`, site:site.id,
     name:site.name+CIVILIZATION_NAMES[Math.floor(nextRandom(state)*CIVILIZATION_NAMES.length)],
-    alive:true,age:1,experience:0,gold:180,power:0,doctrine:0,superSoldiers:0,profile:Math.floor(nextRandom(state)*3),warId:null };
+    alive:true,age:1,experience:0,gold:180,power:0,doctrine:0,superSoldiers:0,profile:Math.floor(nextRandom(state)*3),warId:null,
+    // Drawn only once the talent exists, so older random sequences are unchanged.
+    tendency:state.talents.tendency?1+Math.floor(nextRandom(state)*3):0 };
 }
 export function seedRefugee(state) {
   const free = SITES.filter(site=>!state.civilizations.some(c=>c.alive && c.site===site.id));
@@ -32,5 +34,20 @@ export const rebirthDelay = state => R.winterSeconds * .75 ** state.talents.rese
 export const refugeeDelay = state => R.refugeeSeconds * .75 ** state.talents.reseed;
 export const civilizationValue = (state,civ,kind='harvest') => R[`${kind}Legacy`] * 2 ** (civ.age-1) * orbitalYieldMultiplier(state);
 
+// The ring multiplies what comes from the surface, not the moon: war and
+// annihilation stay the heart of VI, the moon is its supply line.
 export const lunarLegacyRate = state => state.talents.outpost
-  ? R.lunarBaseIncome * 2 ** (state.talents.recovery + state.talents.lunarIndustry + (state.talents.massDriver ?? 0)) : 0;
+  ? R.lunarBaseIncome * 2 ** (state.talents.lunarIndustry + (state.talents.massDriver ?? 0)) : 0;
+// A cycle begins when the previous winter ends (or when VI opens).
+export const cycleStartedAt = state => state.lastCatastropheAt === null ? 0 : state.lastCatastropheAt + state.winterDuration;
+export function doomsdayMultiplier(state) {
+  if (!state.talents.doomsday) return 1;
+  const duration = Math.max(0, state.elapsed - cycleStartedAt(state));
+  return 1 + Math.max(0, Math.min(1, (R.doomsdaySeconds - duration) / R.doomsdaySeconds));
+}
+export const nuclearMultiplier = state => 2 ** (state.talents.nuclearResearch ?? 0) * doomsdayMultiplier(state);
+export function bondRate(state, war) {
+  if (!state.talents.bonds) return 0;
+  const lower = Math.min(war.game.ages.player, war.game.ages.enemy);
+  return R.bondRate * 2 ** (state.talents.bonds - 1) * 2 ** (lower - 1) * orbitalYieldMultiplier(state);
+}

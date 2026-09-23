@@ -5,7 +5,7 @@ import { purchaseTalent, updateProgression } from '../src/progression.js';
 import { createOrbitalState, enterOrbital, startOrbitalWar, updateOrbital, resolveOrbitalWar, findCivilization, purchaseOrbitalTalent, getOrbitalTalentState, getInterventionState, intervene, orbitalLegacySpent } from '../src/orbital-game.js';
 import { syncWarCivilizations } from '../src/orbital-war.js';
 import { ORBITAL_RULES as R, ORBITAL_RULES, ORBITAL_TALENTS as T, SITES } from '../src/orbital-config.js';
-import { civilizationValue, rebirthDelay, lunarLegacyRate } from '../src/celestial-economy.js';
+import { civilizationValue, rebirthDelay, lunarLegacyRate, bondRate, nuclearMultiplier, doomsdayMultiplier, orbitalYieldMultiplier } from '../src/celestial-economy.js';
 import { serializeSession, parseSession, DEBUG_SAVE_KEY, createSaveStore, mapSessionQuantities } from '../src/save.js';
 import { oldOrbitalSpent } from '../src/orbital-history.js';
 import { fromV15Record } from '../src/save-record.js';
@@ -69,9 +69,32 @@ export function registerOrbitalColonyTests(test,assert,near){
     const back=parseSession(winter);assert(getOrbitalTalentState(back,'voyage')==='ready'&&purchaseOrbitalTalent(back,'voyage')&&back.orbital.completionAt!==null);
     assert(serializeSession(parseSession(serializeSession(back)))===serializeSession(back));
   });
+  test('Cycle talents: tendencies vary new civilizations, war bonds pay per second, research and ruins raise the annihilation',()=>{
+    // Tendencies are drawn only after the talent, and they change the war's stat sources.
+    const plain=colonyFixture({legacy:10000000,talents:['monitor','reseed']});assert(plain.orbital.civilizations.every(c=>c.tendency===0));
+    const s=colonyFixture({legacy:10000000,talents:['monitor','reseed','tendency','nuclearResearch','bonds']});
+    pair(s);const w=s.orbital.wars[0];future(w);won(w);resolveOrbitalWar(s,w.id);advance(s,61);
+    assert(s.orbital.civilizations.every(c=>c.tendency>=1&&c.tendency<=3),'Every new seed carries a tendency');
+    const [a,b]=s.orbital.civilizations;assert(pair(s));const war=s.orbital.wars[0];
+    const tagged=war.game.bonuses.filter(e=>e.source.id.endsWith(':tendency'));assert(tagged.length>0);
+    // War bonds: with no experience flowing, one second of war pays the bond rate.
+    const rate=bondRate(s.orbital,war);assert(rate===R.bondRate*orbitalYieldMultiplier(s.orbital));
+    // Research doubles the annihilation; the ruins of this cycle add half with 连锁反扑.
+    const civ=s.orbital.civilizations.find(c=>c.alive);const base=civilizationValue(s.orbital,civ,'nuclear');
+    assert(nuclearMultiplier(s.orbital)===2&&base>0);
+    assert(purchaseOrbitalTalent(s,'chain')&&getOrbitalTalentState(s,'doomsday')!=='max');
+    assert(serializeSession(parseSession(serializeSession(s)))===serializeSession(s));
+    const bad=JSON.parse(serializeSession(s));bad.orbital.civilizations[0].tendency=4;throws(()=>parseSession(JSON.stringify(bad)));
+    const untalented=JSON.parse(serializeSession(plain));untalented.orbital.civilizations[0].tendency=1;throws(()=>parseSession(JSON.stringify(untalented)));
+  });
+  test('Doomsday clock: a fast cycle doubles the annihilation, a slow one pays the base',()=>{
+    const s=colonyFixture({legacy:100000000,talents:['monitor','reseed','nuclearResearch','chain','doomsday']});
+    assert(doomsdayMultiplier(s.orbital)===2);s.orbital.elapsed=R.doomsdaySeconds/2;near(doomsdayMultiplier(s.orbital),1.5);
+    s.orbital.elapsed=R.doomsdaySeconds*3;assert(doomsdayMultiplier(s.orbital)===1);
+  });
   test('Lunar economy: locked production is zero, outpost and each industry rank pay the displayed rate',()=>{
     const locked=colonyFixture({legacy:10000,talents:['recovery']});advance(locked,1);assert(lunarLegacyRate(locked.orbital)===0&&locked.orbital.lunarProduced===0);
-    const s=lunarFixture();let rate=128;assert(lunarLegacyRate(s.orbital)===rate);
+    const s=lunarFixture();let rate=R.lunarBaseIncome;assert(lunarLegacyRate(s.orbital)===rate);
     for(let rank=0;rank<=4;rank++){
       const wallet=s.permanent.legacy,total=s.permanent.totalLegacy,earned=s.orbital.legacyEarned,produced=s.orbital.lunarProduced;
       advance(s,1);assert(Q.eq(s.permanent.legacy,Q.add(wallet,rate))&&Q.eq(s.permanent.totalLegacy,Q.add(total,rate)));
@@ -79,11 +102,12 @@ export function registerOrbitalColonyTests(test,assert,near){
       assert(buildOrbitalViewModel(s)['#colony-lunar-rate']===Q.format(rate));parseSession(serializeSession(s));
       if(rank<4){assert(purchaseOrbitalTalent(s,'lunarIndustry'));rate*=2;assert(lunarLegacyRate(s.orbital)===rate);}
     }
-    assert(!purchaseOrbitalTalent(s,'lunarIndustry'));for(let rank=3;rank<=7;rank++)assert(purchaseOrbitalTalent(s,'recovery')&&lunarLegacyRate(s.orbital)===32*2**(rank+4));
+    // The ring multiplies surface income, never the moon's supply line.
+    assert(!purchaseOrbitalTalent(s,'lunarIndustry'));for(let rank=3;rank<=7;rank++)assert(purchaseOrbitalTalent(s,'recovery')&&lunarLegacyRate(s.orbital)===R.lunarBaseIncome*2**4);
   });
   test('Lunar production: winter keeps producing, pause/hidden/invalid deltas freeze, refresh keeps fractions without offline awards',()=>{
     let s=lunarFixture();pair(s);const w=s.orbital.wars[0];future(w);won(w);resolveOrbitalWar(s,w.id);const produced=s.orbital.lunarProduced;advance(s,1);
-    assert(s.orbital.phase==='winter'&&Q.eq(s.orbital.lunarProduced,Q.add(produced,128)));
+    assert(s.orbital.phase==='winter'&&Q.eq(s.orbital.lunarProduced,Q.add(produced,R.lunarBaseIncome)));
     updateProgression(s,1/60);const raw=serializeSession(s);assert(s.orbital.lunarFraction>0);
     for(const dt of [0,-1,NaN,Infinity])updateProgression(s,dt);updateProgression(s,.05,{paused:true});updateProgression(s,.05,{hidden:true});assert(serializeSession(s)===raw);
     const r=parseSession(raw);assert(serializeSession(r)===raw);advance(s,2);advance(r,2);assert(serializeSession(s)===serializeSession(r));

@@ -3,7 +3,7 @@ import { getSuperSoldierBonuses } from './progression-bonuses.js';
 import { Q } from './quantity.js';
 import { createGame, updateGame, updateCommander, evolve, AGES, UNITS, TURRETS } from './game.js';
 import { createBonusStack, stat } from './stats.js';
-import { ORBITAL_RULES as R } from './orbital-config.js';
+import { ORBITAL_RULES as R, TENDENCIES } from './orbital-config.js';
 const TEAMS=['player','enemy'];
 export function warBonuses(civilizations) {
   const effects=[];
@@ -21,6 +21,10 @@ export function warBonuses(civilizations) {
       effects.push(...getSuperSoldierBonuses(c.superSoldiers>=2,c.superSoldiers>=1,team).map(e=>({...e,source:{...source,id:`orbit:${c.id}:elite`,label:`${c.name} · ${c.superSoldiers>=2?'狙击激光枪':'超级士兵计划'}`}})));
       effects.push({target:{stat:'allowEnemyRecruit',type:'superSoldier',team},type:'override',value:c.superSoldiers>=1,source});
     }
+    // A tendency changes how a civilization fights, so wars stop being identical.
+    const tendency=TENDENCIES[c.tendency??0];
+    if(tendency)for(const [key,value]of Object.entries(tendency.effects))effects.push({target:{stat:key,team,...(['damage','health'].includes(key)?{kind:'unit'}:key==='experience'?{kind:'reward'}:{})},
+      type:'multiply',value,source:{...source,id:`orbit:${c.id}:tendency`,label:`${c.name} · ${tendency.name}`}});
     add('armyLimit',12,undefined,'override');add('queueLimit',4,undefined,'override');
   }
   return createBonusStack(effects);

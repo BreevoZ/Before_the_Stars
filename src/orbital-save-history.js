@@ -14,11 +14,22 @@ export const V17_ORBITAL_TALENTS = Object.freeze({
   lunarIndustry: {"costs":[8192,32768,131072,524288],"requires":{"outpost":1}},
   transit: {"costs":[262144],"requires":{"outpost":1,"harvest":1},"cycles":4},
 });
+const V20_KEYS=['tendency','nuclearResearch','chain','doomsday','bonds'];
 // v18: the moon produced before the route existed and 地月航线 completed VI.
 export function v18OrbitalTalents(current){
-  const talents=Object.fromEntries(Object.entries(current).filter(([key])=>!['massDriver','shipyard','voyage'].includes(key))
+  const talents=Object.fromEntries(Object.entries(current).filter(([key])=>!['massDriver','shipyard','voyage',...V20_KEYS].includes(key))
     .map(([key,t])=>[key,{costs:t.costs,requires:t.requires,...(t.cycles?{cycles:t.cycles}:{})}]));
   talents.outpost={costs:[65536],requires:{recovery:2},cycles:2};
   talents.transit={costs:[4194304],requires:{outpost:1},cycles:4};
+  talents.regression={costs:[1024],requires:{technology:1}};
+  talents.harvest={costs:[2048],requires:{technology:1}};
+  return Object.freeze(talents);
+}
+// v19: no cycle or war-bond talents; 知识封锁 and 轨道收割 hung under 技术馈赠.
+export function v19OrbitalTalents(current){
+  const talents=Object.fromEntries(Object.entries(current).filter(([key])=>!['tendency','nuclearResearch','chain','doomsday','bonds'].includes(key))
+    .map(([key,t])=>[key,{costs:t.costs,requires:t.requires,...(t.cycles?{cycles:t.cycles}:{}),...(t.ring?{ring:t.ring}:{})}]));
+  talents.regression={costs:[1024],requires:{technology:1}};
+  talents.harvest={costs:[2048],requires:{technology:1}};
   return Object.freeze(talents);
 }

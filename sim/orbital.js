@@ -9,8 +9,8 @@ export function simulateOrbital({seed=1,legacy=0,maxSeconds=3600,buyTalents=true
   const milestones=[],nuclearTimes=[];let decision=0,cycles=0;
   // Keep wars going until 远航协议 is bought; it can only be bought during a
   // nuclear winter, so a player short of Legacy waits for the next one.
-  const PRIORITY=['monitor','patronage','recovery','reseed','weaving','technology','regression','harvest','diversity',
-    'transit','outpost','lunarIndustry','massDriver','shipyard','voyage'];
+  const PRIORITY=['monitor','patronage','recovery','reseed','bonds','nuclearResearch','weaving','tendency','technology','regression','harvest','diversity',
+    'chain','transit','outpost','lunarIndustry','massDriver','doomsday','shipyard','voyage'];
   const done=()=>session.orbital.nuclearCycles>=targetCycles && (!buyTalents || session.orbital.completionAt!==null);
   while(session.orbital.elapsed<maxSeconds && !done()){
     const o=session.orbital;

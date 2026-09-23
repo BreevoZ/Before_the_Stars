@@ -56,6 +56,9 @@ const paths = {
   coin: '<circle cx="12" cy="12" r="8"/><path d="m12 7 4 5-4 5-4-5 4-5Z"/>',
   clock: '<circle cx="12" cy="13" r="8"/><path d="M12 8v5l3 2M9 2h6"/>',
   star: '<path d="m12 2 3 6 7 1-5 5 1 8-6-4-6 4 1-8-5-5 7-1 3-6Z"/>',
+  // The ark leaving for the stars: a long hull climbing away from a trail,
+  // toward a small spark on the horizon.
+  ark: '<path d="M5 19C8 14 12 10 18 7C16 12 11 16 5 19Z"/><path d="m8 13-3 .5M11 16l-.5 3"/><path d="M2.5 21.5 4 20" stroke-dasharray="1 1.6"/><path d="M20.5 1.5v3.5M18.75 3.25h3.5"/>',
   up: '<path d="m5 11 7-7 7 7M12 4v17"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   lock: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4m-4 5v2"/>',

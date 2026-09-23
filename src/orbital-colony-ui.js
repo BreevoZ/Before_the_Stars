@@ -36,7 +36,7 @@ export function createOrbitalColonyUI(getSession,{commit,archive,save,speed,view
   el('colony-start-war').addEventListener('click',()=>{const s=getSession(),o=s.orbital;if(startOrbitalWar(s,o.selectedCivilization,o.selectedOpponent))commit();});
   for(const [key,a]of Object.entries(A)){
     const button=document.createElement('button');button.id=`intervene-${key}`;button.type='button';button.title=a.description;
-    button.innerHTML=`<span class="intervention-icon">${icon({boost:'shield',airdrop:'parachute',ceasefire:'truce',advance:'spark',regress:'lock',harvest:'beam',doctrines:'shield',superSoldiers:'elite',sniper:'rifle'}[key])}</span><span><strong id="intervene-${key}-name">${a.name}</strong><small id="intervene-${key}-state"></small></span><span class="orbit-price"><small id="intervene-${key}-cost"></small>${icon("legacy")}</span>`;
+    button.innerHTML=`<span class="intervention-icon">${icon({boost:'puppet',airdrop:'parachute',ceasefire:'truce',advance:'gift',regress:'lock',harvest:'strike',doctrines:'scroll',superSoldiers:'ascend',sniper:'skyshot'}[key])}</span><span><strong id="intervene-${key}-name">${a.name}</strong><small id="intervene-${key}-state"></small></span><span class="orbit-price"><small id="intervene-${key}-cost"></small>${icon("legacy")}</span>`;
     button.addEventListener('click',()=>{const s=getSession();if(intervene(s,s.orbital.selectedCivilization,key))commit();});el(military.includes(key)?'colony-military-actions':'colony-interventions').append(button);
   }
   for(let age=1;age<=5;age++){

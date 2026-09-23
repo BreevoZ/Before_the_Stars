@@ -139,6 +139,12 @@ export function registerOrbitalColonyTests(test,assert,near){
     const wallet=s.permanent.legacy;assert(purchaseTalent(s,'timeAcceleration')&&Q.eq(s.permanent.legacy,Q.sub(wallet,TALENTS.timeAcceleration.costs[0])));
     assert(availableSpeeds(s.permanent).includes(3));const raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw);
   });
+  test('Talent icons: every node in both star maps has its own drawn icon; only the shared protocol repeats',async()=>{
+    const {TALENT_MAP}=await import('../src/talent-map.js'),{iconMarkup}=await import('../src/icons.js');
+    const names=[...Object.entries(TALENT_MAP).map(([k,a])=>[`I:${k}`,a.icon]),...Object.entries(T).map(([k,t])=>[`VI:${k}`,t.icon])];
+    const seen=new Map();for(const [node,name]of names){assert(iconMarkup(name)!==iconMarkup('__missing__')||name==='shield',`${node} uses an undefined icon ${name}`);
+      if(name!=='protocol'){assert(!seen.has(name),`${node} reuses ${name} from ${seen.get(name)}`);seen.set(name,node);}}
+  });
   test('Intel: the pre-war estimate shows only with 情报网络 and favours the older, boosted side',()=>{
     const plain=colonyFixture({legacy:10000,talents:['monitor']});assert(!/情报预估/.test(buildOrbitalViewModel(plain)['#colony-war-hint']));
     const s=colonyFixture({legacy:10000,talents:['monitor','intel']});assert(/情报预估：.*\d+%.*\d+%/.test(buildOrbitalViewModel(s)['#colony-war-hint']));

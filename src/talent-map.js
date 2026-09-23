@@ -1,5 +1,5 @@
 import { Q } from './quantity.js';
-import { PROTOCOL_GLYPH, LEGACY_GLYPH } from './icons.js';
+import { iconMarkup } from './icons.js';
 import { createBindings } from './dom-bindings.js';
 import { buildTalentViewModel } from './talent-view-model.js';
 import { UPGRADES, TALENT_LAYER_REQUIREMENT } from './progression-config.js';
@@ -11,44 +11,34 @@ const el = id => document.getElementById(id);
 const svgNS = 'http://www.w3.org/2000/svg';
 // Explicit art direction for this small tree; prerequisites still come from TALENT_TREE.
 // Coordinates are independent of node size, so a narrow screen never shrinks touch targets.
-const glyphs = {
-  spark: 'M12 2c2 6 7 8 7 13a7 7 0 01-14 0c0-3 2-5 4-7-1 5 4 6 3-6z',
-  clock: 'M12 2a10 10 0 110 20 10 10 0 010-20M12 6v6l4 3',
-  automation: 'M5 8h14v11H5z M9 8V5h6v3 M8 12h2m4 0h2 M9 16h6',
-  growth: 'M4 20V9l6 3V6l6 4V3h4v17z M8 16h2m4 0h2',
-  legacy: LEGACY_GLYPH,
-  helmet: 'M5 20V8l3-5h8l3 5v12l-7 3z M5 10l7 3 7-3 M8 17h8',
-  blade: 'M3 21l5-6M6 13l5 5 M9 14L19 3l2 2-9 12',
-  arrow: 'M3 21L21 3M13 3h8v8M3 15l6 6',
-  heavy: 'M4 20V9l4-5h8l4 5v11z M4 12h16M9 8h6M9 16h6',
-};
+// Every node has its own icon from the shared set in icons.js, as in the VI tree.
 const mapData = {
-  spark: { x: 550, y: 1570, kind: 'keystone', icon: glyphs.spark },
+  spark: { x: 550, y: 1570, kind: 'keystone', icon: 'ember' },
   // Side branches sit on the same rows as the era layers, as in the VI tree:
   // automation on the left, growth and Legacy on the right, each in columns.
-  logistics: { x: 80, y: 1320 }, formation: { x: 220, y: 1320, kind: 'keystone' },
-  defense: { x: 80, y: 1110, kind: 'specialist' }, evolution: { x: 220, y: 1110 },
-  fireControl: { x: 220, y: 900, icon: 'M12 2v5m0 10v5M2 12h5m10 0h5M12 7a5 5 0 110 10 5 5 0 010-10' },
-  campaign: { x: 220, y: 690, icon: 'M3 8h16l-4-4m4 4-4 4M21 16H5l4 4m-4-4 4-4' },
-  extermination: { x: 220, y: 480, kind: 'keystone', icon: 'M5 20 19 4M5 4l14 16M2 17l5 5m10 0 5-5M4 6V2h4m8 0h4v4' },
-  production: { x: 770, y: 1320 }, warfare: { x: 875, y: 1320 },
-  supply: { x: 770, y: 1110, kind: 'specialist' }, salvage: { x: 875, y: 1110, kind: 'specialist' },
-  conservation: { x: 1020, y: 1320, kind: 'keystone' }, challenge: { x: 1065, y: 1110, kind: 'specialist' },
-  timeAcceleration: { x: 820, y: 788, icon: glyphs.clock },
+  logistics: { x: 80, y: 1320, icon: 'logistics' }, formation: { x: 220, y: 1320, kind: 'keystone', icon: 'wedge' },
+  defense: { x: 80, y: 1110, kind: 'specialist', icon: 'bastion' }, evolution: { x: 220, y: 1110, icon: 'stairs' },
+  fireControl: { x: 220, y: 900, icon: 'crosshair' },
+  campaign: { x: 220, y: 690, icon: 'forward' },
+  extermination: { x: 220, y: 480, kind: 'keystone', icon: 'skull' },
+  production: { x: 770, y: 1320, icon: 'income' }, warfare: { x: 875, y: 1320, icon: 'ledger' },
+  supply: { x: 770, y: 1110, kind: 'specialist', icon: 'coins' }, salvage: { x: 875, y: 1110, kind: 'specialist', icon: 'salvage' },
+  conservation: { x: 1020, y: 1320, kind: 'keystone', icon: 'urn' }, challenge: { x: 1065, y: 1110, kind: 'specialist', icon: 'summit' },
+  timeAcceleration: { x: 820, y: 788, icon: 'hasten' },
   // The machine needs both 遗产保存 and era III; it is drawn from its own branch.
-  legacyMachine: { x: 970, y: 900, kind: 'keystone', icon: glyphs.automation, parent: 'conservation' },
-  legacyEfficiency: { x: 920, y: 690, kind: 'specialist', icon: glyphs.clock }, legacyCapacity: { x: 1030, y: 690, kind: 'specialist', icon: glyphs.heavy },
-  superSoldierPlan: { x: 550, y: 270, kind: 'keystone', icon: glyphs.helmet },
-  elite: { x: 380, y: 190, kind: 'specialist' }, superRanged: { x: 720, y: 190, kind: 'specialist', icon: glyphs.arrow },
+  legacyMachine: { x: 970, y: 900, kind: 'keystone', icon: 'gear', parent: 'conservation' },
+  legacyEfficiency: { x: 920, y: 690, kind: 'specialist', icon: 'hourglass' }, legacyCapacity: { x: 1030, y: 690, kind: 'specialist', icon: 'layers' },
+  superSoldierPlan: { x: 550, y: 270, kind: 'keystone', icon: 'visor' },
+  elite: { x: 380, y: 190, kind: 'specialist', icon: 'chevrons' }, superRanged: { x: 720, y: 190, kind: 'specialist', icon: 'scope' },
   // The goal of the surface, and the node VI grows from: the same disc on both pages.
-  bypasser: { x: 550, y: 80, kind: 'keystone', finale: true, icon: PROTOCOL_GLYPH },
+  bypasser: { x: 550, y: 80, kind: 'keystone', finale: true, icon: 'protocol' },
 };
+const TRAIT_ICONS = { openingStone: 'hurl', ricochet: 'ricochet', devour: 'jaws', shieldWall: 'shieldwall', fireArrow: 'firearrow', javelin: 'javelin',
+  parry: 'parry', volley: 'volley', canister: 'scatter', grenade: 'grenade', suppression: 'suppress', coaxial: 'coaxial', blink: 'blink', overload: 'overload', forceField: 'forcefield' };
 for (let layer = 1; layer <= 5; layer++) layerTalents(layer).forEach((key, slot) => {
-  mapData[key] = { x: 410 + slot * 140, y: 1320 - (layer - 1) * 210,
-    icon: [glyphs.blade, glyphs.arrow, glyphs.heavy][slot] };
+  mapData[key] = { x: 410 + slot * 140, y: 1320 - (layer - 1) * 210, icon: TRAIT_ICONS[key] };
 });
-export const TALENT_MAP = Object.freeze(Object.fromEntries(Object.entries(mapData).map(([key, art]) => [key,
-  { ...art, icon: art.icon ?? glyphs[TALENT_TREE[key].branch] ?? glyphs.automation }])));
+export const TALENT_MAP = Object.freeze(mapData);
 const GATES = Object.freeze(Object.fromEntries(Array.from({ length: 6 }, (_, index) => [index + 1, { x: 550, y: index === 5 ? 378 : 1418 - index * 210 }])));
 const colors = Object.fromEntries(['root', 'automation', 'growth', 'legacy', 'units'].map(key => [key, `var(--route-${key})`]));
 function pathElement(className) { const path = document.createElementNS(svgNS, 'path'); path.setAttribute('class', className); return path; }
@@ -76,7 +66,7 @@ export function createTalentMap(getSession, changed) {
     if (parent) { item.dataset.parent = parent[0]; item.dataset.requiredLevel = parent[1]; }
     item.style.setProperty('--star-color', colors[config.branch]);
     const shape = art.finale ? '<circle class="star-ring" cx="32" cy="32" r="31.5"/><circle class="star-halo" cx="32" cy="32" r="29"/><circle class="star-frame" cx="32" cy="32" r="24"/>' : kind === 'specialist' ? '<path class="star-frame" d="M32 2 62 32 32 62 2 32Z"/>' : kind === 'keystone' ? '<circle class="star-halo" cx="32" cy="32" r="31"/><circle class="star-frame" cx="32" cy="32" r="27"/>' : '<path class="star-frame" d="M32 2 58 17v30L32 62 6 47V17Z"/>';
-    item.innerHTML = `<button id="node-${key}" class="talent-node" type="button" aria-controls="talent-details" aria-expanded="false" aria-pressed="false"><svg viewBox="0 0 64 64" aria-hidden="true">${shape}<path class="star-icon" d="${art.icon}" transform="translate(20 12)"/></svg><span class="node-ranks" id="level-${key}" aria-hidden="true"></span><small class="node-cost" id="cost-${key}"></small><span class="node-name">${config.name}</span></button>${key === 'spark' ? '<span id="root-caption" class="root-caption"></span>' : ''}`;
+    item.innerHTML = `<button id="node-${key}" class="talent-node" type="button" aria-controls="talent-details" aria-expanded="false" aria-pressed="false"><svg viewBox="0 0 64 64" aria-hidden="true">${shape}<g class="star-icon" transform="translate(20 12)">${iconMarkup(art.icon)}</g></svg><span class="node-ranks" id="level-${key}" aria-hidden="true"></span><small class="node-cost" id="cost-${key}"></small><span class="node-name">${config.name}</span></button>${key === 'spark' ? '<span id="root-caption" class="root-caption"></span>' : ''}`;
     map.append(item);
     const button = el(`node-${key}`);
     button.addEventListener('pointerenter', event => { if (!mobile && !hoverSuppressed && event.pointerType === 'mouse' && !pinned) select(key); });

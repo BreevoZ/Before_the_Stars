@@ -33,19 +33,19 @@ export const ORBITAL_TALENTS = Object.freeze({
   protocol: talent('存续协议',[0],{},'继承地表篇。文明可以灭亡，轨道上的我们将继续存在。',660,1150,'protocol',{root:true,kind:'keystone',branch:'root',finale:true}),
   // LIFE · 文明循环: seeding on one side, the winter that ends each cycle on the other.
   reseed: talent('播种计划',[128,512,2048],{protocol:1},'每级缩短 25% 核冬天和幸存文明等待新对手的时间。',340,935,'leaf',{branch:'life'}),
-  diversity: talent('多元萌芽',[512,2048,65536,524288],{reseed:1},'每级提高每轮文明数量的下限；四级后八个点位全部萌芽。',150,780,'network',{branch:'life',kind:'specialist'}),
-  tendency: talent('文明倾向',[1024],{reseed:1},'此后萌芽的文明随机带有好战、守成或重科技倾向，改变它们的战斗方式与战争结局。',310,780,'spark',{branch:'life'}),
-  nuclearResearch: talent('核冬天研究',[4096,65536],{reseed:1},'每级核毁灭遗产翻倍。',470,780,'fire',{branch:'life',kind:'keystone'}),
-  chain: talent('连锁反扑',[16384],{nuclearResearch:1},'核毁灭时，本轮已经覆灭的文明废墟也按其最终时代结算一半遗产。',430,610,'beam',{branch:'life'}),
+  diversity: talent('多元萌芽',[512,2048,65536,524288],{reseed:1},'每级提高每轮文明数量的下限；四级后八个点位全部萌芽。',150,780,'sprouts',{branch:'life',kind:'specialist'}),
+  tendency: talent('文明倾向',[1024],{reseed:1},'此后萌芽的文明随机带有好战、守成或重科技倾向，改变它们的战斗方式与战争结局。',310,780,'tendency',{branch:'life'}),
+  nuclearResearch: talent('核冬天研究',[4096,65536],{reseed:1},'每级核毁灭遗产翻倍。',470,780,'radiation',{branch:'life',kind:'keystone'}),
+  chain: talent('连锁反扑',[16384],{nuclearResearch:1},'核毁灭时，本轮已经覆灭的文明废墟也按其最终时代结算一半遗产。',430,610,'chain',{branch:'life'}),
   doomsday: talent('末日时钟',[262144],{chain:1},'显示本轮已持续的时间；一轮在十分钟内走向核毁灭，遗产最多翻倍。',330,455,'clock',{branch:'life',kind:'specialist'}),
   // HOME · 地月家园: the mainline, in the order goods actually travel.
   recovery: talent('环地球生存空间',[256,1024,4096,16384,65536,262144,1048576],{protocol:1},'每级建成七分之一居住环，战争与核毁灭遗产翻倍。第七段接合后，星环完整环绕地球。',660,935,'habitat',{branch:'home',kind:'keystone'}),
   // The route comes first: nothing mined on the moon reaches Earth without it.
-  transit: talent('地月航线',[32768],{recovery:2},'贯通地月运输航线。只有打通航线，月面的产出才能运回地球。',660,775,'orbital',{cycles:2,branch:'home'}),
+  transit: talent('地月航线',[32768],{recovery:2},'贯通地月运输航线。只有打通航线，月面的产出才能运回地球。',660,775,'route',{cycles:2,branch:'home'}),
   outpost: talent('月球前哨',[65536],{transit:1},'建立 VI 月面生产基地，货运舱沿地月航线运回遗产；战争与核毁灭遗产再翻倍。',660,615,'moon',{branch:'home',kind:'keystone'}),
   lunarIndustry: talent('月面自动工场',[131072,524288,2097152,8388608],{outpost:1},'每级月面产能翻倍；扩建采掘场、太阳翼与自动生产枢纽。',565,460,'industry',{branch:'home'}),
-  massDriver: talent('质量投射器',[1048576],{outpost:1},'在月面铺设电磁发射轨道，货运舱发射更快，月面产能 ×2。',755,460,'up',{branch:'home',kind:'specialist'}),
-  shipyard: talent('深空船坞',[4194304],{lunarIndustry:2,massDriver:1},'在月面建造远航方舟的船坞。',660,285,'rocket',{cycles:3,branch:'home'}),
+  massDriver: talent('质量投射器',[1048576],{outpost:1},'在月面铺设电磁发射轨道，货运舱发射更快，月面产能 ×2。',755,460,'railgun',{branch:'home',kind:'specialist'}),
+  shipyard: talent('深空船坞',[4194304],{lunarIndustry:2,massDriver:1},'在月面建造远航方舟的船坞。',660,285,'drydock',{cycles:3,branch:'home'}),
   // The full ring is a stated condition rather than an edge: a drawn link from
   // the ring would cut straight through the route, outpost and shipyard nodes.
   voyage: talent('远航协议',[16777216],{shipyard:1},'带上历次轮回中观测到的全部文明，驶离地月系统。需要完整星环，只能在核冬天期间启航，完成 VI。',660,70,'ark',{cycles:4,ring:7,branch:'home',kind:'keystone',finale:true}),
@@ -53,20 +53,20 @@ export const ORBITAL_TALENTS = Object.freeze({
   // proxy war rising under 代理人战争, intelligence and truce beside it.
   monitor: talent('地面监控',[128],{protocol:1},'接入地表实况，观看双方 AI 的真实战争；开启干预路线。',1020,935,'eye',{branch:'war'}),
   airdrop: talent('资源空投',[128],{monitor:1},'花费 Legacy 向选中文明空投金币，数额为其时代起始金币的两倍；每个文明最多五次，价格逐次翻倍。',850,935,'parachute',{branch:'war'}),
-  weaving: talent('争端编织',[1024],{monitor:1},'可选自动配对空闲文明开战，优先匹配相近时代。',1200,935,'link',{branch:'war',kind:'specialist'}),
-  patronage: talent('代理人战争',[256],{monitor:1},'花费 Legacy 强化指定文明的部队生命与伤害。',900,780,'sword',{branch:'war'}),
-  bonds: talent('战争债券',[2048,32768],{monitor:1},'每场进行中的战争持续产出遗产，随双方中较低的时代翻倍；二级再翻倍。',1040,780,'legacy',{branch:'war'}),
+  weaving: talent('争端编织',[1024],{monitor:1},'可选自动配对空闲文明开战，优先匹配相近时代。',1200,935,'pairing',{branch:'war',kind:'specialist'}),
+  patronage: talent('代理人战争',[256],{monitor:1},'花费 Legacy 强化指定文明的部队生命与伤害。',900,780,'puppet',{branch:'war'}),
+  bonds: talent('战争债券',[2048,32768],{monitor:1},'每场进行中的战争持续产出遗产，随双方中较低的时代翻倍；二级再翻倍。',1040,780,'bond',{branch:'war'}),
   intel: talent('情报网络',[1024],{monitor:1},'挑起战争前显示双方胜率预估；交战中随基地与兵力实时更新。',1180,780,'radar',{branch:'war'}),
   // Advancing and blocking technology are two sides of one lever.
-  technology: talent('技术馈赠',[512],{patronage:1},'让选中文明进化一个时代；技术馈赠不产生战争经验收益。',830,615,'spark',{branch:'war'}),
+  technology: talent('技术馈赠',[512],{patronage:1},'让选中文明进化一个时代；技术馈赠不产生战争经验收益。',830,615,'gift',{branch:'war'}),
   regression: talent('知识封锁',[512],{patronage:1},'使文明倒退一个时代，销毁超时代部队、炮塔与订单。',970,615,'lock',{branch:'war'}),
   overview: talent('全域监视',[4096],{intel:1},'同时以缩略图观看所有进行中的战争，点击任一缩略图切换主画面。',1110,615,'screens',{branch:'war'}),
   ceasefire: talent('停火协议',[8192],{intel:1},'花费 Legacy 冻结一场战争 60 秒：双方停止行动，也不产生经验与债券收益。用来决定核毁灭何时到来。',1240,615,'truce',{branch:'war',kind:'specialist'}),
   // The last step of suppression: first block a civilization's knowledge, then erase it.
-  harvest: talent('轨道收割',[16384],{regression:1},'直接毁灭选中文明并收获 Legacy；废墟不能重复收割。',1040,455,'beam',{branch:'war',kind:'keystone'}),
-  doctrines: talent('战争学说',[4096],{patronage:1},'向交战文明逐档授予 I–V 的全部兵种特性；每档对应该时代的三个兵种，最多五档。',900,455,'shield',{branch:'war',kind:'keystone'}),
-  superSoldiers: talent('超限战士',[32768],{doctrines:1},'为完成五档学说的未来文明开放超级士兵。AI 使用自己的金币招募，初始使用激光匕首。',900,300,'elite',{branch:'war',kind:'specialist'}),
-  sniper: talent('天穹狙击',[131072],{superSoldiers:1},'为已获得超级士兵的文明授予狙击激光枪：远程锁定、引导后贯穿射击。',900,160,'rifle',{branch:'war',kind:'specialist'}),
+  harvest: talent('轨道收割',[16384],{regression:1},'直接毁灭选中文明并收获 Legacy；废墟不能重复收割。',1040,455,'strike',{branch:'war',kind:'keystone'}),
+  doctrines: talent('战争学说',[4096],{patronage:1},'向交战文明逐档授予 I–V 的全部兵种特性；每档对应该时代的三个兵种，最多五档。',900,455,'scroll',{branch:'war',kind:'keystone'}),
+  superSoldiers: talent('超限战士',[32768],{doctrines:1},'为完成五档学说的未来文明开放超级士兵。AI 使用自己的金币招募，初始使用激光匕首。',900,300,'ascend',{branch:'war',kind:'specialist'}),
+  sniper: talent('天穹狙击',[131072],{superSoldiers:1},'为已获得超级士兵的文明授予狙击激光枪：远程锁定、引导后贯穿射击。',900,160,'skyshot',{branch:'war',kind:'specialist'}),
 });
 export const ORBITAL_ACTIONS = Object.freeze({
   // One boost all but decides a war between equals, so the first costs what

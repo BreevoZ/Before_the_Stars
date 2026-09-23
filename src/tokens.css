@@ -221,7 +221,7 @@
   /* Gold means one thing in both star maps: the mainline to the next stage,
      with its start and end. Branches keep their own hues; state is shown by
      brightness and glow in the node's own colour, never by turning gold. */
-  --route-main: var(--route-legacy); --route-branch: var(--route-automation); --route-economy: var(--route-branch); --route-units: var(--route-branch);
+  --route-main: var(--route-legacy); --route-branch: #9dbd8c; --route-economy: var(--route-branch); --route-units: var(--route-branch);
   --color-selected-stroke: #eef2e6;
   --purchase-flash: #f0d79d;
   --color-command-frame: #41584c;

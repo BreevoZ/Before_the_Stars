@@ -224,18 +224,16 @@ body:has(#archives-dialog[data-destruction]) #civilization-bar { display: none; 
 .tree-legend{position:absolute;right:28px;z-index:4;display:flex;gap:16px;font-size:10px;letter-spacing:1px;color:var(--muted);pointer-events:none}
 .tree-legend span{display:flex;align-items:center;gap:6px}.tree-legend svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.2}
 /* Legends sit in the header band, never over nodes. */
-#home-legend{position:relative;top:auto;right:auto;flex-shrink:0;justify-content:flex-end;padding:9px 36px;background:var(--color-home-home-header-surface);border-bottom:1px solid var(--color-home-home-header-border-bottom);z-index:3}#orbit-legend{top:106px}
-@media(max-width:740px){.tree-legend{gap:10px;font-size:9px}#orbit-legend{top:auto;bottom:34px;right:12px}#home-legend{padding:7px 12px;flex-wrap:wrap;justify-content:center}}
+#home-legend{position:relative;top:auto;right:auto;flex-shrink:0;justify-content:flex-end;padding:9px 36px;background:var(--color-home-home-header-surface);border-bottom:1px solid var(--color-home-home-header-border-bottom);z-index:3}#orbit-legend{top:139px;left:0;right:0;justify-content:flex-end;padding:9px 32px;background:var(--color-home-home-header-surface);border-bottom:1px solid #8eaaa515}
+@media(max-width:740px){.tree-legend{gap:10px;font-size:9px}#orbit-legend{top:160px;padding:7px 12px;flex-wrap:wrap;justify-content:center}.orbit-tree-scroll{inset:190px 0 40px!important}#home-legend{padding:7px 12px;flex-wrap:wrap;justify-content:center}}
 .tree-legend .legend-main{color:var(--route-main)}.tree-legend .legend-main svg{stroke-width:1.6}
 .talent-node[data-state="max"] .node-name{top:calc(100% + 8px)}
 /* Owned and available must never look alike: an owned node is filled with its
    colour and its icon turns light; an available one stays dark with a dashed,
    breathing outline. */
-.talent-node[data-owned="true"] .star-frame{fill:color-mix(in srgb,currentColor 28%,#0f1a1a);stroke-width:1.6}
-.talent-node[data-owned="true"] .star-icon{stroke:#eef2e6}
+.talent-node[data-owned="true"] .star-frame{fill:color-mix(in srgb,currentColor 16%,#101b1a);stroke-width:1.6}
 .talent-node[data-state="ready"][data-owned="false"] .star-frame{stroke-dasharray:3 2.4}
-.orbit-talents-dialog .orbit-node[data-owned="true"] .orbit-node-frame{fill:color-mix(in srgb,var(--node-color) 28%,#0f1a1a);stroke-width:1.5}
-.orbit-talents-dialog .orbit-node[data-owned="true"] .orbit-node-glyph{color:#eef2e6}
+.orbit-talents-dialog .orbit-node[data-owned="true"] .orbit-node-frame{fill:color-mix(in srgb,var(--node-color) 16%,#101b1a);stroke-width:1.5}
 .orbit-talents-dialog .orbit-node[data-state="ready"][data-owned="false"] .orbit-node-frame{stroke-dasharray:3 2.4}
 /* Edges run behind labels: names and prices carry a halo of the sky colour. */
 .node-name,.node-cost,.orbit-node-name,.orbit-node>small,.orbit-route{text-shadow:0 0 3px #0e181b,0 0 6px #0e181b,0 0 10px #0e181b}

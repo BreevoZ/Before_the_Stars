@@ -14,15 +14,16 @@ const whole=v=>amount(v)&&Q.isInteger(v);
 export function validateOrbital(s,version){
   if(version<=15)return validateOldOrbital(s,version);
   const o=s.orbital;if(s.run.phase!=='orbital'){check(o===undefined,'轨道阶段状态');return;}
-  keys(o,Object.keys(createOrbitalState(1)),'轨道字段');
-  check(o.version===2&&bool(o.started)&&num(o.elapsed)&&int(o.rng,0,4294967295),'轨道时钟与随机源');
+  const configs=version===16?Object.fromEntries(Object.entries(T).filter(([key])=>key!=='lunarIndustry')):T;
+  keys(o,Object.keys(createOrbitalState(1)).filter(key=>version>=17||!['lunarProduced','lunarFraction'].includes(key)),'轨道字段');
+  check(o.version===(version===16?2:3)&&bool(o.started)&&num(o.elapsed)&&int(o.rng,0,4294967295),'轨道时钟与随机源');
   for(const key of ['cycle','settledCycle','nuclearCycles','nextCivilization','nextWar'])check(int(o[key]),key);
   check(o.nuclearCycles===o.settledCycle&&o.settledCycle<=o.cycle,'核毁灭凭据');
   check(['dormant','living','winter'].includes(o.phase)&&o.started===(o.phase!=='dormant'),'萌芽阶段');
   check(o.started?o.cycle>=1:o.cycle===0,'萌芽轮次');
   check(o.phase==='winter'?o.settledCycle===o.cycle:o.phase==='living'?o.settledCycle===o.cycle-1:o.settledCycle===0,'轮次结算标记');
-  keys(o.talents,Object.keys(T),'轨道天赋');check(object(o.payments)&&Object.keys(o.payments).every(k=>Object.hasOwn(T,k)&&k!=='protocol'),'轨道账本');
-  for(const [key,t]of Object.entries(T)){
+  keys(o.talents,Object.keys(configs),'轨道天赋');check(object(o.payments)&&Object.keys(o.payments).every(k=>Object.hasOwn(configs,k)&&k!=='protocol'),'轨道账本');
+  for(const [key,t]of Object.entries(configs)){
     const rank=o.talents[key];check(int(rank,0,t.costs.length),'轨道天赋等级');
     if(rank)check(Object.entries(t.requires).every(([p,n])=>o.talents[p]>=n)&&(t.cycles??0)<=o.nuclearCycles,'轨道天赋前置');
     const paid=o.payments[key]??[];check(Array.isArray(paid)&&paid.length===(key==='protocol'?0:rank)&&paid.every((cost,i)=>Q.eq(cost,t.costs[i])),'轨道天赋实付');
@@ -30,6 +31,7 @@ export function validateOrbital(s,version){
   check(o.talents.protocol===1,'存续协议继承');
   check(bool(o.autoWar)&&(!o.autoWar||o.talents.weaving>0)&&num(o.autoElapsed,0,.25)&&o.autoElapsed<.25,'战争自动化');
   check(whole(o.interventionSpent)&&whole(o.legacyEarned)&&Q.lte(o.legacyEarned,s.permanent.totalLegacy)&&whole(o.lastReward)&&Q.lte(o.lastReward,o.legacyEarned),'轨道遗产');
+  if(version>=17)check(whole(o.lunarProduced)&&Q.lte(o.lunarProduced,o.legacyEarned)&&num(o.lunarFraction,0,1)&&o.lunarFraction<1&&(o.talents.outpost>0||Q.eq(o.lunarProduced,0)&&o.lunarFraction===0),'月面生产记录');
   check(num(o.legacyFraction,0,1)&&o.legacyFraction<1,'战争收益余数');
   check(num(o.remaining,0,rebirthDelay(o))&&num(o.winterDuration,0,rebirthDelay(o))&&o.remaining<=o.winterDuration&&num(o.refugeeRemaining,0,refugeeDelay(o)),'重生等待');
   check(o.phase==='winter'?o.remaining>0:o.remaining===0,'核冬天时钟');

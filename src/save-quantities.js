@@ -29,6 +29,7 @@ export function mapSessionQuantities(session, convert) {
   }
   if(session.version >= 16 && session.orbital) {
     const o=session.orbital;
+    if(session.version>=17)field(o,'lunarProduced');
     for(const key of ['legacyEarned','interventionSpent','lastReward'])field(o,key);
     for(const c of o.civilizations){field(c,'experience');field(c,'gold');}
     for(const costs of Object.values(o.payments))for(let i=0;i<costs.length;i++)field(costs,i);

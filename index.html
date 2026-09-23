@@ -15,20 +15,40 @@
   <body>
 
     <section id="orbital-game" class="colony-shell" aria-label="轨道文明" hidden>
-      <header class="colony-header"><div class="colony-wordmark"><small>BEFORE THE STARS</small><h1>VI <span>轨道文明</span></h1></div>
-        <div class="colony-wallet"><small>LEGACY</small><strong id="colony-legacy"></strong><span id="colony-earned"></span></div>
-        <nav aria-label="轨道控制"><button id="colony-talents" class="colony-primary" type="button">轨道天赋</button><button id="colony-pause" title="空格暂停 / 继续" type="button">暂停</button><button id="colony-speed" title="R 切换速度" type="button">1×</button><select id="colony-debug-speed" aria-label="轨道调试速度" hidden><option value="1">1×</option><option value="5">5×</option><option value="10">10×</option><option value="20">20×</option></select><button id="colony-save" type="button">存档</button></nav>
+      <header class="colony-header">
+        <div class="colony-wordmark"><span data-icon="protocol"></span><div><small>BEFORE THE STARS</small><h1>VI <span>轨道文明</span></h1></div></div>
+        <div class="colony-wallet"><span data-icon="legacy" aria-hidden="true"></span><strong id="colony-legacy"></strong><span>Legacy<small id="colony-income"></small></span></div>
+        <nav aria-label="轨道控制"><button id="colony-talents" class="colony-primary" type="button"><span data-icon="network"></span>轨道天赋</button><button id="colony-pause" type="button" title="空格暂停 / 继续"></button><button id="colony-speed" type="button" title="R 切换速度"></button><select id="colony-debug-speed" aria-label="轨道调试速度" hidden><option value="1">1×</option><option value="5">5×</option><option value="10">10×</option><option value="20">20×</option></select><button id="colony-save" type="button">存档</button></nav>
       </header>
-      <div class="colony-heading"><p class="colony-eyebrow">ORBITAL OBSERVATORY · <span id="colony-time"></span></p><h2 id="colony-objective"></h2><p id="colony-objective-detail"></p><small id="colony-cycle"></small></div>
+      <div class="colony-heading"><div><p class="colony-eyebrow">TERRA / <span id="colony-time"></span></p><h2 id="colony-objective"></h2></div><div><small id="colony-cycle"></small><p id="colony-earned"></p></div></div>
+      <p id="colony-objective-detail" class="colony-intro"></p>
       <p id="colony-save-warning" role="status" hidden></p><p id="colony-fallout" class="colony-outcome" role="status" hidden></p><p id="colony-complete" role="status" hidden></p>
-      <div class="colony-layout"><div class="colony-observation"><div id="colony-map"><canvas id="colony-world" aria-label="地球上的随机文明点位与战争连线"></canvas></div><p id="colony-refugees" hidden></p>
-        <section id="colony-monitor-locked" class="colony-monitor-locked"><span>地表传来战争的微光。</span><button id="colony-unlock-monitor" type="button">解锁「地面监控」以观看战争</button></section>
-        <section id="colony-monitor"><header><h3>地面战争实况</h3><small>双方 AI 接管 · 沿用地表战斗与进化规则</small></header><div id="colony-wars" role="group" aria-label="选择监控战争"></div><div class="colony-battle-hud"><span id="colony-war-player"></span><span id="colony-war-enemy"></span></div><canvas id="colony-battle" aria-label="两个地表文明的实时战斗"></canvas><p id="colony-no-war">目前没有战争。选择两个空闲文明，挑起下一场冲突。</p></section>
-        <p id="colony-event" class="colony-event" role="status"></p>
-        <details class="colony-journal"><summary>观测日志与规则</summary><p>双方使用自己的金币，由 AI 招募、建塔、获取伤亡经验并进化。轨道只使用 Legacy：战争经验产生遗产，歼灭、主动收割和全球核毁灭发放一次性收益。</p><p>交战双方都达到 V 且一方获胜时，所有点位立即遭受核毁灭。奖励与结算标记同时保存，核冬天后随机诞生新文明。若普通战争或收割后仅剩一个或没有文明，30 秒后会有新的原始聚落萌芽；播种天赋可缩短等待。</p><p>空格暂停，R 倍速。隐藏页面、打开存档或天赋树时暂停，没有离线收益。知识封锁会销毁目标超时代的部队、炮塔、订单与飞行武器。地表阶段永久加成不自动作用于这些文明。</p><ol id="colony-log"></ol><button id="colony-archive" type="button">回望地表天赋</button></details>
-      </div><aside class="colony-control" aria-label="文明干预"><h3>挑动战争</h3><label>观察文明<select id="colony-first"></select></label><label>交战对手<select id="colony-opponent"></select></label><button id="colony-start-war" class="colony-primary" type="button">挑起战争</button><p id="colony-war-hint"></p><label id="colony-auto-row" hidden><input id="colony-auto" type="checkbox">自动配对空闲文明</label><hr><h3 id="colony-selected-name"></h3><p id="colony-selected-stats"></p><div id="colony-interventions"></div></aside></div>
+      <div class="colony-layout">
+        <div class="colony-observation">
+          <div id="colony-map"><canvas id="colony-world" aria-label="自转的地球、文明点位与环地球生存空间"></canvas><div class="colony-map-caption"><span data-icon="earth"></span><span>地表观测<small>与地面共享昼夜 · 背面的文明可从下方选择</small></span></div></div>
+          <div id="colony-roster" aria-label="所有地表文明"></div><p id="colony-refugees" hidden></p>
+          <section id="colony-monitor-locked" class="colony-monitor-locked"><span data-icon="eye"></span><div>地表的战火，仍在视野之外。<small>解锁监控，近距离见证文明的战争。</small></div><button id="colony-unlock-monitor" type="button">地面监控 <span aria-hidden="true">↗</span></button></section>
+          <section id="colony-monitor"><header><h3><span data-icon="eye"></span>地面实况</h3><small id="colony-solar-time"></small></header><div id="colony-wars" role="group" aria-label="选择监控战争"></div><div class="colony-battle-hud"><span id="colony-war-player"></span><span id="colony-war-enemy"></span></div><canvas id="colony-battle" aria-label="两个地表文明的实时战斗"></canvas><p id="colony-no-war">战线暂时安静。选择两个文明，开启下一场冲突。</p></section>
+        </div>
+        <aside class="colony-control" aria-label="文明干预">
+          <p class="colony-eyebrow">SURFACE / 地表事务</p><h3>文明之间</h3>
+          <div class="colony-pair"><label>观察文明<select id="colony-first"></select></label><span class="colony-versus" aria-hidden="true">↔</span><label>交战对手<select id="colony-opponent"></select></label></div>
+          <button id="colony-start-war" class="colony-primary" type="button"><span data-icon="sword"></span>挑起战争</button><p id="colony-war-hint"></p><label id="colony-auto-row" hidden><input id="colony-auto" type="checkbox" role="switch">自动配对空闲文明</label>
+          <div class="colony-intervention-heading"><p class="colony-eyebrow">INTERVENTION / 干预</p><h3 id="colony-selected-name"></h3><p id="colony-selected-stats"></p></div><div id="colony-interventions"></div>
+          <div class="colony-habitat"><span data-icon="habitat"></span><div><strong>环地球生存空间</strong><small id="colony-habitat-state"></small></div><button id="colony-build-habitat" type="button" aria-label="扩建环地球生存空间">扩建 ↗</button></div>
+        </aside>
+      </div>
+      <section id="colony-lunar" class="colony-lunar" hidden><canvas id="colony-moon" aria-label="VI 月面基地和自动生产设施"></canvas><div><p class="colony-eyebrow">LUNA / VI · 月面开发</p><h2>另一处，长明的家园。</h2><p>地球的文明会消亡。月面工场，始终运转。</p><div class="lunar-yield"><span data-icon="legacy"></span><strong id="colony-lunar-rate"></strong><small>Legacy / s</small></div><small id="colony-lunar-produced"></small><button id="colony-lunar-upgrade" type="button">扩建月面工场 ↗</button></div></section>
+      <footer class="colony-footer"><p id="colony-event" class="colony-event" role="status"></p><details class="colony-journal"><summary>观测日志与规则</summary><p>双 AI 使用地面金币招募、建塔，靠伤亡经验进化。战争经验、歼灭与收割产生 Legacy。双方都到达 V 且一方获胜，全球文明核毁灭；结算后等待新文明萌芽。</p><p>月球属于 VI，解锁后自动生产 Legacy。空格暂停，R 倍速；天赋、存档、隐藏页面和离线期间不推进战争与产出。</p><ol id="colony-log"></ol><button id="colony-archive" type="button">回望地表天赋 ↗</button></details></footer>
     </section>
-    <dialog id="orbit-talents-dialog" class="orbit-talents-dialog" aria-labelledby="orbit-tree-title"><canvas id="orbit-tree-sky" aria-hidden="true"></canvas><header><div><small>ORBITAL CONSTELLATION</small><h2 id="orbit-tree-title">轨道天赋</h2></div><strong id="orbit-tree-wallet"></strong><button id="close-orbit-talents" type="button">返回地球 · Esc</button></header><div class="orbit-tree-scroll"><div class="orbit-tree-map"><svg id="orbit-tree-edges" viewBox="0 0 900 900" aria-hidden="true"></svg><div id="orbit-tree-nodes"></div></div></div><section class="orbit-talent-detail" aria-label="天赋详情"><div><h3 id="orbit-detail-name"></h3><p id="orbit-detail-description"></p><small id="orbit-detail-requires"></small></div><div><p id="orbit-detail-effect"></p><button id="orbit-buy" type="button"></button></div></section></dialog>
+    <dialog id="orbit-talents-dialog" class="orbit-talents-dialog" aria-labelledby="orbit-tree-title">
+      <canvas id="orbit-tree-sky" aria-hidden="true"></canvas>
+      <header><div class="colony-wordmark"><span data-icon="protocol"></span><div><small>BEFORE THE STARS / VI</small><h2 id="orbit-tree-title">轨道星图</h2></div></div><div class="colony-wallet"><span data-icon="legacy"></span><strong id="orbit-tree-wallet"></strong><span>Legacy<small>文明遗产</small></span></div><button id="close-orbit-talents" type="button">返回观测台 <span>Esc</span></button></header>
+      <div class="orbit-tree-scroll"><div class="orbit-tree-map"><svg id="orbit-tree-edges" viewBox="0 0 1100 880" aria-hidden="true"></svg><div id="orbit-tree-nodes"></div><span class="orbit-route route-life">生命的回响</span><span class="orbit-route route-war">地表的命运</span><span class="orbit-route route-home">我们的家园</span></div></div>
+      <p class="orbit-tree-guide">从存续协议延伸文明 · 拖动空白处浏览 · 双击节点购买</p>
+      <section id="orbit-detail" class="orbit-talent-detail" aria-label="天赋详情" hidden><button id="close-orbit-detail" type="button" class="icon-button" aria-label="关闭天赋详情">×</button><p class="colony-eyebrow" id="orbit-detail-branch"></p><h3 id="orbit-detail-name"></h3><p id="orbit-detail-description"></p><div class="orbit-effect"><span><small>当前</small><strong id="orbit-detail-current"></strong></span><span aria-hidden="true">→</span><span><small>下一级</small><strong id="orbit-detail-next"></strong></span></div><p id="orbit-detail-effect" class="sr-only"></p><small id="orbit-detail-requires"></small><button id="orbit-buy" type="button"></button></section>
+      <p id="orbit-feedback" role="status" aria-live="polite"></p>
+    </dialog>
 
     <main class="game-shell">
       <header class="masthead">
@@ -37,7 +57,7 @@
         <button class="icon-button" id="help" type="button" data-icon="help" aria-label="帮助与单位资料" title="帮助与单位资料 · ?"></button></div>
       </header>
       <nav id="civilization-bar" class="civilization-bar" aria-label="文明进度" hidden>
-        <div class="legacy-wallet" title="文明遗产，用于购买永久天赋"><span aria-hidden="true">✧</span><strong id="legacy-balance">0</strong><span>Legacy<small>文明遗产</small></span><small id="legacy-production" hidden></small></div>
+        <div class="legacy-wallet" title="文明遗产，用于购买永久天赋"><span data-icon="legacy" aria-hidden="true"></span><strong id="legacy-balance">0</strong><span>Legacy<small>文明遗产</small></span><small id="legacy-production" hidden></small></div>
         <div class="civilization-actions"><button id="archives" type="button" hidden>天赋树 <span aria-hidden="true">↗</span></button><button id="autobuyer-menu" type="button" hidden>自动购买 <small id="autobuyer-label">未解锁</small></button></div>
       </nav>
       <p id="challenge-status" class="challenge-status" hidden></p>
@@ -124,7 +144,7 @@
       <div class="home-curtain" aria-hidden="true"></div>
       <header class="home-header">
         <div class="home-wordmark"><span aria-hidden="true">✳</span><div><small>BEFORE THE STARS</small><h2 id="archives-title">文明星图</h2></div></div>
-        <div class="home-wallet"><span aria-hidden="true">✧</span><strong id="legacy">0</strong><span>Legacy<small>文明遗产</small></span></div>
+        <div class="home-wallet"><span data-icon="legacy" aria-hidden="true"></span><strong id="legacy">0</strong><span>Legacy<small>文明遗产</small></span></div>
         <nav class="home-nav" aria-label="文明档案"><button id="return-orbit" class="text-button" type="button" hidden>返回轨道</button><button id="home-automation" class="text-button" type="button">自动购买</button><button id="archive-save" class="text-button" type="button">存档</button><button class="icon-button" id="close-archives" type="button" data-icon="close" aria-label="返回战场"></button></nav>
       </header>
       <div class="home-scroll" id="home-scroll">

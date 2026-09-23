@@ -1,5 +1,19 @@
 // Small code-native icons keep controls crisp at any display density.
+export const PROTOCOL_GLYPH = 'M5 21V7l7-5 7 5v14M9 21V9h6v12M2 21h20';
+export const LEGACY_GLYPH = 'M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z';
 const paths = {
+  protocol: `<path d="${PROTOCOL_GLYPH}"/>`,
+  legacy: `<path d="${LEGACY_GLYPH}"/>`,
+  earth: '<circle cx="12" cy="12" r="9"/><path d="m5 6 5 2-1 4 4 3-2 5M15 4l-2 5 5 2 2 5"/>',
+  moon: '<path d="M17 3A9 9 0 1 0 21 17 10 10 0 0 1 17 3Z"/>',
+  habitat: '<ellipse cx="12" cy="12" rx="10" ry="5" transform="rotate(-25 12 12)"/><circle cx="12" cy="12" r="6"/><path d="m4 14 2 3m4-8 2 3m5-5 2 3"/>',
+  eye: '<path d="M2 12Q12 0 22 12Q12 24 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+  leaf: '<path d="M5 20Q2 3 21 3Q22 19 5 20ZM5 20 16 8"/>',
+  network: '<path d="m5 6 14 1-7 13L5 6Z"/><circle cx="5" cy="6" r="2"/><circle cx="19" cy="7" r="2"/><circle cx="12" cy="20" r="2"/>',
+  beam: '<path d="M8 3h8M12 3v11M4 21l8-7 8 7M8 21l4-7 4 7"/>',
+  link: '<path d="m3 8 6-4 6 4-6 4-6-4Zm6 8 6-4 6 4-6 4-6-4Z"/>',
+  industry: '<path d="M3 21V10l6 3V7l6 5V3h5v18H3ZM7 17h2m4 0h2"/>',
+  spark: '<path d="m13 2-8 12h7l-1 8 8-13h-7l1-7Z"/>',
   egg: '<path d="M7 15c0-4 3-9 5-9s5 5 5 9a5 5 0 0 1-10 0ZM3 21h18M4 8l4 5M17 5l3 3"/>',
   catapult: '<path d="M3 21h18M6 20l6-14 6 14M7 5l10 12M3 3h7l-2 4H5M11 15h5"/>',
   oil: '<path d="M3 21V4h18v17M7 7h10l-1 8H8L7 7Zm3 0V4h4v3m-2 11v3"/>',

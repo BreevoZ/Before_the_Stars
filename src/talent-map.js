@@ -1,4 +1,5 @@
 import { Q } from './quantity.js';
+import { PROTOCOL_GLYPH, LEGACY_GLYPH } from './icons.js';
 import { createBindings } from './dom-bindings.js';
 import { buildTalentViewModel } from './talent-view-model.js';
 import { UPGRADES, TALENT_LAYER_REQUIREMENT } from './progression-config.js';
@@ -15,7 +16,7 @@ const glyphs = {
   clock: 'M12 2a10 10 0 110 20 10 10 0 010-20M12 6v6l4 3',
   automation: 'M5 8h14v11H5z M9 8V5h6v3 M8 12h2m4 0h2 M9 16h6',
   growth: 'M4 20V9l6 3V6l6 4V3h4v17z M8 16h2m4 0h2',
-  legacy: 'M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z',
+  legacy: LEGACY_GLYPH,
   helmet: 'M5 20V8l3-5h8l3 5v12l-7 3z M5 10l7 3 7-3 M8 17h8',
   blade: 'M3 21l5-6M6 13l5 5 M9 14L19 3l2 2-9 12',
   arrow: 'M3 21L21 3M13 3h8v8M3 15l6 6',
@@ -37,7 +38,7 @@ const mapData = {
   legacyEfficiency: { x: 1050, y: 320, kind: 'specialist', icon: glyphs.clock },
   superSoldierPlan: { x: 550, y: 260, kind: 'keystone', icon: glyphs.helmet },
   elite: { x: 380, y: 170, kind: 'specialist' }, superRanged: { x: 720, y: 170, kind: 'specialist', icon: glyphs.arrow },
-  bypasser: { x: 550, y: 60, kind: 'keystone', icon: 'M5 21V7l7-5 7 5v14M9 21V9h6v12M2 21h20' },
+  bypasser: { x: 550, y: 60, kind: 'keystone', icon: PROTOCOL_GLYPH },
 };
 for (let layer = 1; layer <= 5; layer++) layerTalents(layer).forEach((key, slot) => {
   mapData[key] = { x: 410 + slot * 140, y: 1320 - (layer - 1) * 210,

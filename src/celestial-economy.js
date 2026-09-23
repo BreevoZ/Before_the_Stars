@@ -31,3 +31,5 @@ export const orbitalYieldMultiplier = state => 2 ** (state.talents.recovery + st
 export const rebirthDelay = state => R.winterSeconds * .75 ** state.talents.reseed;
 export const refugeeDelay = state => R.refugeeSeconds * .75 ** state.talents.reseed;
 export const civilizationValue = (state,civ,kind='harvest') => R[`${kind}Legacy`] * 2 ** (civ.age-1) * orbitalYieldMultiplier(state);
+
+export const lunarLegacyRate = state => state.talents.outpost ? R.lunarBaseIncome * 2 ** (state.talents.recovery + state.talents.lunarIndustry) : 0;

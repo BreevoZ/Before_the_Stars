@@ -1,4 +1,5 @@
 import { Q } from './quantity.js';
+import { dayPhase } from './celestial-clock.js';
 import { drawTurret } from './turrets.js';
 import { RULES, UNITS, AGES, ABILITIES, getTurretPosition, getAbilityRadius, getAbilityImpactX, getUnitHealth, getUnitChargeTarget, attributes } from './game.js';
 import { drawUnit } from './units.js';
@@ -11,7 +12,7 @@ const PALETTES = {
 };
 
 // One full day follows match time, so pausing and restarting also affect the sky.
-const DAY_NIGHT_CYCLE_SECONDS = 120;
+
 // Hash each axis independently. A height-dependent modulo creates rows/diagonals
 // at certain aspect ratios; normalized points keep the same sky through resizing.
 function starNoise(seed) {
@@ -97,7 +98,7 @@ function drawCelestialBody(ctx, ground, angle, moon) {
 }
 
 export function drawLandscape(ctx, height, ground, time) {
-  const phase = (time % DAY_NIGHT_CYCLE_SECONDS) / DAY_NIGHT_CYCLE_SECONDS;
+  const phase = dayPhase(time);
   const light = landscapeLight(phase);
   const sky = ctx.createLinearGradient(0, 0, 0, ground);
   sky.addColorStop(0, light.skyTop);
@@ -207,8 +208,9 @@ export function createRenderer(canvas) {
   new ResizeObserver(resize).observe(canvas);
   resize();
 
-  return function render(game, { targeting = false, targetX = RULES.width / 2 } = {}) {
-    drawBattleScene(ctx, game, { height: sceneHeight, entityScale, time: reducedMotion.matches ? 0 : game.elapsed,
+  return function render(game, { targeting = false, targetX = RULES.width / 2, skyTime = game.elapsed } = {}) {
+    if (!canvas.width || !canvas.height || !Number.isFinite(sceneHeight)) return;
+    drawBattleScene(ctx, game, { height: sceneHeight, entityScale, time: reducedMotion.matches ? 0 : game.elapsed, skyTime: reducedMotion.matches ? 0 : skyTime,
       reducedMotion: reducedMotion.matches, targeting, targetX });
   };
 }
@@ -216,8 +218,8 @@ export function createRenderer(canvas) {
 // One painter for live combat and its final frame in the destruction sequence.
 // Presentation callers supply their camera/clock; this never advances combat.
 export function drawBattleScene(ctx, game, { height = RULES.height, ground = height * .738,
-  time = game.elapsed, entityScale = 1, reducedMotion = false, targeting = false, targetX = RULES.width / 2 } = {}) {
-  drawLandscape(ctx, height, ground, time);
+  time = game.elapsed, skyTime = time, entityScale = 1, reducedMotion = false, targeting = false, targetX = RULES.width / 2 } = {}) {
+  drawLandscape(ctx, height, ground, skyTime);
   ctx.save();
   ctx.translate(0, ground);
   drawBase(ctx, game.bases.player, game.ages.player, time, entityScale, game.turrets.player.length);

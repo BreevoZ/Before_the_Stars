@@ -1,13 +1,13 @@
 import { Q } from './quantity.js';
 import { ORBITAL_RULES as R, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as ACTIONS } from './orbital-config.js';
-import { seedCivilizations, seedRefugee, orbitalYieldMultiplier, civilizationValue, rebirthDelay, refugeeDelay } from './celestial-economy.js';
+import { seedCivilizations, seedRefugee, orbitalYieldMultiplier, civilizationValue, rebirthDelay, refugeeDelay, lunarLegacyRate } from './celestial-economy.js';
 import { createWar, updateWar, syncWarCivilizations, refreshWarBonuses, changeTechnology } from './orbital-war.js';
 
 export function createOrbitalState(seed = (Math.random()*4294967296)>>>0) {
   return {version:R.version,started:false,elapsed:0,rng:seed>>>0,cycle:0,settledCycle:0,nuclearCycles:0,
     phase:'dormant',remaining:0,winterDuration:0,refugeeRemaining:0,nextCivilization:0,nextWar:0,
     civilizations:[],wars:[],talents:Object.fromEntries(Object.keys(T).map(k=>[k,k==='protocol'?1:0])),
-    payments:{},interventionSpent:0,legacyEarned:0,legacyFraction:0,lastReward:0,lastCatastropheAt:null,
+    payments:{},interventionSpent:0,legacyEarned:0,legacyFraction:0,lunarProduced:0,lunarFraction:0,lastReward:0,lastCatastropheAt:null,
     selectedCivilization:null,selectedOpponent:null,selectedWar:null,autoWar:false,autoElapsed:0,completionAt:null,
     log:[{time:0,text:'存续协议已生效。地表的战火，将成为轨道家园的遗产。'}]};
 }
@@ -77,6 +77,9 @@ export function intervene(s,id,key){
 export function updateOrbital(s,dt,{paused=false,hidden=false}={}){
   const o=s.orbital;if(!active(s)||paused||hidden||!Number.isFinite(dt)||dt<=0)return false;
   dt=Math.min(.05,dt);o.elapsed+=dt;let changed=false;
+  o.lunarFraction+=lunarLegacyRate(o)*dt;
+  const lunarWhole=Math.floor(o.lunarFraction+1e-10);o.lunarFraction=Math.max(0,o.lunarFraction-lunarWhole);
+  if(lunarWhole){o.lunarProduced=Q.add(o.lunarProduced,lunarWhole);award(s,lunarWhole);}
   if(o.phase==='winter'){o.remaining=Math.max(0,o.remaining-dt);if(o.remaining<=1e-8){beginCycle(o);return true;}return false;}
   for(const war of [...o.wars]){
     // Every paid launch owns a damage snapshot; live modifiers affect only new attacks.

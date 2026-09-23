@@ -11,7 +11,7 @@ export function simulateOrbital({seed=1,legacy=0,maxSeconds=3600,buyTalents=true
     const o=session.orbital;
     if(o.elapsed>=decision){decision=o.elapsed+1;
       const idle=o.civilizations.filter(c=>c.alive&&!c.warId).sort((a,b)=>a.age-b.age);for(let i=0;i+1<idle.length;i+=2)startOrbitalWar(session,idle[i].id,idle[i+1].id);
-      if(buyTalents)for(const key of ['monitor','patronage','recovery','reseed','weaving','technology','regression','harvest','diversity','outpost','transit'])if(purchaseOrbitalTalent(session,key))milestones.push({talent:key,rank:o.talents[key],at:Math.round(o.elapsed)});
+      if(buyTalents)for(const key of ['monitor','patronage','recovery','reseed','weaving','technology','regression','harvest','diversity','outpost','lunarIndustry','transit'])if(purchaseOrbitalTalent(session,key))milestones.push({talent:key,rank:o.talents[key],at:Math.round(o.elapsed)});
       if(interventions){const c=o.civilizations.find(c=>c.alive&&c.warId);if(c && c.age<5 && getInterventionState(session,c.id,'advance')==='ready')intervene(session,c.id,'advance');}
     }
     updateOrbital(session,RULES.fixedStep);

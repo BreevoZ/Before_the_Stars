@@ -232,7 +232,7 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     sync, save, open, cycleSpeed, animate(timestamp) {
       const suspended = saveDialog.open || autoDialog.open || challengeDialog.open || debugDialog.open;
       orbital.tick(timestamp, suspended); destruction.tick(timestamp, suspended);
-      if (!dialog.open) colony.paint();
+      if (!dialog.open) colony.paint(timestamp);
     },
     step(dt) {
       const before = session.game;

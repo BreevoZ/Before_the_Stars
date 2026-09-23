@@ -81,5 +81,5 @@ const v13 = Object.fromEntries(Object.entries(v12).map(([key, config]) => [key, 
     superRanged: [512], bypasser: [10000] })[key] ?? (config.unit ? [2 ** (config.layer + 1)] : config.costs),
 }]));
 const v14 = { ...v13, fireControl: { costs: [8], requires: { evolution: 1 } }, campaign: { costs: [16], requires: { fireControl: 1 } }, extermination: { costs: [64], requires: { campaign: 1 } } };
-export const HISTORICAL_TALENTS = freeze({ 2: v2, 3: v3, 4: v4, 5: v5, 6: v5, 7: v5, 8: v5, 9: v9, 10: v10, 11: v11, 12: v12, 13: v13, 14: v14, 15: v14 });
+export const HISTORICAL_TALENTS = freeze({ 2: v2, 3: v3, 4: v4, 5: v5, 6: v5, 7: v5, 8: v5, 9: v9, 10: v10, 11: v11, 12: v12, 13: v13, 14: v14, 15: v14, 16: v14 });
 export const HISTORICAL_UPGRADE_COSTS = Object.freeze([1, 2, 4, 8, 16]);

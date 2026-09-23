@@ -109,17 +109,22 @@ node sim/batch.js --out sim/results/scan.csv
 `orbital-scene.js` 是可按时间寻址的纯 Canvas 表现，星图背景与动画工坊共用它。36 艘飞船由固定种子生成，镜头位移和尾焰使用演出时间；减少动态效果直接选最终帧。
 
 
-### VI 战争观测（v16）
+### VI 战争观测与地月家园（v17）
 
 `launch` 创建未开始的 `session.orbital`；`enterOrbital` 幂等地开启第一轮随机萌芽。主循环复用固定步长、倍速、暂停、页面可见性和模态窗口守卫，不更新原地表战斗与遗产生产机。
 
 - `celestial-economy.js`：持久化 LCG 随机源、点位萌芽、核冬天/新聚落等待和回收价值；无 DOM。
 - `orbital-war.js`：复用 `createGame`、统一属性管线和双方 `updateCommander`，不复制战斗引擎。文明年龄、金币与经验同完整战斗同步；科技馈赠/回退不会制造战争经验收益；军备扶持保留生命比例，已发射弹药保留原属性快照。
 - `orbital-game.js`：文明和战争标识、命令守卫、战争结算、全局核毁灭及 Legacy 账本。双方 V 且出现胜者才将整轮标记为已结算。收割/普通战争通过移除活动战争和文明存活标记防重，核毁灭用 `settledCycle` 防重；奖励从不依赖 Canvas。
-- `orbital-config.js`：8 个点位、天赋树、前置、费用、干预和战争数值。Legacy 是唯一轨道货币，月球以前哨天赋接入回收倍率，不引入新资源或第二层 prestige。
-- `orbital-save.js`：v16 形状、前置、支付账本、文明/战争互相引用及结算一致性。`save-battle.js` 是地表与轨道共用的完整战斗校验；存档省略可推导加成、基地上限，保留部队、订单、弹药快照、双方 AI 与随机源。
-- `orbital-view-model.js` / `orbital-colony-ui.js`：纯视图投影、一次绑定、全屏 SVG 天赋树与原有 Canvas 战斗监控。`orbital-render.js` 绘制点位地球、核毁灭和轨道星图背景。
+- `orbital-config.js`：8 个点位、天赋树、前置、费用、干预和战争数值。Legacy 是唯一轨道货币，月球前哨保留战争倍率，并以模拟时钟自动生产 Legacy；生存空间与月面工场每级翻倍，不引入新资源或第二层 prestige。
+- `orbital-save.js`：v16/v17 形状、前置、支付账本、文明/战争互相引用及结算一致性。`save-battle.js` 是地表与轨道共用的完整战斗校验；存档省略可推导加成、基地上限，保留部队、订单、弹药快照、双方 AI 与随机源。
+- `orbital-view-model.js` / `orbital-colony-ui.js`：纯视图投影、一次绑定、全屏 SVG 天赋树与原有 Canvas 战斗监控。`orbital-render.js` 绘制自转地球、核毁灭、逐段居住环、月面设施与轨道星图。`celestial-clock.js` 统一 120 秒太阳日，按点位经度给地面渲染传入 `skyTime`，不改变真实战斗时钟。
 
 v15 原建设记录由冻结的 `orbital-history.js` / `orbital-save-v15.js` 先校验再迁移。v16 删除旧支出并由统一账本返还已建/在建 Legacy，保留历史收入，重新萌芽；不把退款记成奖励。真实 v15 抵达、在建、完成样本位于 `tests/fixtures/v15-orbital.js`。完整战争确定性续跑、全球结算页刷新、重生后读档、损坏存档及备份恢复均有回归。
 
 `sim/orbital.js` 使用实际双 AI 战斗，决策策略只负责配对/花钱，不提供额外收入。`tests/orbital-colony-cases.js` 在 Node 和浏览器共用；浏览器覆盖天赋暂停与购买、监控、干预、窄屏，以及从零钱包真实打到核毁灭再重生。独立试玩页使用内存存档，不接触用户进度。
+
+
+v16 → v17 是保留战争的增量迁移：增加 `lunarIndustry` 等级、`lunarProduced` 和 `lunarFraction`；不改已有回收等级或支付记录，不追溯补发月面收入。`updateOrbital` 在暂停/隐藏/有效时间检查之后，按产能积累小数余量、整数入统一 Legacy 账本，核冬天照常生产。新等级通过正常购买与立即保存路径，渲染无经济副作用。
+
+首次毁灭演出以已结算存档为前提。空布局回退到全屏战场；绘制失败时主动恢复 `inert`、移除遮罩与相关样式，保留星图和重建入口，不能让 Canvas 错误截断主循环。浏览器回归覆盖首次立即结算、零尺寸布局、注入绘制异常、跳过及后续重建推进。

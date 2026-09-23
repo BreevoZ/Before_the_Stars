@@ -2,62 +2,115 @@ import { createBindings } from './dom-bindings.js';
 import { SITES, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as A, ORBITAL_RULES as R } from './orbital-config.js';
 import { startOrbitalWar, intervene, purchaseOrbitalTalent } from './orbital-game.js';
 import { buildOrbitalViewModel } from './orbital-view-model.js';
-import { drawOrbitalColony, drawOrbitalTalentSky, sitePosition } from './orbital-render.js';
+import { drawOrbitalColony, drawOrbitalTalentSky, drawLunarColony, sitePosition } from './orbital-render.js';
 import { createRenderer } from './render.js';
-const ICONS={orbit:'M3 12h18M12 3a7 9 0 1 0 .1 0M5 7v10M19 7v10',eye:'M2 12Q12 1 22 12Q12 23 2 12M15 12a3 3 0 1 0-6 0a3 3 0 1 0 6 0',sword:'M5 20L19 4l1 5L9 20M4 14l7 7',spark:'M13 2L5 14h7l-1 8 8-13h-7z',lock:'M5 10h14v11H5zM8 10V6a4 4 0 0 1 8 0v4',beam:'M8 3h8M12 3v11M4 21l8-7 8 7M8 21l4-7 4 7',archive:'M5 4h14v17H5zM8 8h8M8 12h8M8 16h5',leaf:'M5 20Q2 3 21 3Q22 19 5 20M5 20L16 8',nodes:'M5 6L19 7 12 20 5 6M5 6h1M19 7h1M12 20h1',link:'M3 8l6-4 6 4-6 4zM9 16l6-4 6 4-6 4z',moon:'M16 3A9 9 0 1 0 21 17A10 10 0 0 1 16 3',star:'M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z'};
-export function createOrbitalColonyUI(getSession,{commit,archive,save,speed,viewChanged}){
+import { icon } from './icons.js';
+import { localSkyTime } from './celestial-clock.js';
+const branch = key => ['reseed','diversity'].includes(key)?'life':['recovery','outpost','lunarIndustry','transit'].includes(key)?'home':'war';
+export function createOrbitalColonyUI(getSession,{commit,archive,save,speed,viewChanged}) {
   const el=id=>document.getElementById(id),bind=createBindings(document),dialog=el('orbit-talents-dialog');
-  let talent='monitor';const reduced=matchMedia('(prefers-reduced-motion: reduce)');
-  function selectCivilization(site,key){const o=getSession().orbital,c=o?.civilizations.find(c=>c.site===site);if(c){o[key]=c.id;
-    if(key==='selectedCivilization'&&c.warId){const w=o.wars.find(w=>w.id===c.warId);o.selectedWar=w.id;o.selectedOpponent=w.participants.find(id=>id!==c.id);}commit();}}
+  const detail=el('orbit-detail'),scroll=dialog.querySelector('.orbit-tree-scroll');
+  const reduced=matchMedia('(prefers-reduced-motion: reduce)');
+  let talent='monitor',selected=false,pinned=false,paused=false,ambient=0,last=null,lastPaint=null,hideTimer;
+  document.querySelectorAll('#orbital-game [data-icon], #orbit-talents-dialog [data-icon]').forEach(node=>{node.innerHTML=icon(node.dataset.icon);});
+  function selectCivilization(site,key){
+    const o=getSession().orbital,c=o?.civilizations.find(c=>c.site===site);if(!c)return;
+    o[key]=c.id;
+    if(key==='selectedCivilization'&&c.warId){const w=o.wars.find(w=>w.id===c.warId);o.selectedWar=w.id;o.selectedOpponent=w.participants.find(id=>id!==c.id);}
+    commit();
+  }
   for(const site of SITES){
     for(const which of ['first','opponent']){const opt=document.createElement('option');opt.id=`${which}-${site.id}`;opt.value=site.id;el(`colony-${which}`).append(opt);}
-    const p=sitePosition(site),button=document.createElement('button');button.id=`site-${site.id}`;button.className='orbit-site';button.type='button';button.style.left=`${p.x/10}%`;button.style.top=`${p.y/6.2}%`;button.innerHTML=`<span id="site-${site.id}-age"></span><small>${site.name}</small>`;
+    const button=document.createElement('button');button.id=`site-${site.id}`;button.className='orbit-site';button.type='button';
+    button.innerHTML=`<span id="site-${site.id}-age"></span><small>${site.name}</small>`;
     button.addEventListener('click',()=>selectCivilization(site.id,'selectedCivilization'));el('colony-map').append(button);
+    const item=document.createElement('button');item.id=`roster-${site.id}`;item.type='button';item.innerHTML=`<i></i><span id="roster-name-${site.id}"></span><small id="roster-age-${site.id}"></small>`;
+    item.addEventListener('click',()=>selectCivilization(site.id,'selectedCivilization'));el('colony-roster').append(item);
   }
   el('colony-first').addEventListener('change',e=>selectCivilization(e.target.value,'selectedCivilization'));
   el('colony-opponent').addEventListener('change',e=>selectCivilization(e.target.value,'selectedOpponent'));
   el('colony-start-war').addEventListener('click',()=>{const s=getSession(),o=s.orbital;if(startOrbitalWar(s,o.selectedCivilization,o.selectedOpponent))commit();});
   for(const [key,a]of Object.entries(A)){
     const button=document.createElement('button');button.id=`intervene-${key}`;button.type='button';button.title=a.description;
-    button.innerHTML=`<strong>${a.name}</strong><small id="intervene-${key}-cost"></small><small id="intervene-${key}-state"></small>`;
+    button.innerHTML=`<span class="intervention-icon">${icon({boost:'shield',advance:'spark',regress:'lock',harvest:'beam'}[key])}</span><span><strong>${a.name}</strong><small id="intervene-${key}-state"></small></span><span class="orbit-price"><small id="intervene-${key}-cost"></small>${icon("legacy")}</span>`;
     button.addEventListener('click',()=>{const s=getSession();if(intervene(s,s.orbital.selectedCivilization,key))commit();});el('colony-interventions').append(button);
   }
-  for(let i=0;i<3;i++){const button=document.createElement('button');button.id=`watch-war-${i}`;button.type='button';button.addEventListener('click',()=>{const o=getSession().orbital;if(o.wars[i]){const w=o.wars[i];o.selectedWar=w.id;[o.selectedCivilization,o.selectedOpponent]=w.participants;commit();}});el('colony-wars').append(button);}
+  for(let i=0;i<3;i++){
+    const button=document.createElement('button');button.id=`watch-war-${i}`;button.type='button';
+    button.addEventListener('click',()=>{const o=getSession().orbital,w=o.wars[i];if(w){o.selectedWar=w.id;[o.selectedCivilization,o.selectedOpponent]=w.participants;commit();}});el('colony-wars').append(button);
+  }
   el('colony-auto').addEventListener('change',e=>{const o=getSession().orbital;if(o?.talents.weaving){o.autoWar=e.target.checked;commit();}});
   const NS='http://www.w3.org/2000/svg';
   for(const [key,t]of Object.entries(T)){
     for(const parent of Object.keys(t.requires)){
       const from=T[parent],path=document.createElementNS(NS,'path');path.id=`orbit-edge-${parent}-${key}`;
       path.setAttribute('d',`M${from.x} ${from.y} C${from.x} ${(from.y+t.y)/2} ${t.x} ${(from.y+t.y)/2} ${t.x} ${t.y}`);
-      path.setAttribute('class',parent==='protocol'?'trunk':'branch');el('orbit-tree-edges').append(path);
+      path.setAttribute('class',parent==='protocol'?'trunk':'branch');path.dataset.route=branch(key);el('orbit-tree-edges').append(path);
     }
-    const node=document.createElement('button');node.id=`orbit-node-${key}`;node.type='button';node.className=`orbit-node${t.keystone||t.root?' keystone':''}`;node.style.left=`${t.x}px`;node.style.top=`${t.y}px`;
-    node.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[t.icon]}"/></svg><span class="orbit-node-name">${t.name}</span><span id="orbit-rank-${key}" class="orbit-rank"></span><small id="orbit-cost-${key}"></small>`;
-    node.addEventListener('click',()=>{talent=key;sync();});node.addEventListener('dblclick',()=>buy(key));
-    node.addEventListener('keydown',e=>{if(!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))return;e.preventDefault();
+    const node=document.createElement('button');node.id=`orbit-node-${key}`;node.type='button';node.className=`orbit-node${t.keystone||t.root?' keystone':''}`;
+    node.dataset.route=branch(key);node.style.left=`${t.x}px`;node.style.top=`${t.y}px`;node.setAttribute('aria-controls','orbit-detail');
+    node.innerHTML=`<span class="orbit-node-ring"></span><span class="orbit-node-glyph">${icon(t.icon)}</span><span id="orbit-rank-${key}" class="orbit-rank"></span><small class="orbit-node-price"><span id="orbit-cost-${key}"></span>${icon("legacy")}</small><span class="orbit-node-name">${t.name}</span>`;
+    node.addEventListener('click',()=>selectTalent(key,true));node.addEventListener('dblclick',()=>buy(key));
+    node.addEventListener('pointerenter',e=>{if(innerWidth>740&&e.pointerType==='mouse'&&!pinned)selectTalent(key);});
+    node.addEventListener('pointerleave',()=>{if(!pinned)hideTimer=setTimeout(closeDetail,180);});
+    node.addEventListener('keydown',e=>{
+      if(!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))return;e.preventDefault();
       const axis=e.code==='ArrowLeft'||e.code==='ArrowRight'?'x':'y',sign=e.code==='ArrowLeft'||e.code==='ArrowUp'?-1:1;
-      const next=Object.entries(T).filter(([,n])=>(n[axis]-t[axis])*sign>0).sort(([,a],[,b])=>Math.hypot(a.x-t.x,a.y-t.y)-Math.hypot(b.x-t.x,b.y-t.y))[0];if(next)el(`orbit-node-${next[0]}`).focus();
+      const next=Object.entries(T).filter(([,n])=>(n[axis]-t[axis])*sign>0).sort(([,a],[,b])=>Math.hypot(a.x-t.x,a.y-t.y)-Math.hypot(b.x-t.x,b.y-t.y))[0];
+      if(next){el(`orbit-node-${next[0]}`).focus();selectTalent(next[0],true);}
     });el('orbit-tree-nodes').append(node);
   }
-  function buy(key){if(!purchaseOrbitalTalent(getSession(),key))return;talent=key;commit();
-    if(!reduced.matches){el(`orbit-node-${key}`).animate([{scale:1},{scale:1.17},{scale:1}],{duration:450});el('orbit-tree-wallet').animate([{color:'#efdaa0',scale:1.06},{scale:1}],{duration:500});
-      for(const p of Object.keys(T[key].requires))el(`orbit-edge-${p}-${key}`).animate([{stroke:'#f0dfa7',strokeDasharray:'5 9',strokeDashoffset:40},{strokeDashoffset:0}],{duration:650});}
+  function positionDetail(){
+    if(!selected||!dialog.open)return;
+    if(innerWidth<=740){detail.style.left='';detail.style.top='';return;}
+    const rect=el(`orbit-node-${talent}`).getBoundingClientRect(),width=detail.offsetWidth;
+    detail.style.left=`${Math.max(16,Math.min(innerWidth-width-16,rect.right+width+30<innerWidth?rect.right+20:rect.left-width-20))}px`;
+    detail.style.top=`${Math.max(92,Math.min(innerHeight-detail.offsetHeight-24,rect.top-24))}px`;
   }
-  function openTree(){if(!getSession().orbital?.started)return;if(!dialog.open)dialog.showModal();sync();paintTree();el(`orbit-node-${talent==='monitor'?'protocol':talent}`).scrollIntoView({block:talent==='monitor'?'end':'center',inline:'center'});el(`orbit-node-${talent}`).focus({preventScroll:true});viewChanged();}
-  el('colony-talents').addEventListener('click',openTree);el('colony-unlock-monitor').addEventListener('click',()=>{talent='monitor';openTree();});
-  el('orbit-buy').addEventListener('click',()=>buy(talent));el('close-orbit-talents').addEventListener('click',()=>dialog.close());dialog.addEventListener('close',viewChanged);
+  function closeDetail(){clearTimeout(hideTimer);selected=false;pinned=false;detail.hidden=true;sync();}
+  function selectTalent(key,pin=false){clearTimeout(hideTimer);talent=key;selected=true;pinned=pin;sync();detail.hidden=false;positionDetail();}
+  detail.addEventListener('pointerenter',()=>clearTimeout(hideTimer));detail.addEventListener('pointerleave',()=>{if(!pinned)hideTimer=setTimeout(closeDetail,180);});
+  el('close-orbit-detail').addEventListener('click',closeDetail);
+  function buy(key){
+    if(!purchaseOrbitalTalent(getSession(),key))return;talent=key;commit();selectTalent(key,true);
+    el('orbit-feedback').textContent=`${T[key].name} · 已点亮 ${getSession().orbital.talents[key]} 级`;
+    if(!reduced.matches){el(`orbit-node-${key}`).animate([{scale:1},{scale:1.15},{scale:1}],{duration:450});
+      el('orbit-tree-wallet').animate([{transform:'translateY(-4px)',opacity:.5},{transform:'translateY(0)',opacity:1}],{duration:450});
+      for(const p of Object.keys(T[key].requires))el(`orbit-edge-${p}-${key}`).animate([{strokeDasharray:'4 7',strokeDashoffset:60,opacity:1},{strokeDashoffset:0,opacity:.7}],{duration:700});}
+  }
+  function openTree(key=null){
+    if(!getSession().orbital?.started)return;
+    closeDetail();if(!dialog.open)dialog.showModal();sync();paintTree();
+    el(`orbit-node-${key??'protocol'}`).scrollIntoView({block:key?'center':'end',inline:'center'});
+    el(`orbit-node-${key??'protocol'}`).focus({preventScroll:true});if(key)selectTalent(key,true);viewChanged();
+  }
+  el('colony-talents').addEventListener('click',()=>openTree());el('colony-unlock-monitor').addEventListener('click',()=>openTree('monitor'));
+  el('colony-build-habitat').addEventListener('click',()=>openTree('recovery'));el('colony-lunar-upgrade').addEventListener('click',()=>openTree('lunarIndustry'));
+  el('orbit-buy').addEventListener('click',()=>buy(talent));el('close-orbit-talents').addEventListener('click',()=>dialog.close());
+  dialog.addEventListener('close',()=>{closeDetail();viewChanged();});scroll.addEventListener('scroll',positionDetail,{passive:true});
+  dialog.addEventListener('cancel',e=>{if(selected){e.preventDefault();closeDetail();}});
+  let drag=null;
+  scroll.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse'||e.target.closest('button'))return;drag={x:e.clientX,y:e.clientY,left:scroll.scrollLeft,top:scroll.scrollTop};scroll.setPointerCapture(e.pointerId);});
+  scroll.addEventListener('pointermove',e=>{if(drag){scroll.scrollLeft=drag.left+drag.x-e.clientX;scroll.scrollTop=drag.top+drag.y-e.clientY;}});
+  scroll.addEventListener('pointerup',()=>{drag=null;});scroll.addEventListener('pointercancel',()=>{drag=null;});
   for(let i=0;i<R.historyLimit;i++){const li=document.createElement('li');li.id=`orbit-log-${i}`;el('colony-log').append(li);}
   el('colony-archive').addEventListener('click',archive);el('colony-save').addEventListener('click',save);el('colony-speed').addEventListener('click',speed);
   el('colony-debug-speed').addEventListener('change',e=>{const s=getSession(),speed=Number(e.target.value);if(s.debug&&[1,5,10,20].includes(speed)){s.debugSpeed=speed;commit();}});
   const battle=el('colony-battle'),renderBattle=createRenderer(battle);
-  function canvasContext(canvas){const {width,height}=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);if(!width||!height)return null;
+  function canvasContext(canvas){const{width,height}=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);if(!width||!height)return null;
     if(canvas.width!==Math.round(width*dpr)||canvas.height!==Math.round(height*dpr)){canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);}const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);return{ctx,width,height};}
-  function paintTree(){const p=canvasContext(el('orbit-tree-sky'));if(p)drawOrbitalTalentSky(p.ctx,p.width,p.height);}
-  function paint(){const o=getSession().orbital;if(!o?.started||document.hidden)return;if(dialog.open){paintTree();return;}
-    const p=canvasContext(el('colony-world'));if(p)drawOrbitalColony(p.ctx,p.width,p.height,o,{reducedMotion:reduced.matches});
-    const war=o.wars.find(w=>w.id===o.selectedWar);if(o.talents.monitor&&war&&battle.width>0)renderBattle(war.game);
+  function paintTree(){const p=canvasContext(el('orbit-tree-sky'));if(p)drawOrbitalTalentSky(p.ctx,p.width,p.height,getSession().orbital,{ambientTime:ambient,reducedMotion:reduced.matches});}
+  function paint(timestamp=performance.now()){
+    const o=getSession().orbital;if(!o?.started||document.hidden){last=null;lastPaint=null;return;}
+    if(last!==null&&!paused&&!reduced.matches)ambient+=Math.max(0,Math.min(.1,(timestamp-last)/1000));last=timestamp;
+    if(lastPaint!==null&&timestamp>=lastPaint&&timestamp-lastPaint<1000/30)return;lastPaint=timestamp;
+    if(dialog.open){paintTree();return;}
+    const p=canvasContext(el('colony-world'));if(p)drawOrbitalColony(p.ctx,p.width,p.height,o,{ambientTime:ambient,reducedMotion:reduced.matches});
+    for(const site of SITES){const pos=sitePosition(site,reduced.matches?0:o.elapsed),node=el(`site-${site.id}`);node.style.left=`${pos.x/10}%`;node.style.top=`${pos.y/6.2}%`;node.hidden=!pos.visible;}
+    const war=o.wars.find(w=>w.id===o.selectedWar);
+    if(o.talents.monitor&&war){const site=SITES.find(site=>site.id===o.civilizations.find(c=>c.id===war.participants[0]).site);renderBattle(war.game,{skyTime:localSkyTime(o.elapsed,site)});}
+    if(o.talents.outpost){const p=canvasContext(el('colony-moon'));if(p)drawLunarColony(p.ctx,p.width,p.height,o,{ambientTime:ambient,reducedMotion:reduced.matches});}
   }
-  function sync(options={}){bind(buildOrbitalViewModel(getSession(),{...options,talent}));}
+  function sync(options={}){if(Object.hasOwn(options,'paused'))paused=options.paused;bind(buildOrbitalViewModel(getSession(),{paused,...options,talent,selected}));}
   return{sync,paint,get treeOpen(){return dialog.open;},dismiss(){dialog.close();}};
 }

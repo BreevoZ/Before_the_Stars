@@ -12,24 +12,26 @@ const svgNS = 'http://www.w3.org/2000/svg';
 // Explicit art direction for this small tree; prerequisites still come from TALENT_TREE.
 // Coordinates are independent of node size, so a narrow screen never shrinks touch targets.
 // Every node has its own icon from the shared set in icons.js, as in the VI tree.
+// Shapes follow one rule in both trees: a circle unlocks a new mechanic, a
+// hexagon is a numeric boost, a diamond is automation or convenience.
 const mapData = {
   spark: { x: 550, y: 1570, kind: 'keystone', icon: 'ember' },
   // Side branches sit on the same rows as the era layers, as in the VI tree:
   // automation on the left, growth and Legacy on the right, each in columns.
-  logistics: { x: 80, y: 1320, icon: 'logistics' }, formation: { x: 220, y: 1320, kind: 'keystone', icon: 'wedge' },
-  defense: { x: 80, y: 1110, kind: 'specialist', icon: 'bastion' }, evolution: { x: 220, y: 1110, icon: 'stairs' },
-  fireControl: { x: 220, y: 900, icon: 'crosshair' },
-  campaign: { x: 220, y: 690, icon: 'forward' },
+  logistics: { x: 80, y: 1320, kind: 'specialist', icon: 'logistics' }, formation: { x: 220, y: 1320, kind: 'specialist', icon: 'wedge' },
+  defense: { x: 80, y: 1110, icon: 'bastion' }, evolution: { x: 220, y: 1110, kind: 'specialist', icon: 'stairs' },
+  fireControl: { x: 220, y: 900, kind: 'specialist', icon: 'crosshair' },
+  campaign: { x: 220, y: 690, kind: 'specialist', icon: 'forward' },
   extermination: { x: 220, y: 480, kind: 'keystone', icon: 'skull' },
   production: { x: 770, y: 1320, icon: 'income' }, warfare: { x: 875, y: 1320, icon: 'ledger' },
-  supply: { x: 770, y: 1110, kind: 'specialist', icon: 'coins' }, salvage: { x: 875, y: 1110, kind: 'specialist', icon: 'salvage' },
-  conservation: { x: 1020, y: 1320, kind: 'keystone', icon: 'urn' }, challenge: { x: 1065, y: 1110, kind: 'specialist', icon: 'summit' },
-  timeAcceleration: { x: 820, y: 788, icon: 'hasten' },
+  supply: { x: 770, y: 1110, icon: 'coins' }, salvage: { x: 875, y: 1110, icon: 'salvage' },
+  conservation: { x: 1020, y: 1320, icon: 'urn' }, challenge: { x: 1065, y: 1110, kind: 'keystone', icon: 'summit' },
+  timeAcceleration: { x: 820, y: 788, kind: 'specialist', icon: 'hasten' },
   // The machine needs both 遗产保存 and era III; it is drawn from its own branch.
   legacyMachine: { x: 970, y: 900, kind: 'keystone', icon: 'gear', parent: 'conservation' },
-  legacyEfficiency: { x: 920, y: 690, kind: 'specialist', icon: 'hourglass' }, legacyCapacity: { x: 1030, y: 690, kind: 'specialist', icon: 'layers' },
+  legacyEfficiency: { x: 920, y: 690, icon: 'hourglass' }, legacyCapacity: { x: 1030, y: 690, icon: 'layers' },
   superSoldierPlan: { x: 550, y: 270, kind: 'keystone', icon: 'visor' },
-  elite: { x: 380, y: 190, kind: 'specialist', icon: 'chevrons' }, superRanged: { x: 720, y: 190, kind: 'specialist', icon: 'scope' },
+  elite: { x: 380, y: 190, kind: 'specialist', icon: 'chevrons' }, superRanged: { x: 720, y: 190, kind: 'keystone', icon: 'scope' },
   // The goal of the surface, and the node VI grows from: the same disc on both pages.
   bypasser: { x: 550, y: 80, kind: 'keystone', finale: true, icon: 'protocol' },
 };

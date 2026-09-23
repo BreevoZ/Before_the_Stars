@@ -2,7 +2,7 @@ import { Q } from './quantity.js';
 import { AGES, UNITS } from './game-config.js';
 import { SITES, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as A, ORBITAL_RULES as R, TENDENCIES } from './orbital-config.js';
 import { findCivilization, getWarState, getInterventionState, interventionCost, getOrbitalTalentState } from './orbital-game.js';
-import { civilizationValue, orbitalYieldMultiplier, lunarLegacyRate, cycleStartedAt, doomsdayMultiplier } from './celestial-economy.js';
+import { civilizationValue, orbitalYieldMultiplier, lunarLegacyRate, cycleStartedAt, doomsdayMultiplier, chronicleMultiplier } from './celestial-economy.js';
 import { TRAITS } from './traits.js';
 import { warOdds } from './orbital-war.js';
 import { siteDaylight } from './celestial-clock.js';
@@ -12,6 +12,10 @@ export function orbitalTalentEffect(o,key,rank=o.talents[key]){
   if(key==='reseed')return `核冬天 ${Math.round(R.winterSeconds*.75**rank)} 秒`;
   if(key==='diversity')return `至少 ${Math.min(R.maxCivilizations,R.minCivilizations+rank)} 个文明`;
   const lunar=(industry=o.talents.lunarIndustry,driver=o.talents.massDriver)=>Q.format(R.lunarBaseIncome*2**(industry+driver));
+  if(key==='quickening')return rank?`新文明从 ${AGES[1+rank].numeral} 时代起步`:'新文明从 I 时代起步';
+  if(key==='chronicle')return rank?`每次核毁灭 +${Math.round(R.chronicleStep*rank*100)}% · 当前 ×${(1+R.chronicleStep*rank*o.nuclearCycles).toFixed(1)}`:'战争遗产不随轮回增长';
+  if(key==='directed')return rank?'可在观测台指定新文明的倾向':'新文明的倾向随机';
+  if(key==='fallout')return rank?`核冬天共收获上次核毁灭的 ${R.falloutShare*100}%`:'核冬天没有收益';
   if(key==='tendency')return rank?'新萌芽的文明带有好战、守成或重科技倾向':'文明没有倾向';
   if(key==='nuclearResearch')return `核毁灭遗产 ×${2**rank}`;
   if(key==='chain')return rank?`本轮废墟按 ${R.chainShare*100}% 结算`:'只结算存活文明';
@@ -53,7 +57,7 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
     '#colony-first@value':first?.site??'', '#colony-opponent@value':second?.site??'',
     '#colony-start-war@disabled':getWarState(s,first?.id,second?.id)!=='ready',
     '#colony-war-hint':{waiting:'等待文明重新萌芽。',selection:'请选择两个存活文明。',busy:'所选文明正在交战；每个文明同时参与一场战争。',ready:'免费挑起战争 · 战斗中的金币属于地面文明。'}[getWarState(s,first?.id,second?.id)]+(o.talents.intel&&first?.alive&&second?.alive&&first!==second&&!first.warId&&!second.warId?` 情报预估：${first.name} ${Math.round(warOdds(first,second)*100)}% · ${second.name} ${Math.round(warOdds(second,first)*100)}%`:''),
-    '#colony-auto-row@hidden':!o.talents.weaving,'#colony-auto@checked':o.autoWar,
+    '#colony-auto-row@hidden':!o.talents.weaving,'#colony-auto@checked':o.autoWar,'#colony-seed-row@hidden':!o.talents.directed,'#colony-seed-tendency@value':String(o.seedTendency),
     '#colony-refugees@hidden':winter||alive.length>=2,'#colony-refugees':`幸存者正在等待新的对手。新聚落即将从空闲点位萌芽。`,
     '#colony-selected-name':first?`${first.name} · ${first.alive?AGES[first.age].numeral+' '+AGES[first.age].shortName:'废墟'}`:'选择一个文明',
     '#colony-selected-stats':first?.alive?`${first.tendency?`${TENDENCIES[first.tendency].name}倾向 · `:''}军备扶持 ${first.power}/5 · 部队伤害与生命 ×${(1.25**first.power).toFixed(2)}${first.airdrops?` · 空投 ${first.airdrops}/${R.maximumAirdrops}`:''} · 收割价值 ${Q.format(civilizationValue(o,first))} Legacy`:'废墟没有可收割的遗产。',

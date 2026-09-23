@@ -1,6 +1,6 @@
 import { createBindings } from './dom-bindings.js';
 import { SITES, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as A, ORBITAL_RULES as R } from './orbital-config.js';
-import { startOrbitalWar, intervene, purchaseOrbitalTalent } from './orbital-game.js';
+import { startOrbitalWar, intervene, purchaseOrbitalTalent, setSeedTendency } from './orbital-game.js';
 import { buildOrbitalViewModel } from './orbital-view-model.js';
 import { drawOrbitalColony, drawOrbitalTalentSky, drawLunarColony, sitePosition } from './orbital-render.js';
 import { createRenderer } from './render.js';
@@ -62,6 +62,7 @@ export function createOrbitalColonyUI(getSession,{commit,archive,save,speed,view
     const button=document.createElement('button');button.id=`watch-war-${i}`;button.type='button';
     button.addEventListener('click',()=>{const o=getSession().orbital,w=o.wars[i];if(w){o.selectedWar=w.id;[o.selectedCivilization,o.selectedOpponent]=w.participants;commit();}});el('colony-wars').append(button);
   }
+  el('colony-seed-tendency').addEventListener('change',e=>{if(setSeedTendency(getSession(),Number(e.target.value)))commit();});
   el('colony-auto').addEventListener('change',e=>{const o=getSession().orbital;if(o?.talents.weaving){o.autoWar=e.target.checked;commit();}});
   const NS='http://www.w3.org/2000/svg';
   for(const [key,t]of Object.entries(T)){

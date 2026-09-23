@@ -1,4 +1,5 @@
 import { ORBITAL_RULES as R, SITES, CIVILIZATION_NAMES } from './orbital-config.js';
+import { AGES } from './game-config.js';
 // Persisted PRNG: refresh cannot reroll civilizations or change ongoing wars.
 export function nextRandom(state) {
   state.rng = (Math.imul(state.rng, 1664525) + 1013904223) >>> 0;
@@ -13,11 +14,16 @@ export function seedCivilizations(state) {
   }
 }
 export function createCivilization(state,site) {
-  return { id:`c${state.cycle}-${++state.nextCivilization}`, site:site.id,
+  // 加速萌芽 starts each seed in a later age, with that age's gold and experience.
+  const age=1+(state.talents.quickening??0);
+  const civ={ id:`c${state.cycle}-${++state.nextCivilization}`, site:site.id,
     name:site.name+CIVILIZATION_NAMES[Math.floor(nextRandom(state)*CIVILIZATION_NAMES.length)],
-    alive:true,age:1,experience:0,gold:180,power:0,airdrops:0,doctrine:0,superSoldiers:0,profile:Math.floor(nextRandom(state)*3),warId:null,
+    alive:true,age,experience:AGES[age].experienceRequired,gold:AGES[age].startingGold,power:0,airdrops:0,doctrine:0,superSoldiers:0,profile:Math.floor(nextRandom(state)*3),warId:null,
     // Drawn only once the talent exists, so older random sequences are unchanged.
     tendency:state.talents.tendency?1+Math.floor(nextRandom(state)*3):0 };
+  // 定向播种 overrides the draw (the draw still happens, so the sequence is stable).
+  if(civ.tendency&&state.talents.directed&&state.seedTendency)civ.tendency=state.seedTendency;
+  return civ;
 }
 export function seedRefugee(state) {
   const free = SITES.filter(site=>!state.civilizations.some(c=>c.alive && c.site===site.id));
@@ -45,6 +51,8 @@ export function doomsdayMultiplier(state) {
   const duration = Math.max(0, state.elapsed - cycleStartedAt(state));
   return 1 + Math.max(0, Math.min(1, (R.doomsdaySeconds - duration) / R.doomsdaySeconds));
 }
+// 轮回记忆: every past annihilation permanently raises war and bond Legacy.
+export const chronicleMultiplier = state => 1 + R.chronicleStep * (state.talents.chronicle ?? 0) * state.nuclearCycles;
 export const nuclearMultiplier = state => 2 ** (state.talents.nuclearResearch ?? 0) * doomsdayMultiplier(state);
 export function bondRate(state, war) {
   if (!state.talents.bonds) return 0;

@@ -10,6 +10,8 @@ export function flipPages({ leaving, entering, from, to, reduced = false, durati
   const timing = { duration, easing: EASING }, hold = { ...timing, fill: 'forwards' };
   // The new page fades in over the old one, so its modal backdrop must not dim it first.
   entering.dialog.dataset.flipping = 'true';
+  // Neither page takes input until the turn has finished: no drag, scroll or click mid-flight.
+  for (const page of [entering, leaving]) page.dialog.dataset.turning = 'true';
   const animations = [
     entering.dialog.animate([{ opacity: 0 }, { opacity: 1 }], timing),
     entering.page.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], timing),
@@ -17,7 +19,7 @@ export function flipPages({ leaving, entering, from, to, reduced = false, durati
     leaving.page.animate([{ transform: 'none' }, { transform: `translate(${-dx}px, ${-dy}px)` }], hold),
     leaving.sky.animate([{ transform: 'none' }, { transform: `translateY(${-drift}px)` }], hold),
   ];
-  return Promise.all(animations.map(animation => animation.finished)).catch(() => {}).then(() => () => { delete entering.dialog.dataset.flipping; animations.forEach(animation => animation.cancel()); });
+  return Promise.all(animations.map(animation => animation.finished)).catch(() => {}).then(() => () => { delete entering.dialog.dataset.flipping; for (const page of [entering, leaving]) delete page.dialog.dataset.turning; animations.forEach(animation => animation.cancel()); });
 }
 // A deliberate overscroll at the seam turns the page; small or mixed wheel
 // movement never does, so inertial scrolling cannot flip by accident.

@@ -1,6 +1,6 @@
 import { Q } from './quantity.js';
 import { ORBITAL_RULES as R, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as ACTIONS } from './orbital-config.js';
-import { seedCivilizations, seedRefugee, orbitalYieldMultiplier, civilizationValue, rebirthDelay, refugeeDelay, lunarLegacyRate, nuclearMultiplier, bondRate } from './celestial-economy.js';
+import { seedCivilizations, seedRefugee, orbitalYieldMultiplier, civilizationValue, rebirthDelay, refugeeDelay, lunarLegacyRate, nuclearMultiplier, bondRate, chronicleMultiplier } from './celestial-economy.js';
 import { createWar, updateWar, syncWarCivilizations, refreshWarBonuses, changeTechnology } from './orbital-war.js';
 import { AGES } from './game-config.js';
 
@@ -9,7 +9,7 @@ export function createOrbitalState(seed = (Math.random()*4294967296)>>>0) {
     phase:'dormant',remaining:0,winterDuration:0,refugeeRemaining:0,nextCivilization:0,nextWar:0,
     civilizations:[],wars:[],talents:Object.fromEntries(Object.keys(T).map(k=>[k,k==='protocol'?1:0])),
     payments:{},interventionSpent:0,legacyEarned:0,legacyFraction:0,lunarProduced:0,lunarFraction:0,lastReward:0,lastCatastropheAt:null,
-    selectedCivilization:null,selectedOpponent:null,selectedWar:null,autoWar:false,autoElapsed:0,completionAt:null,
+    selectedCivilization:null,selectedOpponent:null,selectedWar:null,autoWar:false,autoElapsed:0,completionAt:null,seedTendency:0,
     log:[{time:0,text:'存续协议已生效。地表的战火，将成为轨道家园的遗产。'}]};
 }
 export function orbitalLegacySpent(o) {return o?Q.add(Q.sum(Object.values(o.payments).flat()),o.interventionSpent):0;}
@@ -35,6 +35,8 @@ export function purchaseOrbitalTalent(s,key){
   if(key==='voyage' && o.completionAt===null)o.completionAt=o.elapsed;
   log(o,`轨道天赋：${T[key].name} ${o.talents[key]} 级。`);return true;
 }
+// 定向播种: 0 keeps the random draw, 1–3 pick the tendency of every later seed.
+export function setSeedTendency(s,value){const o=s.orbital;if(!active(s)||!o.talents.directed||![0,1,2,3].includes(value))return false;o.seedTendency=value;return true;}
 export function getWarState(s,a,b){
   if(!active(s)||s.orbital.phase!=='living')return 'waiting';
   const first=findCivilization(s.orbital,a),second=findCivilization(s.orbital,b);
@@ -115,13 +117,17 @@ export function updateOrbital(s,dt,{paused=false,hidden=false}={}){
   o.lunarFraction+=lunarLegacyRate(o)*dt;
   const lunarWhole=Math.floor(o.lunarFraction+1e-10);o.lunarFraction=Math.max(0,o.lunarFraction-lunarWhole);
   if(lunarWhole){o.lunarProduced=Q.add(o.lunarProduced,lunarWhole);award(s,lunarWhole);}
-  if(o.phase==='winter'){o.remaining=Math.max(0,o.remaining-dt);if(o.remaining<=1e-8){beginCycle(o);return true;}return false;}
+  if(o.phase==='winter'){
+    // 余烬观测: the winter itself pays out half the last annihilation, evenly.
+    if(o.talents.fallout&&o.winterDuration>0){o.legacyFraction+=Q.toNumber(o.lastReward)*R.falloutShare/o.winterDuration*Math.min(dt,o.remaining);
+      const whole=Math.floor(o.legacyFraction+1e-10);o.legacyFraction=Math.max(0,o.legacyFraction-whole);award(s,whole);}
+    o.remaining=Math.max(0,o.remaining-dt);if(o.remaining<=1e-8){beginCycle(o);return true;}return false;}
   for(const war of [...o.wars]){
     // A frozen war neither fights nor pays; only its truce clock runs.
     if(war.ceasefire>0){war.ceasefire=Math.max(0,war.ceasefire-dt);if(war.ceasefire<=1e-8){war.ceasefire=0;changed=true;}continue;}
     // Every paid launch owns a damage snapshot; live modifiers affect only new attacks.
     const xp=updateWar(war,dt);syncWarCivilizations(o,war);
-    o.legacyFraction+=Q.toNumber(xp)*R.legacyPerExperience*orbitalYieldMultiplier(o)+bondRate(o,war)*dt;
+    o.legacyFraction+=(Q.toNumber(xp)*R.legacyPerExperience*orbitalYieldMultiplier(o)+bondRate(o,war)*dt)*chronicleMultiplier(o);
     const whole=Math.floor(o.legacyFraction+1e-10);o.legacyFraction=Math.max(0,o.legacyFraction-whole);award(s,whole);
     if(resolveOrbitalWar(s,war.id)){changed=true;if(o.phase==='winter')return true;}
   }

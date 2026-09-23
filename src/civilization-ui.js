@@ -167,6 +167,8 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     el(toSurface ? 'flip-orbit' : 'orbit-flip-surface').focus({ preventScroll: true });
     flipping = false; changed();
   }
+  // Escape cannot close either page while it is turning.
+  for (const page of Object.values(pages)) page.dialog.addEventListener('cancel', event => { if (page.dialog.dataset.turning) event.preventDefault(); });
   el('flip-orbit').addEventListener('click', () => flipTo('orbit'));
   watchSeam(el('home-scroll'), -1, () => { if (dialog.open && !el('flip-orbit').hidden) flipTo('orbit'); });
   const colony = createOrbitalColonyUI(() => session, { viewChanged: () => changed(), commit: () => { save(); changed(); }, flipSurface: () => flipTo('surface'),

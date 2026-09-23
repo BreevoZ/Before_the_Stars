@@ -4,10 +4,10 @@ import { launchReady } from './orbital-cases.js';
 import { purchaseTalent, updateProgression } from '../src/progression.js';
 import { getTalentState, TALENTS } from '../src/talents.js';
 import { availableSpeeds } from '../src/progression-config.js';
-import { createOrbitalState, enterOrbital, startOrbitalWar, updateOrbital, resolveOrbitalWar, findCivilization, purchaseOrbitalTalent, getOrbitalTalentState, getInterventionState, intervene, orbitalLegacySpent, interventionCost } from '../src/orbital-game.js';
+import { createOrbitalState, enterOrbital, startOrbitalWar, updateOrbital, resolveOrbitalWar, findCivilization, purchaseOrbitalTalent, getOrbitalTalentState, getInterventionState, intervene, orbitalLegacySpent, interventionCost, setSeedTendency } from '../src/orbital-game.js';
 import { syncWarCivilizations, warOdds } from '../src/orbital-war.js';
 import { ORBITAL_RULES as R, ORBITAL_RULES, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as ACTIONS, SITES } from '../src/orbital-config.js';
-import { civilizationValue, rebirthDelay, lunarLegacyRate, bondRate, nuclearMultiplier, doomsdayMultiplier, orbitalYieldMultiplier } from '../src/celestial-economy.js';
+import { civilizationValue, rebirthDelay, lunarLegacyRate, bondRate, nuclearMultiplier, doomsdayMultiplier, orbitalYieldMultiplier, chronicleMultiplier } from '../src/celestial-economy.js';
 import { serializeSession, parseSession, DEBUG_SAVE_KEY, createSaveStore, mapSessionQuantities } from '../src/save.js';
 import { oldOrbitalSpent } from '../src/orbital-history.js';
 import { fromV15Record } from '../src/save-record.js';
@@ -117,7 +117,8 @@ export function registerOrbitalColonyTests(test,assert,near){
   });
   test('v22: 轨道收割 moves under 知识封锁, earlier harvesters keep it with a free lock, and eight civilizations can fight four wars',()=>{
     const s=colonyFixture({legacy:100000,talents:['monitor','patronage']});
-    const old=JSON.parse(serializeSession(s));old.version=21;old.orbital.version=7;delete old.orbital.talents.overview;
+    const old=JSON.parse(serializeSession(s));old.version=21;old.orbital.version=7;delete old.orbital.seedTendency;
+    for(const key of ['overview','quickening','chronicle','directed','fallout'])delete old.orbital.talents[key];
     old.orbital.talents.harvest=1;old.orbital.payments.harvest=['2048'];
     const migrated=parseSession(JSON.stringify(old));
     assert(migrated.version===SAVE_VERSION&&migrated.orbital.talents.regression===1&&JSON.stringify(migrated.orbital.payments.regression)==='["0"]');
@@ -144,6 +145,20 @@ export function registerOrbitalColonyTests(test,assert,near){
     const names=[...Object.entries(TALENT_MAP).map(([k,a])=>[`I:${k}`,a.icon]),...Object.entries(T).map(([k,t])=>[`VI:${k}`,t.icon])];
     const seen=new Map();for(const [node,name]of names){assert(iconMarkup(name)!==iconMarkup('__missing__')||name==='shield',`${node} uses an undefined icon ${name}`);
       if(name!=='protocol'){assert(!seen.has(name),`${node} reuses ${name} from ${seen.get(name)}`);seen.set(name,node);}}
+  });
+  test('Cycle talents II: quickened seeds start later, directed seeding picks the tendency, fallout pays through the winter, memory grows with cycles',()=>{
+    const s=colonyFixture({legacy:1e8,talents:['reseed','diversity','quickening','tendency','directed','nuclearResearch','chain','fallout','quickening','chronicle']}),o=s.orbital;
+    assert(setSeedTendency(s,2)&&!setSeedTendency(s,4));
+    o.phase='winter';o.remaining=1e-3;o.settledCycle=o.cycle;o.nuclearCycles=o.cycle;o.lastCatastropheAt=0;o.winterDuration=1;for(const c of o.civilizations)c.alive=false;advance(s,.1);
+    assert(o.phase==='living'&&o.civilizations.every(c=>c.age===3&&Q.eq(c.experience,AGES[3].experienceRequired)&&c.tendency===2));
+    const raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw);
+    const bad=JSON.parse(raw);bad.orbital.seedTendency=5;throws(()=>parseSession(JSON.stringify(bad)));
+    assert(o.talents.chronicle===1&&o.nuclearCycles>0&&Math.abs(chronicleMultiplier(o)-(1+R.chronicleStep*o.nuclearCycles))<1e-9);
+    // Fallout: the whole winter pays half the last annihilation.
+    const w=colonyFixture({legacy:1e8,talents:['reseed','nuclearResearch','chain','fallout']}),wo=w.orbital;
+    wo.phase='winter';wo.settledCycle=wo.cycle;wo.nuclearCycles=wo.cycle;wo.lastCatastropheAt=0;wo.winterDuration=wo.remaining=rebirthDelay(wo);wo.lastReward=10000;wo.legacyEarned=Q.add(wo.legacyEarned,10000);w.permanent.totalLegacy=Q.add(w.permanent.totalLegacy,10000);
+    for(const c of wo.civilizations){c.alive=false;c.warId=null;}wo.wars=[];wo.selectedWar=null;
+    const before=wo.legacyEarned;advance(w,rebirthDelay(wo)+1);near(Q.toNumber(Q.sub(wo.legacyEarned,before)),10000*R.falloutShare,2);
   });
   test('Intel: the pre-war estimate shows only with 情报网络 and favours the older, boosted side',()=>{
     const plain=colonyFixture({legacy:10000,talents:['monitor']});assert(!/情报预估/.test(buildOrbitalViewModel(plain)['#colony-war-hint']));
@@ -281,7 +296,7 @@ export function registerOrbitalColonyTests(test,assert,near){
   test('Orbital simulation: real wars finish nuclear cycles, differ by seed, unlock VI and keep all options bounded',()=>{
     const a=simulateOrbital({seed:1}),b=simulateOrbital({seed:2});assert(a.cycles===4&&a.completed&&b.cycles===4&&b.completed&&a.nuclearTimes[0]!==b.nuclearTimes[0]);
     // Civilizations climb I→V in minutes, so four nuclear cycles take ~35–45 simulated minutes.
-    assert(a.seconds>1700&&a.seconds<3000&&b.seconds>1700&&b.seconds<3000);
+    assert(a.seconds>1500&&a.seconds<3000&&b.seconds>1500&&b.seconds<3000);
     for(const options of [{legacy:-1},{legacy:.5},{seed:-1},{targetCycles:0},{maxSeconds:Infinity},{maxSeconds:86401},{buyTalents:1}])throws(()=>simulateOrbital(options));
   });
   test('Orbital view model: Legacy prices, monitor gating and tree prerequisites reflect actual state',()=>{

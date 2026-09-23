@@ -129,6 +129,11 @@ function ruinImage(ctx, width, height) {
 // At 15 seconds the pixels are exactly the home's existing ruin scene.
 export function drawDestructionScene(ctx, width, height, seconds, { game, origin = { x: 0, y: 0, width: 1, height: 1 }, reducedMotion = false } = {}) {
   const frame = destructionFrame(seconds, reducedMotion), { time } = frame;
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return frame;
+  // A first-frame layout/visibility change can yield an empty battlefield.
+  // Never divide by that width or feed Infinity into Canvas gradients.
+  if (!origin || !['x','y','width','height'].every(key => Number.isFinite(origin[key])) || origin.width <= 0 || origin.height <= 0)
+    origin = { x: 0, y: 0, width: 1, height: 1 };
   ctx.save(); ctx.clearRect(0, 0, width, height);
   if (frame.ruins < 1 && game) {
     ctx.globalAlpha = frame.expansion; ctx.fillStyle = '#0c1519'; ctx.fillRect(0, 0, width, height); ctx.globalAlpha = 1;

@@ -83,6 +83,34 @@ export function registerDestructionTests(test, assert, near) {
       assert(win.__storage.getItem(DEBUG_SAVE_KEY)===raw && parseSession(raw).game.elapsed===gameTime);
     } finally { frame.remove(); }
   });
+  test.browser('First debug finale: empty initial layout cannot poison Canvas; completion or skip permits a running rebuild',async()=>{
+    for(const skip of [false,true]){
+      const frame=await mountFixture(null,false,'debug');
+      try{const d=frame.contentDocument,w=frame.contentWindow,el=id=>d.getElementById(id);let now=0;
+        // Simulate clicking as the responsive battlefield is being laid out.
+        el('battlefield').getBoundingClientRect=()=>({left:0,top:0,width:0,height:0});
+        d.querySelector('[data-debug-command="finale"]').click();
+        assert(!el('destruction-presentation').hidden);w.__testFrame(now);
+        if(skip)el('skip-destruction').click();else for(let i=0;i<230;i++)w.__testFrame(now+=100);
+        assert(el('destruction-presentation').hidden&&!el('home-scroll').inert);
+        el('rebuild-civilization').click();for(let i=0;i<20;i++)w.__testFrame(now+=100);
+        assert(!el('archives-dialog').open&&el('pause-battle').getAttribute('aria-pressed')==='false');
+        el('save-menu').click();el('manual-save').click();const s=parseSession(w.__storage.getItem(DEBUG_SAVE_KEY));
+        assert(s.game.elapsed>0&&s.run.phase==='battle'&&s.permanent.completedCycles===1&&s.permanent.legacy===1);
+      }finally{frame.remove();}
+    }
+  });
+  test.browser('First debug finale: a failed Canvas frame releases the overlay and inert controls; rebuilding resumes RAF',async()=>{
+    const frame=await mountFixture(null,false,'debug');
+    try{const d=frame.contentDocument,w=frame.contentWindow,el=id=>d.getElementById(id);let now=0;
+      d.querySelector('[data-debug-command="finale"]').click();w.__testFrame(now);
+      const ctx=el('destruction-sky').getContext('2d'),original=ctx.createLinearGradient;
+      ctx.createLinearGradient=()=>{throw new Error('Injected Canvas failure');};w.__testFrame(now+=100);ctx.createLinearGradient=original;
+      assert(el('destruction-presentation').hidden&&!el('home-scroll').inert&&!el('archives-dialog').hasAttribute('data-destruction'));
+      el('rebuild-civilization').click();for(let i=0;i<20;i++)w.__testFrame(now+=100);
+      el('save-menu').click();el('manual-save').click();const s=parseSession(w.__storage.getItem(DEBUG_SAVE_KEY));assert(s.game.elapsed>0&&s.permanent.completedCycles===1);
+    }finally{frame.remove();}
+  });
   test.browser('First finale: Escape reveals the home, refreshing never replays; later completions retain the short transition', async () => {
     let frame=await mountFixture(serializeSession(createDebugProgression()),false,'debug');
     try {

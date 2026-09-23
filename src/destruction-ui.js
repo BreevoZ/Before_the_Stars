@@ -6,14 +6,14 @@ export function createDestructionUI() {
   const panel = el('destruction-presentation'), canvas = el('destruction-sky'), caption = el('destruction-caption');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let shown = false, time = 0, last = null, battle = null, origin = null, inertStates = [];
-  function paint() {
+  function draw() {
     if (!shown || !dialog.open) return;
     const width = dialog.clientWidth, height = dialog.clientHeight, ratio = Math.min(devicePixelRatio || 1, 2);
     if (!width || !height) return;
     if (canvas.width !== Math.round(width * ratio) || canvas.height !== Math.round(height * ratio)) {
       canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio);
     }
-    const ctx = canvas.getContext('2d'); ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    const ctx = canvas.getContext('2d'); if (!ctx) { finish(); return; } ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     const frame = drawDestructionScene(ctx, width, height, time, { game: battle, origin });
     dialog.style.setProperty('--destruction-tree', String(frame.treeOpacity));
     dialog.style.setProperty('--destruction-ruins', String(frame.ruins));
@@ -23,6 +23,14 @@ export function createDestructionUI() {
     caption.style.opacity = String(frame.captionOpacity);
     if (caption.textContent !== frame.caption) caption.textContent = frame.caption;
     panel.dataset.time = time.toFixed(3);
+  }
+  function paint() {
+    try { draw(); }
+    catch (error) {
+      // Settlement was saved before presentation. A failed Canvas must release
+      // every inert element and let the next RAF/rebuild run normally.
+      finish(); console.warn('毁灭演出已跳过，结算与重建仍可继续。', error);
+    }
   }
   function dismiss() {
     if (!shown) return;
@@ -49,7 +57,7 @@ export function createDestructionUI() {
     dialog.setAttribute('aria-labelledby', 'destruction-title');
     inertStates = [...dialog.children].filter(node => node !== panel).map(node => [node, node.inert]);
     inertStates.forEach(([node]) => { node.inert = true; });
-    paint(); el('skip-destruction').focus({ preventScroll: true });
+    paint(); if (shown) el('skip-destruction').focus({ preventScroll: true });
   }
   el('skip-destruction').addEventListener('click', finish);
   dialog.addEventListener('cancel', event => { if (shown) { event.preventDefault(); finish(); } });

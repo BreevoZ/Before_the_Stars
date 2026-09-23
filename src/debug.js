@@ -1,7 +1,7 @@
 import { orbitalLegacySpent } from './orbital-game.js';
 import { paidLegacy } from './legacy-ledger.js';
 import { Q } from './quantity.js';
-import { AGES, evolve } from './game.js';
+import { AGES, evolve, getEvolutionState } from './game.js';
 import { SURFACE } from './progression-config.js';
 import { createProgression, resolveBattle } from './progression.js';
 
@@ -56,8 +56,14 @@ export function runDebugCommand(session, command) {
   if (command === 'resources') return supplyDebugRun(session);
   if (!['victory', 'finale', 'defeat'].includes(command)) return false;
   if (command === 'finale') {
-    game.experience.enemy = Q.max(game.experience.enemy, AGES[SURFACE.finalEnemyAge].experienceRequired);
-    while (game.ages.enemy < SURFACE.finalEnemyAge) evolve(game, 'enemy');
+    const experience = Q.max(game.experience.enemy, AGES[SURFACE.finalEnemyAge].experienceRequired);
+    const probe = { ...game, ages: { ...game.ages }, experience: { ...game.experience, enemy: experience } };
+    for (; probe.ages.enemy < SURFACE.finalEnemyAge; probe.ages.enemy++) {
+      if (getEvolutionState(probe, 'enemy') !== 'ready') return false;
+    }
+    game.experience.enemy = experience;
+    // Bounded even if a test challenge prevents evolution at a later age.
+    for (let age = game.ages.enemy; age < SURFACE.finalEnemyAge; age++) if (!evolve(game, 'enemy')) return false;
   }
   game.bases[command === 'defeat' ? 'player' : 'enemy'].hp = 0;
   game.status = Q.eq(game.bases.player.hp, 0) ? (Q.eq(game.bases.enemy.hp, 0) ? 'draw' : 'lost') : 'won';

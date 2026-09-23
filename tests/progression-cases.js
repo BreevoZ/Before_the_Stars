@@ -42,6 +42,10 @@ export async function mountFixture(raw, unavailable = false, mode = 'incremental
 
 export function registerProgressionTests(test, assert, near) {
   const throws = action => { let threw = false; try { action(); } catch { threw = true; } assert(threw, 'Expected invalid save to be rejected'); };
+  test('Debug finale: blocked evolution returns without mutation or a hanging command',()=>{
+    const s=createDebugProgression();s.game=createGame({mode:'incremental',bonuses:[...s.game.bonuses,{target:{kind:'team',team:'enemy',stat:'canEvolve'},type:'override',value:false,source:{kind:'challenge',id:'debug-test',label:'Test restriction'}}]});
+    const before=JSON.stringify(s);assert(!runDebugCommand(s,'finale')&&JSON.stringify(s)===before);
+  });
   test('Modes: default and legacy incremental URLs use civilization; classic and debug require explicit URLs', () => {
     for (const search of ['', '?mode=incremental', '?mode=unknown']) assert(getGameMode(search) === 'incremental');
     assert(getGameMode('?mode=classic') === 'classic' && getGameMode('?mode=debug') === 'debug');

@@ -51,9 +51,10 @@
 .star-icon { fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
 .star-halo { fill: var(--color-home-star-halo-fill); stroke: currentColor; stroke-width: .4; opacity: .45; filter: drop-shadow(0 0 5px currentColor); }
 .node-ranks { position: absolute; top: 59%; left: 0; width: 100%; font-size: 7px; letter-spacing: 1px; white-space: nowrap; }
-.node-cost { position: absolute; top: 73%; left: 0; width: 100%; font-size: 9px; line-height: 1; font-variant-numeric: tabular-nums; }
-.node-name { position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); color: var(--color-home-node-name-text); font-size: 11px; white-space: nowrap; letter-spacing: 1px; }
-.root-caption { position: absolute; top: calc(100% + 31px); left: 50%; transform: translateX(-50%); color: var(--color-home-root-caption-text); font-size: 9px; white-space: nowrap; }
+/* Same anatomy as the VI tree: ranks inside, price and name beneath. */
+.node-cost { position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 9px; line-height: 1; font-variant-numeric: tabular-nums; color: var(--gold); }
+.node-name { position: absolute; top: calc(100% + 20px); left: 50%; transform: translateX(-50%); color: var(--color-home-node-name-text); font-size: 11px; white-space: nowrap; letter-spacing: 1px; }
+.root-caption { position: absolute; top: calc(100% + 42px); left: 50%; transform: translateX(-50%); color: var(--color-home-root-caption-text); font-size: 9px; white-space: nowrap; }
 .talent-node[data-state="prerequisite"], .talent-node[data-state="locked"] { opacity: .48; }
 .talent-node[data-state="legacy"] { opacity: .58; }
 .talent-node[data-state="during-run"][data-owned="false"] { opacity: .48; }
@@ -197,3 +198,25 @@ body:has(#archives-dialog[data-destruction]) #civilization-bar { display: none; 
 #destruction-caption { position: absolute; top: 23%; left: 24px; right: 24px; max-width: 660px; margin: 0 auto; text-align: center; font-size: clamp(13px, 1.6vw, 18px); font-weight: 400; letter-spacing: 3px; line-height: 2; color: var(--color-home-text); text-wrap: balance; text-shadow: 0 2px 18px var(--color-home-surface); }
 #skip-destruction { position: absolute; top: max(16px, env(safe-area-inset-top)); right: max(18px, env(safe-area-inset-right)); min-height: 44px; padding: 10px 12px; font-size: 11px; letter-spacing: 1px; color: var(--color-home-text); }
 @media (max-width: 740px) { #destruction-caption { top: 29%; left: 28px; right: 28px; font-size: 14px; letter-spacing: 2px; } }
+
+/* 存续协议 is the summit of the surface and the root VI grows from: one large
+   disc, identical on both pages. Its outer ring turns until it is reached. */
+.talent-star.finale { width: 112px; height: 112px; }
+.talent-star.finale .node-ranks { top: 64%; font-size: 8px; }
+.talent-star.finale .node-name { font-size: 14px; letter-spacing: 4px; color: var(--gold); }
+.talent-star.finale .node-cost { font-size: 10px; }
+.talent-star.finale .star-frame { stroke-width: .9; }
+.talent-star.finale svg { filter: drop-shadow(0 0 10px #c3bd7833); }
+.star-ring { fill: none; stroke: currentColor; stroke-width: .4; stroke-dasharray: 1.5 2.5; opacity: .7; transform-origin: 32px 32px; animation: star-ring-turn 60s linear infinite; }
+.talent-node[data-owned="true"] .star-ring { animation: none; opacity: .35; }
+@keyframes star-ring-turn { to { rotate: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .star-ring { animation: none; } }
+#flip-orbit { display: block; margin: 14px auto 0; font-size: 10px; letter-spacing: 2px; min-height: 36px; }
+#flip-orbit[hidden] { display: none; }
+
+#archives-dialog[data-flipping]::backdrop,#orbit-talents-dialog[data-flipping]::backdrop{background:transparent}
+/* Both star maps share one header grid, so the wallet stays put when the page turns. */
+@media (min-width: 741px) {
+  #archives-dialog .home-header, .orbit-talents-dialog > header { display: grid; grid-template-columns: 1fr auto 1fr; }
+  #archives-dialog .home-nav, .orbit-talents-dialog > header > :last-child { justify-self: end; }
+}

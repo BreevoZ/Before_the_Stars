@@ -30,7 +30,7 @@ const talent = (name,costs,requires,description,x,y,icon,extra={}) => ({name,cos
 // The mainline to the next stage runs straight up the middle; the cycle of
 // seeding and ending civilizations sits to the left, intervention to the right.
 export const ORBITAL_TALENTS = Object.freeze({
-  protocol: talent('存续协议',[0],{},'继承地表篇。文明可以灭亡，轨道上的我们将继续存在。',660,1110,'protocol',{root:true,kind:'keystone',branch:'root'}),
+  protocol: talent('存续协议',[0],{},'继承地表篇。文明可以灭亡，轨道上的我们将继续存在。',660,1150,'protocol',{root:true,kind:'keystone',branch:'root',finale:true}),
   // LIFE · 文明循环: seeding on one side, the winter that ends each cycle on the other.
   reseed: talent('播种计划',[128,512,2048],{protocol:1},'每级缩短 25% 核冬天和幸存文明等待新对手的时间。',340,935,'leaf',{branch:'life'}),
   diversity: talent('多元萌芽',[512,2048],{reseed:1},'提高每轮文明数量的下限，最多六个。',150,780,'network',{branch:'life',kind:'specialist'}),

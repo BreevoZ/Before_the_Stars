@@ -127,6 +127,9 @@ export function getTalentSpending(talents, grants = []) {
     sum + (grants.includes(key) ? 0 : config.costs.slice(0, talents[key]).reduce((total, cost) => total + cost, 0)), 0);
 }
 
+// The protocol takes everything the surface saved, never less than its floor:
+// every player starts VI from the same empty wallet.
+export const protocolPrice = permanent => Q.max(TALENTS.bypasser.costs[0], permanent.legacy);
 export function layerTalents(layer) { return Object.entries(TALENTS).filter(([, config]) => config.branch === 'units' && config.layer === layer && config.unit).map(([key]) => key); }
 export function meetsTalentRequirements(levels, config) {
   return Object.entries(config.requires).every(([key, required]) => (levels[key] ?? 0) >= required) &&

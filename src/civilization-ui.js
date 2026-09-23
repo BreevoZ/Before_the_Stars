@@ -1,5 +1,6 @@
 import { enterOrbital } from './orbital-game.js';
 import { createOrbitalColonyUI } from './orbital-colony-ui.js';
+import { flipPages, nodeCenter, watchSeam } from './tree-flip.js';
 import { canAutoContinue } from './automation.js';
 import { getChallengeLevels } from './progression-machine.js';
 import { createBindings } from './dom-bindings.js';
@@ -149,7 +150,26 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     save(); changed();
     if (key === 'bypasser') orbital.present(true);
   });
-  const colony = createOrbitalColonyUI(() => session, { viewChanged: () => changed(), commit: () => { save(); changed(); },
+  // VI and the surface are two pages of one tree, joined at 存续协议.
+  let flipping = false;
+  const orbitTree = el('orbit-talents-dialog');
+  const pages = { surface: { dialog, page: el('home-scroll'), sky: el('home-sky') }, orbit: { dialog: orbitTree, page: orbitTree.querySelector('.orbit-tree-scroll'), sky: el('orbit-tree-sky') } };
+  async function flipTo(target) {
+    if (flipping || !session.orbital?.started) return;
+    flipping = true;
+    const toSurface = target === 'surface', leaving = pages[toSurface ? 'orbit' : 'surface'], entering = pages[target];
+    const from = nodeCenter(el(toSurface ? 'orbit-node-protocol' : 'node-bypasser'));
+    if (toSurface) { if (!dialog.open) dialog.showModal(); talentControls.open(false, 'bypasser'); changed(); }
+    else colony.openTree();
+    const cleanup = await flipPages({ leaving, entering, from, to: nodeCenter(el(toSurface ? 'node-bypasser' : 'orbit-node-protocol')), reduced: matchMedia('(prefers-reduced-motion: reduce)').matches });
+    leaving.dialog.close(); if (typeof cleanup === 'function') cleanup();
+    // Focus the way back, not the node: focusing a node opens its detail card.
+    el(toSurface ? 'flip-orbit' : 'orbit-flip-surface').focus({ preventScroll: true });
+    flipping = false; changed();
+  }
+  el('flip-orbit').addEventListener('click', () => flipTo('orbit'));
+  watchSeam(el('home-scroll'), -1, () => { if (dialog.open && !el('flip-orbit').hidden) flipTo('orbit'); });
+  const colony = createOrbitalColonyUI(() => session, { viewChanged: () => changed(), commit: () => { save(); changed(); }, flipSurface: () => flipTo('surface'),
     archive: () => { if (!dialog.open) dialog.showModal(); talentControls.open(false); changed(); }, save: openSave, speed: cycleSpeed });
   const orbital = createOrbitalUI({ review: () => talentControls.open(false), save: openSave, enter: () => {
     if (enterOrbital(session)) save();

@@ -83,7 +83,7 @@ export function registerEconomyPacingTests(test, assert) {
     assert(Q.format(999999)==='999999' && Q.format(1000000)==='1e+6');
     assert(Q.format(Q.of('1e400'))==='1e+400');
     const s=parseSession(JSON.stringify(records.destruction)), view=buildTalentViewModel(s);
-    assert(view['#buy-bypasser'] === `${ECONOMY.bypasserCost} Legacy · 启航`);
+    assert(view['#buy-bypasser'] === `注入全部 ${ECONOMY.bypasserCost} Legacy · 启航`);
     assert(TALENTS.bypasser.costs[0]===ECONOMY.bypasserCost);
   });
 }

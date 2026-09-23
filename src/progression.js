@@ -5,7 +5,7 @@ import { payLegacy } from './legacy-ledger.js';
 import { createGame, updateGame } from './game.js';
 import { updateAutomation, createAutomation, configureAutomation, canAutoContinue } from './automation.js';
 import { UPGRADES, UPGRADE_COSTS, SAVE_VERSION, automationUnlocked, availableSpeeds, getVictorySupplies, LEGACY_ECONOMY } from './progression-config.js';
-import { emptyTalents, talentLevel, TALENTS, getTalentState } from './talents.js';
+import { emptyTalents, talentLevel, TALENTS, getTalentState, protocolPrice } from './talents.js';
 import { getRunBonuses } from './progression-bonuses.js';
 import { createBonusStack, stat } from './stats.js';
 import { PHASE, getTransition, getNextChallengeLevel, isBetweenRuns } from './progression-machine.js';
@@ -118,7 +118,7 @@ const effects = {
   launch(session) {
     const { permanent } = session;
     session.orbital = createOrbitalState();
-    payLegacy(permanent, 'bypasser', TALENTS.bypasser.costs[0]);
+    payLegacy(permanent, 'bypasser', protocolPrice(permanent));
     permanent.talents.bypasser = 1;
   },
 };

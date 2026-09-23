@@ -267,12 +267,12 @@ export function registerOrbitalColonyTests(test,assert,near){
   test.browser('Lunar UI: rate, cost, shared icons, hidden detail, purchase and pause match the saved production',async()=>{
     const frame=await mountFixture(serializeSession(lunarFixture()),false,'debug',{reducedMotion:true});
     try{const d=frame.contentDocument,w=frame.contentWindow,el=id=>d.getElementById(id);let now=0;
-      assert(!el('colony-lunar').hidden&&el('colony-lunar-rate').textContent==='128');
+      assert(!el('colony-lunar').hidden&&el('colony-lunar-rate').textContent===Q.format(R.lunarBaseIncome));
       el('colony-talents').click();assert(el('orbit-detail').hidden);
       assert(el('orbit-node-protocol').querySelector('svg path').getAttribute('d')===PROTOCOL_GLYPH);
       el('close-orbit-talents').click();el('colony-lunar-upgrade').click();assert(!el('orbit-detail').hidden);
-      assert(el('orbit-detail-current').textContent.includes('128')&&el('orbit-detail-next').textContent.includes('256'));
-      el('orbit-buy').click();assert(el('colony-lunar-rate').textContent==='256');el('close-orbit-talents').click();
+      assert(el('orbit-detail-current').textContent.includes(Q.format(R.lunarBaseIncome))&&el('orbit-detail-next').textContent.includes(Q.format(R.lunarBaseIncome*2)));
+      el('orbit-buy').click();assert(el('colony-lunar-rate').textContent===Q.format(R.lunarBaseIncome*2));el('close-orbit-talents').click();
       for(let i=0;i<10;i++)w.__testFrame(now+=100);el('colony-pause').click();const wallet=el('colony-legacy').textContent;
       for(let i=0;i<10;i++)w.__testFrame(now+=100);assert(el('colony-legacy').textContent===wallet);
       el('colony-save').click();el('manual-save').click();const saved=parseSession(w.__storage.getItem(DEBUG_SAVE_KEY));assert(saved.orbital.talents.lunarIndustry===1&&saved.orbital.lunarProduced>0);

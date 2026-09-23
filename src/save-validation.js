@@ -107,7 +107,9 @@ export function validateRecord(session, version = SAVE_VERSION) {
       const prices = [current, ...[10, 11, 12, 13].map(old => HISTORICAL_TALENTS[old][key]?.costs ?? (Object.hasOwn(p.upgrades, key) ? HISTORICAL_UPGRADE_COSTS : []))];
       check(Array.isArray(payments) && payments.length === level, '购买账本等级');
       for (const [rank, cost] of payments.entries()) check(wholeAmount(cost) && (p.talentGrants.includes(key)
-        ? Q.eq(cost, 0) : prices.some(list => list[rank] !== undefined && Q.eq(cost, list[rank]))), '购买账本价格');
+        ? Q.eq(cost, 0) : prices.some(list => list[rank] !== undefined && Q.eq(cost, list[rank]))
+          // From v21 the protocol takes the whole balance, never less than its floor.
+          || key === 'bypasser' && version >= 21 && Q.gte(cost, TALENTS.bypasser.costs[0])), '购买账本价格');
     }
   }
   validateOrbital(session, version);

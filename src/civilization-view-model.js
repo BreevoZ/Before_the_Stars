@@ -73,6 +73,7 @@ export function buildCivilizationViewModel(session, { debug = false } = {}) {
     text('result-hint', run.phase === 'destruction' ? (p.completedCycles === 1 ? '第一份文明遗产 · 解锁你的第一个天赋' : '重建清空本轮资源与战场 · 保留遗产、天赋与自动购买设置') : run.phase === 'victory' ? `继续时获得战役补给：+${Q.format(supplies.gold)} 金币、+${Q.format(supplies.experience)} 经验 · 未完成订单退款 · 基地满血` : '从原始时代重新尝试');
   }
   text('return-orbit', run.phase !== 'orbital', 'hidden');
+  text('flip-orbit', !(run.phase === 'orbital' && session.orbital?.started), 'hidden');
   if (run.phase === 'orbital') {
     text('home-heading', '地表的星火，已经抵达轨道。');
     text('cycle-outcome', '存续协议已生效。地表天赋、遗产与通关记录均已保留。');

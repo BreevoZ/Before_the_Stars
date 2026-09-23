@@ -26,11 +26,21 @@ export function registerOrbitalTests(test, assert) {
     assert(s.permanent.completedCycles===cycles && s.run.earnedLegacy===reward);parseSession(serializeSession(s));
     purchaseTalent(s,'bypasser');assert(!runDebugCommand(s,'legacy'));
   });
+  test('Protocol price: a large balance is taken whole, the save keeps that payment and rejects one below the floor', () => {
+    const s=launchReady();s.permanent.legacy=Q.add(s.permanent.legacy,123456);s.permanent.totalLegacy=Q.add(s.permanent.totalLegacy,123456);
+    const wallet=s.permanent.legacy;assert(Q.gt(wallet,TALENTS.bypasser.costs[0])&&purchaseTalent(s,'bypasser'));
+    assert(Q.eq(s.permanent.legacy,0)&&Q.eq(s.permanent.purchaseCosts.bypasser[0],wallet));
+    const raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw);
+    const low=JSON.parse(raw);const floor=JSON.parse(raw);floor.permanent.purchaseCosts.bypasser=[String(TALENTS.bypasser.costs[0])];parseSession(JSON.stringify(floor));
+    low.permanent.purchaseCosts.bypasser=[String(TALENTS.bypasser.costs[0]-1)];
+    let rejected=false;try{parseSession(JSON.stringify(low));}catch{rejected=true;}assert(rejected);
+  });
   test('Orbital: purchase atomically pays once and persists arrival before any animation; stale launch and rebuild are inert', () => {
     let s=launchReady(); const before=serializeSession(s), wallet=s.permanent.legacy, total=s.permanent.totalLegacy, earned=s.run.earnedLegacy, cycles=s.permanent.completedCycles;
     assert(!transitionCivilization(s,'launch','old-run') && serializeSession(s)===before);
     assert(purchaseTalent(s,'bypasser') && s.run.phase==='orbital' && s.permanent.talents.bypasser===1);
-    assert(s.permanent.legacy===wallet-TALENTS.bypasser.costs[0] && s.permanent.totalLegacy===total);
+    // The protocol takes the whole balance: VI always starts from an empty wallet.
+    assert(Q.eq(s.permanent.legacy,0) && Q.eq(s.permanent.purchaseCosts.bypasser[0],Q.max(wallet,TALENTS.bypasser.costs[0])) && s.permanent.totalLegacy===total);
     const raw=serializeSession(s); s=parseSession(raw);
     assert(s.run.earnedLegacy===earned && s.permanent.completedCycles===cycles && s.run.settled);
     assert(!purchaseTalent(s,'bypasser') && !transitionCivilization(s,'launch',s.run.runId) && !rebuildCivilization(s,s.run.runId) && !resolveBattle(s));
@@ -112,7 +122,10 @@ export function registerOrbitalTests(test, assert) {
     let frame=await mountFixture(serializeSession(launchReady()));
     try {
       let doc=frame.contentDocument, el=id=>doc.getElementById(id);
-      el('node-bypasser').click();assert(!el('buy-bypasser').disabled && el('buy-bypasser').textContent.includes(String(TALENTS.bypasser.costs[0])));
+      el('node-bypasser').click();assert(!el('buy-bypasser').disabled && el('buy-bypasser').textContent.startsWith('注入全部 '));
+      el('buy-bypasser').click();
+      // The protocol empties the wallet, so the first click only asks for confirmation.
+      assert(el('buy-bypasser').textContent.startsWith('确认注入全部') && el('orbital-presentation').hidden);
       el('buy-bypasser').click();const raw=frame.contentWindow.__storage.getItem(SAVE_KEY);
       assert(parseSession(raw).run.phase==='orbital' && !el('orbital-presentation').hidden);
       assert(el('home-scroll').inert && !el('archives-dialog').querySelector(':focus')?.closest('.talent-details'));
@@ -134,7 +147,7 @@ export function registerOrbitalTests(test, assert) {
     const frame=await mountFixture(serializeSession(launchReady()),false,'incremental',{reducedMotion:true});
     try {
       frame.style.width='390px';frame.style.height='844px';const doc=frame.contentDocument,el=id=>doc.getElementById(id);
-      el('node-bypasser').click();el('buy-bypasser').click();
+      el('node-bypasser').click();el('buy-bypasser').click();el('buy-bypasser').click();
       assert(el('archives-dialog').dataset.orbital==='arrived' && el('skip-orbital').hidden);
       assert(doc.documentElement.scrollWidth<=frame.clientWidth);
       for(const [w,h] of [[390,844],[1280,800]]) {
@@ -154,7 +167,7 @@ export function registerOrbitalTests(test, assert) {
     const frame=await mountFixture(serializeSession(launchReady()));
     try {
       const doc=frame.contentDocument,win=frame.contentWindow,el=id=>doc.getElementById(id);
-      el('node-bypasser').click();el('buy-bypasser').click();const raw=win.__storage.getItem(SAVE_KEY);
+      el('node-bypasser').click();el('buy-bypasser').click();el('buy-bypasser').click();const raw=win.__storage.getItem(SAVE_KEY);
       let hidden=false,now=0;Object.defineProperty(doc,'hidden',{configurable:true,get:()=>hidden});
       const tick=count=>{for(let i=0;i<count;i++)win.__testFrame(now+=100);};
       tick(10);const opacity=el('orbital-presentation').style.getPropertyValue('--scene-opacity');

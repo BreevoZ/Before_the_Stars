@@ -4,7 +4,7 @@ import { createBindings } from './dom-bindings.js';
 import { buildTalentViewModel } from './talent-view-model.js';
 import { UPGRADES, TALENT_LAYER_REQUIREMENT } from './progression-config.js';
 import { purchaseUpgrade } from './progression.js';
-import { TALENT_TREE, purchaseTalent, layerTalents, talentPrerequisiteText } from './talents.js';
+import { TALENT_TREE, purchaseTalent, layerTalents, talentPrerequisiteText, getTalentState } from './talents.js';
 import { drawOrbitalScene } from './orbital-scene.js';
 
 const el = id => document.getElementById(id);
@@ -24,21 +24,24 @@ const glyphs = {
 };
 const mapData = {
   spark: { x: 550, y: 1570, kind: 'keystone', icon: glyphs.spark },
-  logistics: { x: 125, y: 1350 }, formation: { x: 265, y: 1190, kind: 'keystone' },
-  evolution: { x: 125, y: 990 }, defense: { x: 265, y: 845, kind: 'specialist' },
-  fireControl: { x: 125, y: 755, icon: 'M12 2v5m0 10v5M2 12h5m10 0h5M12 7a5 5 0 110 10 5 5 0 010-10' },
-  campaign: { x: 125, y: 535, icon: 'M3 8h16l-4-4m4 4-4 4M21 16H5l4 4m-4-4 4-4' },
-  extermination: { x: 125, y: 315, kind: 'keystone', icon: 'M5 20 19 4M5 4l14 16M2 17l5 5m10 0 5-5M4 6V2h4m8 0h4v4' },
-  production: { x: 825, y: 1330 }, supply: { x: 825, y: 1120, kind: 'specialist' },
-  warfare: { x: 955, y: 1110 }, salvage: { x: 955, y: 900, kind: 'specialist' },
-  conservation: { x: 1030, y: 1350, kind: 'keystone' }, challenge: { x: 990, y: 1210, kind: 'specialist' },
-  timeAcceleration: { x: 830, y: 690, icon: glyphs.clock },
-  legacyMachine: { x: 1030, y: 780, kind: 'keystone', icon: glyphs.automation },
-  legacyCapacity: { x: 930, y: 530, kind: 'specialist', icon: glyphs.heavy },
-  legacyEfficiency: { x: 1050, y: 320, kind: 'specialist', icon: glyphs.clock },
-  superSoldierPlan: { x: 550, y: 260, kind: 'keystone', icon: glyphs.helmet },
-  elite: { x: 380, y: 170, kind: 'specialist' }, superRanged: { x: 720, y: 170, kind: 'specialist', icon: glyphs.arrow },
-  bypasser: { x: 550, y: 60, kind: 'keystone', icon: PROTOCOL_GLYPH },
+  // Side branches sit on the same rows as the era layers, as in the VI tree:
+  // automation on the left, growth and Legacy on the right, each in columns.
+  logistics: { x: 80, y: 1320 }, formation: { x: 220, y: 1320, kind: 'keystone' },
+  defense: { x: 80, y: 1110, kind: 'specialist' }, evolution: { x: 220, y: 1110 },
+  fireControl: { x: 220, y: 900, icon: 'M12 2v5m0 10v5M2 12h5m10 0h5M12 7a5 5 0 110 10 5 5 0 010-10' },
+  campaign: { x: 220, y: 690, icon: 'M3 8h16l-4-4m4 4-4 4M21 16H5l4 4m-4-4 4-4' },
+  extermination: { x: 220, y: 480, kind: 'keystone', icon: 'M5 20 19 4M5 4l14 16M2 17l5 5m10 0 5-5M4 6V2h4m8 0h4v4' },
+  production: { x: 770, y: 1320 }, warfare: { x: 875, y: 1320 },
+  supply: { x: 770, y: 1110, kind: 'specialist' }, salvage: { x: 875, y: 1110, kind: 'specialist' },
+  conservation: { x: 1020, y: 1320, kind: 'keystone' }, challenge: { x: 1065, y: 1110, kind: 'specialist' },
+  timeAcceleration: { x: 820, y: 788, icon: glyphs.clock },
+  // The machine needs both 遗产保存 and era III; it is drawn from its own branch.
+  legacyMachine: { x: 970, y: 900, kind: 'keystone', icon: glyphs.automation, parent: 'conservation' },
+  legacyEfficiency: { x: 920, y: 690, kind: 'specialist', icon: glyphs.clock }, legacyCapacity: { x: 1030, y: 690, kind: 'specialist', icon: glyphs.heavy },
+  superSoldierPlan: { x: 550, y: 270, kind: 'keystone', icon: glyphs.helmet },
+  elite: { x: 380, y: 190, kind: 'specialist' }, superRanged: { x: 720, y: 190, kind: 'specialist', icon: glyphs.arrow },
+  // The goal of the surface, and the node VI grows from: the same disc on both pages.
+  bypasser: { x: 550, y: 80, kind: 'keystone', finale: true, icon: PROTOCOL_GLYPH },
 };
 for (let layer = 1; layer <= 5; layer++) layerTalents(layer).forEach((key, slot) => {
   mapData[key] = { x: 410 + slot * 140, y: 1320 - (layer - 1) * 210,
@@ -46,7 +49,7 @@ for (let layer = 1; layer <= 5; layer++) layerTalents(layer).forEach((key, slot)
 });
 export const TALENT_MAP = Object.freeze(Object.fromEntries(Object.entries(mapData).map(([key, art]) => [key,
   { ...art, icon: art.icon ?? glyphs[TALENT_TREE[key].branch] ?? glyphs.automation }])));
-const GATES = Object.freeze(Object.fromEntries(Array.from({ length: 6 }, (_, index) => [index + 1, { x: 550, y: index === 5 ? 365 : 1418 - index * 210 }])));
+const GATES = Object.freeze(Object.fromEntries(Array.from({ length: 6 }, (_, index) => [index + 1, { x: 550, y: index === 5 ? 378 : 1418 - index * 210 }])));
 const colors = Object.fromEntries(['root', 'automation', 'growth', 'legacy', 'units'].map(key => [key, `var(--route-${key})`]));
 function pathElement(className) { const path = document.createElementNS(svgNS, 'path'); path.setAttribute('class', className); return path; }
 
@@ -54,7 +57,7 @@ export function createTalentMap(getSession, changed) {
   const bind = createBindings(document);
   const screen = el('archives-dialog'), map = el('talent-tree'), details = el('talent-details');
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-  let selected = null, pinned = false, hoverSuppressed = false, hideTimer = 0, points = {}, mobile = false;
+  let selected = null, pinned = false, hoverSuppressed = false, hideTimer = 0, points = {}, mobile = false, armedUntil = 0;
   const edges = new Map(), animations = new Set();
   const svg = document.createElementNS(svgNS, 'svg'); svg.classList.add('talent-connections'); svg.setAttribute('aria-hidden', 'true'); map.append(svg);
   for (const [branch, name] of Object.entries({ automation: '自动化', growth: '文明增益', legacy: '遗产收益' })) {
@@ -62,17 +65,17 @@ export function createTalentMap(getSession, changed) {
     label.dataset.branch = branch; label.innerHTML = `<span>${name}</span><small>${{ automation: '让文明自行运转', growth: '让每次重建更强', legacy: '让星火传得更远' }[branch]}</small>`; map.append(label);
   }
   for (const [key, config] of Object.entries(TALENT_TREE)) {
-    const art = TALENT_MAP[key], parent = config.requiresLayer ? [`gate-${config.requiresLayer + 1}`, 1] : config.unit ? ['gate-1', 1] : Object.entries(config.requires)[0], kind = art.kind ?? 'ordinary';
+    const art = TALENT_MAP[key], parent = art.parent ? [art.parent, 1] : config.requiresLayer ? [`gate-${config.requiresLayer + 1}`, 1] : config.unit ? ['gate-1', 1] : Object.entries(config.requires)[0], kind = art.kind ?? 'ordinary';
     if (parent) {
       const path = pathElement(`talent-link ${parent[0] === 'spark' ? 'trunk' : 'twig'}`);
       path.id = `link-${key}`; path.dataset.parent = parent[0]; path.dataset.child = key; path.dataset.requiredLevel = parent[1]; path.style.color = colors[config.branch];
       const flow = pathElement('talent-flow'); flow.id = `flow-${key}`; flow.setAttribute('pathLength', '1'); flow.style.color = colors[config.branch];
       svg.append(path, flow); edges.set(key, { path, flow, parent: parent[0] });
     }
-    const item = document.createElement('div'); item.className = `talent-star ${kind}`; item.dataset.talent = key;
+    const item = document.createElement('div'); item.className = `talent-star ${kind}${art.finale ? ' finale' : ''}`; item.dataset.talent = key;
     if (parent) { item.dataset.parent = parent[0]; item.dataset.requiredLevel = parent[1]; }
     item.style.setProperty('--star-color', colors[config.branch]);
-    const shape = kind === 'specialist' ? '<path class="star-frame" d="M32 2 62 32 32 62 2 32Z"/>' : kind === 'keystone' ? '<circle class="star-halo" cx="32" cy="32" r="31"/><circle class="star-frame" cx="32" cy="32" r="27"/>' : '<path class="star-frame" d="M32 2 58 17v30L32 62 6 47V17Z"/>';
+    const shape = art.finale ? '<circle class="star-ring" cx="32" cy="32" r="31.5"/><circle class="star-halo" cx="32" cy="32" r="29"/><circle class="star-frame" cx="32" cy="32" r="24"/>' : kind === 'specialist' ? '<path class="star-frame" d="M32 2 62 32 32 62 2 32Z"/>' : kind === 'keystone' ? '<circle class="star-halo" cx="32" cy="32" r="31"/><circle class="star-frame" cx="32" cy="32" r="27"/>' : '<path class="star-frame" d="M32 2 58 17v30L32 62 6 47V17Z"/>';
     item.innerHTML = `<button id="node-${key}" class="talent-node" type="button" aria-controls="talent-details" aria-expanded="false" aria-pressed="false"><svg viewBox="0 0 64 64" aria-hidden="true">${shape}<path class="star-icon" d="${art.icon}" transform="translate(20 12)"/></svg><span class="node-ranks" id="level-${key}" aria-hidden="true"></span><small class="node-cost" id="cost-${key}"></small><span class="node-name">${config.name}</span></button>${key === 'spark' ? '<span id="root-caption" class="root-caption"></span>' : ''}`;
     map.append(item);
     const button = el(`node-${key}`);
@@ -87,6 +90,12 @@ export function createTalentMap(getSession, changed) {
     el('talent-detail-cards').append(card);
     const buy = () => {
       const s = getSession(), before = s.permanent.legacy;
+      // The protocol empties the wallet, so it always asks once more.
+      if (key === 'bypasser' && getTalentState(s, key) === 'ready' && performance.now() > armedUntil) {
+        armedUntil = performance.now() + 6000; select(key, true); sync(); el(`buy-${key}`).focus({ preventScroll: true });
+        setTimeout(() => { if (performance.now() >= armedUntil) sync(); }, 6100); return;
+      }
+      armedUntil = 0;
       if (!(Object.hasOwn(UPGRADES, key) ? purchaseUpgrade : purchaseTalent)(s, key)) return;
       if (key === 'bypasser') { closeDetail(); changed(key); sync(); return; }
       changed(key); sync(); feedback(key, Q.sub(before, s.permanent.legacy));
@@ -181,7 +190,7 @@ export function createTalentMap(getSession, changed) {
       const d = `M${a.x},${a.y} C${a.x},${mid} ${b.x},${mid} ${b.x},${b.y}`;
       edge.path.setAttribute('d', d); edge.flow.setAttribute('d', d);
     }
-    for (const [branch, position] of Object.entries({ automation: [190, 1460], growth: [845, 1460], legacy: [1020, 1460] })) {
+    for (const [branch, position] of Object.entries({ automation: [150, 1460], growth: [822, 1460], legacy: [1020, 1460] })) {
       const label = el(`branch-${branch}`); label.style.left = `${position[0] * sx}px`; label.style.top = `${position[1]}px`;
     }
     drawScene(); positionDetail();
@@ -198,16 +207,16 @@ export function createTalentMap(getSession, changed) {
   reduced.addEventListener('change', () => { if (reduced.matches) { screen.dataset.cinematic = 'false'; el('skip-home-intro').hidden = true; for (const animation of animations) animation.cancel(); } });
   el('talents-panel').addEventListener('animationend', event => { if (event.animationName === 'constellation-rise') { screen.dataset.cinematic = 'false'; el('skip-home-intro').hidden = true; } });
   el('skip-home-intro').addEventListener('click', () => { screen.dataset.cinematic = 'false'; el('skip-home-intro').hidden = true; });
-  function open(cinematic = false) {
+  function open(cinematic = false, anchor = null) {
     screen.dataset.cinematic = String(cinematic && !reduced.matches); el('skip-home-intro').hidden = !cinematic || reduced.matches;
     closeDetail(); layout();
     // Root stays comfortably reachable on a phone; the branches grow upwards.
-    el('home-scroll').scrollTop = el('home-scroll').scrollHeight;
+    el('home-scroll').scrollTop = anchor ? 0 : el('home-scroll').scrollHeight;
     el('tree-scroll').scrollLeft = Math.max(0, points.spark.x - el('tree-scroll').clientWidth / 2);
     el('close-archives').focus({ preventScroll: true });
   }
   function sync() {
-    const changed = bind(buildTalentViewModel(getSession()));
+    const changed = bind(buildTalentViewModel(getSession(), { armed: performance.now() < armedUntil }));
     if (changed) positionDetail();
   }
   return { sync, open, closeDetail };

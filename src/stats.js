@@ -10,7 +10,7 @@ const growth = Object.freeze({ quantity: true, min: 0 });
 const growthInteger = Object.freeze({ quantity: true, min: 0, round: 'floor' });
 const count = max => ({ min: 0, max, round: 'floor' });
 export const STAT_DEFINITIONS = Object.freeze({
-  ...TRAIT_STATS, canRanged: { boolean: true }, sniperRifle: { boolean: true },
+  ...TRAIT_STATS, traitAccess: { boolean: true }, allowEnemyRecruit: { boolean: true }, canRanged: { boolean: true }, sniperRifle: { boolean: true },
   damage: growth, meleeDamage: growth, chargeDamage: growth, tickDamage: growth, baseDamage: growth,
   health: { quantity: true, min: 1, round: 'round' }, baseHealth: { quantity: true, min: 1, round: 'round' },
   armor: growth, armorPierce: growth, rangedReduction: { min: 0, max: 1 },
@@ -100,7 +100,7 @@ function baseValues(context) {
   if (context.kind === 'civilization') return { legacy: 1, earlyFinale: false, legacyMachine: false,
     legacyMachineShare: LEGACY_ECONOMY.machineShares[0], legacyFillSeconds: LEGACY_ECONOMY.fillSeconds };
   return { ...context.base, enabled: true, attackSpeed: 1,
-    ...(context.kind === 'unit' ? { ...TRAIT_DEFAULTS, canRanged: true, sniperRifle: false } : {}),
+    ...(context.kind === 'unit' ? { ...TRAIT_DEFAULTS, traitAccess: context.team === 'player', allowEnemyRecruit: false, canRanged: true, sniperRifle: false } : {}),
     ...(context.kind === 'turret' ? { attackInterval: context.base.interval } : {}) };
 }
 function eraBonuses(context) {

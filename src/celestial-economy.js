@@ -15,7 +15,7 @@ export function seedCivilizations(state) {
 export function createCivilization(state,site) {
   return { id:`c${state.cycle}-${++state.nextCivilization}`, site:site.id,
     name:site.name+CIVILIZATION_NAMES[Math.floor(nextRandom(state)*CIVILIZATION_NAMES.length)],
-    alive:true,age:1,experience:0,gold:180,power:0,profile:Math.floor(nextRandom(state)*3),warId:null };
+    alive:true,age:1,experience:0,gold:180,power:0,doctrine:0,superSoldiers:0,profile:Math.floor(nextRandom(state)*3),warId:null };
 }
 export function seedRefugee(state) {
   const free = SITES.filter(site=>!state.civilizations.some(c=>c.alive && c.site===site.id));

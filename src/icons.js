@@ -2,6 +2,7 @@
 export const PROTOCOL_GLYPH = 'M5 21V7l7-5 7 5v14M9 21V9h6v12M2 21h20';
 export const LEGACY_GLYPH = 'M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z';
 const paths = {
+  elite: '<path d="M5 20V8l3-5h8l3 5v12l-7 3-7-3ZM5 10l7 3 7-3M8 17h8"/>',
   protocol: `<path d="${PROTOCOL_GLYPH}"/>`,
   legacy: `<path d="${LEGACY_GLYPH}"/>`,
   earth: '<circle cx="12" cy="12" r="9"/><path d="m5 6 5 2-1 4 4 3-2 5M15 4l-2 5 5 2 2 5"/>',

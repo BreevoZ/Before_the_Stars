@@ -30,7 +30,7 @@ function future(war){for(const team of ['player','enemy']){war.game.experience[t
 function won(war){war.game.bases.enemy.hp=0;war.game.status='won';}
 function pair(s){const idle=s.orbital.civilizations.filter(c=>c.alive&&!c.warId);return startOrbitalWar(s,idle[0]?.id,idle[1]?.id);}
 export function lunarFixture(){
-  const s=colonyFixture({legacy:1000000,talents:['monitor','recovery','recovery','reseed','reseed']});
+  const s=colonyFixture({legacy:50000000,talents:['monitor','recovery','recovery','reseed','reseed']});
   for(let i=0;i<2;i++){pair(s);const w=s.orbital.wars[0];future(w);won(w);resolveOrbitalWar(s,w.id);advance(s,61);}
   purchaseOrbitalTalent(s,'outpost');return s;
 }
@@ -47,9 +47,9 @@ export function registerOrbitalColonyTests(test,assert,near){
     const a=sitePosition(SITES[0],0),b=sitePosition(SITES[0],30);assert(a.x!==b.x&&a.depth!==b.depth);
   });
   test('Orbital habitat: each purchase adds one section and retains the original doubling; protocol glyph is shared',()=>{
-    const s=colonyFixture({legacy:100000});const value=civilizationValue(s.orbital,s.orbital.civilizations[0]);
-    for(let rank=1;rank<=3;rank++){assert(purchaseOrbitalTalent(s,'recovery'));assert(habitatSegments(rank).length===rank);assert(civilizationValue(s.orbital,s.orbital.civilizations[0])===value*2**rank);}
-    assert(!purchaseOrbitalTalent(s,'recovery')&&T.recovery.costs.join(',')==='256,1024,4096');
+    const s=colonyFixture({legacy:5000000});const value=civilizationValue(s.orbital,s.orbital.civilizations[0]);
+    for(let rank=1;rank<=7;rank++){assert(purchaseOrbitalTalent(s,'recovery'));assert(habitatSegments(rank).length===rank);assert(civilizationValue(s.orbital,s.orbital.civilizations[0])===value*2**rank);}
+    assert(!purchaseOrbitalTalent(s,'recovery')&&T.recovery.costs.length===7);
     assert(T.protocol.icon==='protocol'&&icon(T.protocol.icon).includes(PROTOCOL_GLYPH));
   });
   test('Lunar economy: locked production is zero, outpost and each industry rank pay the displayed rate',()=>{
@@ -62,7 +62,7 @@ export function registerOrbitalColonyTests(test,assert,near){
       assert(buildOrbitalViewModel(s)['#colony-lunar-rate']===Q.format(rate));parseSession(serializeSession(s));
       if(rank<4){assert(purchaseOrbitalTalent(s,'lunarIndustry'));rate*=2;assert(lunarLegacyRate(s.orbital)===rate);}
     }
-    assert(!purchaseOrbitalTalent(s,'lunarIndustry'));assert(purchaseOrbitalTalent(s,'recovery')&&lunarLegacyRate(s.orbital)===4096);
+    assert(!purchaseOrbitalTalent(s,'lunarIndustry'));for(let rank=3;rank<=7;rank++)assert(purchaseOrbitalTalent(s,'recovery')&&lunarLegacyRate(s.orbital)===32*2**(rank+4));
   });
   test('Lunar production: winter keeps producing, pause/hidden/invalid deltas freeze, refresh keeps fractions without offline awards',()=>{
     let s=lunarFixture();pair(s);const w=s.orbital.wars[0];future(w);won(w);resolveOrbitalWar(s,w.id);const produced=s.orbital.lunarProduced;advance(s,1);
@@ -73,7 +73,7 @@ export function registerOrbitalColonyTests(test,assert,near){
   });
   test('Orbital v17: real v16 war upgrades once, preserving ledger, habitat ranks and combat, without backpay',()=>{
     const source=JSON.stringify(v16Orbital),s=parseSession(source),r=parseSession(serializeSession(s));
-    assert(s.version===17&&s.orbital.version===3&&s.orbital.lunarProduced===0&&s.orbital.lunarFraction===0&&s.orbital.talents.lunarIndustry===0);
+    assert(s.version===18&&s.orbital.version===4&&s.orbital.lunarProduced===0&&s.orbital.lunarFraction===0&&s.orbital.talents.lunarIndustry===0);
     assert(s.orbital.talents.recovery===v16Orbital.orbital.talents.recovery&&s.orbital.wars.length===1);
     assert(JSON.stringify(v16Orbital)===source&&serializeSession(s)===serializeSession(r));
     assert(JSON.stringify(JSON.parse(serializeSession(s)).orbital.wars)===JSON.stringify(v16Orbital.orbital.wars));
@@ -161,7 +161,7 @@ export function registerOrbitalColonyTests(test,assert,near){
   });
   test('Orbital v15 migration: real arrived, in-progress and complete saves retain earned currency and refund all retired construction once',()=>{
     for(const record of Object.values(records)){const old=fromV15Record(mapSessionQuantities(structuredClone(record),Q.decode)),s=parseSession(JSON.stringify(record)),refund=oldOrbitalSpent(old.orbital);
-      assert(s.version===17&&s.orbital.version===3&&s.orbital.started===old.orbital.started&&s.orbital.legacyEarned===old.orbital.legacyEarned);
+      assert(s.version===18&&s.orbital.version===4&&s.orbital.started===old.orbital.started&&s.orbital.legacyEarned===old.orbital.legacyEarned);
       assert(Q.eq(s.permanent.legacy,Q.add(old.permanent.legacy,refund))&&Q.eq(s.permanent.totalLegacy,old.permanent.totalLegacy));
       assert(s.permanent.completedCycles===old.permanent.completedCycles&&s.orbital.talents.protocol===1);
       assert(serializeSession(parseSession(serializeSession(s)))===serializeSession(s));
@@ -190,7 +190,7 @@ export function registerOrbitalColonyTests(test,assert,near){
     const canvas=document.createElement('canvas');canvas.width=600;canvas.height=420;const ctx=canvas.getContext('2d');
     drawOrbitStars(ctx,600,420,0);const stars=canvas.toDataURL();drawOrbitStars(ctx,600,420,2);assert(canvas.toDataURL()!==stars);
     drawOrbitStars(ctx,600,420,0,true);const quiet=canvas.toDataURL();drawOrbitStars(ctx,600,420,5,true);assert(canvas.toDataURL()===quiet);
-    const s=lunarFixture(),raw=serializeSession(s);drawOrbitalTalentSky(ctx,600,420,s.orbital,{ambientTime:0});const sky=canvas.toDataURL();drawOrbitalTalentSky(ctx,600,420,s.orbital,{ambientTime:10});assert(canvas.toDataURL()!==sky);
+    const s=lunarFixture(),raw=serializeSession(s);drawOrbitalTalentSky(ctx,600,420,s.orbital,{ambientTime:0});const sky=canvas.toDataURL();drawOrbitalTalentSky(ctx,600,420,s.orbital,{ambientTime:10});assert(canvas.toDataURL()===sky);
     drawLunarColony(ctx,600,420,s.orbital);const moon=canvas.toDataURL();drawLunarColony(ctx,600,420,{...s.orbital,talents:{...s.orbital.talents,lunarIndustry:4}});assert(canvas.toDataURL()!==moon);
     assert(serializeSession(s)===raw);
   });

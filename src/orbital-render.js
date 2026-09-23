@@ -1,3 +1,4 @@
+import { drawOrbitalScene, ORBITAL_SECONDS } from './orbital-scene.js';
 import { SITES, ORBITAL_RULES as R } from './orbital-config.js';
 import { dayPhase, TAU, siteLongitude } from './celestial-clock.js';
 const C={sky:'#0e181b',ocean:'#284c51',land:'#829077',light:'#b9cfb4',gold:'#c5b17d',war:'#c28d70'};
@@ -88,42 +89,90 @@ function globe(ctx,cx,cy,r,o,{time=o.elapsed,camera=0,reducedMotion=false}={}){
   }
   ctx.restore();ctx.globalAlpha=1;ctx.strokeStyle='#b4cbb52b';ctx.lineWidth=.8;ctx.beginPath();ctx.arc(cx,cy,r,0,TAU);ctx.stroke();
 }
-export function habitatSegments(rank){return Array.from({length:rank},(_,i)=>({start:-2.6+i*1.72,end:-1.9+i*1.72}));}
-function habitat(ctx,cx,cy,r,rank,front){
-  ctx.save();ctx.translate(cx,cy);ctx.rotate(-.28);const rx=r*1.28,ry=r*.36;
-  ctx.strokeStyle='#adc3a82a';ctx.lineWidth=.6;ctx.beginPath();ctx.ellipse(0,0,rx,ry,0,front?0:Math.PI,front?Math.PI:TAU);ctx.stroke();
-  for(const segment of habitatSegments(rank)){
-    const pts=[];for(let t=segment.start;t<=segment.end;t+=.025){if((Math.sin(t)>=0)!==front)continue;pts.push([Math.cos(t)*rx,Math.sin(t)*ry]);}
-    if(pts.length<2)continue;path(ctx,pts);ctx.strokeStyle='#192725';ctx.lineWidth=r*.038;ctx.stroke();ctx.strokeStyle='#899d8b';ctx.lineWidth=r*.020;ctx.stroke();
-    for(let i=1;i<pts.length;i+=4){disc(ctx,pts[i][0],pts[i][1],Math.max(.75,r*.0035),C.gold);}
-  }ctx.restore();
+export function habitatSegments(rank){
+  return Array.from({length:Math.min(R.habitatSections,Math.max(0,rank))},(_,i)=>({start:i*TAU/R.habitatSections,end:(i+1)*TAU/R.habitatSections}));
 }
-export function drawOrbitalColony(ctx,width,height,o,{reducedMotion=false,ambientTime=o.elapsed}={}){
+const orbitPoint=(angle,rx,ry)=>[Math.cos(angle)*rx,Math.sin(angle)*ry];
+function habitat(ctx,cx,cy,r,rank,front,{time=0,construction=1,reducedMotion=false}={}){
+  ctx.save();ctx.translate(cx,cy);ctx.rotate(-.28);
+  const rx=r*1.31,ry=r*.39,rotation=.32+(reducedMotion?0:time*TAU/600),beam=r*.045;
+  // A faint surveyed orbit is distinct from the constructed, three-dimensional deck.
+  ctx.strokeStyle='#adc3a819';ctx.lineWidth=.7;ctx.setLineDash([2,7]);ctx.beginPath();ctx.ellipse(0,0,rx,ry,0,front?0:Math.PI,front?Math.PI:TAU);ctx.stroke();ctx.setLineDash([]);
+  function lineArc(start,end,width,color,offset=0){
+    ctx.strokeStyle=color;ctx.lineWidth=width;const points=[],steps=Math.max(1,Math.ceil((end-start)/.018));for(let i=0;i<=steps;i++){const t=start+(end-start)*i/steps;if((Math.sin(t)>=0)!==front){if(points.length>1){path(ctx,points);ctx.stroke();}points.length=0;continue;}points.push(orbitPoint(t,rx+offset,ry+offset*.3));}
+    if(points.length>1){ctx.strokeStyle=color;ctx.lineWidth=width;path(ctx,points);ctx.stroke();}
+  }
+  for(const [i,segment]of habitatSegments(rank).entries()){
+    const end=segment.start+(segment.end-segment.start)*(i===rank-1?construction:1),start=segment.start+rotation,finish=end+rotation;
+    lineArc(start,finish,beam+3,'#0b191c');lineArc(start,finish,beam,'#607c72');lineArc(start,finish,1,'#becab0',beam*.38);lineArc(start,finish,1,'#263d3c',-beam*.42);
+    for(let a=start+.035;a<finish;a+=.060){if((Math.sin(a)>=0)!==front)continue;const[x,y]=orbitPoint(a,rx,ry);
+      ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(Math.cos(a)*ry,-Math.sin(a)*rx));
+      ctx.fillStyle='#233e3c';ctx.fillRect(-2,-beam*.4,1,beam*.8);
+      ctx.fillStyle=i%2?'#b8c9ad':'#c6bc8b';ctx.globalAlpha=.65;ctx.fillRect(-1,-beam*.20,1.8,Math.max(1,beam*.16));ctx.globalAlpha=1;ctx.restore();
+    }
+    for(const offset of [.26,.68]){const a=start+(segment.end-segment.start)*offset;if(a>finish||(Math.sin(a)>=0)!==front)continue;
+      const[x,y]=orbitPoint(a,rx,ry);ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(Math.sin(a)*.4,Math.cos(a)));
+      ctx.fillStyle='#72968a';ctx.fillRect(-2,-1,beam*1.8,2);ctx.fillStyle='#294d4b';ctx.fillRect(beam*.75,-beam*.85,beam*1.3,beam*1.7);
+      ctx.strokeStyle='#88a49b60';ctx.lineWidth=.65;ctx.strokeRect(beam*.75,-beam*.85,beam*1.3,beam*1.7);for(let n=0;n<3;n++){path(ctx,[[beam*.85,-beam*.5+n*beam*.5],[beam*1.94,-beam*.5+n*beam*.5]]);ctx.stroke();}ctx.restore();
+    }
+    for(const a of [start,finish])if((Math.sin(a)>=0)===front){const[x,y]=orbitPoint(a,rx,ry);ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(Math.cos(a)*ry,-Math.sin(a)*rx));ctx.fillStyle='#92a995';ctx.fillRect(-2,-beam*.65,4,beam*1.3);ctx.fillStyle='#d4c393';ctx.fillRect(-1,-beam*.15,2,2);ctx.restore();}
+  }
+  if(rank){const length=rank/R.habitatSections*TAU,angle=rotation+(reducedMotion?.22:(time*.035)%length);if((Math.sin(angle)>=0)===front){const[x,y]=orbitPoint(angle,rx,ry);disc(ctx,x,y,3,'#bdd3c02a');disc(ctx,x,y,1.2,'#dbe2bb');}}
+  ctx.restore();
+}
+export function drawOrbitalColony(ctx,width,height,o,{reducedMotion=false,ambientTime=o.elapsed,construction=1}={}){
   ctx.save();ctx.scale(width/1000,height/620);drawOrbitStars(ctx,1000,620,ambientTime,reducedMotion);
   const time=reducedMotion?0:o.elapsed;
-  habitat(ctx,500,322,238,o.talents.recovery,false);globe(ctx,500,322,238,o,{time,reducedMotion});habitat(ctx,500,322,238,o.talents.recovery,true);
+  habitat(ctx,500,322,238,o.talents.recovery,false,{time,construction,reducedMotion});globe(ctx,500,322,238,o,{time,reducedMotion});habitat(ctx,500,322,238,o.talents.recovery,true,{time,construction,reducedMotion});
   for(const w of o.wars){const points=w.participants.map(id=>sitePosition(SITES.find(s=>s.id===o.civilizations.find(c=>c.id===id).site),time));if(!points.every(p=>p.visible))continue;
     const[a,b]=points;ctx.strokeStyle=C.war;ctx.lineWidth=1;ctx.setLineDash([3,6]);ctx.lineDashOffset=reducedMotion?0:-ambientTime*3;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo((a.x+b.x)/2,(a.y+b.y)/2-45,b.x,b.y);ctx.stroke();ctx.setLineDash([]);
   }
   ctx.font='10px ui-monospace, monospace';ctx.fillStyle='#81968b';ctx.fillText('TERRA  /  '+(o.phase==='winter'?'核冬天':'文明观测'),38,572);
-  ctx.fillText(`HABITAT  ${String(o.talents.recovery).padStart(2,'0')} / 03`,780,572);
+  ctx.fillText(`HABITAT  ${String(o.talents.recovery).padStart(2,'0')} / 07`,780,572);
   ctx.restore();
 }
-export function drawOrbitalTalentSky(ctx,width,height,o={elapsed:0,phase:'living',civilizations:[],talents:{recovery:0}},{ambientTime=0,reducedMotion=false}={}){
-  drawOrbitStars(ctx,width,height,ambientTime,reducedMotion);
-  const r=Math.max(width*.42,height*.58),cx=width*.5,cy=height+r*.42;
-  const camera=reducedMotion?0:ambientTime*.014,time=reducedMotion?0:o.elapsed;
-  habitat(ctx,cx,cy,r,o.talents.recovery,false);globe(ctx,cx,cy,r,o,{time,camera,reducedMotion});habitat(ctx,cx,cy,r,o.talents.recovery,true);
-  const veil=ctx.createLinearGradient(0,0,0,height);veil.addColorStop(0,'#0b141950');veil.addColorStop(.55,'#0b141945');veil.addColorStop(1,'#0b141920');ctx.fillStyle=veil;ctx.fillRect(0,0,width,height);
+// Exactly the quiet horizon at the end of the surface departure sequence.
+// No planet spin, star animation or simulation clock behind the talent tree.
+export function drawOrbitalTalentSky(ctx,width,height){drawOrbitalScene(ctx,width,height,ORBITAL_SECONDS);}
+
+export function lunarFacilities(level){
+  return Array.from({length:3+level*2},(_,i)=>({longitude:i*2.39996,latitude:Math.sin(i*1.7)*.62,kind:i%3===0?'hub':i%3===1?'array':'factory'}));
+}
+export function lunarRotation(time){return dayPhase(time*120/R.lunarRotationSeconds)*TAU;}
+function lunarFacility(ctx,p,size,kind,time,reduced){
+  ctx.save();ctx.translate(p.x,p.y);ctx.scale(Math.max(.16,p.depth),.8);ctx.rotate(-.13);
+  ctx.fillStyle='#152e2d48';ctx.beginPath();ctx.ellipse(4,7,size*1.6,size*.35,0,0,TAU);ctx.fill();
+  const panel=(x,y)=>{ctx.fillStyle='#274e4d';ctx.fillRect(x,y,14,8);ctx.strokeStyle='#9fb7a050';ctx.lineWidth=.6;ctx.strokeRect(x,y,14,8);for(let i=1;i<4;i++){path(ctx,[[x+i*3.5,y],[x+i*3.5,y+8]]);ctx.stroke();}path(ctx,[[x,y+4],[x+14,y+4]]);ctx.stroke();};
+  ctx.scale(size/15,size/15);
+  panel(-27,-3);panel(13,-3);ctx.strokeStyle='#879f90';ctx.lineWidth=1;path(ctx,[[-14,1],[14,1]]);ctx.stroke();
+  if(kind==='hub'){
+    ctx.fillStyle='#9eafa0';ctx.beginPath();ctx.ellipse(0,-3,10,7,0,Math.PI,TAU);ctx.lineTo(10,4);ctx.lineTo(-10,4);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#314f4b';ctx.fillRect(-10,2,20,4);ctx.strokeStyle='#c3cbb2';path(ctx,[[0,-10],[0,1]]);ctx.stroke();
+    ctx.strokeStyle='#a2b7a4';path(ctx,[[8,-3],[12,-17],[18,-17]]);ctx.stroke();disc(ctx,18,-17,1,'#d2c496');
+  }else{
+    ctx.fillStyle='#536f65';ctx.fillRect(-10,-8,20,13);ctx.fillStyle='#b1bda6';path(ctx,[[-10,-8],[-4,-13],[14,-13],[10,-8]]);ctx.closePath();ctx.fill();ctx.fillStyle='#81998a';path(ctx,[[10,-8],[14,-13],[14,0],[10,5]]);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='#b3c7b0';ctx.lineWidth=1;path(ctx,[[-6,-8],[-6,-19],[1,-19]]);ctx.stroke();
+    if(kind==='factory'){const angle=reduced?-.4:Math.sin(time*.5)*.35;ctx.save();ctx.translate(-6,-19);ctx.rotate(angle);path(ctx,[[0,0],[14,0],[14,10]]);ctx.stroke();ctx.restore();}
+  }
+  ctx.fillStyle='#d6cc9d';for(let i=0;i<3;i++)ctx.fillRect(-7+i*5,-3,2,2);ctx.restore();
 }
 export function drawLunarColony(ctx,width,height,o,{ambientTime=o.elapsed,reducedMotion=false}={}){
   ctx.save();drawOrbitStars(ctx,width,height,ambientTime,reducedMotion);
-  const r=height*.62,cx=width*.70,cy=height*.66;
-  const g=ctx.createLinearGradient(cx-r,cy-r,cx+r,cy+r);g.addColorStop(0,'#a8b09b');g.addColorStop(.5,'#687669');g.addColorStop(1,'#263633');disc(ctx,cx,cy,r,g);
+  const mobile=width<620,r=mobile?Math.min(width*.35,height*.28):Math.min(height*.40,width*.21),cx=width*(mobile?.53:.76),cy=height*(mobile?.70:.51),rotation=lunarRotation(reducedMotion?0:o.elapsed);
+  const halo=ctx.createRadialGradient(cx,cy,r*.98,cx,cy,r*1.07);halo.addColorStop(0,'#8ea89821');halo.addColorStop(1,'#8ea89800');disc(ctx,cx,cy,r*1.07,halo);
+  const g=ctx.createLinearGradient(cx-r,cy-r,cx+r,cy+r);g.addColorStop(0,'#a0ae9c');g.addColorStop(.6,'#637b70');g.addColorStop(1,'#263e3b');disc(ctx,cx,cy,r,g);
   ctx.save();ctx.beginPath();ctx.arc(cx,cy,r,0,TAU);ctx.clip();
-  for(let i=0;i<28;i++){const x=cx+(noise(i+60)*2-1)*r,y=cy+(noise(i+800)*2-1)*r,cr=3+noise(i+99)*r*.15;disc(ctx,x,y,cr,'#34443d40');ctx.strokeStyle='#d1d5bb15';ctx.lineWidth=1;ctx.beginPath();ctx.arc(x,y,cr,.4,2.7);ctx.stroke();}
-  for(let i=0;i<1+(o.talents.lunarIndustry??0)*2;i++){
-    const x=cx-r*.6+(i%5)*r*.24,y=cy+r*.12+Math.floor(i/5)*r*.16;
-    ctx.fillStyle='#b2bdaa';ctx.fillRect(x,y-10,14,10);ctx.fillStyle='#405750';ctx.fillRect(x+16,y-7,17,6);ctx.fillStyle=C.gold;ctx.fillRect(x+4,y-7,3,2);
-  }ctx.restore();ctx.restore();
+  // Craters are attached to spherical coordinates, foreshortened at the limb.
+  for(let i=0;i<70;i++){
+    const p=sphere(noise(i+17)*TAU,(noise(i+222)*2-1)*1.42,rotation);if(p.z<=0)continue;
+    const cr=(.022+noise(i+903)*.11)*r,x=cx+p.x*r,y=cy+p.y*r;
+    ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(-p.y,p.x));ctx.scale(Math.max(.08,p.z),1);
+    disc(ctx,0,0,cr,'#243f3a24');ctx.strokeStyle='#c4d0b323';ctx.lineWidth=Math.max(.7,r*.006);ctx.beginPath();ctx.arc(0,0,cr,.4,2.9);ctx.stroke();disc(ctx,cr*.1,cr*.08,cr*.7,'#334b4225');ctx.restore();
+  }
+  ctx.drawImage(terminator(ctx,.32),cx-r,cy-r,r*2,r*2);
+  const facilities=lunarFacilities(o.talents.lunarIndustry).map(f=>{const p=sphere(f.longitude,f.latitude,rotation);return{...f,x:cx+p.x*r,y:cy+p.y*r,depth:p.z};}).filter(p=>p.depth>.12).sort((a,b)=>a.depth-b.depth);
+  ctx.strokeStyle='#b7c8a235';ctx.lineWidth=1;ctx.setLineDash([2,3]);for(let i=1;i<facilities.length;i++)if(Math.hypot(facilities[i].x-facilities[i-1].x,facilities[i].y-facilities[i-1].y)<r){path(ctx,[[facilities[i].x,facilities[i].y],[facilities[i-1].x,facilities[i-1].y]]);ctx.stroke();}ctx.setLineDash([]);
+  for(const p of facilities)lunarFacility(ctx,p,r*.13,p.kind,ambientTime,reducedMotion);
+  ctx.restore();ctx.strokeStyle='#acbca455';ctx.lineWidth=.8;ctx.beginPath();ctx.arc(cx,cy,r,0,TAU);ctx.stroke();
+  ctx.fillStyle='#9baf9e';ctx.font='9px ui-monospace, monospace';ctx.textAlign='center';ctx.fillText(`LUNA  /  ${String(lunarFacilities(o.talents.lunarIndustry).length).padStart(2,'0')} FACILITIES`,cx,cy+r+25);ctx.restore();
 }

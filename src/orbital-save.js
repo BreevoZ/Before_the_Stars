@@ -1,3 +1,4 @@
+import { V17_ORBITAL_TALENTS as OLD } from './orbital-save-history.js';
 import { Q } from './quantity.js';
 import { check, object, num, int, bool, id } from './save-primitives.js';
 import { validateShape, AI_SHAPE } from './save-schema.js';
@@ -14,9 +15,9 @@ const whole=v=>amount(v)&&Q.isInteger(v);
 export function validateOrbital(s,version){
   if(version<=15)return validateOldOrbital(s,version);
   const o=s.orbital;if(s.run.phase!=='orbital'){check(o===undefined,'轨道阶段状态');return;}
-  const configs=version===16?Object.fromEntries(Object.entries(T).filter(([key])=>key!=='lunarIndustry')):T;
+  const configs=version===16?Object.fromEntries(Object.entries(OLD).filter(([key])=>key!=='lunarIndustry')):version===17?OLD:T;
   keys(o,Object.keys(createOrbitalState(1)).filter(key=>version>=17||!['lunarProduced','lunarFraction'].includes(key)),'轨道字段');
-  check(o.version===(version===16?2:3)&&bool(o.started)&&num(o.elapsed)&&int(o.rng,0,4294967295),'轨道时钟与随机源');
+  check(o.version===(version===16?2:version===17?3:4)&&bool(o.started)&&num(o.elapsed)&&int(o.rng,0,4294967295),'轨道时钟与随机源');
   for(const key of ['cycle','settledCycle','nuclearCycles','nextCivilization','nextWar'])check(int(o[key]),key);
   check(o.nuclearCycles===o.settledCycle&&o.settledCycle<=o.cycle,'核毁灭凭据');
   check(['dormant','living','winter'].includes(o.phase)&&o.started===(o.phase!=='dormant'),'萌芽阶段');
@@ -26,7 +27,7 @@ export function validateOrbital(s,version){
   for(const [key,t]of Object.entries(configs)){
     const rank=o.talents[key];check(int(rank,0,t.costs.length),'轨道天赋等级');
     if(rank)check(Object.entries(t.requires).every(([p,n])=>o.talents[p]>=n)&&(t.cycles??0)<=o.nuclearCycles,'轨道天赋前置');
-    const paid=o.payments[key]??[];check(Array.isArray(paid)&&paid.length===(key==='protocol'?0:rank)&&paid.every((cost,i)=>Q.eq(cost,t.costs[i])),'轨道天赋实付');
+    const paid=o.payments[key]??[];check(Array.isArray(paid)&&paid.length===(key==='protocol'?0:rank)&&paid.every((cost,i)=>Q.eq(cost,t.costs[i]) || version>=18 && OLD[key]?.costs[i]!==undefined && Q.eq(cost,OLD[key].costs[i])),'轨道天赋实付');
   }
   check(o.talents.protocol===1,'存续协议继承');
   check(bool(o.autoWar)&&(!o.autoWar||o.talents.weaving>0)&&num(o.autoElapsed,0,.25)&&o.autoElapsed<.25,'战争自动化');
@@ -40,11 +41,17 @@ export function validateOrbital(s,version){
   check(Array.isArray(o.civilizations)&&o.civilizations.length<=SITES.length,'地表文明数量');
   const ids=new Set(),sites=new Set();
   for(const c of o.civilizations){
-    keys(c,['id','site','name','alive','age','experience','gold','power','profile','warId'],'文明字段');
+    keys(c,['id','site','name','alive','age','experience','gold','power','profile','warId',...(version>=18?['doctrine','superSoldiers']:[])],'文明字段');
     check(id(c.id)&&!ids.has(c.id)&&c.id.startsWith(`c${o.cycle}-`)&&SITES.some(p=>p.id===c.site)&&!sites.has(c.site),'文明点位与标识');ids.add(c.id);sites.add(c.site);
     check(typeof c.name==='string'&&c.name.length>0&&c.name.length<=24&&bool(c.alive)&&int(c.age,1,R.finalAge)&&int(c.power,0,R.maximumPower)&&int(c.profile,0,2),'文明状态');
     check(whole(c.experience)&&Q.gte(c.experience,AGES[c.age].experienceRequired)&&amount(c.gold),'文明经济');
     check(c.warId===null||id(c.warId),'文明战争引用');
+    if(version>=18){
+      check(int(c.doctrine,0,5)&&int(c.superSoldiers,0,2),'文明兵种升级');
+      check(!c.doctrine||o.talents.doctrines>0,'学说授权');
+      check(!c.superSoldiers||c.doctrine===5&&o.talents.superSoldiers>0,'超级士兵授权');
+      check(c.superSoldiers<2||o.talents.sniper>0,'狙击授权');
+    }
   }
   check(Array.isArray(o.wars)&&o.wars.length<=3,'战争数量');const wars=new Set(),participants=new Set();
   for(const w of o.wars){

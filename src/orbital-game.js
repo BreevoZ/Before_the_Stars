@@ -57,21 +57,32 @@ export function resolveOrbitalWar(s,id){
   let reward=0;for(const i of loserTeams){const c=findCivilization(o,war.participants[i]);reward=Q.add(reward,civilizationValue(o,c,'defeat'));c.alive=false;}
   endWar(o,war);award(s,reward);log(o,`一场地表战争结束，收获 ${Q.format(reward)} Legacy。幸存者保留时代与经验。`);return true;
 }
-export function interventionCost(o,c,key){return ACTIONS[key].baseCost*2**(key==='boost'?c.power:key==='regress'?Math.max(0,c.age-2):key==='advance'?c.age-1:0);}
+export function interventionCost(o,c,key){if(key==='doctrines')return ACTIONS[key].costs[Math.min(4,c.doctrine)];return ACTIONS[key].baseCost*2**(key==='boost'?c.power:key==='regress'?Math.max(0,c.age-2):key==='advance'?c.age-1:0);}
 export function getInterventionState(s,id,key){
   const o=s.orbital,c=findCivilization(o,id),a=ACTIONS[key];if(!active(s)||o.phase!=='living'||!a||!o.talents[a.talent]||!o.talents.monitor)return 'locked';
-  if(!c?.alive)return 'dead';if((key==='boost'&&c.power>=R.maximumPower)||(key==='advance'&&c.age>=R.finalAge)||(key==='regress'&&c.age<=1))return 'max';
+  if(!c?.alive)return 'dead';
+  if(['doctrines','superSoldiers','sniper'].includes(key)){
+    if(key==='doctrines'&&c.doctrine>=5||key==='superSoldiers'&&c.superSoldiers>=1||key==='sniper'&&c.superSoldiers>=2)return 'max';
+    if(!c.warId)return 'war';
+    if(key==='doctrines'&&c.age<c.doctrine+1||key!=='doctrines'&&c.age<5)return 'age';
+    if(key==='superSoldiers'&&c.doctrine<5||key==='sniper'&&c.superSoldiers<1)return 'doctrine';
+  }
+  if((key==='boost'&&c.power>=R.maximumPower)||(key==='advance'&&c.age>=R.finalAge)||(key==='regress'&&c.age<=1))return 'max';
   return Q.gte(s.permanent.legacy,interventionCost(o,c,key))?'ready':'legacy';
 }
 export function intervene(s,id,key){
   if(getInterventionState(s,id,key)!=='ready')return false;const o=s.orbital,c=findCivilization(o,id),cost=interventionCost(o,c,key);
   s.permanent.legacy=Q.sub(s.permanent.legacy,cost);o.interventionSpent=Q.add(o.interventionSpent,cost);
   if(key==='boost'){c.power++;const war=o.wars.find(w=>w.id===c.warId);if(war)refreshWarBonuses(o,war);}
+  if(['doctrines','superSoldiers','sniper'].includes(key)){
+    if(key==='doctrines')c.doctrine++;else c.superSoldiers=key==='sniper'?2:1;
+    refreshWarBonuses(o,o.wars.find(w=>w.id===c.warId));
+  }
   if(key==='advance'||key==='regress'){changeTechnology(o,c,key==='advance'?1:-1);const war=o.wars.find(w=>w.id===c.warId);if(war)syncWarCivilizations(o,war);}
   if(key==='harvest'){
     const reward=civilizationValue(o,c);c.alive=false;const war=o.wars.find(w=>w.id===c.warId);if(war){syncWarCivilizations(o,war);endWar(o,war);}award(s,reward);
     log(o,`轨道光束抹去了${c.name}，收割 ${Q.format(reward)} Legacy。`);
-  }else log(o,`${ACTIONS[key].name} → ${c.name} · −${cost} Legacy。`);
+  }else log(o,`${ACTIONS[key].name}${key==='doctrines'?' '+c.doctrine+'/5':''} → ${c.name} · −${Q.format(cost)} Legacy。`);
   return true;
 }
 export function updateOrbital(s,dt,{paused=false,hidden=false}={}){

@@ -1,8 +1,9 @@
 import { Q } from './quantity.js';
-import { AGES } from './game-config.js';
+import { AGES, UNITS } from './game-config.js';
 import { SITES, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as A, ORBITAL_RULES as R } from './orbital-config.js';
 import { findCivilization, getWarState, getInterventionState, interventionCost, getOrbitalTalentState } from './orbital-game.js';
 import { civilizationValue, orbitalYieldMultiplier, lunarLegacyRate } from './celestial-economy.js';
+import { TRAITS } from './traits.js';
 import { siteDaylight } from './celestial-clock.js';
 export const orbitalTime = seconds => `${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`;
 export function orbitalTalentEffect(o,key,rank=o.talents[key]){
@@ -11,6 +12,9 @@ export function orbitalTalentEffect(o,key,rank=o.talents[key]){
   if(key==='diversity')return `至少 ${Math.min(6,R.minCivilizations+rank)} 个文明`;
   if(key==='outpost')return rank?`${Q.format(R.lunarBaseIncome*2**(o.talents.recovery+o.talents.lunarIndustry))} Legacy/s · 战争再 ×2`:'尚未建立月面基地';
   if(key==='lunarIndustry')return `${Q.format(R.lunarBaseIncome*2**(o.talents.recovery+rank))} Legacy/s`;
+  if(key==='doctrines')return rank?'可授予 I–V 五档兵种特性':'未开放兵种学说';
+  if(key==='superSoldiers')return rank?'可授权近战超级士兵':'未开放精锐授权';
+  if(key==='sniper')return rank?'可授权引导狙击激光枪':'未开放远程强化';
   return rank?'已解锁':'未解锁';
 }
 export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=false}={}){
@@ -22,7 +26,8 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
     '#colony-earned':`本阶段已收获 ${Q.format(o.legacyEarned)} · 收益 ×${orbitalYieldMultiplier(o)}`,
     '#colony-income':o.talents.outpost?`月面 +${Q.format(lunarLegacyRate(o))}/s`:'文明遗产',
     '#colony-lunar@hidden':!o.talents.outpost,'#colony-lunar-rate':Q.format(lunarLegacyRate(o)),
-    '#colony-lunar-produced':`累计生产 ${Q.format(o.lunarProduced)} Legacy`,'#colony-habitat-state':`${o.talents.recovery} / 3 段 · 遗产 ×${2**o.talents.recovery}`,
+    '#colony-lunar-level':`自动工场 ${o.talents.lunarIndustry} / 4 · ${3+o.talents.lunarIndustry*2} 处设施 · 星环 ×${2**o.talents.recovery}`,
+    '#colony-lunar-produced':`累计生产 ${Q.format(o.lunarProduced)} Legacy`,'#colony-habitat-state':`${o.talents.recovery} / ${R.habitatSections} 段 · 遗产 ×${2**o.talents.recovery}`,
     '#colony-time':orbitalTime(o.elapsed),'#colony-cycle':`第 ${o.cycle} 轮萌芽 · ${o.nuclearCycles} 次核毁灭`,
     '#colony-pause':paused?'继续':'暂停','#colony-pause@aria-pressed':String(paused),
     '#colony-speed':`${s.permanent.settings.speed}×`,'#colony-speed@hidden':s.debug===true,'#colony-debug-speed@hidden':s.debug!==true,'#colony-debug-speed@value':String(s.debugSpeed??1),
@@ -47,10 +52,17 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
     v[`#roster-name-${site.id}`]=c?.name??site.name;v[`#roster-age-${site.id}`]=c?.alive?`${AGES[c.age].numeral} · ${siteDaylight(o.elapsed,site).label}`:'废墟';
     for(const which of ['first','opponent']){v[`#${which}-${site.id}`]=label;v[`#${which}-${site.id}@disabled`]=!c?.alive;}
   }
+  for(let rank=1;rank<=R.habitatSections;rank++)v[`#colony-ring-ranks-${rank}@class:built`]=o.talents.recovery>=rank;
+  for(let rank=1;rank<=4;rank++)v[`#colony-lunar-ranks-${rank}@class:built`]=o.talents.lunarIndustry>=rank;
+  v['#colony-doctrines@hidden']=!o.talents.doctrines;
+  v['#colony-doctrine-status']=first?.alive?`${first.name} · 学说 ${first.doctrine}/5${first.superSoldiers?' · '+(first.superSoldiers===2?'狙击精锐':'匕首精锐'):''}`:'等待一个交战文明';
+  for(let age=1;age<=5;age++)v[`#doctrine-tier-${age}@class:granted`]=Boolean(first?.alive&&first.doctrine>=age);
   for(const [key,a]of Object.entries(A)){
     const status=getInterventionState(s,first?.id,key),cost=first?interventionCost(o,first,key):a.baseCost;
-    v[`#intervene-${key}@disabled`]=status!=='ready';v[`#intervene-${key}-cost`]=key==='harvest'&&first?.alive?`+${Q.format(civilizationValue(o,first))}`:`${Q.format(cost)}`;
-    v[`#intervene-${key}-state`]={locked:`需要「${T[a.talent].name}」`,dead:'文明已消亡',max:'已达界限',legacy:'遗产不足',ready:'执行'}[status];
+    v[`#intervene-${key}@disabled`]=status!=='ready';
+    v[`#intervene-${key}-name`]=key==='doctrines'&&first?.doctrine<5?`授予 ${AGES[first.doctrine+1].numeral} · ${AGES[first.doctrine+1].shortName}学说`:a.name;
+    if(['superSoldiers','sniper'].includes(key))v[`#intervene-${key}@hidden`]=!o.talents[a.talent];v[`#intervene-${key}-cost`]=key==='harvest'&&first?.alive?`+${Q.format(civilizationValue(o,first))}`:`${Q.format(cost)}`;
+    v[`#intervene-${key}-state`]={locked:`需要「${T[a.talent].name}」`,dead:'文明已消亡',max:'已完成',legacy:'遗产不足',war:'需要交战中的文明',age:'文明时代不足',doctrine:key==='sniper'?'先授予超级士兵':'先完成五档学说',ready:key==='doctrines'?Object.values(TRAITS).filter(t=>UNITS[t.units[0]].age===(first?.doctrine??0)+1).map(t=>t.name).join(' · '):'执行'}[status];
   }
   for(let i=0;i<3;i++){const w=o.wars[i];v[`#watch-war-${i}@hidden`]=!w;v[`#watch-war-${i}`]=w?w.participants.map(id=>findCivilization(o,id).name).join(' ↔ '):'';v[`#watch-war-${i}@aria-pressed`]=String(w?.id===o.selectedWar);}
   const w=o.wars.find(w=>w.id===o.selectedWar);v['#colony-battle@hidden']=!w;v['#colony-no-war@hidden']=Boolean(w);
@@ -64,7 +76,7 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
     for(const parent of Object.keys(t.requires))v[`#orbit-edge-${parent}-${key}@class:lit`]=rank>0;
   }
   const t=T[talent],rank=o.talents[talent],status=getOrbitalTalentState(s,talent);
-  Object.assign(v,{'#orbit-detail@hidden':!selected,'#orbit-detail-current':orbitalTalentEffect(o,talent),'#orbit-detail-next':rank>=t.costs.length?'已完成':orbitalTalentEffect(o,talent,rank+1),'#orbit-detail-branch':['recovery','outpost','lunarIndustry','transit'].includes(talent)?'HABITAT / 我们的家园':['reseed','diversity'].includes(talent)?'LIFE / 文明播种':'SURFACE / 战争与观测','#orbit-detail-name':t.name,'#orbit-detail-description':t.description,'#orbit-detail-effect':`${orbitalTalentEffect(o,talent)} → ${orbitalTalentEffect(o,talent,Math.min(t.costs.length,rank+1))}`,
+  Object.assign(v,{'#orbit-detail@hidden':!selected,'#orbit-detail-current':orbitalTalentEffect(o,talent),'#orbit-detail-next':rank>=t.costs.length?'已完成':orbitalTalentEffect(o,talent,rank+1),'#orbit-detail-branch':T[talent].branch==='home'?'HABITAT / 地月家园':T[talent].branch==='life'?'LIFE / 文明播种':T[talent].branch==='root'?'ORIGIN / 存续协议':'SURFACE / 地表干预','#orbit-detail-name':t.name,'#orbit-detail-description':t.description,'#orbit-detail-effect':`${orbitalTalentEffect(o,talent)} → ${orbitalTalentEffect(o,talent,Math.min(t.costs.length,rank+1))}`,
     '#orbit-detail-requires':`${Object.entries(t.requires).map(([p,n])=>`${T[p].name} ${n} 级`).join(' + ')||'继承自地表篇'}${t.cycles?` · ${t.cycles} 次核毁灭（当前 ${o.nuclearCycles}）`:''}`,
     '#orbit-buy@disabled':status!=='ready','#orbit-buy':status==='max'?'已点亮':`${Q.format(t.costs[rank])} Legacy · ${status==='ready'?'点亮天赋':status==='legacy'?'遗产不足':status==='cycles'?'等待核毁灭记录':'前置未满足'}`});
   for(let i=0;i<R.historyLimit;i++){const e=o.log[o.log.length-1-i];v[`#orbit-log-${i}`]=e?`${orbitalTime(e.time)}  ${e.text}`:'';v[`#orbit-log-${i}@hidden`]=!e;}

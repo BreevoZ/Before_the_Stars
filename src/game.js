@@ -86,7 +86,7 @@ export function getRecruitState(game, type = 'melee', team = 'player') {
   if (!validTeam(team) || !validType(type)) return 'invalid';
   if (game.status !== 'playing') return 'finished';
   if (!stat(game, team, 'canRecruit') || !stat(game, { type, team }, 'enabled')) return 'disabled';
-  if (UNITS[type].playerOnly && team !== 'player') return 'player-only';
+  if (UNITS[type].playerOnly && team !== 'player' && !stat(game, { type, team }, 'allowEnemyRecruit')) return 'player-only';
   if (UNITS[type].age > game.ages[team]) return 'locked';
   if (UNITS[type].age < game.ages[team]) return 'outdated';
   if (game.queues[team].length >= stat(game, team, 'queueLimit')) return 'queue-full';
@@ -231,13 +231,21 @@ function updateTraining(game, team, dt) {
   game.queues[team].shift();
 }
 
-export function updateCommander(game, dt, team = 'enemy', ai = game.ai) {
+export function updateCommander(game, dt, team = 'enemy', ai = game.ai, { specialType = null } = {}) {
   const opponent = otherTeam(team);
   if (!ai.enabled) return;
   ai.cooldown = Math.max(0, ai.cooldown - dt);
   if (ai.cooldown > 0) return;
   ai.cooldown = RULES.aiDecisionInterval;
   evolve(game, team);
+  if (specialType && UNITS[specialType]?.age === game.ages[team] && stat(game, { type: specialType, team }, 'enabled')) {
+    const army = game.units.filter(u => u.team === team), queue = game.queues[team];
+    if (!army.some(u => u.type === specialType) && !queue.some(u => u.type === specialType)) {
+      if (recruit(game, specialType, team)) { ai.orders++; return; }
+      // Keep a small escort alive while saving the normal price for one elite.
+      if (army.length + queue.length >= 3) return;
+    }
+  }
   const opponentArmy = game.units.filter(unit => unit.team === opponent);
   const invaders = opponentArmy.filter(unit => (team === 'enemy' ? unit.x > gameBaseX(team) - 420 : unit.x < gameBaseX(team) + 420) ||
     (attributes(game, unit).baseRange && Math.abs(unit.x - gameBaseX(team)) - RULES.baseHalfWidth <= attributes(game, unit).baseRange + 0.01));
@@ -317,7 +325,7 @@ function traitContext(game, unit, hits, extra = {}) {
     }, ...extra };
 }
 function traitHook(game, unit, hook, hits, extra = {}) {
-  if (unit.team !== 'player') return;
+  if (!stat(game, unit, 'traitAccess')) return;
   const applicable = unitTraits(unit).some(trait => trait.hooks[hook] && stat(game, unit, trait.stat));
   if (applicable) runTraitHook(hook, traitContext(game, unit, hits, extra));
 }
@@ -659,8 +667,8 @@ function resolveHits(game, hits) {
     if (stats && Q.gt(hit.target.hp, 0)) traitHook(game, hit.target, 'onHit', hits, { hit, role: 'defender', attacker });
     if (hit.cancelled) continue;
     hit.resolvedDamage = Q.gt(hit.damage, 0) ? Q.max(1, Q.mul(Q.sub(hit.damage, armor), 1 - hit.guard)) : 0;
-    if (stats && Q.gt(hit.target.hp, 0) && hit.target.team === 'player' && !hit.secondary) {
-      const protector = game.units.filter(unit => unit !== hit.target && unit.team === 'player' && Q.gt(unit.hp, 0)
+    if (stats && Q.gt(hit.target.hp, 0) && !hit.secondary) {
+      const protector = game.units.filter(unit => unit !== hit.target && unit.team === hit.target.team && stat(game, unit, 'traitAccess') && Q.gt(unit.hp, 0)
         && unitTraits(unit).some(trait => trait.protectionRadius && Math.abs(unit.x - hit.target.x) <= trait.protectionRadius && stat(game, unit, trait.stat)))
         .sort((a, b) => Math.abs(a.x - hit.target.x) - Math.abs(b.x - hit.target.x) || a.id - b.id)[0];
       if (protector) traitHook(game, protector, 'onHit', hits, { hit, role: 'protector', absorb(damage) {

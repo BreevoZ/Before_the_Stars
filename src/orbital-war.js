@@ -1,3 +1,5 @@
+import { TRAITS } from './traits.js';
+import { getSuperSoldierBonuses } from './progression-bonuses.js';
 import { Q } from './quantity.js';
 import { createGame, updateGame, updateCommander, evolve, AGES, UNITS, TURRETS } from './game.js';
 import { createBonusStack, stat } from './stats.js';
@@ -12,6 +14,13 @@ export function warBonuses(civilizations) {
     add('damage',1.25**c.power,'unit');add('health',1.25**c.power,'unit');
     // These wars evolve from casualties, without a hidden time-based XP grant.
     // A limited front prevents the observer from becoming a CPU stress test.
+    if (Object.hasOwn(c,'doctrine')) {
+      add('traitAccess',true,'unit','override');
+      for(const trait of Object.values(TRAITS))if(UNITS[trait.units[0]].age<=c.doctrine)
+        effects.push({target:{stat:trait.stat,type:trait.units[0],team},type:'override',value:true,source:{...source,id:`orbit:${c.id}:doctrine`,label:`${c.name} · 第 ${UNITS[trait.units[0]].age} 档学说`}});
+      effects.push(...getSuperSoldierBonuses(c.superSoldiers>=2,c.superSoldiers>=1,team).map(e=>({...e,source:{...source,id:`orbit:${c.id}:elite`,label:`${c.name} · ${c.superSoldiers>=2?'狙击激光枪':'超级士兵计划'}`}})));
+      effects.push({target:{stat:'allowEnemyRecruit',type:'superSoldier',team},type:'override',value:c.superSoldiers>=1,source});
+    }
     add('armyLimit',12,undefined,'override');add('queueLimit',4,undefined,'override');
   }
   return createBonusStack(effects);
@@ -24,7 +33,7 @@ export function createWar(id, civilizations) {
   return {id,participants:civilizations.map(c=>c.id),game,commanders};
 }
 export function updateWar(war,dt) {
-  for(const team of TEAMS) updateCommander(war.game,dt,team,war.commanders[team]);
+  for(const team of TEAMS) updateCommander(war.game,dt,team,war.commanders[team],{specialType:stat(war.game,{type:'superSoldier',team},'enabled')?'superSoldier':null});
   const before=Q.sum(Object.values(war.game.experience));
   updateGame(war.game,dt);
   return Q.sub(Q.sum(Object.values(war.game.experience)),before);

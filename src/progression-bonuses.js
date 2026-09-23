@@ -35,8 +35,8 @@ export function getRunBonuses(run) {
     run.extraBonuses ?? []);
 }
 
-export function getSuperSoldierBonuses(ranged = false, enabled = true) {
-  const target = stat => ({ stat, type: 'superSoldier', team: 'player' });
+export function getSuperSoldierBonuses(ranged = false, enabled = true, team = 'player') {
+  const target = stat => ({ stat, type: 'superSoldier', team });
   return [
     contribution('doctrine', 'superSoldierPlan', '超级士兵计划', target('enabled'), 'override', enabled),
     contribution('doctrine', 'superRanged', '狙击激光枪', target('canRanged'), 'override', ranged),

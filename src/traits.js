@@ -93,8 +93,9 @@ const byUnit = Object.fromEntries([...new Set(definitions.flatMap(def => def.uni
 export function unitTraits(unit) { return byUnit[unit.type] ?? []; }
 export function runTraitHook(hook, context) {
   if (!TRAIT_HOOKS.includes(hook)) throw new TypeError(`Unknown trait hook: ${hook}`);
-  // Player traits stay player-only even when an imported extra source targets enemies.
-  if (context.unit.team !== 'player') return;
+  // Surface opponents keep their old rules; orbital sponsorship explicitly
+  // enables the same hooks for either side through the attribute pipeline.
+  if (context.stats.traitAccess === false || context.unit.team !== 'player' && !context.stats.traitAccess) return;
   for (const trait of unitTraits(context.unit)) {
     if (!trait.hooks[hook] || !context.stats[trait.stat]) continue;
     if (hook === 'onEngage' && context.distance > (trait.range ?? context.stats.range)) continue;
@@ -106,12 +107,12 @@ export function runTraitHook(hook, context) {
       effect: (...args) => context.effect(trait.id, ...args) });
   }
 }
-export function validTraitState(unit) {
+export function validTraitState(unit, { allowEnemy = false } = {}) {
   if (unit.traits === undefined) return true;
   if (!unit.traits || typeof unit.traits !== 'object' || Array.isArray(unit.traits)) return false;
   return Object.entries(unit.traits).every(([id, state]) => {
     const def = Object.hasOwn(TRAITS, id) ? TRAITS[id] : null;
-    return def && unit.team === 'player' && def.units.includes(unit.type) && state && typeof state === 'object' && !Array.isArray(state)
+    return def && (unit.team === 'player' || allowEnemy && unit.team === 'enemy') && def.units.includes(unit.type) && state && typeof state === 'object' && !Array.isArray(state)
       && Object.keys(state).length === Object.keys(def.state).length && Object.entries(def.state).every(([key, field]) =>
         field.type === 'boolean' ? typeof state[key] === 'boolean' : typeof state[key] === 'number' && Number.isFinite(state[key]) && state[key] >= field.min && state[key] <= field.max && (field.type !== 'integer' || Number.isInteger(state[key])));
   });

@@ -61,6 +61,49 @@ function terminator(ctx,camera){
     pixels.data[i]=7;pixels.data[i+1]=16;pixels.data[i+2]=23;pixels.data[i+3]=Math.round(clamp(.5-solar*2.8)*158);
   }c.putImageData(pixels,0,0);shadows.set(ctx,{canvas,angle});return canvas;
 }
+const frostMasks=new WeakMap();
+function frostMask(ctx,frost,spin){
+  const key=`${Math.round(frost*40)}:${Math.round(spin*30)}`,previous=frostMasks.get(ctx);if(previous?.key===key)return previous.canvas;
+  const canvas=previous?.canvas??ctx.canvas.ownerDocument.createElement('canvas');canvas.width=canvas.height=128;
+  const c=canvas.getContext('2d'),pixels=c.createImageData(128,128),edge=Math.sin((72-frost*26)*Math.PI/180);
+  for(let y=0;y<128;y++)for(let x=0;x<128;x++){
+    const nx=(x+.5)/64-1,ny=(y+.5)/64-1,z2=1-nx*nx-ny*ny;if(z2<=0)continue;
+    const lon=Math.atan2(nx,Math.sqrt(z2))-spin,ragged=Math.sin(lon*3)*.05+Math.sin(lon*7+1.3)*.03;
+    const a=clamp((Math.abs(ny)-edge-ragged)/.06),i=(y*128+x)*4;
+    pixels.data[i]=214;pixels.data[i+1]=228;pixels.data[i+2]=226;pixels.data[i+3]=Math.round(a*(.18+.72*clamp(nx*.9+.45))*frost*230);
+  }c.putImageData(pixels,0,0);frostMasks.set(ctx,{canvas,key});return canvas;
+}
+const smooth=(a,b,v)=>{const t=clamp((v-a)/(b-a));return t*t*(3-2*t);};
+// Nuclear winter, in the planet's own frame so it turns with the surface:
+// staggered strikes (flash, shockwave, a burning scar), then an ash veil that
+// drains the colour, frost creeping down from both poles, and a slow thaw
+// before the next seeds. Reduced motion shows the depth of winter, still.
+function nuclearWinter(ctx,cx,cy,r,o,{time,rotation,camera,reducedMotion}){
+  const W=Math.max(1,o.winterDuration),age=reducedMotion?W*.45:Math.max(0,o.elapsed-o.lastCatastropheAt);
+  const ash=smooth(.4,5,age)*(1-smooth(W*.55,W,age))*.9,frost=smooth(3,W*.45,age)*(1-smooth(W*.7,W,age));
+  // Ash drains the colour first, then darkens what is left.
+  ctx.save();ctx.globalCompositeOperation='saturation';ctx.globalAlpha=Math.min(1,ash*1.1);ctx.fillStyle='hsl(0,0%,50%)';ctx.fillRect(cx-r,cy-r,r*2,r*2);ctx.restore();
+  ctx.globalAlpha=.1+ash*.45;ctx.fillStyle='#0d1414';ctx.fillRect(cx-r,cy-r,r*2,r*2);ctx.globalAlpha=1;
+  // Frost caps. The axis is upright, so a cap is everything above a latitude,
+  // with a ragged edge that turns with the surface. Sampled into a small mask.
+  if(frost>.01)ctx.drawImage(frostMask(ctx,frost,rotation-camera),cx-r,cy-r,r*2,r*2);
+  // The ash veil: soot clouds drifting on the winds.
+  if(ash>.01)for(let i=0;i<60;i++){const lon=noise(i*5+700)*TAU+(reducedMotion?0:age*.03*(1+noise(i+760))),lat=(noise(i*11+730)*2-1)*1.2,p=sphere(lon,lat,rotation,camera);
+    if(p.z<=0)continue;const pr=r*(.2+noise(i+780)*.22)*(.35+p.z*.65),x=cx+p.x*r,y=cy+p.y*r,g=ctx.createRadialGradient(x,y,0,x,y,pr);
+    g.addColorStop(0,`rgba(58,63,60,${.34*ash})`);g.addColorStop(.55,`rgba(58,63,60,${.18*ash})`);g.addColorStop(1,'rgba(58,63,60,0)');disc(ctx,x,y,pr,g);}
+  if(reducedMotion)return;
+  // The first detonation whitens the whole planet for a moment.
+  if(age<.6){ctx.globalAlpha=(1-age/.6)*.45;ctx.fillStyle='#f4efd9';ctx.fillRect(cx-r,cy-r,r*2,r*2);ctx.globalAlpha=1;}
+  // Strikes, one site after another, then the scars keep burning through the winter.
+  o.civilizations.forEach((c,i)=>{const site=SITES.find(s=>s.id===c.site),p=sitePosition(site,time,{cx,cy,r,camera});if(!p.visible)return;
+    const t=age-i*.45,k=r/238;if(t<0)return;
+    if(t<.9){const f=1-t/.9,flash=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,(10+t*60)*k);flash.addColorStop(0,`rgba(255,248,224,${f})`);flash.addColorStop(.35,`rgba(255,226,170,${f*.7})`);flash.addColorStop(1,'rgba(255,226,170,0)');disc(ctx,p.x,p.y,(10+t*60)*k,flash);}
+    if(t<2.4){const q=t/2.4;ctx.strokeStyle=`rgba(244,226,178,${(1-q)*.75})`;ctx.lineWidth=Math.max(.6,(1-q)*3*k);ctx.beginPath();ctx.ellipse(p.x,p.y,(6+q*70)*k*Math.max(.3,p.depth),(6+q*70)*k,Math.atan2(p.y-cy,p.x-cx),0,TAU);ctx.stroke();}
+    const burn=clamp(1-t/(W*.8))*(.75+.25*Math.sin(t*9+i)),glow=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,22*k);
+    glow.addColorStop(0,`rgba(236,146,86,${.8*burn})`);glow.addColorStop(.4,`rgba(196,96,58,${.35*burn})`);glow.addColorStop(1,'rgba(196,96,58,0)');disc(ctx,p.x,p.y,22*k,glow);
+    if(t<6){const plume=smooth(.3,2.5,t)*(1-smooth(4,6,t));ctx.globalAlpha=plume*.55;disc(ctx,p.x,p.y-(4+t*3)*k,(6+t*4)*k,'#8a8676');ctx.globalAlpha=1;}
+  });
+}
 function globe(ctx,cx,cy,r,o,{time=o.elapsed,camera=0,reducedMotion=false}={}){
   const rotation=dayPhase(time)*TAU,night=o.phase==='winter';
   const glow=ctx.createRadialGradient(cx,cy,r*.93,cx,cy,r*1.07);glow.addColorStop(0,'#759b8a00');glow.addColorStop(.6,'#8cbaa229');glow.addColorStop(1,'#759b8a00');disc(ctx,cx,cy,r*1.07,glow);
@@ -83,10 +126,7 @@ function globe(ctx,cx,cy,r,o,{time=o.elapsed,camera=0,reducedMotion=false}={}){
     const daylight=Math.sin(siteLongitude(site)+rotation),alpha=clamp(-daylight+.2);
     if(c.alive&&c.age>1){for(let i=0;i<c.age*3;i++){ctx.globalAlpha=alpha*.8;disc(ctx,p.x+(noise(i+c.age)*18-9)*r/238,p.y+(noise(i+31)*14-7)*r/238,.5+c.age*.08,C.gold);}}
   }ctx.globalAlpha=1;
-  if(night){ctx.fillStyle='#111c1b8f';ctx.fillRect(cx-r,cy-r,r*2,r*2);
-    const age=o.elapsed-o.lastCatastropheAt;
-    if(!reducedMotion&&age<R.nuclearVisualSeconds)for(const c of o.civilizations){const p=sitePosition(SITES.find(s=>s.id===c.site),time,{cx,cy,r,camera});if(p.visible){ctx.globalAlpha=clamp(1-age/R.nuclearVisualSeconds)*.4;disc(ctx,p.x,p.y,8+age*r*.035,'#d8c195');}}
-  }
+  if(night)nuclearWinter(ctx,cx,cy,r,o,{time,rotation,camera,reducedMotion});
   ctx.restore();ctx.globalAlpha=1;ctx.strokeStyle='#b4cbb52b';ctx.lineWidth=.8;ctx.beginPath();ctx.arc(cx,cy,r,0,TAU);ctx.stroke();
 }
 export function habitatSegments(rank){

@@ -15,7 +15,8 @@ const svgNS = 'http://www.w3.org/2000/svg';
 // Shapes follow one rule in both trees: a circle unlocks a new mechanic, a
 // hexagon is a numeric boost, a diamond is automation or convenience.
 const mapData = {
-  spark: { x: 550, y: 1570, kind: 'keystone', icon: 'ember' },
+  // Root and summit share the large ringed disc: where the surface begins and where it ends.
+  spark: { x: 550, y: 1560, kind: 'keystone', finale: true, icon: 'ember' },
   // Side branches sit on the same rows as the era layers, as in the VI tree:
   // automation on the left, growth and Legacy on the right, each in columns.
   logistics: { x: 80, y: 1320, kind: 'specialist', icon: 'logistics' }, formation: { x: 220, y: 1320, kind: 'specialist', icon: 'wedge' },

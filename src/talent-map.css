@@ -223,5 +223,6 @@ body:has(#archives-dialog[data-destruction]) #civilization-bar { display: none; 
 #archives-dialog[data-turning] *,#orbit-talents-dialog[data-turning] *{pointer-events:none!important}/* One shape legend for both star maps. */
 .tree-legend{position:absolute;right:28px;z-index:4;display:flex;gap:16px;font-size:10px;letter-spacing:1px;color:var(--muted);pointer-events:none}
 .tree-legend span{display:flex;align-items:center;gap:6px}.tree-legend svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.2}
-#home-legend{position:sticky;top:12px;float:right;margin:12px 28px 0 0}#orbit-legend{top:150px}
-@media(max-width:740px){.tree-legend{gap:10px;font-size:9px}#home-legend{margin:10px 12px 0 0}#orbit-legend{top:auto;bottom:34px;right:12px}}
+/* Legends sit in the header band, never over nodes. */
+#home-legend{top:calc(max(20px, env(safe-area-inset-top)) + 62px);right:36px}#orbit-legend{top:106px}
+@media(max-width:740px){.tree-legend{gap:10px;font-size:9px}#home-legend,#orbit-legend{top:auto;bottom:34px;right:12px}}

@@ -14,7 +14,7 @@ export function buildTalentViewModel(session, { armed = false } = {}) {
     const state = complete ? 'max' : (upgrade ? getUpgradeState : getTalentState)(session, name);
     const protocol = name === 'bypasser' && !complete, price = protocol ? Q.format(protocolPrice(p), 6) : config.costs[level] === undefined ? '' : Q.format(config.costs[level], 6);
     const reason = session.run.phase === 'orbital' && state === 'during-run' ? '已抵达轨道 · 地表档案留存' : state === 'ready' && name === 'bypasser' ? '注入全部遗产后立即启航，VI 从零开始 · 演出可跳过，进度立即保存' : protocol && state === 'legacy' ? `注入全部遗产，至少 ${Q.format(config.costs[0], 6)}` : state === 'ready' && ['spark', 'timeAcceleration'].includes(name) ? '立即解锁速度档位' : reasons[state];
-    put(`level-${name}`, config.costs.length > 1 ? '●'.repeat(level) + '○'.repeat(config.costs.length - level) : '');
+    put(`level-${name}`, '●'.repeat(level) + '○'.repeat(config.costs.length - level));
     put(`cost-${name}`, state === 'planned' ? '待开放' : state === 'max' ? '' : `${protocol ? '全部 ' : ''}${price} ✧`);
     put(`current-${name}`, config.effects[level]); put(`next-${name}`, config.effects[level + 1] ?? '已达到最高等级');
     put(`grant-${name}`, !p.talentGrants.includes(name), 'hidden');

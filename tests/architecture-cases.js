@@ -64,7 +64,7 @@ export function registerArchitectureTests(test, assert) {
     assert(buildTalentViewModel(s)['#node-spark@data-state'] === 'ready');
     assert(buildAutomationViewModel(s)['#automation-settings@hidden']);
     assert(purchaseTalent(s, 'spark'));
-    assert(buildTalentViewModel(s)['#level-spark'] === '' && buildTalentViewModel(s)['#node-spark@data-state'] === 'max');
+    assert(buildTalentViewModel(s)['#level-spark'] === '●' && buildTalentViewModel(s)['#node-spark@data-state'] === 'max');
     assert(buildTalentViewModel(s)['#link-formation@data-state'] === 'available');
     assert(buildAutomationViewModel(s)['#automation-settings@hidden']);
     rebuildCivilization(s, s.run.runId);

@@ -12,8 +12,8 @@ const svgNS = 'http://www.w3.org/2000/svg';
 // Explicit art direction for this small tree; prerequisites still come from TALENT_TREE.
 // Coordinates are independent of node size, so a narrow screen never shrinks touch targets.
 // Every node has its own icon from the shared set in icons.js, as in the VI tree.
-// Shapes follow one rule in both trees: a circle unlocks a new mechanic, a
-// hexagon is a numeric boost, a diamond is automation or convenience.
+// Shapes follow one rule in both trees: a circle opens a new system, a hexagon
+// strengthens or extends one, a diamond is automation or convenience.
 const mapData = {
   // Root and summit share the large ringed disc: where the surface begins and where it ends.
   spark: { x: 550, y: 1560, kind: 'keystone', finale: true, icon: 'ember' },
@@ -23,7 +23,7 @@ const mapData = {
   defense: { x: 80, y: 1110, icon: 'bastion' }, evolution: { x: 220, y: 1110, kind: 'specialist', icon: 'stairs' },
   fireControl: { x: 220, y: 900, kind: 'specialist', icon: 'crosshair' },
   campaign: { x: 220, y: 690, kind: 'specialist', icon: 'forward' },
-  extermination: { x: 220, y: 480, kind: 'keystone', icon: 'skull' },
+  extermination: { x: 220, y: 480, icon: 'skull' },
   production: { x: 770, y: 1320, icon: 'income' }, warfare: { x: 875, y: 1320, icon: 'ledger' },
   supply: { x: 770, y: 1110, icon: 'coins' }, salvage: { x: 875, y: 1110, icon: 'salvage' },
   conservation: { x: 1020, y: 1320, icon: 'urn' }, challenge: { x: 1065, y: 1110, kind: 'keystone', icon: 'summit' },
@@ -32,7 +32,7 @@ const mapData = {
   legacyMachine: { x: 970, y: 900, kind: 'keystone', icon: 'gear', parent: 'conservation' },
   legacyEfficiency: { x: 920, y: 690, icon: 'hourglass' }, legacyCapacity: { x: 1030, y: 690, icon: 'layers' },
   superSoldierPlan: { x: 550, y: 270, kind: 'keystone', icon: 'visor' },
-  elite: { x: 380, y: 190, kind: 'specialist', icon: 'chevrons' }, superRanged: { x: 720, y: 190, kind: 'keystone', icon: 'scope' },
+  elite: { x: 380, y: 190, kind: 'specialist', icon: 'chevrons' }, superRanged: { x: 720, y: 190, icon: 'scope' },
   // The goal of the surface, and the node VI grows from: the same disc on both pages.
   bypasser: { x: 550, y: 80, kind: 'keystone', finale: true, icon: 'protocol' },
 };
@@ -43,9 +43,9 @@ for (let layer = 1; layer <= 5; layer++) layerTalents(layer).forEach((key, slot)
 });
 export const TALENT_MAP = Object.freeze(mapData);
 const GATES = Object.freeze(Object.fromEntries(Array.from({ length: 6 }, (_, index) => [index + 1, { x: 550, y: index === 5 ? 378 : 1418 - index * 210 }])));
-// Gold is the mainline only: the root, the era spine through the gates, the
-// super soldier plan and the protocol. The Legacy branch is the economy hue.
-const colors = { root: 'var(--route-main)', main: 'var(--route-main)', automation: 'var(--route-automation)', growth: 'var(--route-growth)', legacy: 'var(--route-economy)', units: 'var(--route-units)' };
+// Two colours only: gold for the mainline (the root, the era spine through the
+// gates, the super soldier plan and the protocol), teal for every branch.
+const colors = { root: 'var(--route-main)', main: 'var(--route-main)', automation: 'var(--route-branch)', growth: 'var(--route-branch)', legacy: 'var(--route-branch)', units: 'var(--route-branch)' };
 const MAINLINE = new Set(['spark', 'superSoldierPlan', 'bypasser']);
 const colorOf = key => MAINLINE.has(key) ? colors.main : colors[TALENT_TREE[key].branch];
 function pathElement(className) { const path = document.createElementNS(svgNS, 'path'); path.setAttribute('class', className); return path; }

@@ -200,7 +200,7 @@ function lunarSystem(ctx,o,moon,cx,cy,r,{ambient,reducedMotion}){
   // that faces the planet and vanish when the far side turns toward us.
   for(let i=0;i<8;i++){const p=feature((noise(i+310)*2-1)*.85,(noise(i+330)*2-1)*.6);if(p.z<=0)continue;
     const px=x+p.x*m,py=y+p.y*m,pr=m*(.2+noise(i+350)*.2)*(.3+p.z*.7),mare=ctx.createRadialGradient(px,py,0,px,py,pr);
-    mare.addColorStop(0,'#35463fcc');mare.addColorStop(.7,'#35463f80');mare.addColorStop(1,'#35463f00');disc(ctx,px,py,pr,mare);}
+    mare.addColorStop(0,'#58695f8c');mare.addColorStop(.7,'#58695f55');mare.addColorStop(1,'#58695f00');disc(ctx,px,py,pr,mare);}
   // A few bright rayed craters mark the far side instead.
   for(let i=0;i<3;i++){const p=feature(Math.PI+(noise(i+370)*2-1)*.8,(noise(i+380)*2-1)*.6);if(p.z<=0)continue;ctx.globalAlpha=.55*p.z;disc(ctx,x+p.x*m,y+p.y*m,m*.07,'#dfe3cf');ctx.globalAlpha=1;}
   const outpost=feature(.22,-.12);

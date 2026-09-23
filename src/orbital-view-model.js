@@ -103,8 +103,8 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
     v[`#orbit-node-${key}@data-state`]=status;v[`#orbit-node-${key}@aria-pressed`]=String(selected&&key===talent);v[`#orbit-node-${key}@aria-expanded`]=String(selected&&key===talent);v[`#orbit-node-${key}@aria-label`]=`${t.name}，${rank}/${t.costs.length} 级，${status==='max'?'已完成':`${t.costs[rank]} Legacy`}`;
     // Show a cycle or ring gate on the node itself, not only in the detail card.
     v[`#orbit-gate-${key}`]=rank>=t.costs.length?'':[(t.cycles??0)>o.nuclearCycles?`☢ ${o.nuclearCycles}/${t.cycles}`:'',(t.ring??0)>o.talents.recovery?`环 ${o.talents.recovery}/${t.ring}`:''].filter(Boolean).join(' · ');
-    // A filled node already says it is owned; single-rank nodes need no rank dots.
-    v[`#orbit-rank-${key}`]=t.costs.length>1?'●'.repeat(rank)+'○'.repeat(t.costs.length-rank):'';v[`#orbit-cost-${key}`]=status==='max'?'':`${Q.format(t.costs[rank])}`;v[`#orbit-node-${key}@data-owned`]=String(rank>0);
+    // A filled node already says it is owned, so there is no 已点亮 label.
+    v[`#orbit-rank-${key}`]='●'.repeat(rank)+'○'.repeat(t.costs.length-rank);v[`#orbit-cost-${key}`]=status==='max'?'':`${Q.format(t.costs[rank])}`;v[`#orbit-node-${key}@data-owned`]=String(rank>0);
     for(const parent of Object.keys(t.requires))v[`#orbit-edge-${parent}-${key}@class:lit`]=rank>0;
   }
   const t=T[talent],rank=o.talents[talent],status=getOrbitalTalentState(s,talent);

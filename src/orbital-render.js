@@ -175,7 +175,7 @@ function habitat(ctx,cx,cy,r,rank,front,{time=0,construction=1,reducedMotion=fal
 // The orbit angle is shared with every battlefield sky, so the phase seen from
 // the ground always matches where the moon is here: to the planet's sunward
 // right it is new, on the far left it is full.
-const MOON=Object.freeze({rx:1.74,ry:.34,tilt:-.17,size:.13});
+const MOON=Object.freeze({rx:1.74,ry:.34,tilt:-.17,size:.15});
 export function moonPosition(time,{cx=500,cy=322,r=238}={}){
   const a=lunarOrbitAngle(time),x=Math.cos(a)*r*MOON.rx,y=Math.sin(a)*r*MOON.ry,c=Math.cos(MOON.tilt),s=Math.sin(MOON.tilt),depth=Math.sin(a);
   return{x:cx+x*c-y*s,y:cy+x*s+y*c,depth,angle:a,m:r*MOON.size*(1+depth*.14)};
@@ -196,9 +196,13 @@ function lunarSystem(ctx,o,moon,cx,cy,r,{ambient,reducedMotion}){
   disc(ctx,x,y,m,'#8f9e8f');
   ctx.save();ctx.beginPath();ctx.arc(x,y,m,0,TAU);ctx.clip();
   const facing=moon.angle+Math.PI,feature=(lon,lat)=>{const a=facing+lon,c=Math.cos(lat);return{x:Math.cos(a)*c,y:-Math.sin(lat),z:Math.sin(a)*c};};
-  for(let i=0;i<9;i++){const p=feature((noise(i+310)*2-1)*2.6,(noise(i+330)*2-1)*.9);if(p.z<=0)continue;
-    const px=x+p.x*m,py=y+p.y*m,pr=m*(.16+noise(i+350)*.22)*(.35+p.z*.65),mare=ctx.createRadialGradient(px,py,0,px,py,pr);
-    mare.addColorStop(0,'#4b5d5470');mare.addColorStop(1,'#4b5d5400');disc(ctx,px,py,pr,mare);}
+  // Maria only on the near side, as on the real moon: they gather on the limb
+  // that faces the planet and vanish when the far side turns toward us.
+  for(let i=0;i<8;i++){const p=feature((noise(i+310)*2-1)*.85,(noise(i+330)*2-1)*.6);if(p.z<=0)continue;
+    const px=x+p.x*m,py=y+p.y*m,pr=m*(.2+noise(i+350)*.2)*(.3+p.z*.7),mare=ctx.createRadialGradient(px,py,0,px,py,pr);
+    mare.addColorStop(0,'#35463fcc');mare.addColorStop(.7,'#35463f80');mare.addColorStop(1,'#35463f00');disc(ctx,px,py,pr,mare);}
+  // A few bright rayed craters mark the far side instead.
+  for(let i=0;i<3;i++){const p=feature(Math.PI+(noise(i+370)*2-1)*.8,(noise(i+380)*2-1)*.6);if(p.z<=0)continue;ctx.globalAlpha=.55*p.z;disc(ctx,x+p.x*m,y+p.y*m,m*.07,'#dfe3cf');ctx.globalAlpha=1;}
   const outpost=feature(.22,-.12);
   ctx.drawImage(terminator(ctx,0),x-m,y-m,m*2,m*2);
   // Base lights on the near side, only once it has turned into night.

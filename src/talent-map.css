@@ -41,7 +41,7 @@
 .constellation-label > span { font-size: 11px; letter-spacing: 5px; }
 .constellation-label small { display: block; font-size: 9px; opacity: .5; margin-top: 7px; letter-spacing: 1px; }
 .constellation-label[data-branch="automation"] { color: var(--color-home-constellation-label-text-2); }
-.constellation-label[data-branch="legacy"] { color: var(--color-home-constellation-label-text-3); }
+.constellation-label[data-branch="legacy"] { color: var(--route-economy); }
 .talent-star { position: absolute; transform: translate(-50%, -50%); width: 64px; height: 64px; }
 .talent-star.keystone { width: 80px; height: 80px; }
 .talent-star.specialist { width: 60px; height: 60px; }
@@ -60,10 +60,10 @@
 .talent-node[data-state="during-run"][data-owned="false"] { opacity: .48; }
 .talent-node[data-owned="true"] .star-frame { fill: var(--color-home-talent-node-fill); stroke-width: 1.7; }
 .talent-node[data-owned="true"] .node-name { color: var(--color-home-talent-node-text); }
-.talent-node[data-state="ready"] .star-frame { fill: var(--color-home-talent-node-fill-2); stroke: var(--color-home-talent-node-stroke); animation: star-breathe 3.2s ease-in-out infinite; }
+.talent-node[data-state="ready"] .star-frame { fill: var(--color-home-talent-node-fill-2); stroke: currentColor; stroke-width: 1.5; animation: star-breathe 3.2s ease-in-out infinite; }
 .talent-node[data-state="ready"] .node-cost { color: var(--color-home-talent-node-text-2); }
-.talent-node[data-state="ready"] .node-name { color: var(--color-home-talent-node-text-3); }
-.talent-node[aria-pressed="true"] .star-frame { stroke: var(--color-home-talent-node-stroke-2); stroke-width: 2; }
+.talent-node[data-state="ready"] .node-name { color: var(--color-home-talent-node-text); }
+.talent-node[aria-pressed="true"] .star-frame { stroke: var(--color-selected-stroke); stroke-width: 2; }
 .talent-node:focus-visible { outline: 1px solid var(--color-home-talent-node-focus); outline-offset: 6px; }
 .talent-node:hover { opacity: 1; }
 .map-guide, .map-yield { text-align: center; font-size: 10px; color: var(--color-home-map-guide-text); margin: 6px 0; line-height: 1.8; }
@@ -86,7 +86,7 @@
 .talent-detail > button:disabled { opacity: .4; cursor: default; }
 .talent-detail > small { display: block; font-size: 9px; margin-top: 9px; text-align: center; color: var(--color-home-talent-detail-small-text); }
 .talent-feedback { position: absolute; bottom: 82px; left: 50%; transform: translateX(-50%); pointer-events: none; z-index: 8; font-size: 11px; color: var(--color-home-talent-feedback-text); opacity: 0; white-space: nowrap; padding: 8px 16px; border-radius: 20px; background: var(--color-home-talent-feedback-surface); }
-@keyframes star-breathe { 0%, 100% { filter: drop-shadow(0 0 2px var(--color-home-0-filter)); } 50% { filter: drop-shadow(0 0 8px var(--color-home-50-filter)); } }
+@keyframes star-breathe { 0%, 100% { filter: drop-shadow(0 0 1px currentColor); } 50% { filter: drop-shadow(0 0 7px currentColor); } }
 @keyframes home-darken { 0%, 15% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes constellation-rise { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes home-words { from { opacity: 0; } to { opacity: 1; } }
@@ -150,10 +150,10 @@
 /* Keep touch targets full size. Only the constellation pans horizontally. */
 .tree-scroll { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: thin; }
 .talent-tree { min-width: 1120px; height: 1700px; }
-.era-gate { position: absolute; transform: translate(-50%, -50%); padding: 5px 10px; border-radius: 20px; background: var(--color-home-surface); color: var(--route-units); font-size: 10px; letter-spacing: 1px; white-space: nowrap; pointer-events: none; }
+.era-gate { position: absolute; transform: translate(-50%, -50%); padding: 5px 10px; border-radius: 20px; background: var(--color-home-surface); color: var(--route-main); font-size: 10px; letter-spacing: 1px; white-space: nowrap; pointer-events: none; }
 .era-gate[data-state="locked"] { opacity: .5; }
 .talent-node[data-state="planned"] { opacity: .4; }
-:root { --route-units: var(--route-root); }
+/* --route-units is defined with the other route colours in tokens.css. */
 
 .orbital-presentation { position: absolute; inset: 0; z-index: 10; display: grid; place-items: center; text-align: center; padding: 24px; }
 .orbital-presentation[hidden] { display: none; }
@@ -226,3 +226,4 @@ body:has(#archives-dialog[data-destruction]) #civilization-bar { display: none; 
 /* Legends sit in the header band, never over nodes. */
 #home-legend{top:calc(max(20px, env(safe-area-inset-top)) + 62px);right:36px}#orbit-legend{top:106px}
 @media(max-width:740px){.tree-legend{gap:10px;font-size:9px}#home-legend,#orbit-legend{top:auto;bottom:34px;right:12px}}
+.tree-legend .legend-main{color:var(--route-main)}.tree-legend .legend-main svg{stroke-width:1.6}

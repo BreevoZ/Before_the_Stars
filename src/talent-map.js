@@ -43,7 +43,11 @@ for (let layer = 1; layer <= 5; layer++) layerTalents(layer).forEach((key, slot)
 });
 export const TALENT_MAP = Object.freeze(mapData);
 const GATES = Object.freeze(Object.fromEntries(Array.from({ length: 6 }, (_, index) => [index + 1, { x: 550, y: index === 5 ? 378 : 1418 - index * 210 }])));
-const colors = Object.fromEntries(['root', 'automation', 'growth', 'legacy', 'units'].map(key => [key, `var(--route-${key})`]));
+// Gold is the mainline only: the root, the era spine through the gates, the
+// super soldier plan and the protocol. The Legacy branch is the economy hue.
+const colors = { root: 'var(--route-main)', main: 'var(--route-main)', automation: 'var(--route-automation)', growth: 'var(--route-growth)', legacy: 'var(--route-economy)', units: 'var(--route-units)' };
+const MAINLINE = new Set(['spark', 'superSoldierPlan', 'bypasser']);
+const colorOf = key => MAINLINE.has(key) ? colors.main : colors[TALENT_TREE[key].branch];
 function pathElement(className) { const path = document.createElementNS(svgNS, 'path'); path.setAttribute('class', className); return path; }
 
 export function createTalentMap(getSession, changed) {
@@ -61,13 +65,13 @@ export function createTalentMap(getSession, changed) {
     const art = TALENT_MAP[key], parent = art.parent ? [art.parent, 1] : config.requiresLayer ? [`gate-${config.requiresLayer + 1}`, 1] : config.unit ? ['gate-1', 1] : Object.entries(config.requires)[0], kind = art.kind ?? 'ordinary';
     if (parent) {
       const path = pathElement(`talent-link ${parent[0] === 'spark' ? 'trunk' : 'twig'}`);
-      path.id = `link-${key}`; path.dataset.parent = parent[0]; path.dataset.child = key; path.dataset.requiredLevel = parent[1]; path.style.color = colors[config.branch];
-      const flow = pathElement('talent-flow'); flow.id = `flow-${key}`; flow.setAttribute('pathLength', '1'); flow.style.color = colors[config.branch];
+      path.id = `link-${key}`; path.dataset.parent = parent[0]; path.dataset.child = key; path.dataset.requiredLevel = parent[1]; path.style.color = colorOf(key);
+      const flow = pathElement('talent-flow'); flow.id = `flow-${key}`; flow.setAttribute('pathLength', '1'); flow.style.color = colorOf(key);
       svg.append(path, flow); edges.set(key, { path, flow, parent: parent[0] });
     }
     const item = document.createElement('div'); item.className = `talent-star ${kind}${art.finale ? ' finale' : ''}`; item.dataset.talent = key;
     if (parent) { item.dataset.parent = parent[0]; item.dataset.requiredLevel = parent[1]; }
-    item.style.setProperty('--star-color', colors[config.branch]);
+    item.style.setProperty('--star-color', colorOf(key));
     const shape = art.finale ? '<circle class="star-ring" cx="32" cy="32" r="31.5"/><circle class="star-halo" cx="32" cy="32" r="29"/><circle class="star-frame" cx="32" cy="32" r="24"/>' : kind === 'specialist' ? '<path class="star-frame" d="M32 2 62 32 32 62 2 32Z"/>' : kind === 'keystone' ? '<circle class="star-halo" cx="32" cy="32" r="31"/><circle class="star-frame" cx="32" cy="32" r="27"/>' : '<path class="star-frame" d="M32 2 58 17v30L32 62 6 47V17Z"/>';
     item.innerHTML = `<button id="node-${key}" class="talent-node" type="button" aria-controls="talent-details" aria-expanded="false" aria-pressed="false"><svg viewBox="0 0 64 64" aria-hidden="true">${shape}<g class="star-icon" transform="translate(20 12)">${iconMarkup(art.icon)}</g></svg><span class="node-ranks" id="level-${key}" aria-hidden="true"></span><small class="node-cost" id="cost-${key}"></small><span class="node-name">${config.name}</span></button>${key === 'spark' ? '<span id="root-caption" class="root-caption"></span>' : ''}`;
     map.append(item);
@@ -103,7 +107,7 @@ export function createTalentMap(getSession, changed) {
     map.append(gate);
     const parents = Number(layer) === 1 ? ['spark'] : layerTalents(Number(layer) - 1);
     for (const parent of parents) {
-      const path = pathElement('talent-link trunk'); path.id = `gate-link-${parent}`; path.dataset.parent = parent; path.dataset.child = `gate-${layer}`; path.style.color = colors.units;
+      const path = pathElement('talent-link trunk'); path.id = `gate-link-${parent}`; path.dataset.parent = parent; path.dataset.child = `gate-${layer}`; path.style.color = colors.main;
       svg.append(path); edges.set(`gate-link-${parent}`, { path, flow: path, parent, to: `gate-${layer}` });
     }
   }

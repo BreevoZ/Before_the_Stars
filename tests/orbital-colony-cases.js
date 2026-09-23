@@ -179,7 +179,8 @@ export function registerOrbitalColonyTests(test,assert,near){
   });
   test('Orbital simulation: real wars finish nuclear cycles, differ by seed, unlock VI and keep all options bounded',()=>{
     const a=simulateOrbital({seed:1}),b=simulateOrbital({seed:2});assert(a.cycles===4&&a.completed&&b.cycles===4&&b.completed&&a.nuclearTimes[0]!==b.nuclearTimes[0]);
-    assert(a.seconds>1200&&a.seconds<2400&&b.seconds>1200&&b.seconds<2400);
+    // Civilizations climb I→V in minutes, so four nuclear cycles take ~35–45 simulated minutes.
+    assert(a.seconds>2000&&a.seconds<3000&&b.seconds>2000&&b.seconds<3000);
     for(const options of [{legacy:-1},{legacy:.5},{seed:-1},{targetCycles:0},{maxSeconds:Infinity},{maxSeconds:86401},{buyTalents:1}])throws(()=>simulateOrbital(options));
   });
   test('Orbital view model: Legacy prices, monitor gating and tree prerequisites reflect actual state',()=>{

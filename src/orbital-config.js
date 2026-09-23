@@ -1,7 +1,11 @@
 // Orbital wars reuse the surface simulation; Legacy is the only orbital wallet.
 export const ORBITAL_RULES = Object.freeze({ version: 4, finalAge: 5, historyLimit: 12,
   winterSeconds: 60, refugeeSeconds: 30, nuclearVisualSeconds: 7, minCivilizations: 4, maxCivilizations: 6,
-  habitatSections: 7, lunarRotationSeconds: 180, lunarBaseIncome: 32, warIncome: 2.5, warExperience: 2, warBaseHealth: 3, legacyPerExperience: 1 / 64,
+  habitatSections: 7, lunarRotationSeconds: 180, lunarBaseIncome: 32, warIncome: 2.5, warBaseHealth: 3,
+  // A civilization should take minutes, not one, to climb from I to V: each
+  // age lasts ~35–40 s of war. Legacy per experience rises by the same factor,
+  // so the war income per second stays where it was.
+  warExperience: .6, legacyPerExperience: 1 / 20,
   defeatLegacy: 64, harvestLegacy: 192, nuclearLegacy: 96, maximumPower: 5 });
 export const SITES = Object.freeze([
   {id:'delta',name:'河口',x:.585,y:.38}, {id:'ridge',name:'山脊',x:.755,y:.27},

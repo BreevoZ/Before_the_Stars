@@ -42,7 +42,13 @@ export function createOrbitalColonyUI(getSession,{commit,archive,save,speed,view
     const item=document.createElement('li');item.id=`doctrine-tier-${age}`;item.textContent=AGES[age].numeral;
     item.title=Object.values(TRAITS).filter(t=>UNITS[t.units[0]].age===age).map(t=>t.name).join(' · ');el('colony-doctrine-tiers').append(item);
   }
-  for(const [id,count]of [['colony-ring-ranks',R.habitatSections],['colony-lunar-ranks',4]])for(let i=1;i<=count;i++){const part=document.createElement('i');part.id=`${id}-${i}`;el(id).append(part);}
+  // The habitat rank is a tiny ring of seven arcs, the same shape as on the globe.
+  const ringSvg=document.createElementNS('http://www.w3.org/2000/svg','svg');ringSvg.setAttribute('viewBox','-26 -10 52 20');
+  for(let i=1;i<=R.habitatSections;i++){const a=(i-1)/R.habitatSections*Math.PI*2+.06,b=i/R.habitatSections*Math.PI*2-.06;
+    const arc=document.createElementNS('http://www.w3.org/2000/svg','path');arc.id=`colony-ring-ranks-${i}`;
+    arc.setAttribute('d',`M${(Math.cos(a)*22).toFixed(2)} ${(Math.sin(a)*7).toFixed(2)} A22 7 0 0 1 ${(Math.cos(b)*22).toFixed(2)} ${(Math.sin(b)*7).toFixed(2)}`);ringSvg.append(arc);}
+  el('colony-ring-ranks').append(ringSvg);
+  for(let i=1;i<=4;i++){const part=document.createElement('i');part.id=`colony-lunar-ranks-${i}`;el('colony-lunar-ranks').append(part);}
   for(let i=0;i<3;i++){
     const button=document.createElement('button');button.id=`watch-war-${i}`;button.type='button';
     button.addEventListener('click',()=>{const o=getSession().orbital,w=o.wars[i];if(w){o.selectedWar=w.id;[o.selectedCivilization,o.selectedOpponent]=w.participants;commit();}});el('colony-wars').append(button);

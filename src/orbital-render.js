@@ -92,37 +92,63 @@ function globe(ctx,cx,cy,r,o,{time=o.elapsed,camera=0,reducedMotion=false}={}){
 export function habitatSegments(rank){
   return Array.from({length:Math.min(R.habitatSections,Math.max(0,rank))},(_,i)=>({start:i*TAU/R.habitatSections,end:(i+1)*TAU/R.habitatSections}));
 }
-const orbitPoint=(angle,rx,ry)=>[Math.cos(angle)*rx,Math.sin(angle)*ry];
+// The habitat is a thin band that hugs the equator, not a Saturn-scale rail. It
+// is lit from the same sun as the globe: a bright rim on the day side, window
+// lights on the night side, and a dark silhouette where it crosses the planet.
+const RING=Object.freeze({rx:1.13,ry:.19,tilt:-.1,width:.026});
 function habitat(ctx,cx,cy,r,rank,front,{time=0,construction=1,reducedMotion=false}={}){
-  ctx.save();ctx.translate(cx,cy);ctx.rotate(-.28);
-  const rx=r*1.31,ry=r*.39,rotation=.32+(reducedMotion?0:time*TAU/600),beam=r*.045;
-  // A faint surveyed orbit is distinct from the constructed, three-dimensional deck.
-  ctx.strokeStyle='#adc3a819';ctx.lineWidth=.7;ctx.setLineDash([2,7]);ctx.beginPath();ctx.ellipse(0,0,rx,ry,0,front?0:Math.PI,front?Math.PI:TAU);ctx.stroke();ctx.setLineDash([]);
-  function lineArc(start,end,width,color,offset=0){
-    ctx.strokeStyle=color;ctx.lineWidth=width;const points=[],steps=Math.max(1,Math.ceil((end-start)/.018));for(let i=0;i<=steps;i++){const t=start+(end-start)*i/steps;if((Math.sin(t)>=0)!==front){if(points.length>1){path(ctx,points);ctx.stroke();}points.length=0;continue;}points.push(orbitPoint(t,rx+offset,ry+offset*.3));}
-    if(points.length>1){ctx.strokeStyle=color;ctx.lineWidth=width;path(ctx,points);ctx.stroke();}
+  ctx.save();ctx.translate(cx,cy);ctx.rotate(RING.tilt);
+  const rx=r*RING.rx,ry=r*RING.ry,band=Math.max(1.6,r*RING.width),spin=reducedMotion?0:time*TAU/900;
+  const faces=t=>(Math.sin(t)>=0)===front,depth=front?1:.62,point=t=>[Math.cos(t)*rx,Math.sin(t)*ry];
+  function arc(a,b,width,color,alpha=1){
+    ctx.strokeStyle=color;ctx.lineWidth=width;ctx.globalAlpha=alpha*depth;ctx.lineCap='round';
+    let run=[];const flush=()=>{if(run.length>1){path(ctx,run);ctx.stroke();}run=[];};
+    for(let t=a;t<=b+1e-9;t+=Math.min(.02,b-a||.02)){if(faces(t))run.push(point(t));else flush();if(t===b)break;}
+    if(faces(b))run.push(point(b));flush();ctx.globalAlpha=1;
   }
-  for(const [i,segment]of habitatSegments(rank).entries()){
-    const end=segment.start+(segment.end-segment.start)*(i===rank-1?construction:1),start=segment.start+rotation,finish=end+rotation;
-    lineArc(start,finish,beam+3,'#0b191c');lineArc(start,finish,beam,'#607c72');lineArc(start,finish,1,'#becab0',beam*.38);lineArc(start,finish,1,'#263d3c',-beam*.42);
-    for(let a=start+.035;a<finish;a+=.060){if((Math.sin(a)>=0)!==front)continue;const[x,y]=orbitPoint(a,rx,ry);
-      ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(Math.cos(a)*ry,-Math.sin(a)*rx));
-      ctx.fillStyle='#233e3c';ctx.fillRect(-2,-beam*.4,1,beam*.8);
-      ctx.fillStyle=i%2?'#b8c9ad':'#c6bc8b';ctx.globalAlpha=.65;ctx.fillRect(-1,-beam*.20,1.8,Math.max(1,beam*.16));ctx.globalAlpha=1;ctx.restore();
-    }
-    for(const offset of [.26,.68]){const a=start+(segment.end-segment.start)*offset;if(a>finish||(Math.sin(a)>=0)!==front)continue;
-      const[x,y]=orbitPoint(a,rx,ry);ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(Math.sin(a)*.4,Math.cos(a)));
-      ctx.fillStyle='#72968a';ctx.fillRect(-2,-1,beam*1.8,2);ctx.fillStyle='#294d4b';ctx.fillRect(beam*.75,-beam*.85,beam*1.3,beam*1.7);
-      ctx.strokeStyle='#88a49b60';ctx.lineWidth=.65;ctx.strokeRect(beam*.75,-beam*.85,beam*1.3,beam*1.7);for(let n=0;n<3;n++){path(ctx,[[beam*.85,-beam*.5+n*beam*.5],[beam*1.94,-beam*.5+n*beam*.5]]);ctx.stroke();}ctx.restore();
-    }
-    for(const a of [start,finish])if((Math.sin(a)>=0)===front){const[x,y]=orbitPoint(a,rx,ry);ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(Math.cos(a)*ry,-Math.sin(a)*rx));ctx.fillStyle='#92a995';ctx.fillRect(-2,-beam*.65,4,beam*1.3);ctx.fillStyle='#d4c393';ctx.fillRect(-1,-beam*.15,2,2);ctx.restore();}
+  // The surveyed orbit shows where the remaining sections will go.
+  ctx.setLineDash([1.5,5]);arc(0,TAU,.7,'#a9c2ad',.2);ctx.setLineDash([]);
+  const segments=habitatSegments(rank);let builtEnd=spin;
+  for(const [i,segment]of segments.entries()){
+    const a=segment.start+spin,b=a+(segment.end-segment.start)*(i===rank-1?construction:1);builtEnd=b;
+    if(front)arc(a,b,band+2.6,'#081315',.85);
+    arc(a,b,band,'#58726a');
+    // Sunlit rim and night-side windows, sampled along the section.
+    for(let t=a;t<b;t+=.024){if(!faces(t))continue;const[x,y]=point(t),sun=Math.cos(t+RING.tilt);
+      if(sun>-.15){const[nx,ny]=point(Math.min(b,t+.026));ctx.globalAlpha=clamp(sun*.75+.25)*.75*depth;ctx.strokeStyle='#dfe3c6';ctx.lineWidth=Math.max(.7,band*.3);
+        path(ctx,[[x,y-band*.3],[nx,ny-band*.3]]);ctx.stroke();}
+      else if(Math.floor(t/.024)%2===0){ctx.globalAlpha=clamp(-sun*1.4)*.85*depth;disc(ctx,x,y,Math.max(.55,band*.16),'#e4cf8e');}
+    }ctx.globalAlpha=1;
+    // Docking hubs at the joints make each purchased section readable.
+    for(const t of [a,b])if(faces(t)){const[x,y]=point(t);ctx.globalAlpha=depth;disc(ctx,x,y,band*.95,'#1a2c2b');disc(ctx,x,y,band*.62,'#9db3a3');disc(ctx,x,y,band*.24,'#e2d7a6');ctx.globalAlpha=1;}
   }
-  if(rank){const length=rank/R.habitatSections*TAU,angle=rotation+(reducedMotion?.22:(time*.035)%length);if((Math.sin(angle)>=0)===front){const[x,y]=orbitPoint(angle,rx,ry);disc(ctx,x,y,3,'#bdd3c02a');disc(ctx,x,y,1.2,'#dbe2bb');}}
+  if(rank&&construction<1&&faces(builtEnd)){
+    const[x,y]=point(builtEnd);ctx.setLineDash([1,3]);arc(builtEnd,builtEnd+.16,band*.5,'#d9cf9d',.45);ctx.setLineDash([]);
+    const glow=ctx.createRadialGradient(x,y,0,x,y,band*3.2);glow.addColorStop(0,'#f2e3aa'+'cc');glow.addColorStop(1,'#f2e3aa00');disc(ctx,x,y,band*3.2,glow);
+  }
+  // Two shuttles run along the finished length.
+  if(rank){const length=builtEnd-spin;for(let k=0;k<2;k++){const t=spin+length*(reducedMotion?.3+k*.4:((time*.02+k*.5)%1));if(faces(t)){const[x,y]=point(t);ctx.globalAlpha=depth;disc(ctx,x,y,band*.9,'#dfe6cc40');disc(ctx,x,y,band*.35,'#f1ecd0');ctx.globalAlpha=1;}}}
   ctx.restore();
+}
+// A small tidally locked moon in the Earth scene: the whole system is one frame,
+// and each cargo capsule arriving from it is production made visible.
+function companionMoon(ctx,o,cx,cy,r,{time,ambient,reducedMotion}){
+  const x=cx+r*1.62,y=cy-r*.92,m=r*.15;
+  const g=ctx.createLinearGradient(x-m,y,x+m,y);g.addColorStop(0,'#26383a');g.addColorStop(.45,'#7d8d81');g.addColorStop(1,'#b3bca8');disc(ctx,x,y,m,g);
+  ctx.strokeStyle='#b3c0aa40';ctx.lineWidth=.6;ctx.beginPath();ctx.arc(x,y,m,0,TAU);ctx.stroke();
+  const level=o.talents.lunarIndustry;
+  for(let i=0;i<4+level*3;i++){ctx.globalAlpha=.55+noise(i+77)*.4;disc(ctx,x-m*.55+noise(i+5)*m*.35,y-m*.15+noise(i+9)*m*.45,.7,'#e5d192');}ctx.globalAlpha=1;
+  if(reducedMotion)return;
+  const interval=6/(1+level),target=[cx+r*.62,cy-r*.78];
+  for(let k=0;k<3;k++){const t=((ambient/interval)+k/3)%1,ease=t*t*(3-2*t);
+    const px=x+(target[0]-x)*ease,py=y+(target[1]-y)*ease-Math.sin(t*Math.PI)*r*.12;
+    ctx.globalAlpha=Math.sin(t*Math.PI)*.9;disc(ctx,px,py,2.2,'#e9d99b30');disc(ctx,px,py,.9,'#f3e7b8');}
+  ctx.globalAlpha=1;
 }
 export function drawOrbitalColony(ctx,width,height,o,{reducedMotion=false,ambientTime=o.elapsed,construction=1}={}){
   ctx.save();ctx.scale(width/1000,height/620);drawOrbitStars(ctx,1000,620,ambientTime,reducedMotion);
   const time=reducedMotion?0:o.elapsed;
+  if(o.talents.outpost)companionMoon(ctx,o,500,322,238,{time,ambient:ambientTime,reducedMotion});
   habitat(ctx,500,322,238,o.talents.recovery,false,{time,construction,reducedMotion});globe(ctx,500,322,238,o,{time,reducedMotion});habitat(ctx,500,322,238,o.talents.recovery,true,{time,construction,reducedMotion});
   for(const w of o.wars){const points=w.participants.map(id=>sitePosition(SITES.find(s=>s.id===o.civilizations.find(c=>c.id===id).site),time));if(!points.every(p=>p.visible))continue;
     const[a,b]=points;ctx.strokeStyle=C.war;ctx.lineWidth=1;ctx.setLineDash([3,6]);ctx.lineDashOffset=reducedMotion?0:-ambientTime*3;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo((a.x+b.x)/2,(a.y+b.y)/2-45,b.x,b.y);ctx.stroke();ctx.setLineDash([]);
@@ -135,44 +161,65 @@ export function drawOrbitalColony(ctx,width,height,o,{reducedMotion=false,ambien
 // No planet spin, star animation or simulation clock behind the talent tree.
 export function drawOrbitalTalentSky(ctx,width,height){drawOrbitalScene(ctx,width,height,ORBITAL_SECONDS);}
 
+// The base grows outward from one landing site. Positions are fixed on the
+// surface: the moon is tidally locked, so the sun, not the ground, moves.
 export function lunarFacilities(level){
-  return Array.from({length:3+level*2},(_,i)=>({longitude:i*2.39996,latitude:Math.sin(i*1.7)*.62,kind:i%3===0?'hub':i%3===1?'array':'factory'}));
+  return Array.from({length:3+level*2},(_,i)=>{const angle=i*2.39996,spread=i?.1+.085*Math.sqrt(i):0;
+    return{longitude:.22+Math.cos(angle)*spread,latitude:-.12+Math.sin(angle)*spread*.8,kind:i%3===0?'hub':i%3===1?'array':'factory'};});
 }
 export function lunarRotation(time){return dayPhase(time*120/R.lunarRotationSeconds)*TAU;}
-function lunarFacility(ctx,p,size,kind,time,reduced){
-  ctx.save();ctx.translate(p.x,p.y);ctx.scale(Math.max(.16,p.depth),.8);ctx.rotate(-.13);
-  ctx.fillStyle='#152e2d48';ctx.beginPath();ctx.ellipse(4,7,size*1.6,size*.35,0,0,TAU);ctx.fill();
-  const panel=(x,y)=>{ctx.fillStyle='#274e4d';ctx.fillRect(x,y,14,8);ctx.strokeStyle='#9fb7a050';ctx.lineWidth=.6;ctx.strokeRect(x,y,14,8);for(let i=1;i<4;i++){path(ctx,[[x+i*3.5,y],[x+i*3.5,y+8]]);ctx.stroke();}path(ctx,[[x,y+4],[x+14,y+4]]);ctx.stroke();};
-  ctx.scale(size/15,size/15);
-  panel(-27,-3);panel(13,-3);ctx.strokeStyle='#879f90';ctx.lineWidth=1;path(ctx,[[-14,1],[14,1]]);ctx.stroke();
-  if(kind==='hub'){
-    ctx.fillStyle='#9eafa0';ctx.beginPath();ctx.ellipse(0,-3,10,7,0,Math.PI,TAU);ctx.lineTo(10,4);ctx.lineTo(-10,4);ctx.closePath();ctx.fill();
-    ctx.fillStyle='#314f4b';ctx.fillRect(-10,2,20,4);ctx.strokeStyle='#c3cbb2';path(ctx,[[0,-10],[0,1]]);ctx.stroke();
-    ctx.strokeStyle='#a2b7a4';path(ctx,[[8,-3],[12,-17],[18,-17]]);ctx.stroke();disc(ctx,18,-17,1,'#d2c496');
-  }else{
-    ctx.fillStyle='#536f65';ctx.fillRect(-10,-8,20,13);ctx.fillStyle='#b1bda6';path(ctx,[[-10,-8],[-4,-13],[14,-13],[10,-8]]);ctx.closePath();ctx.fill();ctx.fillStyle='#81998a';path(ctx,[[10,-8],[14,-13],[14,0],[10,5]]);ctx.closePath();ctx.fill();
-    ctx.strokeStyle='#b3c7b0';ctx.lineWidth=1;path(ctx,[[-6,-8],[-6,-19],[1,-19]]);ctx.stroke();
-    if(kind==='factory'){const angle=reduced?-.4:Math.sin(time*.5)*.35;ctx.save();ctx.translate(-6,-19);ctx.rotate(angle);path(ctx,[[0,0],[14,0],[14,10]]);ctx.stroke();ctx.restore();}
-  }
-  ctx.fillStyle='#d6cc9d';for(let i=0;i<3;i++)ctx.fillRect(-7+i*5,-3,2,2);ctx.restore();
+// Sun angle over one lunar day: from a lit right limb through full to a lit left
+// limb, never a pitch-black new moon, so both the fields and the lights show.
+const lunarSun=(time,reduced)=>reduced?.78:Math.PI/2+Math.sin(lunarRotation(time))*1.2;
+const lunarDark=(p,sun)=>clamp(.5-(p.x*Math.cos(sun)+p.z*Math.sin(sun))*2.8);
+function surfacePatch(ctx,cx,cy,r,p,draw){
+  ctx.save();ctx.translate(cx+p.x*r,cy+p.y*r);ctx.rotate(Math.atan2(p.y,p.x));ctx.scale(Math.max(.14,p.z),1);draw();ctx.restore();
 }
 export function drawLunarColony(ctx,width,height,o,{ambientTime=o.elapsed,reducedMotion=false}={}){
   ctx.save();drawOrbitStars(ctx,width,height,ambientTime,reducedMotion);
-  const mobile=width<620,r=mobile?Math.min(width*.35,height*.28):Math.min(height*.40,width*.21),cx=width*(mobile?.53:.76),cy=height*(mobile?.70:.51),rotation=lunarRotation(reducedMotion?0:o.elapsed);
+  const mobile=width<620,r=mobile?Math.min(width*.35,height*.28):Math.min(height*.40,width*.21),cx=width*(mobile?.53:.76),cy=height*(mobile?.70:.51);
+  const sun=lunarSun(o.elapsed,reducedMotion),level=o.talents.lunarIndustry,site=(lon,lat)=>sphere(lon,lat,0);
   const halo=ctx.createRadialGradient(cx,cy,r*.98,cx,cy,r*1.07);halo.addColorStop(0,'#8ea89821');halo.addColorStop(1,'#8ea89800');disc(ctx,cx,cy,r*1.07,halo);
-  const g=ctx.createLinearGradient(cx-r,cy-r,cx+r,cy+r);g.addColorStop(0,'#a0ae9c');g.addColorStop(.6,'#637b70');g.addColorStop(1,'#263e3b');disc(ctx,cx,cy,r,g);
+  const g=ctx.createRadialGradient(cx-r*.25,cy-r*.3,r*.1,cx,cy,r);g.addColorStop(0,'#a9b3a1');g.addColorStop(.7,'#7f8f83');g.addColorStop(1,'#56675f');disc(ctx,cx,cy,r,g);
   ctx.save();ctx.beginPath();ctx.arc(cx,cy,r,0,TAU);ctx.clip();
-  // Craters are attached to spherical coordinates, foreshortened at the limb.
-  for(let i=0;i<70;i++){
-    const p=sphere(noise(i+17)*TAU,(noise(i+222)*2-1)*1.42,rotation);if(p.z<=0)continue;
-    const cr=(.022+noise(i+903)*.11)*r,x=cx+p.x*r,y=cy+p.y*r;
-    ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(-p.y,p.x));ctx.scale(Math.max(.08,p.z),1);
-    disc(ctx,0,0,cr,'#243f3a24');ctx.strokeStyle='#c4d0b323';ctx.lineWidth=Math.max(.7,r*.006);ctx.beginPath();ctx.arc(0,0,cr,.4,2.9);ctx.stroke();disc(ctx,cr*.1,cr*.08,cr*.7,'#334b4225');ctx.restore();
-  }
-  ctx.drawImage(terminator(ctx,.32),cx-r,cy-r,r*2,r*2);
-  const facilities=lunarFacilities(o.talents.lunarIndustry).map(f=>{const p=sphere(f.longitude,f.latitude,rotation);return{...f,x:cx+p.x*r,y:cy+p.y*r,depth:p.z};}).filter(p=>p.depth>.12).sort((a,b)=>a.depth-b.depth);
-  ctx.strokeStyle='#b7c8a235';ctx.lineWidth=1;ctx.setLineDash([2,3]);for(let i=1;i<facilities.length;i++)if(Math.hypot(facilities[i].x-facilities[i-1].x,facilities[i].y-facilities[i-1].y)<r){path(ctx,[[facilities[i].x,facilities[i].y],[facilities[i-1].x,facilities[i-1].y]]);ctx.stroke();}ctx.setLineDash([]);
-  for(const p of facilities)lunarFacility(ctx,p,r*.13,p.kind,ambientTime,reducedMotion);
-  ctx.restore();ctx.strokeStyle='#acbca455';ctx.lineWidth=.8;ctx.beginPath();ctx.arc(cx,cy,r,0,TAU);ctx.stroke();
-  ctx.fillStyle='#9baf9e';ctx.font='9px ui-monospace, monospace';ctx.textAlign='center';ctx.fillText(`LUNA  /  ${String(lunarFacilities(o.talents.lunarIndustry).length).padStart(2,'0')} FACILITIES`,cx,cy+r+25);ctx.restore();
+  // Dark maria first, then craters with a shadowed floor and a sunward rim.
+  for(let i=0;i<6;i++)for(let k=0;k<3;k++){const p=site((noise(i+401)*2-1)*1.2+(noise(i*5+k)-.5)*.35,(noise(i+433)*2-1)*.85+(noise(i*7+k+50)-.5)*.3);if(p.z<=0)continue;
+    const mr=r*(.09+noise(i*3+k+457)*.12);surfacePatch(ctx,cx,cy,r,p,()=>{const soft=ctx.createRadialGradient(0,0,0,0,0,mr);soft.addColorStop(0,'#3a4c4633');soft.addColorStop(.7,'#3a4c4626');soft.addColorStop(1,'#3a4c4600');disc(ctx,0,0,mr,soft);});}
+  for(let i=0;i<70;i++){const p=site((noise(i+17)*2-1)*1.5,(noise(i+222)*2-1)*1.35);if(p.z<=.02)continue;const cr=(.01+noise(i+903)**3*.055)*r;
+    surfacePatch(ctx,cx,cy,r,p,()=>{const floor=ctx.createRadialGradient(-cr*.2,0,0,0,0,cr);floor.addColorStop(0,'#2b3c3848');floor.addColorStop(1,'#2b3c3810');disc(ctx,0,0,cr,floor);
+      ctx.strokeStyle='#e2e6d044';ctx.lineWidth=Math.max(.6,r*.004);ctx.beginPath();ctx.arc(0,0,cr,-.9,.9);ctx.stroke();});}
+  // Industry reads from orbit as ground marks: mining scars, reflective solar
+  // fields and roads between sites. Buildings are too small to see from here.
+  const sites=lunarFacilities(level).map(f=>({...f,p:site(f.longitude,f.latitude)})),s=r*.05;
+  ctx.strokeStyle='#cfd2bb';ctx.lineWidth=.7;
+  for(let i=1;i<sites.length;i++){const a=sites[i].p,b=sites[Math.floor((i-1)/2)].p;if(a.z<=0||b.z<=0)continue;ctx.globalAlpha=.2;path(ctx,[[cx+a.x*r,cy+a.y*r],[cx+b.x*r,cy+b.y*r]]);ctx.stroke();}
+  ctx.globalAlpha=1;
+  for(const [i,f]of sites.entries()){if(f.p.z<=0)continue;const lit=1-lunarDark(f.p,sun);surfacePatch(ctx,cx,cy,r,f.p,()=>{
+    if(f.kind==='array'){ // reflective panel rows; they glint in sunlight
+      ctx.fillStyle='#a9c0c2';for(let row=0;row<3;row++)for(let col=0;col<4;col++){ctx.globalAlpha=.25+lit*.45;ctx.fillRect(-s*.95+col*s*.5+row*s*.12,-s*.5+row*s*.36,s*.4,s*.24);}}
+    else if(f.kind==='factory'){ // a pale mining scar of overlapping regolith blobs
+      for(let k=0;k<4;k++){const bx=(noise(i*9+k)-.5)*s*1.6,by=(noise(i*11+k+3)-.5)*s,br=s*(.45+noise(i*13+k)*.5);
+        const scar=ctx.createRadialGradient(bx,by,0,bx,by,br);scar.addColorStop(0,'#d6d6c066');scar.addColorStop(1,'#d6d6c000');disc(ctx,bx,by,br,scar);}
+      ctx.strokeStyle='#2f3d3999';ctx.lineWidth=.8;path(ctx,[[-s*.5,s*.1],[s*.1,-s*.15],[s*.55,.0]]);ctx.stroke();}
+    else{ // a hub: a few small building footprints, no outline
+      for(let k=0;k<5;k++){ctx.globalAlpha=.7;ctx.fillStyle=k%2?'#c7ccb7':'#aab4a2';const w=s*(.22+noise(i+k*17)*.25),h=s*(.16+noise(i+k*23)*.18);
+        ctx.fillRect((noise(i+k*31)-.5)*s*1.1-w/2,(noise(i+k*37)-.5)*s*.8-h/2,w,h);}}
+    ctx.globalAlpha=1;});}
+  ctx.drawImage(terminator(ctx,sun),cx-r,cy-r,r*2,r*2);
+  // City lights come up where the base has fallen into night.
+  for(const f of sites){if(f.p.z<=0)continue;const dark=lunarDark(f.p,sun);if(dark<.05)continue;const n=f.kind==='hub'?10:f.kind==='factory'?6:3;
+    for(let k=0;k<n;k++){const x=cx+f.p.x*r+(noise(k*13+f.longitude*977|0)-.5)*s*2.4*f.p.z,y=cy+f.p.y*r+(noise(k*29+f.latitude*613|0)-.5)*s*1.8;
+      ctx.globalAlpha=dark*.18;disc(ctx,x,y,2.6,'#e8cf8a');ctx.globalAlpha=dark*(.6+noise(k+3)*.4);disc(ctx,x,y,.8,'#f2dea0');}}
+  ctx.globalAlpha=1;ctx.restore();
+  ctx.strokeStyle='#acbca455';ctx.lineWidth=.8;ctx.beginPath();ctx.arc(cx,cy,r,0,TAU);ctx.stroke();
+  // The mass driver: a straight track from the first site, launching cargo at a
+  // rate that rises with the factory level.
+  const hub=sites[0].p,hx=cx+hub.x*r,hy=cy+hub.y*r,dir=[-.82,-.57],track=r*.34,tx=hx+dir[0]*track,ty=hy+dir[1]*track;
+  ctx.strokeStyle='#d9d2a6';ctx.globalAlpha=.55;ctx.lineWidth=1;path(ctx,[[hx,hy],[tx,ty]]);ctx.stroke();ctx.globalAlpha=1;
+  const interval=6/(1+level);
+  for(let k=0;k<4;k++){const t=reducedMotion?.25+k*.2:((ambientTime/interval)+k/4)%1;
+    const on=t<.25,d=on?t/.25:1+(t-.25)/.75*2.2,x=hx+dir[0]*track*d,y=hy+dir[1]*track*d;
+    ctx.globalAlpha=on?.9:Math.max(0,.9-(t-.25)/.75);disc(ctx,x,y,3,'#efdfa434');disc(ctx,x,y,1.1,'#f6ebc2');}
+  ctx.globalAlpha=1;
+  ctx.fillStyle='#9baf9e';ctx.font='9px ui-monospace, monospace';ctx.textAlign='center';ctx.fillText(`LUNA  /  ${String(sites.length).padStart(2,'0')} FACILITIES`,cx,cy+r+25);ctx.restore();
 }

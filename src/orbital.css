@@ -79,3 +79,18 @@ body[data-orbital-active="true"] .game-shell{display:none}
 @keyframes orbit-finale-turn{to{rotate:360deg}}@media(prefers-reduced-motion:reduce){.orbit-node.finale .orbit-finale-ring{animation:none}}
 
 #archives-dialog[data-flipping]::backdrop,#orbit-talents-dialog[data-flipping]::backdrop{background:transparent}
+
+/* The observation column always reaches the foot of the control column: the
+   journal takes whatever height is left instead of leaving a blank block. */
+.colony-layout{align-items:stretch}.colony-observation{display:flex;flex-direction:column}
+.colony-chronicle{flex:1 1 0;min-height:150px;display:flex;flex-direction:column;margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
+.colony-chronicle header{display:flex;justify-content:space-between;align-items:center}.colony-chronicle h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:13px;font-weight:450}.colony-chronicle h3 [data-icon]{width:16px;height:16px;color:var(--route-automation)}.colony-chronicle small{font-size:9px;color:var(--muted)}
+#colony-log{flex:1 1 0;min-height:0;overflow:auto;margin:0;padding:0;list-style:none;font-size:10px;line-height:1.9;color:var(--muted);scrollbar-width:thin}#colony-log li:first-child{color:var(--color-home-text)}#colony-log li{padding:3px 0;border-bottom:1px solid #8eaaa512;font-variant-numeric:tabular-nums}
+/* 全域监视: every war at once, small enough to sit under the main feed. */
+.colony-war-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
+.colony-war-grid button{display:block;padding:0;text-align:left;border:1px solid var(--line);border-radius:5px;background:#0c1618;overflow:hidden;min-height:0}
+.colony-war-grid button[aria-pressed="true"]{border-color:var(--gold)}.colony-war-grid canvas{display:block;width:100%;aspect-ratio:16/7}
+.colony-war-grid span{display:block;padding:6px 8px;font-size:9px;line-height:1.6;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.colony-war-grid [aria-pressed="true"] span{color:var(--gold)}
+.colony-war-grid [data-truce="true"] canvas{filter:saturate(.3) brightness(.8)}
+@media(max-width:740px){.colony-war-grid{grid-template-columns:1fr 1fr}.colony-chronicle{min-height:0}}
+.orbit-gate{position:absolute;left:50%;bottom:calc(100% + 4px);transform:translateX(-50%);white-space:nowrap;font-size:9px;letter-spacing:1px;color:var(--enemy);opacity:.85}.orbit-gate:empty{display:none}

@@ -95,7 +95,7 @@ export function registerOrbitalTests(test, assert) {
     const frame = await mountFixture(serializeSession(launchReady()));
     try {
       const doc = frame.contentDocument, win = frame.contentWindow, el = id => doc.getElementById(id);
-      el('node-bypasser').click(); el('buy-bypasser').click();
+      el('node-bypasser').click(); el('buy-bypasser').click(); el('buy-bypasser').click();
       let now = 0;
       const tick = n => { for (let i = 0; i < n; i++) win.__testFrame(now += 100); };
       for (const [width, height] of [[1100, 844], [390, 844], [320, 844], [844, 390]]) {

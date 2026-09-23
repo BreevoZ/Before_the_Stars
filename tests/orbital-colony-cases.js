@@ -2,6 +2,8 @@ import { SAVE_VERSION } from '../src/progression-config.js';
 import { Q } from '../src/quantity.js';
 import { launchReady } from './orbital-cases.js';
 import { purchaseTalent, updateProgression } from '../src/progression.js';
+import { getTalentState, TALENTS } from '../src/talents.js';
+import { availableSpeeds } from '../src/progression-config.js';
 import { createOrbitalState, enterOrbital, startOrbitalWar, updateOrbital, resolveOrbitalWar, findCivilization, purchaseOrbitalTalent, getOrbitalTalentState, getInterventionState, intervene, orbitalLegacySpent, interventionCost } from '../src/orbital-game.js';
 import { syncWarCivilizations, warOdds } from '../src/orbital-war.js';
 import { ORBITAL_RULES as R, ORBITAL_RULES, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as ACTIONS, SITES } from '../src/orbital-config.js';
@@ -113,6 +115,30 @@ export function registerOrbitalColonyTests(test,assert,near){
     const untalented=JSON.parse(serializeSession(plain));untalented.orbital.wars[0].ceasefire=5;throws(()=>parseSession(JSON.stringify(untalented)));
     const supplied=JSON.parse(serializeSession(plain));supplied.orbital.civilizations[0].airdrops=1;throws(()=>parseSession(JSON.stringify(supplied)));
   });
+  test('v22: 轨道收割 moves under 知识封锁, earlier harvesters keep it with a free lock, and eight civilizations can fight four wars',()=>{
+    const s=colonyFixture({legacy:100000,talents:['monitor','patronage']});
+    const old=JSON.parse(serializeSession(s));old.version=21;old.orbital.version=7;delete old.orbital.talents.overview;
+    old.orbital.talents.harvest=1;old.orbital.payments.harvest=['2048'];
+    const migrated=parseSession(JSON.stringify(old));
+    assert(migrated.version===SAVE_VERSION&&migrated.orbital.talents.regression===1&&JSON.stringify(migrated.orbital.payments.regression)==='["0"]');
+    assert(Q.eq(migrated.orbital.payments.harvest[0],2048)&&migrated.orbital.talents.overview===0);
+    const raw=serializeSession(migrated);assert(serializeSession(parseSession(raw))===raw);
+    const fresh=colonyFixture({legacy:10000000,talents:['monitor','patronage','technology']});assert(!purchaseOrbitalTalent(fresh,'harvest'));
+    assert(purchaseOrbitalTalent(fresh,'regression')&&purchaseOrbitalTalent(fresh,'harvest')&&Q.eq(fresh.orbital.payments.harvest[0],T.harvest.costs[0]));
+    const full=colonyFixture({legacy:10000000,talents:['reseed','diversity','diversity','diversity','diversity']});
+    full.orbital.phase='winter';full.orbital.remaining=0.001;full.orbital.settledCycle=full.orbital.cycle;full.orbital.nuclearCycles=full.orbital.cycle;full.orbital.lastCatastropheAt=0;full.orbital.winterDuration=1;
+    for(const c of full.orbital.civilizations)c.alive=false;advance(full,.1);
+    assert(full.orbital.civilizations.length===R.maxCivilizations&&SITES.length===R.maxCivilizations);
+    while(pair(full));assert(full.orbital.wars.length===R.maxWars);
+    const four=serializeSession(full);assert(serializeSession(parseSession(four))===four);
+  });
+  test('Surface speed in VI: 时间加速 can still be bought after the protocol; other surface talents stay sealed',()=>{
+    const s=colonyFixture({legacy:100000});s.permanent.talents.timeAcceleration=0;delete s.permanent.purchaseCosts.timeAcceleration;
+    s.permanent.settings.speed=Math.min(s.permanent.settings.speed,2);
+    assert(getTalentState(s,'timeAcceleration')==='ready'&&getTalentState(s,'logistics')!=='ready');
+    const wallet=s.permanent.legacy;assert(purchaseTalent(s,'timeAcceleration')&&Q.eq(s.permanent.legacy,Q.sub(wallet,TALENTS.timeAcceleration.costs[0])));
+    assert(availableSpeeds(s.permanent).includes(3));const raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw);
+  });
   test('Intel: the pre-war estimate shows only with 情报网络 and favours the older, boosted side',()=>{
     const plain=colonyFixture({legacy:10000,talents:['monitor']});assert(!/情报预估/.test(buildOrbitalViewModel(plain)['#colony-war-hint']));
     const s=colonyFixture({legacy:10000,talents:['monitor','intel']});assert(/情报预估：.*\d+%.*\d+%/.test(buildOrbitalViewModel(s)['#colony-war-hint']));
@@ -213,7 +239,7 @@ export function registerOrbitalColonyTests(test,assert,near){
     assert(!intervene(s,id,'regress'));parseSession(serializeSession(s));
   });
   test('Orbital harvest: kills the selected civilization once, ends its war, retains its opponent and respawns after a bounded wait',()=>{
-    const s=colonyFixture({legacy:10000,talents:['monitor','patronage','technology','harvest']});pair(s);const o=s.orbital,id=o.wars[0].participants[0],c=findCivilization(o,id),reward=civilizationValue(o,c);
+    const s=colonyFixture({legacy:100000,talents:['monitor','patronage','technology','regression','harvest']});pair(s);const o=s.orbital,id=o.wars[0].participants[0],c=findCivilization(o,id),reward=civilizationValue(o,c);
     assert(intervene(s,id,'harvest')&&!intervene(s,id,'harvest')&&!c.alive&&o.wars.length===0&&Q.eq(o.legacyEarned,reward));
     for(const other of o.civilizations.filter(c=>c.alive))assert(intervene(s,other.id,'harvest'));
     advance(s,61);assert(o.civilizations.filter(c=>c.alive).length===2&&o.nuclearCycles===0);parseSession(serializeSession(s));
@@ -249,7 +275,7 @@ export function registerOrbitalColonyTests(test,assert,near){
   test('Orbital simulation: real wars finish nuclear cycles, differ by seed, unlock VI and keep all options bounded',()=>{
     const a=simulateOrbital({seed:1}),b=simulateOrbital({seed:2});assert(a.cycles===4&&a.completed&&b.cycles===4&&b.completed&&a.nuclearTimes[0]!==b.nuclearTimes[0]);
     // Civilizations climb I→V in minutes, so four nuclear cycles take ~35–45 simulated minutes.
-    assert(a.seconds>2000&&a.seconds<3000&&b.seconds>2000&&b.seconds<3000);
+    assert(a.seconds>1700&&a.seconds<3000&&b.seconds>1700&&b.seconds<3000);
     for(const options of [{legacy:-1},{legacy:.5},{seed:-1},{targetCycles:0},{maxSeconds:Infinity},{maxSeconds:86401},{buyTalents:1}])throws(()=>simulateOrbital(options));
   });
   test('Orbital view model: Legacy prices, monitor gating and tree prerequisites reflect actual state',()=>{

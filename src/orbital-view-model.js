@@ -10,7 +10,7 @@ export const orbitalTime = seconds => `${Math.floor(seconds/60)}:${String(Math.f
 export function orbitalTalentEffect(o,key,rank=o.talents[key]){
   if(key==='recovery')return `${rank} 段 · 遗产 ×${2**rank}`;
   if(key==='reseed')return `核冬天 ${Math.round(R.winterSeconds*.75**rank)} 秒`;
-  if(key==='diversity')return `至少 ${Math.min(6,R.minCivilizations+rank)} 个文明`;
+  if(key==='diversity')return `至少 ${Math.min(R.maxCivilizations,R.minCivilizations+rank)} 个文明`;
   const lunar=(industry=o.talents.lunarIndustry,driver=o.talents.massDriver)=>Q.format(R.lunarBaseIncome*2**(industry+driver));
   if(key==='tendency')return rank?'新萌芽的文明带有好战、守成或重科技倾向':'文明没有倾向';
   if(key==='nuclearResearch')return `核毁灭遗产 ×${2**rank}`;
@@ -40,7 +40,7 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
     '#colony-earned':`本阶段已收获 ${Q.format(o.legacyEarned)} · 收益 ×${orbitalYieldMultiplier(o)}`,
     '#colony-income':o.talents.outpost?`月面 +${Q.format(lunarLegacyRate(o))}/s`:'文明遗产',
     '#colony-lunar@hidden':!o.talents.outpost,'#colony-lunar-rate':Q.format(lunarLegacyRate(o)),
-    '#colony-lunar-level':`自动工场 ${o.talents.lunarIndustry} / 4 · ${3+o.talents.lunarIndustry*2} 处设施 · 星环 ×${2**o.talents.recovery}`,
+    '#colony-lunar-level':`自动工场 ${o.talents.lunarIndustry} / 4 · ${3+o.talents.lunarIndustry*2} 处设施 · ${o.talents.massDriver?'质量投射器运行中':'穿梭货运'}`,
     '#colony-lunar-produced':`累计生产 ${Q.format(o.lunarProduced)} Legacy`,'#colony-habitat-state':`${o.talents.recovery} / ${R.habitatSections} 段 · 遗产 ×${2**o.talents.recovery}`,
     '#colony-time':orbitalTime(o.elapsed),
     '#colony-cycle':`第 ${o.cycle} 轮萌芽 · ${o.nuclearCycles} 次核毁灭${o.talents.doomsday&&!winter?` · 末日时钟 ${orbitalTime(Math.max(0,o.elapsed-cycleStartedAt(o)))} · 核毁灭 ×${doomsdayMultiplier(o).toFixed(2)}`:''}`,
@@ -79,7 +79,11 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
     if(['superSoldiers','sniper'].includes(key))v[`#intervene-${key}@hidden`]=!o.talents[a.talent];v[`#intervene-${key}-cost`]=key==='harvest'&&first?.alive?`+${Q.format(civilizationValue(o,first))}`:`${Q.format(cost)}`;
     v[`#intervene-${key}-state`]={locked:`需要「${T[a.talent].name}」`,dead:'文明已消亡',max:'已完成',truce:'所在战争停火中',legacy:'遗产不足',war:'需要交战中的文明',age:'文明时代不足',doctrine:key==='sniper'?'先授予超级士兵':'先完成五档学说',ready:key==='doctrines'?Object.values(TRAITS).filter(t=>UNITS[t.units[0]].age===(first?.doctrine??0)+1).map(t=>t.name).join(' · '):'执行'}[status];
   }
-  for(let i=0;i<3;i++){const w=o.wars[i];v[`#watch-war-${i}@hidden`]=!w;v[`#watch-war-${i}`]=w?w.participants.map(id=>findCivilization(o,id).name).join(' ↔ '):'';v[`#watch-war-${i}@aria-pressed`]=String(w?.id===o.selectedWar);}
+  v['#colony-wars@hidden']=Boolean(o.talents.overview);v['#colony-war-grid@hidden']=!(o.talents.overview&&o.wars.length);
+  for(let i=0;i<R.maxWars;i++){const w=o.wars[i],civs=w?w.participants.map(id=>findCivilization(o,id)):[];
+    v[`#war-thumb-${i}@hidden`]=!w;v[`#war-thumb-${i}@aria-pressed`]=String(w?.id===o.selectedWar);v[`#war-thumb-${i}@data-truce`]=String(Boolean(w?.ceasefire));
+    v[`#war-thumb-${i}-label`]=w?`${civs.map(c=>`${c.name} ${AGES[c.age].numeral}`).join(' ↔ ')}${w.ceasefire>0?` · 停火 ${Math.ceil(w.ceasefire)}s`:''}`:'';}
+  for(let i=0;i<R.maxWars;i++){const w=o.wars[i];v[`#watch-war-${i}@hidden`]=!w;v[`#watch-war-${i}`]=w?w.participants.map(id=>findCivilization(o,id).name).join(' ↔ '):'';v[`#watch-war-${i}@aria-pressed`]=String(w?.id===o.selectedWar);}
   const w=o.wars.find(w=>w.id===o.selectedWar);v['#colony-battle@hidden']=!w;v['#colony-no-war@hidden']=Boolean(w);
   const host=w&&findCivilization(o,w.participants[0]),site=host&&SITES.find(s=>s.id===host.site);
   v['#colony-solar-time']=site?`${host.name}战区 · ${siteDaylight(o.elapsed,site).label} · ${w.ceasefire>0?`停火中 ${Math.ceil(w.ceasefire)} 秒`:'双方 AI 接管'}`:'等待地面信号';
@@ -88,6 +92,8 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
   for(const [key,t]of Object.entries(T)){
     const rank=o.talents[key],status=getOrbitalTalentState(s,key);
     v[`#orbit-node-${key}@data-state`]=status;v[`#orbit-node-${key}@aria-pressed`]=String(selected&&key===talent);v[`#orbit-node-${key}@aria-expanded`]=String(selected&&key===talent);v[`#orbit-node-${key}@aria-label`]=`${t.name}，${rank}/${t.costs.length} 级，${status==='max'?'已完成':`${t.costs[rank]} Legacy`}`;
+    // Show a cycle or ring gate on the node itself, not only in the detail card.
+    v[`#orbit-gate-${key}`]=rank>=t.costs.length?'':[(t.cycles??0)>o.nuclearCycles?`☢ ${o.nuclearCycles}/${t.cycles}`:'',(t.ring??0)>o.talents.recovery?`环 ${o.talents.recovery}/${t.ring}`:''].filter(Boolean).join(' · ');
     v[`#orbit-rank-${key}`]='●'.repeat(rank)+'○'.repeat(t.costs.length-rank);v[`#orbit-cost-${key}`]=status==='max'?'已点亮':`${Q.format(t.costs[rank])}`;
     for(const parent of Object.keys(t.requires))v[`#orbit-edge-${parent}-${key}@class:lit`]=rank>0;
   }

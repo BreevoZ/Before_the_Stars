@@ -67,7 +67,8 @@ export const TALENTS = Object.freeze({
     return [trait.id, { name: trait.name, branch: 'units', layer, unit: trait.units[0], costs: [UNIT_TALENT_COSTS[layer - 1]], requires: layer === 1 ? { spark: 1 } : {}, requiresLayer: layer > 1 ? layer - 1 : undefined,
       effects: ['基础作战方式', TRAIT_DESCRIPTIONS[trait.id]] }];
   })),
-  timeAcceleration: { name: '时间加速', branch: 'growth', layer: 4, costs: PRICES.timeAcceleration, requires: { spark: 1 }, requiresLayer: 3,
+  // Speed carries into VI, so it stays purchasable after the protocol.
+  timeAcceleration: { name: '时间加速', branch: 'growth', layer: 4, costs: PRICES.timeAcceleration, requires: { spark: 1 }, requiresLayer: 3, persists: true,
     effects: ['最高速度 2×', '解锁 3× 游戏速度'] },
   superSoldierPlan: { name: '超级士兵计划', branch: 'units', layer: 6, costs: PRICES.superSoldierPlan, requires: {}, requiresLayer: 5,
     effects: ['超级士兵未开放', '未来时代可招募超级士兵 · 全覆轻甲与激光短匕首'] },
@@ -93,7 +94,7 @@ export function getTalentState(session, key) {
   if (!Object.hasOwn(TALENTS, key)) return 'invalid';
   if (TALENTS[key].placeholder) return 'planned';
   if (!session.permanent.completedCycles) return 'locked';
-  if (!isBetweenRuns(session.run.phase)) return 'during-run';
+  if (!isBetweenRuns(session.run.phase) && !(session.run.phase === 'orbital' && TALENTS[key].persists)) return 'during-run';
   const config = TALENTS[key], level = talentLevel(session, key);
   if (level >= config.costs.length) return 'max';
   if (!meetsTalentRequirements({ ...session.permanent.talents, ...session.permanent.upgrades }, config)) return 'prerequisite';

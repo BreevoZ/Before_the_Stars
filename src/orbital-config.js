@@ -1,6 +1,6 @@
 // Orbital wars reuse the surface simulation; Legacy is the only orbital wallet.
-export const ORBITAL_RULES = Object.freeze({ version: 7, finalAge: 5, historyLimit: 12,
-  winterSeconds: 60, refugeeSeconds: 30, nuclearVisualSeconds: 7, minCivilizations: 4, maxCivilizations: 6,
+export const ORBITAL_RULES = Object.freeze({ version: 8, finalAge: 5, historyLimit: 12,
+  winterSeconds: 60, refugeeSeconds: 30, nuclearVisualSeconds: 7, minCivilizations: 4, maxCivilizations: 8, maxWars: 4,
   habitatSections: 7, lunarRotationSeconds: 180, lunarBaseIncome: 512, warIncome: 2.5, warBaseHealth: 3,
   // A civilization should take minutes, not one, to climb from I to V: each
   // age lasts ~35–40 s of war. Legacy per experience rises by the same factor,
@@ -33,7 +33,7 @@ export const ORBITAL_TALENTS = Object.freeze({
   protocol: talent('存续协议',[0],{},'继承地表篇。文明可以灭亡，轨道上的我们将继续存在。',660,1150,'protocol',{root:true,kind:'keystone',branch:'root',finale:true}),
   // LIFE · 文明循环: seeding on one side, the winter that ends each cycle on the other.
   reseed: talent('播种计划',[128,512,2048],{protocol:1},'每级缩短 25% 核冬天和幸存文明等待新对手的时间。',340,935,'leaf',{branch:'life'}),
-  diversity: talent('多元萌芽',[512,2048],{reseed:1},'提高每轮文明数量的下限，最多六个。',150,780,'network',{branch:'life',kind:'specialist'}),
+  diversity: talent('多元萌芽',[512,2048,65536,524288],{reseed:1},'每级提高每轮文明数量的下限；四级后八个点位全部萌芽。',150,780,'network',{branch:'life',kind:'specialist'}),
   tendency: talent('文明倾向',[1024],{reseed:1},'此后萌芽的文明随机带有好战、守成或重科技倾向，改变它们的战斗方式与战争结局。',310,780,'spark',{branch:'life'}),
   nuclearResearch: talent('核冬天研究',[4096,65536],{reseed:1},'每级核毁灭遗产翻倍。',470,780,'fire',{branch:'life',kind:'keystone'}),
   chain: talent('连锁反扑',[16384],{nuclearResearch:1},'核毁灭时，本轮已经覆灭的文明废墟也按其最终时代结算一半遗产。',430,610,'beam',{branch:'life'}),
@@ -60,8 +60,10 @@ export const ORBITAL_TALENTS = Object.freeze({
   // Advancing and blocking technology are two sides of one lever.
   technology: talent('技术馈赠',[512],{patronage:1},'让选中文明进化一个时代；技术馈赠不产生战争经验收益。',830,615,'spark',{branch:'war'}),
   regression: talent('知识封锁',[512],{patronage:1},'使文明倒退一个时代，销毁超时代部队、炮塔与订单。',970,615,'lock',{branch:'war'}),
-  harvest: talent('轨道收割',[2048],{patronage:1},'直接毁灭选中文明并收获 Legacy；废墟不能重复收割。',1090,615,'beam',{branch:'war',kind:'keystone'}),
-  ceasefire: talent('停火协议',[8192],{intel:1},'花费 Legacy 冻结一场战争 60 秒：双方停止行动，也不产生经验与债券收益。用来决定核毁灭何时到来。',1210,615,'truce',{branch:'war',kind:'specialist'}),
+  overview: talent('全域监视',[4096],{intel:1},'同时以缩略图观看所有进行中的战争，点击任一缩略图切换主画面。',1110,615,'screens',{branch:'war'}),
+  ceasefire: talent('停火协议',[8192],{intel:1},'花费 Legacy 冻结一场战争 60 秒：双方停止行动，也不产生经验与债券收益。用来决定核毁灭何时到来。',1240,615,'truce',{branch:'war',kind:'specialist'}),
+  // The last step of suppression: first block a civilization's knowledge, then erase it.
+  harvest: talent('轨道收割',[16384],{regression:1},'直接毁灭选中文明并收获 Legacy；废墟不能重复收割。',1040,455,'beam',{branch:'war',kind:'keystone'}),
   doctrines: talent('战争学说',[4096],{patronage:1},'向交战文明逐档授予 I–V 的全部兵种特性；每档对应该时代的三个兵种，最多五档。',900,455,'shield',{branch:'war',kind:'keystone'}),
   superSoldiers: talent('超限战士',[32768],{doctrines:1},'为完成五档学说的未来文明开放超级士兵。AI 使用自己的金币招募，初始使用激光匕首。',900,300,'elite',{branch:'war',kind:'specialist'}),
   sniper: talent('天穹狙击',[131072],{superSoldiers:1},'为已获得超级士兵的文明授予狙击激光枪：远程锁定、引导后贯穿射击。',900,160,'rifle',{branch:'war',kind:'specialist'}),

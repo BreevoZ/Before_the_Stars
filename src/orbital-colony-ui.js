@@ -50,7 +50,15 @@ export function createOrbitalColonyUI(getSession,{commit,archive,save,speed,view
     arc.setAttribute('d',`M${(Math.cos(a)*22).toFixed(2)} ${(Math.sin(a)*7).toFixed(2)} A22 7 0 0 1 ${(Math.cos(b)*22).toFixed(2)} ${(Math.sin(b)*7).toFixed(2)}`);ringSvg.append(arc);}
   el('colony-ring-ranks').append(ringSvg);
   for(let i=1;i<=4;i++){const part=document.createElement('i');part.id=`colony-lunar-ranks-${i}`;el('colony-lunar-ranks').append(part);}
-  for(let i=0;i<3;i++){
+  const thumbs=[];
+  for(let i=0;i<R.maxWars;i++){
+    // 全域监视 thumbnails: each has its own renderer, drawn at a low frame rate.
+    const thumb=document.createElement('button');thumb.id=`war-thumb-${i}`;thumb.type='button';thumb.innerHTML=`<canvas aria-hidden="true"></canvas><span id="war-thumb-${i}-label"></span>`;
+    thumb.addEventListener('click',()=>{const o=getSession().orbital,w=o.wars[i];if(w){o.selectedWar=w.id;[o.selectedCivilization,o.selectedOpponent]=w.participants;commit();}});
+    el('colony-war-grid').append(thumb);thumbs.push({canvas:thumb.querySelector('canvas'),render:null});
+  }
+  let lastThumbs=null;
+  for(let i=0;i<R.maxWars;i++){
     const button=document.createElement('button');button.id=`watch-war-${i}`;button.type='button';
     button.addEventListener('click',()=>{const o=getSession().orbital,w=o.wars[i];if(w){o.selectedWar=w.id;[o.selectedCivilization,o.selectedOpponent]=w.participants;commit();}});el('colony-wars').append(button);
   }
@@ -69,7 +77,7 @@ export function createOrbitalColonyUI(getSession,{commit,archive,save,speed,view
     const node=document.createElement('button');node.id=`orbit-node-${key}`;node.type='button';node.className=`orbit-node ${t.kind??'ordinary'}${t.finale?' finale':''}`;
     node.dataset.route=branch(key);node.style.left=`${t.x}px`;node.style.top=`${t.y}px`;node.setAttribute('aria-controls','orbit-detail');
     const shape=t.finale?'<circle class="orbit-finale-ring" cx="32" cy="32" r="31.5"/><circle class="orbit-halo" cx="32" cy="32" r="29"/><circle cx="32" cy="32" r="24"/>':t.kind==='specialist'?'<path d="M32 2 62 32 32 62 2 32Z"/>':t.kind==='keystone'?'<circle class="orbit-halo" cx="32" cy="32" r="31"/><circle cx="32" cy="32" r="26"/>':'<path d="M32 2 58 17v30L32 62 6 47V17Z"/>';
-    node.innerHTML=`<svg class="orbit-node-frame" viewBox="0 0 64 64" aria-hidden="true">${shape}</svg><span class="orbit-node-glyph">${icon(t.icon)}</span><span id="orbit-rank-${key}" class="orbit-rank"></span><small class="orbit-node-price"><span id="orbit-cost-${key}"></span>${icon("legacy")}</small><span class="orbit-node-name">${t.name}</span>`;
+    node.innerHTML=`<svg class="orbit-node-frame" viewBox="0 0 64 64" aria-hidden="true">${shape}</svg><span class="orbit-node-glyph">${icon(t.icon)}</span><span id="orbit-rank-${key}" class="orbit-rank"></span><small class="orbit-node-price"><span id="orbit-cost-${key}"></span>${icon("legacy")}</small><span id="orbit-gate-${key}" class="orbit-gate"></span><span class="orbit-node-name">${t.name}</span>`;
     node.addEventListener('click',()=>selectTalent(key,true));node.addEventListener('dblclick',()=>buy(key));
     node.addEventListener('pointerenter',e=>{if(innerWidth>740&&e.pointerType==='mouse'&&!pinned)selectTalent(key);});
     node.addEventListener('pointerleave',()=>{if(!pinned)hideTimer=setTimeout(closeDetail,180);});
@@ -134,6 +142,9 @@ export function createOrbitalColonyUI(getSession,{commit,archive,save,speed,view
     for(const site of SITES){const pos=sitePosition(site,reduced.matches?0:o.elapsed),node=el(`site-${site.id}`);node.style.left=`${pos.x/10}%`;node.style.top=`${pos.y/6.2}%`;node.hidden=!pos.visible;}
     const war=o.wars.find(w=>w.id===o.selectedWar);
     if(o.talents.monitor&&war){const site=SITES.find(site=>site.id===o.civilizations.find(c=>c.id===war.participants[0]).site);renderBattle(war.game,{skyTime:localSkyTime(o.elapsed,site)});}
+    if(o.talents.overview&&o.wars.length&&(lastThumbs===null||timestamp-lastThumbs>=100||timestamp<lastThumbs)){lastThumbs=timestamp;
+      o.wars.forEach((w,i)=>{const thumb=thumbs[i];if(!thumb.canvas.getBoundingClientRect().width)return;thumb.render??=createRenderer(thumb.canvas);
+        const site=SITES.find(site=>site.id===o.civilizations.find(c=>c.id===w.participants[0]).site);thumb.render(w.game,{skyTime:localSkyTime(o.elapsed,site)});});}
     if(o.talents.outpost){const p=canvasContext(el('colony-moon'));if(p)drawLunarColony(p.ctx,p.width,p.height,o,{ambientTime:ambient,reducedMotion:reduced.matches});}
   }
   function sync(options={}){if(Object.hasOwn(options,'paused'))paused=options.paused;bind(buildOrbitalViewModel(getSession(),{paused,...options,talent,selected}));}

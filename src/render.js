@@ -74,15 +74,22 @@ function line(ctx, points, color, width = 2) {
 const celestialPoint = (ground, angle) => ({ x: RULES.width / 2 - Math.cos(angle) * RULES.width * 0.39, y: ground * (1 - Math.sin(angle) * 0.78) });
 // The moon shows the phase of the orbiting moon: its lit limb faces the sun,
 // wherever the sun is (even below the horizon), and the dark part keeps a faint earthshine.
+// By day the sky washes the moon out: its dark part and glow vanish, the lit
+// part pales, and close to the sun it fades away entirely, as a young moon does.
 function drawCelestialBody(ctx, ground, angle, moon, { sunAngle = angle + Math.PI, elongation = Math.PI } = {}) {
   const elevation = Math.sin(angle);
   if (elevation < -0.15) return;
   const { x, y } = celestialPoint(ground, angle);
   const radius = moon ? 27 : 32, lit = moon ? (1 - Math.cos(elongation)) / 2 : 1;
+  const clamp01 = value => Math.min(1, Math.max(0, value));
+  const daylight = moon ? clamp01((Math.sin(sunAngle) + 0.1) / 0.35) : 0;
+  const separation = Math.acos(Math.cos(elongation)), nearSun = clamp01((separation - 0.3) / 0.6);
+  const visibility = moon ? (1 - daylight * 0.6) * (1 - daylight * (1 - nearSun)) : 1;
+  if (visibility <= 0.01) return;
   ctx.save();
-  ctx.globalAlpha = Math.min(1, Math.max(0, (elevation + 0.15) / 0.3));
+  ctx.globalAlpha = clamp01((elevation + 0.15) / 0.3) * visibility;
   const glow = ctx.createRadialGradient(x, y, radius * 0.6, x, y, radius * 3.5);
-  glow.addColorStop(0, moon ? `rgba(220,229,191,${0.19 * lit})` : '#ffe3a555');
+  glow.addColorStop(0, moon ? `rgba(220,229,191,${0.19 * lit * (1 - daylight)})` : '#ffe3a555');
   glow.addColorStop(1, moon ? 'rgba(220,229,191,0)' : '#ffe3a500');
   ctx.fillStyle = glow;
   ctx.fillRect(x - radius * 3.5, y - radius * 3.5, radius * 7, radius * 7);
@@ -91,7 +98,8 @@ function drawCelestialBody(ctx, ground, angle, moon, { sunAngle = angle + Math.P
   }
   const sun = celestialPoint(ground, sunAngle);
   ctx.translate(x, y); ctx.rotate(Math.atan2(sun.y - y, sun.x - x));
-  ctx.fillStyle = '#56645c38'; ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill();
+  // Earthshine on the dark part only shows against a dark sky.
+  if (daylight < 1) { ctx.fillStyle = `rgba(86,100,92,${0.22 * (1 - daylight)})`; ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill(); }
   // Lit region: the sunward half-disc bounded by the terminator ellipse.
   ctx.beginPath(); ctx.arc(0, 0, radius, -Math.PI / 2, Math.PI / 2);
   for (let i = 0; i <= 24; i++) { const phi = Math.PI / 2 - i / 24 * Math.PI; ctx.lineTo(radius * Math.cos(elongation) * Math.cos(phi), radius * Math.sin(phi)); }
@@ -134,8 +142,9 @@ export function drawLandscape(ctx, height, ground, time, lunarTime = time) {
   }
   ctx.restore();
   const sunAngle = phase * Math.PI * 2, orbit = lunarOrbitAngle(lunarTime);
-  drawCelestialBody(ctx, ground, sunAngle, false);
+  // The moon goes behind the sun: near conjunction it must never cover it.
   drawCelestialBody(ctx, ground, lunarSkyAngle(sunAngle, lunarTime), true, { sunAngle, elongation: orbit });
+  drawCelestialBody(ctx, ground, sunAngle, false);
 
   polygon(ctx, [[0, ground], [0, ground - 115], [95, ground - 149], [171, ground - 114],
     [284, ground - 195], [361, ground - 121], [425, ground - 155], [568, ground - 83],

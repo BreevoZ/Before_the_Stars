@@ -1,6 +1,6 @@
 import { drawOrbitalScene, ORBITAL_SECONDS } from './orbital-scene.js';
 import { SITES, ORBITAL_RULES as R } from './orbital-config.js';
-import { dayPhase, TAU, siteLongitude } from './celestial-clock.js';
+import { dayPhase, TAU, siteLongitude, lunarOrbitAngle } from './celestial-clock.js';
 const C={sky:'#0e181b',ocean:'#284c51',land:'#829077',light:'#b9cfb4',gold:'#c5b17d',war:'#c28d70'};
 const clamp=v=>Math.max(0,Math.min(1,v));
 function noise(n){let v=Math.imul(n^(n>>>16),0x21f0aaad);v=Math.imul(v^(v>>>15),0x735a2d97);return((v^(v>>>15))>>>0)/4294967296;}
@@ -132,9 +132,12 @@ function habitat(ctx,cx,cy,r,rank,front,{time=0,construction=1,reducedMotion=fal
 }
 // The moon orbits the Earth on a wider, slightly steeper plane than the ring:
 // it passes in front of the planet, then behind it, over one orbital period.
-const MOON=Object.freeze({rx:1.74,ry:.34,tilt:-.17,size:.13,period:240});
+// The orbit angle is shared with every battlefield sky, so the phase seen from
+// the ground always matches where the moon is here: to the planet's sunward
+// right it is new, on the far left it is full.
+const MOON=Object.freeze({rx:1.74,ry:.34,tilt:-.17,size:.13});
 export function moonPosition(time,{cx=500,cy=322,r=238}={}){
-  const a=time/MOON.period*TAU-.7,x=Math.cos(a)*r*MOON.rx,y=Math.sin(a)*r*MOON.ry,c=Math.cos(MOON.tilt),s=Math.sin(MOON.tilt),depth=Math.sin(a);
+  const a=lunarOrbitAngle(time),x=Math.cos(a)*r*MOON.rx,y=Math.sin(a)*r*MOON.ry,c=Math.cos(MOON.tilt),s=Math.sin(MOON.tilt),depth=Math.sin(a);
   return{x:cx+x*c-y*s,y:cy+x*s+y*c,depth,angle:a,m:r*MOON.size*(1+depth*.14)};
 }
 // Where cargo docks: the point of the ring on the moon's side of the planet.
@@ -146,18 +149,28 @@ function moonOrbitPath(ctx,cx,cy,r,front){
 // Drawn in two passes: whichever side of the planet the moon is on, it and its
 // cargo stream share that layer, so the globe hides them on the far side.
 function lunarSystem(ctx,o,moon,cx,cy,r,{ambient,reducedMotion}){
-  const{x,y,m}=moon,lit=.55+moon.depth*.12;
-  const g=ctx.createLinearGradient(x-m,y,x+m,y);g.addColorStop(0,'#1f3032');g.addColorStop(.42,'#6f8076');g.addColorStop(1,'#b8c1ad');disc(ctx,x,y,m,g);
-  for(let i=0;i<5;i++){const px=x+(noise(i+310)-.45)*m*1.1,py=y+(noise(i+330)-.5)*m*1.1,pr=m*(.16+noise(i+350)*.2),mare=ctx.createRadialGradient(px,py,0,px,py,pr);
-    mare.addColorStop(0,'#34463f66');mare.addColorStop(1,'#34463f00');disc(ctx,px,py,pr,mare);}
-  ctx.globalAlpha=1;ctx.strokeStyle='#b3c0aa45';ctx.lineWidth=.6;ctx.beginPath();ctx.arc(x,y,m,0,TAU);ctx.stroke();
+  const{x,y,m}=moon;
+  // Seen from space, the moon is lit exactly like the planet: the sun is to the
+  // right, so its right half is day. It is tidally locked: the near side keeps
+  // facing the planet, so its features turn across the disc as it orbits.
+  disc(ctx,x,y,m,'#8f9e8f');
+  ctx.save();ctx.beginPath();ctx.arc(x,y,m,0,TAU);ctx.clip();
+  const facing=moon.angle+Math.PI,feature=(lon,lat)=>{const a=facing+lon,c=Math.cos(lat);return{x:Math.cos(a)*c,y:-Math.sin(lat),z:Math.sin(a)*c};};
+  for(let i=0;i<9;i++){const p=feature((noise(i+310)*2-1)*2.6,(noise(i+330)*2-1)*.9);if(p.z<=0)continue;
+    const px=x+p.x*m,py=y+p.y*m,pr=m*(.16+noise(i+350)*.22)*(.35+p.z*.65),mare=ctx.createRadialGradient(px,py,0,px,py,pr);
+    mare.addColorStop(0,'#4b5d5470');mare.addColorStop(1,'#4b5d5400');disc(ctx,px,py,pr,mare);}
+  const outpost=feature(.22,-.12);
+  ctx.drawImage(terminator(ctx,0),x-m,y-m,m*2,m*2);
+  // Base lights on the near side, only once it has turned into night.
+  if(o.talents.outpost&&outpost.z>0&&outpost.x<.05){const level=o.talents.lunarIndustry;
+    for(let i=0;i<3+level*2;i++){ctx.globalAlpha=clamp(.05-outpost.x)*(.5+noise(i+77)*.5);disc(ctx,x+outpost.x*m+(noise(i+5)-.5)*m*.35*outpost.z,y+outpost.y*m+(noise(i+9)-.5)*m*.3,.7,'#e5d192');}ctx.globalAlpha=1;}
+  ctx.restore();ctx.strokeStyle='#b3c0aa45';ctx.lineWidth=.6;ctx.beginPath();ctx.arc(x,y,m,0,TAU);ctx.stroke();
   const dock=ringDock(moon.angle,cx,cy,r),len=Math.hypot(dock[0]-x,dock[1]-y)||1,sx=x+(dock[0]-x)/len*m*.95,sy=y+(dock[1]-y)/len*m*.95;
   // A gentle arc from the moon's limb, bowed away from the planet's centre.
   const dx=dock[0]-sx,dy=dock[1]-sy,nx=-dy/len,ny=dx/len,bow=len*.16*(nx*(sx-cx)+ny*(sy-cy)>0?1:-1);
   const at=t=>{const u=1-t;return[u*u*sx+2*u*t*((sx+dock[0])/2+nx*bow)+t*t*dock[0],u*u*sy+2*u*t*((sy+dock[1])/2+ny*bow)+t*t*dock[1]];};
   if(!o.talents.outpost){ctx.setLineDash([2,6]);ctx.strokeStyle='#c9c19a55';ctx.lineWidth=.8;ctx.beginPath();for(let t=0;t<=1;t+=.05){const[p,q]=at(t);t?ctx.lineTo(p,q):ctx.moveTo(p,q);}ctx.stroke();ctx.setLineDash([]);return;}
   const level=o.talents.lunarIndustry,driver=Boolean(o.talents.massDriver);
-  for(let i=0;i<3+level*2;i++){ctx.globalAlpha=(.45+noise(i+77)*.4)*lit;disc(ctx,x-m*.5+noise(i+5)*m*.4,y-m*.2+noise(i+9)*m*.5,.65,'#e5d192');}ctx.globalAlpha=1;
   // The corridor itself: faint before the driver, a steady filament after it.
   ctx.strokeStyle=driver?'#e8d9a0':'#c9c19a';ctx.globalAlpha=driver?.22:.1;ctx.lineWidth=driver?1.1:.7;ctx.beginPath();for(let t=0;t<=1;t+=.04){const[p,q]=at(t);t?ctx.lineTo(p,q):ctx.moveTo(p,q);}ctx.stroke();ctx.globalAlpha=1;
   if(reducedMotion)return;
@@ -203,9 +216,10 @@ export function lunarFacilities(level){
     return{longitude:.22+Math.cos(angle)*spread,latitude:-.12+Math.sin(angle)*spread*.8,kind:i%3===0?'hub':i%3===1?'array':'factory'};});
 }
 export function lunarRotation(time){return dayPhase(time*120/R.lunarRotationSeconds)*TAU;}
-// Sun angle over one lunar day: from a lit right limb through full to a lit left
-// limb, never a pitch-black new moon, so both the fields and the lights show.
-const lunarSun=(time,reduced)=>reduced?.78:Math.PI/2+Math.sin(lunarRotation(time))*1.2;
+// The close-up is the moon as seen from the planet, so it shows the same phase
+// as every battlefield sky: full when the orbit angle is π, new at 0. The night
+// mask never goes fully black, so a new moon still shows the base's lights.
+const lunarSun=(time,reduced)=>reduced?.78:lunarOrbitAngle(time)-Math.PI/2;
 const lunarDark=(p,sun)=>clamp(.5-(p.x*Math.cos(sun)+p.z*Math.sin(sun))*2.8);
 function surfacePatch(ctx,cx,cy,r,p,draw){
   ctx.save();ctx.translate(cx+p.x*r,cy+p.y*r);ctx.rotate(Math.atan2(p.y,p.x));ctx.scale(Math.max(.14,p.z),1);draw();ctx.restore();

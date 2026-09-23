@@ -8,3 +8,11 @@ export function siteDaylight(seconds, site) {
   const phase = dayPhase(localSkyTime(seconds, site));
   return { phase, elevation: Math.sin(phase * TAU), label: phase < .08 || phase > .94 ? '黎明' : phase < .44 ? '昼间' : phase < .56 ? '黄昏' : '夜间' };
 }
+// The moon shares this clock. It orbits the same way the planet spins, so it
+// rises later each day; the angle is measured from the sun's direction, so
+// 0 is a new moon and π a full one, for the orbital view and every battlefield.
+export const LUNAR_ORBIT_SECONDS = 480;
+export const lunarOrbitAngle = seconds => 2.5 - seconds / LUNAR_ORBIT_SECONDS * TAU;
+// Sky angle of the moon for a local sun angle, and the lit fraction of its disc.
+export const lunarSkyAngle = (sunAngle, seconds) => sunAngle + lunarOrbitAngle(seconds);
+export const lunarIllumination = seconds => (1 - Math.cos(lunarOrbitAngle(seconds))) / 2;

@@ -141,10 +141,10 @@ export function createOrbitalColonyUI(getSession,{commit,archive,save,speed,view
     if(construction===1)ringBuild=null;
     for(const site of SITES){const pos=sitePosition(site,reduced.matches?0:o.elapsed),node=el(`site-${site.id}`);node.style.left=`${pos.x/10}%`;node.style.top=`${pos.y/6.2}%`;node.hidden=!pos.visible;}
     const war=o.wars.find(w=>w.id===o.selectedWar);
-    if(o.talents.monitor&&war){const site=SITES.find(site=>site.id===o.civilizations.find(c=>c.id===war.participants[0]).site);renderBattle(war.game,{skyTime:localSkyTime(o.elapsed,site)});}
+    if(o.talents.monitor&&war){const site=SITES.find(site=>site.id===o.civilizations.find(c=>c.id===war.participants[0]).site);renderBattle(war.game,{skyTime:localSkyTime(o.elapsed,site),lunarTime:o.elapsed});}
     if(o.talents.overview&&o.wars.length&&(lastThumbs===null||timestamp-lastThumbs>=100||timestamp<lastThumbs)){lastThumbs=timestamp;
       o.wars.forEach((w,i)=>{const thumb=thumbs[i];if(!thumb.canvas.getBoundingClientRect().width)return;thumb.render??=createRenderer(thumb.canvas);
-        const site=SITES.find(site=>site.id===o.civilizations.find(c=>c.id===w.participants[0]).site);thumb.render(w.game,{skyTime:localSkyTime(o.elapsed,site)});});}
+        const site=SITES.find(site=>site.id===o.civilizations.find(c=>c.id===w.participants[0]).site);thumb.render(w.game,{skyTime:localSkyTime(o.elapsed,site),lunarTime:o.elapsed});});}
     if(o.talents.outpost){const p=canvasContext(el('colony-moon'));if(p)drawLunarColony(p.ctx,p.width,p.height,o,{ambientTime:ambient,reducedMotion:reduced.matches});}
   }
   function sync(options={}){if(Object.hasOwn(options,'paused'))paused=options.paused;bind(buildOrbitalViewModel(getSession(),{paused,...options,talent,selected}));}

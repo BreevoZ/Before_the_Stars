@@ -1,5 +1,5 @@
 import { Q } from './quantity.js';
-import { dayPhase } from './celestial-clock.js';
+import { dayPhase, lunarOrbitAngle, lunarSkyAngle } from './celestial-clock.js';
 import { drawTurret } from './turrets.js';
 import { RULES, UNITS, AGES, ABILITIES, getTurretPosition, getAbilityRadius, getAbilityImpactX, getUnitHealth, getUnitChargeTarget, attributes } from './game.js';
 import { drawUnit } from './units.js';
@@ -71,33 +71,37 @@ function line(ctx, points, color, width = 2) {
   ctx.stroke();
 }
 
-function drawCelestialBody(ctx, ground, angle, moon) {
+const celestialPoint = (ground, angle) => ({ x: RULES.width / 2 - Math.cos(angle) * RULES.width * 0.39, y: ground * (1 - Math.sin(angle) * 0.78) });
+// The moon shows the phase of the orbiting moon: its lit limb faces the sun,
+// wherever the sun is (even below the horizon), and the dark part keeps a faint earthshine.
+function drawCelestialBody(ctx, ground, angle, moon, { sunAngle = angle + Math.PI, elongation = Math.PI } = {}) {
   const elevation = Math.sin(angle);
   if (elevation < -0.15) return;
-  const x = RULES.width / 2 - Math.cos(angle) * RULES.width * 0.39;
-  const y = ground * (1 - elevation * 0.78);
-  const radius = moon ? 27 : 32;
+  const { x, y } = celestialPoint(ground, angle);
+  const radius = moon ? 27 : 32, lit = moon ? (1 - Math.cos(elongation)) / 2 : 1;
   ctx.save();
   ctx.globalAlpha = Math.min(1, Math.max(0, (elevation + 0.15) / 0.3));
   const glow = ctx.createRadialGradient(x, y, radius * 0.6, x, y, radius * 3.5);
-  glow.addColorStop(0, moon ? '#dce5bf30' : '#ffe3a555');
-  glow.addColorStop(1, moon ? '#dce5bf00' : '#ffe3a500');
+  glow.addColorStop(0, moon ? `rgba(220,229,191,${0.19 * lit})` : '#ffe3a555');
+  glow.addColorStop(1, moon ? 'rgba(220,229,191,0)' : '#ffe3a500');
   ctx.fillStyle = glow;
   ctx.fillRect(x - radius * 3.5, y - radius * 3.5, radius * 7, radius * 7);
-  ctx.fillStyle = moon ? '#d9dfba' : '#ffe3a5';
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
-  ctx.fill();
-  if (moon) {
-    ctx.fillStyle = '#9aaa9530';
-    for (const [dx, dy, size] of [[-9, -6, 7], [9, 7, 5], [-5, 13, 3]]) {
-      ctx.beginPath(); ctx.arc(x + dx, y + dy, size, 0, Math.PI * 2); ctx.fill();
-    }
+  if (!moon) {
+    ctx.fillStyle = '#ffe3a5'; ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill(); ctx.restore(); return;
   }
-  ctx.restore();
+  const sun = celestialPoint(ground, sunAngle);
+  ctx.translate(x, y); ctx.rotate(Math.atan2(sun.y - y, sun.x - x));
+  ctx.fillStyle = '#56645c38'; ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill();
+  // Lit region: the sunward half-disc bounded by the terminator ellipse.
+  ctx.beginPath(); ctx.arc(0, 0, radius, -Math.PI / 2, Math.PI / 2);
+  for (let i = 0; i <= 24; i++) { const phi = Math.PI / 2 - i / 24 * Math.PI; ctx.lineTo(radius * Math.cos(elongation) * Math.cos(phi), radius * Math.sin(phi)); }
+  ctx.closePath(); ctx.fillStyle = '#d9dfba'; ctx.fill();
+  ctx.save(); ctx.clip(); ctx.fillStyle = '#9aaa9530';
+  for (const [dx, dy, size] of [[-9, -6, 7], [9, 7, 5], [-5, 13, 3]]) { ctx.beginPath(); ctx.arc(dx, dy, size, 0, Math.PI * 2); ctx.fill(); }
+  ctx.restore(); ctx.restore();
 }
 
-export function drawLandscape(ctx, height, ground, time) {
+export function drawLandscape(ctx, height, ground, time, lunarTime = time) {
   const phase = dayPhase(time);
   const light = landscapeLight(phase);
   const sky = ctx.createLinearGradient(0, 0, 0, ground);
@@ -129,8 +133,9 @@ export function drawLandscape(ctx, height, ground, time) {
     }
   }
   ctx.restore();
-  drawCelestialBody(ctx, ground, phase * Math.PI * 2, false);
-  drawCelestialBody(ctx, ground, phase * Math.PI * 2 + Math.PI, true);
+  const sunAngle = phase * Math.PI * 2, orbit = lunarOrbitAngle(lunarTime);
+  drawCelestialBody(ctx, ground, sunAngle, false);
+  drawCelestialBody(ctx, ground, lunarSkyAngle(sunAngle, lunarTime), true, { sunAngle, elongation: orbit });
 
   polygon(ctx, [[0, ground], [0, ground - 115], [95, ground - 149], [171, ground - 114],
     [284, ground - 195], [361, ground - 121], [425, ground - 155], [568, ground - 83],
@@ -208,9 +213,9 @@ export function createRenderer(canvas) {
   new ResizeObserver(resize).observe(canvas);
   resize();
 
-  return function render(game, { targeting = false, targetX = RULES.width / 2, skyTime = game.elapsed } = {}) {
+  return function render(game, { targeting = false, targetX = RULES.width / 2, skyTime = game.elapsed, lunarTime = skyTime } = {}) {
     if (!canvas.width || !canvas.height || !Number.isFinite(sceneHeight)) return;
-    drawBattleScene(ctx, game, { height: sceneHeight, entityScale, time: reducedMotion.matches ? 0 : game.elapsed, skyTime: reducedMotion.matches ? 0 : skyTime,
+    drawBattleScene(ctx, game, { height: sceneHeight, entityScale, time: reducedMotion.matches ? 0 : game.elapsed, skyTime: reducedMotion.matches ? 0 : skyTime, lunarTime: reducedMotion.matches ? 0 : lunarTime,
       reducedMotion: reducedMotion.matches, targeting, targetX });
   };
 }
@@ -218,8 +223,8 @@ export function createRenderer(canvas) {
 // One painter for live combat and its final frame in the destruction sequence.
 // Presentation callers supply their camera/clock; this never advances combat.
 export function drawBattleScene(ctx, game, { height = RULES.height, ground = height * .738,
-  time = game.elapsed, skyTime = time, entityScale = 1, reducedMotion = false, targeting = false, targetX = RULES.width / 2 } = {}) {
-  drawLandscape(ctx, height, ground, skyTime);
+  time = game.elapsed, skyTime = time, lunarTime = skyTime, entityScale = 1, reducedMotion = false, targeting = false, targetX = RULES.width / 2 } = {}) {
+  drawLandscape(ctx, height, ground, skyTime, lunarTime);
   ctx.save();
   ctx.translate(0, ground);
   drawBase(ctx, game.bases.player, game.ages.player, time, entityScale, game.turrets.player.length);

@@ -26,7 +26,7 @@ export function orbitalTalentEffect(o,key,rank=o.talents[key]){
   if(key==='lunarIndustry')return `${lunar(rank)} Legacy/s`;
   if(key==='massDriver')return rank?`货运加速 · ${lunar(undefined,rank)} Legacy/s`:'货运舱按常规节奏发射';
   if(key==='shipyard')return rank?'方舟正在船坞中成形':'尚无远航船坞';
-  if(key==='voyage')return rank?'方舟已驶离地月系统':'等待启航';
+  if(key==='voyage')return rank?'方舟已下水 · 行星际空间已打开':'等待启航';
   if(key==='airdrop')return rank?`空投 ${R.airdropGold}× 时代起始金币，每个文明最多 ${R.maximumAirdrops} 次`:'无法向地表投送物资';
   if(key==='intel')return rank?'显示开战前与交战中的胜率预估':'战局只能凭经验判断';
   if(key==='ceasefire')return rank?`可冻结一场战争 ${R.ceasefireSeconds} 秒`:'战争一旦开始便无法中止';
@@ -45,7 +45,9 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
     '#colony-legacy':Q.format(s.permanent.legacy),'#orbit-tree-wallet':Q.format(s.permanent.legacy),
     '#colony-earned':`本阶段已收获 ${Q.format(o.legacyEarned)} · 收益 ×${orbitalYieldMultiplier(o)}`,
     '#colony-income':o.talents.outpost?`月面 +${Q.format(lunarLegacyRate(o))}/s`:'文明遗产',
-    '#colony-lunar@hidden':!o.talents.outpost,'#colony-view-moon@hidden':!o.talents.outpost,'#colony-lunar-rate':Q.format(lunarLegacyRate(o)),
+    '#colony-lunar@hidden':!o.talents.outpost,'#colony-view-moon@hidden':!o.talents.outpost,'#colony-view-system@hidden':!o.talents.voyage,
+    // VII extends VI: the same observatory, renamed once the ark is launched.
+    '#colony-stage-numeral':o.talents.voyage?'VII':'VI','#colony-stage-name':o.talents.voyage?'行星际':'轨道文明','#colony-lunar-rate':Q.format(lunarLegacyRate(o)),
     '#colony-lunar-level':`自动工场 ${o.talents.lunarIndustry} / 4 · ${3+o.talents.lunarIndustry*2} 处设施 · ${o.talents.massDriver?'质量投射器运行中':'穿梭货运'}`,
     '#colony-lunar-produced':`累计生产 ${Q.format(o.lunarProduced)} Legacy`,'#colony-habitat-state':`${o.talents.recovery} / ${R.habitatSections} 段 · 遗产 ×${2**o.talents.recovery}`,
     '#colony-time':orbitalTime(o.elapsed),
@@ -55,7 +57,7 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
     '#colony-objective':winter?'余烬，等待下一次黎明。':'地球之上，文明再生。',
     '#colony-objective-detail':winter?`全球文明已被核武毁灭。${Math.ceil(o.remaining)} 秒后，新的火种将在不同点位萌芽。`:'选择两个空闲文明，挑起战争。双方通过招募、杀敌与阵亡获得经验并进化。',
     '#colony-fallout@hidden':!winter,'#colony-fallout':`+${Q.format(o.lastReward)} Legacy 已入账 · 核冬天 ${Math.ceil(o.remaining)} 秒${getOrbitalTalentState(s,'voyage')==='ready'?' · 远航协议可以启航':''}`,
-    '#colony-complete@hidden':o.completionAt===null,'#colony-complete':`VI · 远航协议已生效。方舟驶离地月系统；VII 行星际阶段尚未开放，地表观测与月面生产继续运行。`,
+    '#colony-complete@hidden':o.completionAt===null,'#colony-complete':`VII · 方舟已下水，行星际空间打开。地球的战争与轮回、月面生产照常继续；各行星的开发将陆续开放。`,
     // During a war the two pickers show the battlefield as it is: left, then right.
     '#colony-first@value':(targetWar?findCivilization(o,targetWar.participants[0]):first)?.site??'', '#colony-opponent@value':(targetWar?findCivilization(o,targetWar.participants[1]):second)?.site??'',
     '#colony-start-war@disabled':getWarState(s,first?.id,second?.id)!=='ready',
@@ -96,6 +98,8 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
   const host=w&&findCivilization(o,w.participants[0]),site=host&&SITES.find(s=>s.id===host.site);
   v['#colony-solar-time']=site?`${host.name}战区 · ${siteDaylight(o.elapsed,site).label} · ${w.ceasefire>0?`停火中 ${Math.ceil(w.ceasefire)} 秒`:'双方 AI 接管'}`:'等待地面信号';
   const odds=w&&o.talents.intel?warOdds(...w.participants.map(id=>findCivilization(o,id)),w):null;
+  // With no war on screen there is no side to pick.
+  for(const team of ['player','enemy'])v[`#colony-war-${team}@hidden`]=!w;
   for(const [i,team]of ['player','enemy'].entries()){v[`#colony-war-${team}@aria-pressed`]=String(Boolean(w&&w.participants[i]===first?.id));v[`#colony-war-${team}@title`]='设为干预目标';}
   for(const [i,team]of ['player','enemy'].entries())v[`#colony-war-${team}`]=w?`${i?'':'◀ '}${findCivilization(o,w.participants[i]).name} · ${AGES[w.game.ages[team]].numeral} · 基地 ${Q.format(w.game.bases[team].hp)}/${Q.format(w.game.bases[team].maxHp)} · 金币 ${Q.format(Q.floor(w.game.gold[team]))} · 经验 ${Q.format(w.game.experience[team])}${odds===null?'':` · 胜率 ${Math.round((i?1-odds:odds)*100)}%`}${i?' ▶':''}`:'';
   for(const [key,t]of Object.entries(T)){

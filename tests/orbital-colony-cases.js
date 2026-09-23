@@ -38,6 +38,14 @@ export function lunarFixture(){
   // The route has to exist before anything from the moon reaches Earth.
   purchaseOrbitalTalent(s,'transit');purchaseOrbitalTalent(s,'outpost');return s;
 }
+// The eve of VII: every condition for 远航协议 met, inside a nuclear winter.
+export function voyageReady(){
+  const s=lunarFixture();
+  for(let i=0;i<2;i++){pair(s);const w=s.orbital.wars[0];future(w);won(w);resolveOrbitalWar(s,w.id);if(i===0)advance(s,61);}
+  while(purchaseOrbitalTalent(s,'recovery')){}for(const key of ['lunarIndustry','lunarIndustry','massDriver','shipyard'])purchaseOrbitalTalent(s,key);
+  return s;
+}
+export function voyageFixture(){const s=voyageReady();purchaseOrbitalTalent(s,'voyage');return s;}
 export function registerOrbitalColonyTests(test,assert,near){
   const throws=fn=>{let caught=false;try{fn();}catch{caught=true;}assert(caught,'Invalid orbital input must be rejected');};
   test('Orbital clock: surface and rotating sites share one solar day, including negative local times',()=>{
@@ -159,6 +167,21 @@ export function registerOrbitalColonyTests(test,assert,near){
     wo.phase='winter';wo.settledCycle=wo.cycle;wo.nuclearCycles=wo.cycle;wo.lastCatastropheAt=0;wo.winterDuration=wo.remaining=rebirthDelay(wo);wo.lastReward=10000;wo.legacyEarned=Q.add(wo.legacyEarned,10000);w.permanent.totalLegacy=Q.add(w.permanent.totalLegacy,10000);
     for(const c of wo.civilizations){c.alive=false;c.warId=null;}wo.wars=[];wo.selectedWar=null;
     const before=wo.legacyEarned;advance(w,rebirthDelay(wo)+1);near(Q.toNumber(Q.sub(wo.legacyEarned,before)),10000*R.falloutShare,2);
+  });
+  test('VII opens as an extension: 远航协议 keeps VI running, renames the observatory and adds the solar system tab',()=>{
+    const before=voyageReady(),vm0=buildOrbitalViewModel(before);assert(vm0['#colony-view-system@hidden']===true&&vm0['#colony-stage-numeral']==='VI');
+    const wallet=before.permanent.legacy;assert(purchaseOrbitalTalent(before,'voyage'));const o=before.orbital;
+    assert(Q.eq(before.permanent.legacy,Q.sub(wallet,T.voyage.costs[0])),'The ark costs its price, not the whole wallet');
+    const vm=buildOrbitalViewModel(before);assert(vm['#colony-view-system@hidden']===false&&vm['#colony-stage-numeral']==='VII'&&vm['#colony-stage-name']==='行星际');
+    const civs=o.nuclearCycles;advance(before,R.winterSeconds+5);assert(o.phase==='living'&&o.civilizations.some(c=>c.alive)&&o.nuclearCycles===civs,'Earth keeps seeding after the launch');
+    const raw=serializeSession(before);assert(serializeSession(parseSession(raw))===raw);
+  });
+  test('Solar system: bodies keep their real order, Kepler periods and a deterministic, periodic orbit',async()=>{
+    const {BODIES,orbitalPeriod,bodyPosition,orbitRadius,EARTH_YEAR_SECONDS}=await import('../src/solar-config.js');
+    const planets=BODIES.filter(b=>!b.belt);for(let i=1;i<BODIES.length;i++)assert(BODIES[i].au>BODIES[i-1].au&&orbitRadius(BODIES[i].au)>orbitRadius(BODIES[i-1].au));
+    near(orbitalPeriod(1),EARTH_YEAR_SECONDS);assert(orbitalPeriod(5.2)>orbitalPeriod(1.52)&&orbitalPeriod(.39)<orbitalPeriod(1));
+    for(const b of planets){const a=bodyPosition(b,123),c=bodyPosition(b,123+orbitalPeriod(b.au));near(a.x,c.x,1e-6);near(a.y,c.y,1e-6);assert(a.x>=0&&a.x<=1000&&a.y>=0&&a.y<=620,`${b.id} stays in frame`);}
+    const {bodyAt}=await import('../src/solar-render.js'),o=voyageFixture().orbital,e=bodyPosition(BODIES.find(b=>b.id==='earth'),o.elapsed);assert(bodyAt(o,e.x,e.y)?.id==='earth');
   });
   test('Intel: the pre-war estimate shows only with 情报网络 and favours the older, boosted side',()=>{
     const plain=colonyFixture({legacy:10000,talents:['monitor']});assert(!/情报预估/.test(buildOrbitalViewModel(plain)['#colony-war-hint']));

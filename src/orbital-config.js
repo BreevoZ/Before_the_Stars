@@ -56,7 +56,7 @@ export const ORBITAL_TALENTS = Object.freeze({
   shipyard: talent('深空船坞',[4194304],{lunarIndustry:2,massDriver:1},'在月面建造远航方舟的船坞。',660,285,'drydock',{cycles:3,branch:'home'}),
   // The full ring is a stated condition rather than an edge: a drawn link from
   // the ring would cut straight through the route, outpost and shipyard nodes.
-  voyage: talent('远航协议',[16777216],{shipyard:1},'带上历次轮回中观测到的全部文明，驶离地月系统。需要完整星环，只能在核冬天期间启航，完成 VI。',660,70,'ark',{cycles:4,ring:7,branch:'home',kind:'keystone',finale:true}),
+  voyage: talent('远航协议',[16777216],{shipyard:1},'方舟下水，打开行星际空间：观测台扩展为整个太阳系，VI 的一切照常运行。需要完整星环，只能在核冬天期间启航。',660,70,'ark',{cycles:4,ring:7,branch:'home',kind:'keystone',finale:true}),
   // WAR · 地表干预: observation along the bottom row, then two columns —
   // proxy war rising under 代理人战争, intelligence and truce beside it.
   monitor: talent('地面监控',[128],{protocol:1},'接入地表实况，观看双方 AI 的真实战争；开启干预路线。',1020,935,'eye',{branch:'war',kind:'specialist'}),

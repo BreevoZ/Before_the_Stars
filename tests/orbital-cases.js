@@ -133,7 +133,7 @@ export function registerOrbitalTests(test, assert) {
       assert(el('archives-dialog').dataset.orbital==='arrived' && !el('orbital-actions').hidden);
       assert(doc.activeElement.id==='orbital-title');
       el('review-surface').click();assert(el('orbital-presentation').hidden && !el('home-scroll').inert);
-      el('node-bypasser').click();assert(el('buy-bypasser').disabled && el('cost-bypasser').textContent==='完整');
+      el('node-bypasser').click();assert(el('buy-bypasser').disabled && el('node-bypasser').dataset.state==='max');
       el('return-orbit').click();el('replay-orbital').click();el('skip-orbital').click();
       assert(frame.contentWindow.__storage.getItem(SAVE_KEY)===raw);
       frame.remove();frame=await mountFixture(raw);doc=frame.contentDocument;el=id=>doc.getElementById(id);

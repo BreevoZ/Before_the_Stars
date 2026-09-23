@@ -227,3 +227,4 @@ body:has(#archives-dialog[data-destruction]) #civilization-bar { display: none; 
 #home-legend{top:calc(max(20px, env(safe-area-inset-top)) + 62px);right:36px}#orbit-legend{top:106px}
 @media(max-width:740px){.tree-legend{gap:10px;font-size:9px}#home-legend,#orbit-legend{top:auto;bottom:34px;right:12px}}
 .tree-legend .legend-main{color:var(--route-main)}.tree-legend .legend-main svg{stroke-width:1.6}
+.talent-node[data-state="max"] .node-name{top:calc(100% + 8px)}

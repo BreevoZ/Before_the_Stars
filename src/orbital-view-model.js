@@ -39,11 +39,13 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
   const o=s.orbital,active=s.run.phase==='orbital'&&o?.started;
   const v={'body@data-orbital-active':String(Boolean(active)),'#orbital-game@hidden':!active};if(!active)return v;
   const alive=o.civilizations.filter(c=>c.alive),first=findCivilization(o,o.selectedCivilization),second=findCivilization(o,o.selectedOpponent),winter=o.phase==='winter';
+  // Which side of its battlefield the intervention target fights on: left is the war's first participant.
+  const targetWar=first?.warId?o.wars.find(w=>w.id===first.warId):null,side=targetWar?['player','enemy'][targetWar.participants.indexOf(first.id)]:null;
   Object.assign(v,{
     '#colony-legacy':Q.format(s.permanent.legacy),'#orbit-tree-wallet':Q.format(s.permanent.legacy),
     '#colony-earned':`本阶段已收获 ${Q.format(o.legacyEarned)} · 收益 ×${orbitalYieldMultiplier(o)}`,
     '#colony-income':o.talents.outpost?`月面 +${Q.format(lunarLegacyRate(o))}/s`:'文明遗产',
-    '#colony-lunar@hidden':!o.talents.outpost,'#colony-lunar-rate':Q.format(lunarLegacyRate(o)),
+    '#colony-lunar@hidden':!o.talents.outpost,'#colony-view-moon@hidden':!o.talents.outpost,'#colony-lunar-rate':Q.format(lunarLegacyRate(o)),
     '#colony-lunar-level':`自动工场 ${o.talents.lunarIndustry} / 4 · ${3+o.talents.lunarIndustry*2} 处设施 · ${o.talents.massDriver?'质量投射器运行中':'穿梭货运'}`,
     '#colony-lunar-produced':`累计生产 ${Q.format(o.lunarProduced)} Legacy`,'#colony-habitat-state':`${o.talents.recovery} / ${R.habitatSections} 段 · 遗产 ×${2**o.talents.recovery}`,
     '#colony-time':orbitalTime(o.elapsed),
@@ -54,12 +56,14 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
     '#colony-objective-detail':winter?`全球文明已被核武毁灭。${Math.ceil(o.remaining)} 秒后，新的火种将在不同点位萌芽。`:'选择两个空闲文明，挑起战争。双方通过招募、杀敌与阵亡获得经验并进化。',
     '#colony-fallout@hidden':!winter,'#colony-fallout':`+${Q.format(o.lastReward)} Legacy 已入账 · 核冬天 ${Math.ceil(o.remaining)} 秒${getOrbitalTalentState(s,'voyage')==='ready'?' · 远航协议可以启航':''}`,
     '#colony-complete@hidden':o.completionAt===null,'#colony-complete':`VI · 远航协议已生效。方舟驶离地月系统；VII 行星际阶段尚未开放，地表观测与月面生产继续运行。`,
-    '#colony-first@value':first?.site??'', '#colony-opponent@value':second?.site??'',
+    // During a war the two pickers show the battlefield as it is: left, then right.
+    '#colony-first@value':(targetWar?findCivilization(o,targetWar.participants[0]):first)?.site??'', '#colony-opponent@value':(targetWar?findCivilization(o,targetWar.participants[1]):second)?.site??'',
     '#colony-start-war@disabled':getWarState(s,first?.id,second?.id)!=='ready',
     '#colony-war-hint':{waiting:'等待文明重新萌芽。',selection:'请选择两个存活文明。',busy:'所选文明正在交战；每个文明同时参与一场战争。',ready:'免费挑起战争 · 战斗中的金币属于地面文明。'}[getWarState(s,first?.id,second?.id)]+(o.talents.intel&&first?.alive&&second?.alive&&first!==second&&!first.warId&&!second.warId?` 情报预估：${first.name} ${Math.round(warOdds(first,second)*100)}% · ${second.name} ${Math.round(warOdds(second,first)*100)}%`:''),
     '#colony-auto-row@hidden':!o.talents.weaving,'#colony-auto@checked':o.autoWar,'#colony-seed-row@hidden':!o.talents.directed,'#colony-seed-tendency@value':String(o.seedTendency),
     '#colony-refugees@hidden':winter||alive.length>=2,'#colony-refugees':`幸存者正在等待新的对手。新聚落即将从空闲点位萌芽。`,
-    '#colony-selected-name':first?`${first.name} · ${first.alive?AGES[first.age].numeral+' '+AGES[first.age].shortName:'废墟'}`:'选择一个文明',
+    '#colony-selected-name':first?`${side?(side==='player'?'◀ 左方 · ':'右方 ▶ · '):''}${first.name} · ${first.alive?AGES[first.age].numeral+' '+AGES[first.age].shortName:'废墟'}`:'选择一个文明',
+    '#colony-target@data-side':side??'none',
     '#colony-selected-stats':first?.alive?`${first.tendency?`${TENDENCIES[first.tendency].name}倾向 · `:''}军备扶持 ${first.power}/5 · 部队伤害与生命 ×${(1.25**first.power).toFixed(2)}${first.airdrops?` · 空投 ${first.airdrops}/${R.maximumAirdrops}`:''} · 收割价值 ${Q.format(civilizationValue(o,first))} Legacy`:'废墟没有可收割的遗产。',
     '#colony-monitor-locked@hidden':Boolean(o.talents.monitor),'#colony-monitor@hidden':!o.talents.monitor,
     '#colony-event':o.log.at(-1)?.text??'',
@@ -92,13 +96,15 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
   const host=w&&findCivilization(o,w.participants[0]),site=host&&SITES.find(s=>s.id===host.site);
   v['#colony-solar-time']=site?`${host.name}战区 · ${siteDaylight(o.elapsed,site).label} · ${w.ceasefire>0?`停火中 ${Math.ceil(w.ceasefire)} 秒`:'双方 AI 接管'}`:'等待地面信号';
   const odds=w&&o.talents.intel?warOdds(...w.participants.map(id=>findCivilization(o,id)),w):null;
-  for(const [i,team]of ['player','enemy'].entries())v[`#colony-war-${team}`]=w?`${findCivilization(o,w.participants[i]).name} · ${AGES[w.game.ages[team]].numeral} · 基地 ${Q.format(w.game.bases[team].hp)}/${Q.format(w.game.bases[team].maxHp)} · 金币 ${Q.format(Q.floor(w.game.gold[team]))} · 经验 ${Q.format(w.game.experience[team])}${odds===null?'':` · 胜率 ${Math.round((i?1-odds:odds)*100)}%`}`:'';
+  for(const [i,team]of ['player','enemy'].entries()){v[`#colony-war-${team}@aria-pressed`]=String(Boolean(w&&w.participants[i]===first?.id));v[`#colony-war-${team}@title`]='设为干预目标';}
+  for(const [i,team]of ['player','enemy'].entries())v[`#colony-war-${team}`]=w?`${i?'':'◀ '}${findCivilization(o,w.participants[i]).name} · ${AGES[w.game.ages[team]].numeral} · 基地 ${Q.format(w.game.bases[team].hp)}/${Q.format(w.game.bases[team].maxHp)} · 金币 ${Q.format(Q.floor(w.game.gold[team]))} · 经验 ${Q.format(w.game.experience[team])}${odds===null?'':` · 胜率 ${Math.round((i?1-odds:odds)*100)}%`}${i?' ▶':''}`:'';
   for(const [key,t]of Object.entries(T)){
     const rank=o.talents[key],status=getOrbitalTalentState(s,key);
     v[`#orbit-node-${key}@data-state`]=status;v[`#orbit-node-${key}@aria-pressed`]=String(selected&&key===talent);v[`#orbit-node-${key}@aria-expanded`]=String(selected&&key===talent);v[`#orbit-node-${key}@aria-label`]=`${t.name}，${rank}/${t.costs.length} 级，${status==='max'?'已完成':`${t.costs[rank]} Legacy`}`;
     // Show a cycle or ring gate on the node itself, not only in the detail card.
     v[`#orbit-gate-${key}`]=rank>=t.costs.length?'':[(t.cycles??0)>o.nuclearCycles?`☢ ${o.nuclearCycles}/${t.cycles}`:'',(t.ring??0)>o.talents.recovery?`环 ${o.talents.recovery}/${t.ring}`:''].filter(Boolean).join(' · ');
-    v[`#orbit-rank-${key}`]='●'.repeat(rank)+'○'.repeat(t.costs.length-rank);v[`#orbit-cost-${key}`]=status==='max'?'已点亮':`${Q.format(t.costs[rank])}`;
+    // A filled node already says it is owned; single-rank nodes need no rank dots.
+    v[`#orbit-rank-${key}`]=t.costs.length>1?'●'.repeat(rank)+'○'.repeat(t.costs.length-rank):'';v[`#orbit-cost-${key}`]=status==='max'?'':`${Q.format(t.costs[rank])}`;v[`#orbit-node-${key}@data-owned`]=String(rank>0);
     for(const parent of Object.keys(t.requires))v[`#orbit-edge-${parent}-${key}@class:lit`]=rank>0;
   }
   const t=T[talent],rank=o.talents[talent],status=getOrbitalTalentState(s,talent);

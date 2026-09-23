@@ -330,8 +330,8 @@ export function registerOrbitalColonyTests(test,assert,near){
     try{const doc=frame.contentDocument,win=frame.contentWindow,el=id=>doc.getElementById(id);let now=0;const tick=n=>{for(let i=0;i<n;i++)win.__testFrame(now+=100);};
       assert(!el('orbital-game').hidden&&el('colony-monitor').hidden);el('colony-start-war').click();tick(10);
       el('colony-talents').click();assert(el('orbit-talents-dialog').open);const before=el('colony-time').textContent;tick(10);assert(el('colony-time').textContent===before);
-      el('orbit-node-monitor').click();el('orbit-buy').click();assert(el('orbit-cost-monitor').textContent==='已点亮');
-      el('orbit-node-patronage').dispatchEvent(new win.MouseEvent('dblclick',{bubbles:true}));assert(el('orbit-cost-patronage').textContent==='已点亮');
+      el('orbit-node-monitor').click();el('orbit-buy').click();assert(el('orbit-node-monitor').dataset.state==='max'&&el('orbit-cost-monitor').textContent==='');
+      el('orbit-node-patronage').dispatchEvent(new win.MouseEvent('dblclick',{bubbles:true}));assert(el('orbit-node-patronage').dataset.state==='max');
       el('close-orbit-talents').click();tick(20);assert(!el('colony-monitor').hidden&&!el('colony-battle').hidden&&el('colony-war-player').textContent.includes('金币'));
       el('intervene-boost').click();assert(el('colony-selected-stats').textContent.includes('1/5'));
       doc.body.dispatchEvent(new win.KeyboardEvent('keydown',{code:'Space',bubbles:true}));const frozen=el('colony-time').textContent;tick(20);assert(el('colony-time').textContent===frozen);

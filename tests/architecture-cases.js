@@ -64,7 +64,7 @@ export function registerArchitectureTests(test, assert) {
     assert(buildTalentViewModel(s)['#node-spark@data-state'] === 'ready');
     assert(buildAutomationViewModel(s)['#automation-settings@hidden']);
     assert(purchaseTalent(s, 'spark'));
-    assert(buildTalentViewModel(s)['#level-spark'] === '●');
+    assert(buildTalentViewModel(s)['#level-spark'] === '' && buildTalentViewModel(s)['#node-spark@data-state'] === 'max');
     assert(buildTalentViewModel(s)['#link-formation@data-state'] === 'available');
     assert(buildAutomationViewModel(s)['#automation-settings@hidden']);
     rebuildCivilization(s, s.run.runId);
@@ -79,7 +79,7 @@ export function registerArchitectureTests(test, assert) {
       s.run.phase = phase;
       const vm = buildTalentViewModel(s);
       for (const key of ['spark', 'production']) {
-        assert(vm[`#buy-${key}`] === '已满级' && vm[`#cost-${key}`] === '完整');
+        assert(vm[`#buy-${key}`] === '已满级' && vm[`#cost-${key}`] === '');
         assert(vm[`#buy-${key}@disabled`] && !vm[`#node-${key}@aria-label`].includes('下一级'));
       }
       assert(!JSON.stringify(vm).includes('undefined'));

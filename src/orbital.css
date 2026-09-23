@@ -95,3 +95,20 @@ body[data-orbital-active="true"] .game-shell{display:none}
 @media(max-width:740px){.colony-war-grid{grid-template-columns:1fr 1fr}.colony-chronicle{min-height:0}}
 .orbit-gate{position:absolute;left:50%;bottom:calc(100% + 4px);transform:translateX(-50%);white-space:nowrap;font-size:9px;letter-spacing:1px;color:var(--enemy);opacity:.85}.orbit-gate:empty{display:none}
 .colony-seed-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;font-size:11px}.colony-seed-row select{min-height:34px;font-size:11px}
+.orbit-node[data-state="max"] .orbit-node-name{top:calc(100% + 8px)}
+/* Sides: left is the player colour, right the enemy colour, as on the battlefield. */
+.colony-battle-hud .colony-side{flex:1;max-width:49%;text-align:left;padding:7px 10px;border:1px solid var(--line);border-left:3px solid var(--side);border-radius:4px;font-size:9px;line-height:1.7;color:var(--muted);min-height:0;background:transparent}
+.colony-side[data-side="player"],.colony-side-label[data-side="player"],#colony-target[data-side="player"]{--side:var(--player)}.colony-side[data-side="enemy"],.colony-side-label[data-side="enemy"],#colony-target[data-side="enemy"]{--side:var(--enemy)}
+.colony-battle-hud .colony-side[data-side="enemy"]{text-align:right;border-left-width:1px;border-right:3px solid var(--side)}
+.colony-battle-hud .colony-side[aria-pressed="true"]{color:var(--color-home-text);background:color-mix(in srgb,var(--side) 12%,transparent);border-color:var(--side)}
+.colony-side-label{color:var(--side)}
+#colony-target[data-side="player"],#colony-target[data-side="enemy"]{border-left:3px solid var(--side);padding-left:12px}#colony-target[data-side="player"] h3,#colony-target[data-side="enemy"] h3{color:var(--side)}
+/* The observation window shows the planet or the moon base; the moon is a tab,
+   not a section at the foot of the page. */
+.colony-view-tabs{position:absolute;right:16px;top:14px;z-index:3;display:flex;gap:2px;padding:3px;border:1px solid var(--line);border-radius:20px;background:#0c1618cc}
+.colony-view-tabs button{font-size:10px;letter-spacing:1px;padding:5px 12px;min-height:0;border-radius:16px;color:var(--muted)}.colony-view-tabs button[aria-pressed="true"]{color:var(--route-main);background:#c3bd781a}
+#colony-map .colony-lunar{position:absolute;inset:0;margin:0;min-height:0;border:0;border-radius:inherit;display:none;z-index:2}
+#colony-map[data-view="moon"] .colony-lunar:not([hidden]){display:block}#colony-map[data-view="moon"] .orbit-site,#colony-map[data-view="moon"] .colony-map-caption{display:none}
+#colony-map .colony-lunar>div{padding:26px 30px;max-width:44%}#colony-world{cursor:default}#colony-world[data-moon-hover="true"]{cursor:pointer}
+@media(max-width:740px){#colony-map .colony-lunar>div{max-width:60%;padding:18px}#colony-map .colony-lunar p:not(.colony-eyebrow){display:none}}
+.colony-pair .colony-side-label{color:var(--side)}

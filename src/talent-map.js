@@ -103,7 +103,8 @@ export function createTalentMap(getSession, changed) {
   }
   for (const [layer, point] of Object.entries(GATES)) {
     const gate = document.createElement('div'); gate.id = `gate-${layer}`; gate.className = 'era-gate';
-    gate.textContent = `${['', 'I · 原始', 'II · 中世纪', 'III · 文艺复兴', 'IV · 现代', 'V · 未来', '超级士兵计划'][layer]} · ${Number(layer) === 1 ? '点亮火种' : `前层任意 ${TALENT_LAYER_REQUIREMENT} 项`}`;
+    // Era name only; the one-talent-per-era rule is stated once in the map guide.
+    gate.textContent = ['', 'I · 原始', 'II · 中世纪', 'III · 文艺复兴', 'IV · 现代', 'V · 未来', '超级士兵计划'][layer];
     map.append(gate);
     const parents = Number(layer) === 1 ? ['spark'] : layerTalents(Number(layer) - 1);
     for (const parent of parents) {

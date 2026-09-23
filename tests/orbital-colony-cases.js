@@ -1,9 +1,10 @@
+import { SAVE_VERSION } from '../src/progression-config.js';
 import { Q } from '../src/quantity.js';
 import { launchReady } from './orbital-cases.js';
 import { purchaseTalent, updateProgression } from '../src/progression.js';
 import { createOrbitalState, enterOrbital, startOrbitalWar, updateOrbital, resolveOrbitalWar, findCivilization, purchaseOrbitalTalent, getOrbitalTalentState, getInterventionState, intervene, orbitalLegacySpent } from '../src/orbital-game.js';
 import { syncWarCivilizations } from '../src/orbital-war.js';
-import { ORBITAL_RULES as R, ORBITAL_TALENTS as T, SITES } from '../src/orbital-config.js';
+import { ORBITAL_RULES as R, ORBITAL_RULES, ORBITAL_TALENTS as T, SITES } from '../src/orbital-config.js';
 import { civilizationValue, rebirthDelay, lunarLegacyRate } from '../src/celestial-economy.js';
 import { serializeSession, parseSession, DEBUG_SAVE_KEY, createSaveStore, mapSessionQuantities } from '../src/save.js';
 import { oldOrbitalSpent } from '../src/orbital-history.js';
@@ -32,7 +33,8 @@ function pair(s){const idle=s.orbital.civilizations.filter(c=>c.alive&&!c.warId)
 export function lunarFixture(){
   const s=colonyFixture({legacy:50000000,talents:['monitor','recovery','recovery','reseed','reseed']});
   for(let i=0;i<2;i++){pair(s);const w=s.orbital.wars[0];future(w);won(w);resolveOrbitalWar(s,w.id);advance(s,61);}
-  purchaseOrbitalTalent(s,'outpost');return s;
+  // The route has to exist before anything from the moon reaches Earth.
+  purchaseOrbitalTalent(s,'transit');purchaseOrbitalTalent(s,'outpost');return s;
 }
 export function registerOrbitalColonyTests(test,assert,near){
   const throws=fn=>{let caught=false;try{fn();}catch{caught=true;}assert(caught,'Invalid orbital input must be rejected');};
@@ -51,6 +53,21 @@ export function registerOrbitalColonyTests(test,assert,near){
     for(let rank=1;rank<=7;rank++){assert(purchaseOrbitalTalent(s,'recovery'));assert(habitatSegments(rank).length===rank);assert(civilizationValue(s.orbital,s.orbital.civilizations[0])===value*2**rank);}
     assert(!purchaseOrbitalTalent(s,'recovery')&&T.recovery.costs.length===7);
     assert(T.protocol.icon==='protocol'&&icon(T.protocol.icon).includes(PROTOCOL_GLYPH));
+  });
+  test('Moon route: the outpost needs the route, the mass driver doubles output, and 远航协议 completes VI only in a nuclear winter',()=>{
+    const s=colonyFixture({legacy:500000000,talents:['monitor','recovery','recovery','reseed','reseed']});
+    for(let i=0;i<2;i++){pair(s);const w=s.orbital.wars[0];future(w);won(w);resolveOrbitalWar(s,w.id);advance(s,61);}
+    assert(getOrbitalTalentState(s,'outpost')==='prerequisite'&&!purchaseOrbitalTalent(s,'outpost'),'No lunar income without the route');
+    assert(purchaseOrbitalTalent(s,'transit')&&purchaseOrbitalTalent(s,'outpost')&&s.orbital.completionAt===null,'The route no longer ends VI');
+    const rate=lunarLegacyRate(s.orbital);assert(purchaseOrbitalTalent(s,'massDriver')&&lunarLegacyRate(s.orbital)===rate*2);
+    for(let i=0;i<2;i++)assert(purchaseOrbitalTalent(s,'lunarIndustry'));
+    while(purchaseOrbitalTalent(s,'recovery')){}
+    for(let i=0;i<2;i++){pair(s);const w=s.orbital.wars[0];future(w);won(w);resolveOrbitalWar(s,w.id);if(i===0)advance(s,61);}
+    assert(purchaseOrbitalTalent(s,'shipyard')&&s.orbital.nuclearCycles===4&&s.orbital.phase==='winter');
+    const winter=serializeSession(s);advance(s,61);
+    assert(s.orbital.phase==='living'&&getOrbitalTalentState(s,'voyage')==='winter'&&!purchaseOrbitalTalent(s,'voyage'),'The ark leaves only in winter');
+    const back=parseSession(winter);assert(getOrbitalTalentState(back,'voyage')==='ready'&&purchaseOrbitalTalent(back,'voyage')&&back.orbital.completionAt!==null);
+    assert(serializeSession(parseSession(serializeSession(back)))===serializeSession(back));
   });
   test('Lunar economy: locked production is zero, outpost and each industry rank pay the displayed rate',()=>{
     const locked=colonyFixture({legacy:10000,talents:['recovery']});advance(locked,1);assert(lunarLegacyRate(locked.orbital)===0&&locked.orbital.lunarProduced===0);
@@ -73,7 +90,7 @@ export function registerOrbitalColonyTests(test,assert,near){
   });
   test('Orbital v17: real v16 war upgrades once, preserving ledger, habitat ranks and combat, without backpay',()=>{
     const source=JSON.stringify(v16Orbital),s=parseSession(source),r=parseSession(serializeSession(s));
-    assert(s.version===18&&s.orbital.version===4&&s.orbital.lunarProduced===0&&s.orbital.lunarFraction===0&&s.orbital.talents.lunarIndustry===0);
+    assert(s.version===SAVE_VERSION&&s.orbital.version===ORBITAL_RULES.version&&s.orbital.lunarProduced===0&&s.orbital.lunarFraction===0&&s.orbital.talents.lunarIndustry===0);
     assert(s.orbital.talents.recovery===v16Orbital.orbital.talents.recovery&&s.orbital.wars.length===1);
     assert(JSON.stringify(v16Orbital)===source&&serializeSession(s)===serializeSession(r));
     assert(JSON.stringify(JSON.parse(serializeSession(s)).orbital.wars)===JSON.stringify(v16Orbital.orbital.wars));
@@ -161,7 +178,7 @@ export function registerOrbitalColonyTests(test,assert,near){
   });
   test('Orbital v15 migration: real arrived, in-progress and complete saves retain earned currency and refund all retired construction once',()=>{
     for(const record of Object.values(records)){const old=fromV15Record(mapSessionQuantities(structuredClone(record),Q.decode)),s=parseSession(JSON.stringify(record)),refund=oldOrbitalSpent(old.orbital);
-      assert(s.version===18&&s.orbital.version===4&&s.orbital.started===old.orbital.started&&s.orbital.legacyEarned===old.orbital.legacyEarned);
+      assert(s.version===SAVE_VERSION&&s.orbital.version===ORBITAL_RULES.version&&s.orbital.started===old.orbital.started&&s.orbital.legacyEarned===old.orbital.legacyEarned);
       assert(Q.eq(s.permanent.legacy,Q.add(old.permanent.legacy,refund))&&Q.eq(s.permanent.totalLegacy,old.permanent.totalLegacy));
       assert(s.permanent.completedCycles===old.permanent.completedCycles&&s.orbital.talents.protocol===1);
       assert(serializeSession(parseSession(serializeSession(s)))===serializeSession(s));

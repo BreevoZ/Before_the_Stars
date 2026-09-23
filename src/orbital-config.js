@@ -1,5 +1,5 @@
 // Orbital wars reuse the surface simulation; Legacy is the only orbital wallet.
-export const ORBITAL_RULES = Object.freeze({ version: 4, finalAge: 5, historyLimit: 12,
+export const ORBITAL_RULES = Object.freeze({ version: 5, finalAge: 5, historyLimit: 12,
   winterSeconds: 60, refugeeSeconds: 30, nuclearVisualSeconds: 7, minCivilizations: 4, maxCivilizations: 6,
   habitatSections: 7, lunarRotationSeconds: 180, lunarBaseIncome: 32, warIncome: 2.5, warBaseHealth: 3,
   // A civilization should take minutes, not one, to climb from I to V: each
@@ -30,9 +30,16 @@ export const ORBITAL_TALENTS = Object.freeze({
   superSoldiers: talent('超限战士',[32768],{doctrines:1},'为完成五档学说的未来文明开放超级士兵。AI 使用自己的金币招募，初始使用激光匕首。',770,265,'elite',{branch:'war',kind:'specialist'}),
   sniper: talent('天穹狙击',[131072],{superSoldiers:1},'为已获得超级士兵的文明授予狙击激光枪：远程锁定、引导后贯穿射击。',770,75,'rifle',{branch:'war',kind:'specialist'}),
   recovery: talent('环地球生存空间',[256,1024,4096,16384,65536,262144,1048576],{protocol:1},'每级建成七分之一居住环，遗产收益翻倍。第七段接合后，星环完整环绕地球。',1100,915,'habitat',{branch:'home',kind:'keystone'}),
-  outpost: talent('月球前哨',[65536],{recovery:2},'建立 VI 月面生产基地，基础产能 32 Legacy/s，受星环加成；战争回收再翻倍。',1100,685,'moon',{cycles:2,branch:'home',kind:'keystone'}),
-  lunarIndustry: talent('月面自动工场',[131072,524288,2097152,8388608],{outpost:1},'每级月面产能翻倍；扩建采掘场、太阳翼与自动生产枢纽。',1230,475,'industry',{branch:'home'}),
-  transit: talent('地月航行',[4194304],{outpost:1},'经历四次核毁灭后贯通地月航线，完成 VI。居住环与月面生产继续运转。',1100,220,'rocket',{cycles:4,branch:'home',kind:'specialist'}),
+  // The route comes first: nothing mined on the moon reaches Earth without it.
+  transit: talent('地月航线',[32768],{recovery:2},'贯通地月运输航线。只有打通航线，月面的产出才能运回地球。',1100,765,'orbital',{cycles:2,branch:'home'}),
+  outpost: talent('月球前哨',[65536],{transit:1},'建立 VI 月面生产基地，基础产能 32 Legacy/s，受星环加成；货运舱沿地月航线运回地球，战争回收再翻倍。',1100,605,'moon',{branch:'home',kind:'keystone'}),
+  lunarIndustry: talent('月面自动工场',[131072,524288,2097152,8388608],{outpost:1},'每级月面产能翻倍；扩建采掘场、太阳翼与自动生产枢纽。',1245,450,'industry',{branch:'home'}),
+  massDriver: talent('质量投射器',[1048576],{outpost:1},'在月面铺设电磁发射轨道，货运舱发射更快，月面产能 ×2。',955,450,'up',{branch:'home',kind:'specialist'}),
+  shipyard: talent('深空船坞',[4194304],{lunarIndustry:2,massDriver:1},'在月面建造远航方舟的船坞。',1100,295,'rocket',{cycles:3,branch:'home'}),
+  // VI's counterpart to 存续协议: survive, then leave.
+  // The full ring is a stated condition rather than an edge: a drawn link from
+  // the ring would cut straight through the route, outpost and shipyard nodes.
+  voyage: talent('远航协议',[16777216],{shipyard:1},'带上历次轮回中观测到的全部文明，驶离地月系统。需要完整星环，只能在核冬天期间启航，完成 VI。',1100,105,'star',{cycles:4,ring:7,branch:'home',kind:'keystone'}),
 });
 export const ORBITAL_ACTIONS = Object.freeze({
   boost: {name:'军备扶持',talent:'patronage',baseCost:16,description:'部队生命与伤害 ×1.25，最多 5 次；现存部队按生命比例同步。'},

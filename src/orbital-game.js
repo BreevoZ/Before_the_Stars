@@ -20,15 +20,18 @@ function beginCycle(o){o.cycle++;o.phase='living';o.remaining=0;o.refugeeRemaini
 export function enterOrbital(s){if(s.run.phase!=='orbital'||!s.orbital||s.orbital.started)return false;s.orbital.started=true;beginCycle(s.orbital);return true;}
 export function getOrbitalTalentState(s,key){
   const o=s.orbital,t=T[key];if(!active(s)||!t)return 'locked';if(o.talents[key]>=t.costs.length)return 'max';
-  if(Object.entries(t.requires).some(([p,n])=>o.talents[p]<n))return 'prerequisite';
+  if(Object.entries(t.requires).some(([p,n])=>o.talents[p]<n)||(t.ring??0)>o.talents.recovery)return 'prerequisite';
   if((t.cycles??0)>o.nuclearCycles)return 'cycles';
+  // The ark leaves while the surface lies in nuclear winter, like the fleet
+  // that left the first civilization's ruins.
+  if(key==='voyage'&&o.phase!=='winter')return 'winter';
   return Q.gte(s.permanent.legacy,t.costs[o.talents[key]])?'ready':'legacy';
 }
 export function purchaseOrbitalTalent(s,key){
   if(getOrbitalTalentState(s,key)!=='ready')return false;const o=s.orbital,cost=T[key].costs[o.talents[key]];
   s.permanent.legacy=Q.sub(s.permanent.legacy,cost);(o.payments[key]??=[]).push(cost);o.talents[key]++;
   if(key==='reseed'){o.remaining*=.75;o.winterDuration*=.75;o.refugeeRemaining*=.75;}
-  if(key==='transit' && o.completionAt===null)o.completionAt=o.elapsed;
+  if(key==='voyage' && o.completionAt===null)o.completionAt=o.elapsed;
   log(o,`轨道天赋：${T[key].name} ${o.talents[key]} 级。`);return true;
 }
 export function getWarState(s,a,b){

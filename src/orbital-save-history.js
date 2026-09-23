@@ -14,3 +14,11 @@ export const V17_ORBITAL_TALENTS = Object.freeze({
   lunarIndustry: {"costs":[8192,32768,131072,524288],"requires":{"outpost":1}},
   transit: {"costs":[262144],"requires":{"outpost":1,"harvest":1},"cycles":4},
 });
+// v18: the moon produced before the route existed and 地月航线 completed VI.
+export function v18OrbitalTalents(current){
+  const talents=Object.fromEntries(Object.entries(current).filter(([key])=>!['massDriver','shipyard','voyage'].includes(key))
+    .map(([key,t])=>[key,{costs:t.costs,requires:t.requires,...(t.cycles?{cycles:t.cycles}:{})}]));
+  talents.outpost={costs:[65536],requires:{recovery:2},cycles:2};
+  talents.transit={costs:[4194304],requires:{outpost:1},cycles:4};
+  return Object.freeze(talents);
+}

@@ -10,8 +10,13 @@ export function orbitalTalentEffect(o,key,rank=o.talents[key]){
   if(key==='recovery')return `${rank} 段 · 遗产 ×${2**rank}`;
   if(key==='reseed')return `核冬天 ${Math.round(R.winterSeconds*.75**rank)} 秒`;
   if(key==='diversity')return `至少 ${Math.min(6,R.minCivilizations+rank)} 个文明`;
-  if(key==='outpost')return rank?`${Q.format(R.lunarBaseIncome*2**(o.talents.recovery+o.talents.lunarIndustry))} Legacy/s · 战争再 ×2`:'尚未建立月面基地';
-  if(key==='lunarIndustry')return `${Q.format(R.lunarBaseIncome*2**(o.talents.recovery+rank))} Legacy/s`;
+  const lunar=(industry=o.talents.lunarIndustry,driver=o.talents.massDriver)=>Q.format(R.lunarBaseIncome*2**(o.talents.recovery+industry+driver));
+  if(key==='transit')return rank?'航线已贯通 · 可建立月球前哨':'月面产出无法运回地球';
+  if(key==='outpost')return rank?`${lunar()} Legacy/s · 战争再 ×2`:'尚未建立月面基地';
+  if(key==='lunarIndustry')return `${lunar(rank)} Legacy/s`;
+  if(key==='massDriver')return rank?`货运加速 · ${lunar(undefined,rank)} Legacy/s`:'货运舱按常规节奏发射';
+  if(key==='shipyard')return rank?'方舟正在船坞中成形':'尚无远航船坞';
+  if(key==='voyage')return rank?'方舟已驶离地月系统':'等待启航';
   if(key==='doctrines')return rank?'可授予 I–V 五档兵种特性':'未开放兵种学说';
   if(key==='superSoldiers')return rank?'可授权近战超级士兵':'未开放精锐授权';
   if(key==='sniper')return rank?'可授权引导狙击激光枪':'未开放远程强化';
@@ -33,8 +38,8 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
     '#colony-speed':`${s.permanent.settings.speed}×`,'#colony-speed@hidden':s.debug===true,'#colony-debug-speed@hidden':s.debug!==true,'#colony-debug-speed@value':String(s.debugSpeed??1),
     '#colony-objective':winter?'余烬，等待下一次黎明。':'地球之上，文明再生。',
     '#colony-objective-detail':winter?`全球文明已被核武毁灭。${Math.ceil(o.remaining)} 秒后，新的火种将在不同点位萌芽。`:'选择两个空闲文明，挑起战争。双方通过招募、杀敌与阵亡获得经验并进化。',
-    '#colony-fallout@hidden':!winter,'#colony-fallout':`+${Q.format(o.lastReward)} Legacy 已入账 · 核冬天 ${Math.ceil(o.remaining)} 秒`,
-    '#colony-complete@hidden':o.completionAt===null,'#colony-complete':`VI · 地月家园已贯通。月面生产与地表观测持续运行。`,
+    '#colony-fallout@hidden':!winter,'#colony-fallout':`+${Q.format(o.lastReward)} Legacy 已入账 · 核冬天 ${Math.ceil(o.remaining)} 秒${getOrbitalTalentState(s,'voyage')==='ready'?' · 远航协议可以启航':''}`,
+    '#colony-complete@hidden':o.completionAt===null,'#colony-complete':`VI · 远航协议已生效。方舟驶离地月系统；VII 行星际阶段尚未开放，地表观测与月面生产继续运行。`,
     '#colony-first@value':first?.site??'', '#colony-opponent@value':second?.site??'',
     '#colony-start-war@disabled':getWarState(s,first?.id,second?.id)!=='ready',
     '#colony-war-hint':{waiting:'等待文明重新萌芽。',selection:'请选择两个存活文明。',busy:'所选文明正在交战；每个文明同时参与一场战争。',ready:'免费挑起战争 · 战斗中的金币属于地面文明。'}[getWarState(s,first?.id,second?.id)],
@@ -77,8 +82,8 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
   }
   const t=T[talent],rank=o.talents[talent],status=getOrbitalTalentState(s,talent);
   Object.assign(v,{'#orbit-detail@hidden':!selected,'#orbit-detail-current':orbitalTalentEffect(o,talent),'#orbit-detail-next':rank>=t.costs.length?'已完成':orbitalTalentEffect(o,talent,rank+1),'#orbit-detail-branch':T[talent].branch==='home'?'HABITAT / 地月家园':T[talent].branch==='life'?'LIFE / 文明播种':T[talent].branch==='root'?'ORIGIN / 存续协议':'SURFACE / 地表干预','#orbit-detail-name':t.name,'#orbit-detail-description':t.description,'#orbit-detail-effect':`${orbitalTalentEffect(o,talent)} → ${orbitalTalentEffect(o,talent,Math.min(t.costs.length,rank+1))}`,
-    '#orbit-detail-requires':`${Object.entries(t.requires).map(([p,n])=>`${T[p].name} ${n} 级`).join(' + ')||'继承自地表篇'}${t.cycles?` · ${t.cycles} 次核毁灭（当前 ${o.nuclearCycles}）`:''}`,
-    '#orbit-buy@disabled':status!=='ready','#orbit-buy':status==='max'?'已点亮':`${Q.format(t.costs[rank])} Legacy · ${status==='ready'?'点亮天赋':status==='legacy'?'遗产不足':status==='cycles'?'等待核毁灭记录':'前置未满足'}`});
+    '#orbit-detail-requires':`${Object.entries(t.requires).map(([p,n])=>`${T[p].name} ${n} 级`).join(' + ')||'继承自地表篇'}${t.cycles?` · ${t.cycles} 次核毁灭（当前 ${o.nuclearCycles}）`:''}${t.ring?` · 星环 ${t.ring} 段（当前 ${o.talents.recovery}）`:''}${talent==='voyage'?' · 只能在核冬天期间启航':''}`,
+    '#orbit-buy@disabled':status!=='ready','#orbit-buy':status==='max'?'已点亮':`${Q.format(t.costs[rank])} Legacy · ${status==='ready'?(talent==='voyage'?'启航':'点亮天赋'):status==='legacy'?'遗产不足':status==='cycles'?'等待核毁灭记录':status==='winter'?'等待核冬天':'前置未满足'}`});
   for(let i=0;i<R.historyLimit;i++){const e=o.log[o.log.length-1-i];v[`#orbit-log-${i}`]=e?`${orbitalTime(e.time)}  ${e.text}`:'';v[`#orbit-log-${i}@hidden`]=!e;}
   return v;
 }

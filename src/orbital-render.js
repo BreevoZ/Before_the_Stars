@@ -136,10 +136,13 @@ function companionMoon(ctx,o,cx,cy,r,{time,ambient,reducedMotion}){
   const x=cx+r*1.62,y=cy-r*.92,m=r*.15;
   const g=ctx.createLinearGradient(x-m,y,x+m,y);g.addColorStop(0,'#26383a');g.addColorStop(.45,'#7d8d81');g.addColorStop(1,'#b3bca8');disc(ctx,x,y,m,g);
   ctx.strokeStyle='#b3c0aa40';ctx.lineWidth=.6;ctx.beginPath();ctx.arc(x,y,m,0,TAU);ctx.stroke();
+  // Before the outpost the route is only a dashed line to an empty moon.
+  if(!o.talents.outpost){ctx.setLineDash([2,6]);ctx.strokeStyle='#c9c19a55';ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(x-m*.8,y+m*.5);
+    ctx.quadraticCurveTo((x+cx+r*.62)/2,(y+cy-r*.78)/2-r*.12,cx+r*.62,cy-r*.78);ctx.stroke();ctx.setLineDash([]);return;}
   const level=o.talents.lunarIndustry;
   for(let i=0;i<4+level*3;i++){ctx.globalAlpha=.55+noise(i+77)*.4;disc(ctx,x-m*.55+noise(i+5)*m*.35,y-m*.15+noise(i+9)*m*.45,.7,'#e5d192');}ctx.globalAlpha=1;
   if(reducedMotion)return;
-  const interval=6/(1+level),target=[cx+r*.62,cy-r*.78];
+  const interval=6/(1+level)/(o.talents.massDriver?2:1),target=[cx+r*.62,cy-r*.78];
   for(let k=0;k<3;k++){const t=((ambient/interval)+k/3)%1,ease=t*t*(3-2*t);
     const px=x+(target[0]-x)*ease,py=y+(target[1]-y)*ease-Math.sin(t*Math.PI)*r*.12;
     ctx.globalAlpha=Math.sin(t*Math.PI)*.9;disc(ctx,px,py,2.2,'#e9d99b30');disc(ctx,px,py,.9,'#f3e7b8');}
@@ -148,7 +151,7 @@ function companionMoon(ctx,o,cx,cy,r,{time,ambient,reducedMotion}){
 export function drawOrbitalColony(ctx,width,height,o,{reducedMotion=false,ambientTime=o.elapsed,construction=1}={}){
   ctx.save();ctx.scale(width/1000,height/620);drawOrbitStars(ctx,1000,620,ambientTime,reducedMotion);
   const time=reducedMotion?0:o.elapsed;
-  if(o.talents.outpost)companionMoon(ctx,o,500,322,238,{time,ambient:ambientTime,reducedMotion});
+  if(o.talents.transit)companionMoon(ctx,o,500,322,238,{time,ambient:ambientTime,reducedMotion});
   habitat(ctx,500,322,238,o.talents.recovery,false,{time,construction,reducedMotion});globe(ctx,500,322,238,o,{time,reducedMotion});habitat(ctx,500,322,238,o.talents.recovery,true,{time,construction,reducedMotion});
   for(const w of o.wars){const points=w.participants.map(id=>sitePosition(SITES.find(s=>s.id===o.civilizations.find(c=>c.id===id).site),time));if(!points.every(p=>p.visible))continue;
     const[a,b]=points;ctx.strokeStyle=C.war;ctx.lineWidth=1;ctx.setLineDash([3,6]);ctx.lineDashOffset=reducedMotion?0:-ambientTime*3;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo((a.x+b.x)/2,(a.y+b.y)/2-45,b.x,b.y);ctx.stroke();ctx.setLineDash([]);
@@ -216,7 +219,7 @@ export function drawLunarColony(ctx,width,height,o,{ambientTime=o.elapsed,reduce
   // rate that rises with the factory level.
   const hub=sites[0].p,hx=cx+hub.x*r,hy=cy+hub.y*r,dir=[-.82,-.57],track=r*.34,tx=hx+dir[0]*track,ty=hy+dir[1]*track;
   ctx.strokeStyle='#d9d2a6';ctx.globalAlpha=.55;ctx.lineWidth=1;path(ctx,[[hx,hy],[tx,ty]]);ctx.stroke();ctx.globalAlpha=1;
-  const interval=6/(1+level);
+  const interval=6/(1+level)/(o.talents.massDriver?2:1);
   for(let k=0;k<4;k++){const t=reducedMotion?.25+k*.2:((ambientTime/interval)+k/4)%1;
     const on=t<.25,d=on?t/.25:1+(t-.25)/.75*2.2,x=hx+dir[0]*track*d,y=hy+dir[1]*track*d;
     ctx.globalAlpha=on?.9:Math.max(0,.9-(t-.25)/.75);disc(ctx,x,y,3,'#efdfa434');disc(ctx,x,y,1.1,'#f6ebc2');}

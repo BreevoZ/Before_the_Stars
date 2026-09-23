@@ -1,3 +1,4 @@
+import { SAVE_VERSION } from '../src/progression-config.js';
 import { Q } from '../src/quantity.js';
 import { TRAITS } from '../src/traits.js';
 import { createTraitSampler } from '../src/trait-scenarios.js';
@@ -6,7 +7,7 @@ import { SUPER_WEAPONS } from '../src/game-config.js';
 import { colonyFixture } from './orbital-colony-cases.js';
 import { purchaseOrbitalTalent, getInterventionState, interventionCost, intervene, startOrbitalWar, resolveOrbitalWar, updateOrbital } from '../src/orbital-game.js';
 import { warBonuses } from '../src/orbital-war.js';
-import { ORBITAL_TALENTS as T, ORBITAL_ACTIONS as A } from '../src/orbital-config.js';
+import { ORBITAL_RULES, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as A } from '../src/orbital-config.js';
 import { habitatSegments, lunarRotation, lunarFacilities, drawOrbitalTalentSky, drawLunarColony, drawOrbitalColony } from '../src/orbital-render.js';
 import { drawOrbitalScene, ORBITAL_SECONDS } from '../src/orbital-scene.js';
 import { serializeSession, parseSession, DEBUG_SAVE_KEY } from '../src/save.js';
@@ -100,8 +101,10 @@ export function registerOrbitalDoctrineTests(test,assert,near){
   });
   test('Orbital v18: actual v17 ledger and active war migrate exactly once; new purchases use new prices',()=>{
     const raw=JSON.stringify(v17Orbital),s=parseSession(raw),wire=JSON.parse(serializeSession(s));
-    assert(s.version===18&&s.orbital.version===4&&s.orbital.talents.recovery===3&&s.orbital.talents.lunarIndustry===1);
-    assert(JSON.stringify(wire.orbital.payments)===JSON.stringify(v17Orbital.orbital.payments)&&JSON.stringify(wire.orbital.wars)===JSON.stringify(v17Orbital.orbital.wars));
+    assert(s.version===SAVE_VERSION&&s.orbital.version===ORBITAL_RULES.version&&s.orbital.talents.recovery===3&&s.orbital.talents.lunarIndustry===1);
+    // v19 grants the route free to anyone who already ran the outpost without it.
+    const {transit,...paid}=wire.orbital.payments;assert(JSON.stringify(transit)==='["0"]'&&s.orbital.talents.transit===1);
+    assert(JSON.stringify(paid)===JSON.stringify(v17Orbital.orbital.payments)&&JSON.stringify(wire.orbital.wars)===JSON.stringify(v17Orbital.orbital.wars));
     assert(s.orbital.civilizations.every(c=>c.doctrine===0&&c.superSoldiers===0));
     const before=s.permanent.legacy;assert(purchaseOrbitalTalent(s,'recovery')&&Q.eq(s.permanent.legacy,Q.sub(before,T.recovery.costs[3])));
     assert(JSON.stringify(v17Orbital)===raw);const saved=serializeSession(s);assert(serializeSession(parseSession(saved))===saved);

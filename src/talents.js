@@ -74,7 +74,7 @@ export const TALENTS = Object.freeze({
   superRanged: { name: '狙击激光枪', branch: 'units', layer: 7, costs: PRICES.superRanged, requires: { superSoldierPlan: 1 },
     effects: ['仅贴身激光匕首', `${SUPER_WEAPONS.sniper.range} 射程 / ${SUPER_WEAPONS.sniper.damage} 穿甲伤害 · 锁定 ${SUPER_WEAPONS.sniper.chargeTime} 秒，开火后冷却 ${SUPER_WEAPONS.sniper.attackInterval} 秒 · 近身改用匕首`] },
   bypasser: { name: '存续协议', branch: 'legacy', layer: 8, costs: PRICES.bypasser, requires: { superSoldierPlan: 1 },
-    effects: ['地表文明的最后一道门槛', `通关余烬远征第 ${ECONOMY.bypasserChallenge} 层后，于终局购买即刻启航至 VI 轨道文明 · 建设轨道家园、治理地表文明并开发月球`] },
+    effects: ['地表文明的最后一道门槛', `通关余烬远征第 ${ECONOMY.bypasserChallenge} 层后，于终局购买即刻启航至 VI 轨道文明 · 俯瞰文明重生、干预地表战争并开发月球`] },
 
 });
 // The diagram and purchasing rules share the same prerequisites. Branch names

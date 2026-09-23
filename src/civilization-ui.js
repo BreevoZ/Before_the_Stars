@@ -72,7 +72,7 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     if (!autoDialog.open) autoDialog.showModal(); changed();
   }
   function openSave() { if (!saveDialog.open) saveDialog.showModal(); changed(); }
-  function replace(next) { destruction.dismiss(); orbital.dismiss(); session = next; saveElapsed = 0; shownFinaleRunId = null;
+  function replace(next) { destruction.dismiss(); orbital.dismiss(); colony.dismiss(); session = next; saveElapsed = 0; shownFinaleRunId = null;
     restoredFinale = next.run.phase === 'destruction' ? next.run.runId : null;
     dialog.close(); autoDialog.close(); challengeDialog.close(); offeredRunId = null;
     changed(true); }
@@ -149,7 +149,7 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     save(); changed();
     if (key === 'bypasser') orbital.present(true);
   });
-  const colony = createOrbitalColonyUI(() => session, { commit: () => { save(); changed(); },
+  const colony = createOrbitalColonyUI(() => session, { viewChanged: () => changed(), commit: () => { save(); changed(); },
     archive: () => { if (!dialog.open) dialog.showModal(); talentControls.open(false); changed(); }, save: openSave, speed: cycleSpeed });
   const orbital = createOrbitalUI({ review: () => talentControls.open(false), save: openSave, enter: () => {
     if (enterOrbital(session)) save();
@@ -225,8 +225,8 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     },
     get session() { return session; },
     get homeOpen() { return dialog.open || Boolean(session.orbital?.started); },
-    get paused() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open || debugDialog.open; },
-    get modalOpen() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open || debugDialog.open; },
+    get paused() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open || debugDialog.open || colony.treeOpen; },
+    get modalOpen() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open || debugDialog.open || colony.treeOpen; },
     get canStep() { return session.game.status === 'playing' || canAutoContinue(session) || Boolean(session.orbital?.started); },
     get timeScale() { return debug ? session.debugSpeed : session.permanent.settings.speed; },
     sync, save, open, cycleSpeed, animate(timestamp) {

@@ -1,3 +1,5 @@
+import { oldOrbitalSpent } from './orbital-history.js';
+import { warBonuses } from './orbital-war.js';
 import { orbitalLegacySpent } from './orbital-game.js';
 import { Q, isLargeQuantity } from './quantity.js';
 import { RULES } from './game-config.js';
@@ -48,7 +50,7 @@ function hydrateRecord(input, version) {
   check(object(p.upgrades) && object(p.talents) && object(p.automation) && (version < 10 ? int(p.totalLegacy) : Q.valid(p.totalLegacy) && Q.gte(p.totalLegacy, 0) && Q.isInteger(p.totalLegacy)), '永久输入');
   check(!Object.hasOwn(p, 'legacy') && !Object.hasOwn(p.automation, 'unlocked') && !Object.hasOwn(s.run, 'battleId') &&
     !Object.hasOwn(g, 'mode') && !Object.hasOwn(g, 'bonuses'), '存档包含派生字段');
-  p.legacy = Q.sub(Q.add(p.totalLegacy, version >= 14 ? p.debugLegacyAdjustment ?? 0 : 0), Q.add(spentLegacy(p, version), version >= 15 ? orbitalLegacySpent(s.orbital) : 0));
+  p.legacy = Q.sub(Q.add(p.totalLegacy, version >= 14 ? p.debugLegacyAdjustment ?? 0 : 0), Q.add(spentLegacy(p, version), version === 15 ? oldOrbitalSpent(s.orbital) : version >= 16 ? orbitalLegacySpent(s.orbital) : 0));
   p.automation.unlocked = version < 9 ? p.talents.autobuyer > 0 : automationUnlocked(p);
   s.run.battleId = `${s.run.runId}:${s.run.battleNumber}`;
   if (s.run.extraBonuses) s.run.extraBonuses = createBonusStack(s.run.extraBonuses);
@@ -58,6 +60,15 @@ function hydrateRecord(input, version) {
     const base = g.bases[team];
     check(object(base) && !['maxHp', 'x', 'team'].some(key => Object.hasOwn(base, key)), '基地输入');
     Object.assign(base, { team, x: team === 'player' ? RULES.playerBaseX : RULES.enemyBaseX, maxHp: stat(g, team, 'baseHealth') });
+  }
+  if (version >= 16 && s.orbital) for (const war of s.orbital.wars) {
+    const battle = war.game;
+    check(!Object.hasOwn(battle,'mode') && !Object.hasOwn(battle,'bonuses'),'战争派生字段');
+    battle.mode='incremental';battle.bonuses=warBonuses(war.participants.map(id=>s.orbital.civilizations.find(c=>c.id===id)));
+    for (const team of ['player','enemy']) {
+      const base=battle.bases[team];check(object(base)&&!['maxHp','x','team'].some(k=>Object.hasOwn(base,k)),'战争基地输入');
+      Object.assign(base,{team,x:team==='player'?RULES.playerBaseX:RULES.enemyBaseX,maxHp:stat(battle,team,'baseHealth')});
+    }
   }
   return s;
 }
@@ -69,5 +80,11 @@ export const fromV11Record = input => hydrateRecord(input, 11);
 export const fromV12Record = input => hydrateRecord(input, 12);
 export const fromV13Record = input => hydrateRecord(input, 13);
 export const fromV14Record = input => hydrateRecord(input, 14);
+export const fromV15Record = input => hydrateRecord(input, 15);
 export const fromSaveRecord = input => hydrateRecord(input, SAVE_VERSION);
-export function toSaveRecord(session) { const record = toV8Record(session); record.version = SAVE_VERSION; return record; }
+export function toSaveRecord(session) { const record = toV8Record(session); record.version = SAVE_VERSION;
+  if (record.orbital) for (const war of record.orbital.wars) {
+    delete war.game.mode;delete war.game.bonuses;
+    for (const base of Object.values(war.game.bases)) {delete base.maxHp;delete base.x;delete base.team;}
+  }
+  return record; }

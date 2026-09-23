@@ -231,70 +231,71 @@ function updateTraining(game, team, dt) {
   game.queues[team].shift();
 }
 
-function updateAI(game, dt) {
-  if (!game.ai.enabled) return;
-  game.ai.cooldown = Math.max(0, game.ai.cooldown - dt);
-  if (game.ai.cooldown > 0) return;
-  game.ai.cooldown = RULES.aiDecisionInterval;
-  evolve(game, 'enemy');
-  const playerArmy = game.units.filter(unit => unit.team === 'player');
-  const invaders = playerArmy.filter(unit => unit.x > RULES.enemyBaseX - 420 ||
-    (attributes(game, unit).baseRange && Math.abs(unit.x - RULES.enemyBaseX) - RULES.baseHalfWidth <= attributes(game, unit).baseRange + 0.01));
-  const playerTowers = game.turrets.player.filter(Boolean).length;
+export function updateCommander(game, dt, team = 'enemy', ai = game.ai) {
+  const opponent = otherTeam(team);
+  if (!ai.enabled) return;
+  ai.cooldown = Math.max(0, ai.cooldown - dt);
+  if (ai.cooldown > 0) return;
+  ai.cooldown = RULES.aiDecisionInterval;
+  evolve(game, team);
+  const opponentArmy = game.units.filter(unit => unit.team === opponent);
+  const invaders = opponentArmy.filter(unit => (team === 'enemy' ? unit.x > gameBaseX(team) - 420 : unit.x < gameBaseX(team) + 420) ||
+    (attributes(game, unit).baseRange && Math.abs(unit.x - gameBaseX(team)) - RULES.baseHalfWidth <= attributes(game, unit).baseRange + 0.01));
+  const opponentTowers = game.turrets[opponent].filter(Boolean).length;
   const siegeThreat = invaders.some(unit => attributes(game, unit).baseRange);
-  game.ai.strategy = !invaders.length && playerTowers > 0 && playerArmy.length <= 2 ? 'siege' : 'balanced';
+  ai.strategy = !invaders.length && opponentTowers > 0 && opponentArmy.length <= 2 ? 'siege' : 'balanced';
   // Save for a defensive tower when pressured; it uses the same wallet as training.
-  const towers = game.turrets.enemy;
+  const towers = game.turrets[team];
   const owned = towers.filter(Boolean).length;
-  if (stat(game, 'enemy', 'canBuild') && AGES[game.ages.enemy].turrets.some(type => stat(game, { type, team: 'enemy' }, 'enabled')) && !siegeThreat && game.elapsed > 18 && (invaders.length >= 3 || Q.lt(game.bases.enemy.hp, Q.mul(game.bases.enemy.maxHp, 0.65)))) {
-    const choices = AGES[game.ages.enemy].turrets.filter(type => stat(game, { type, team: 'enemy' }, 'enabled'));
-    const towerStats = type => attributes(game, { type, team: 'enemy' });
+  if (stat(game, team, 'canBuild') && AGES[game.ages[team]].turrets.some(type => stat(game, { type, team }, 'enabled')) && !siegeThreat && game.elapsed > 18 && (invaders.length >= 3 || Q.lt(game.bases[team].hp, Q.mul(game.bases[team].maxHp, 0.65)))) {
+    const choices = AGES[game.ages[team]].turrets.filter(type => stat(game, { type, team }, 'enabled'));
+    const towerStats = type => attributes(game, { type, team });
     const coverage = type => { const stats = towerStats(type); return (stats.splash ?? 0) + (stats.fieldRadius ?? 0) + (stats.pierce ?? 0) * 40; };
     const type = invaders.length >= 3 ? choices.reduce((best, type) =>
       coverage(type) > coverage(best) ? type : best)
       : invaders.some(unit => Q.gt(stat(game, unit, 'armor'), 0))
       ? choices.find(type => towerStats(type).ignoreArmor) ?? choices[0]
       : choices.reduce((fastest, type) => towerStats(type).attackInterval < towerStats(fastest).attackInterval ? type : fastest);
-    if (towers.includes(null) && buildTurret(game, 'enemy', type)) return;
-    const reserve = Q.add(stat(game, { type, team: 'enemy' }, 'cost'), stat(game, { type: AGES[game.ages.enemy].units[0], team: 'enemy' }, 'cost'));
-    if (owned === towers.length && getExpansionState(game, 'enemy') !== 'max-slots' && Q.gte(game.gold.enemy, Q.add(reserve, getExpansionCost(game, 'enemy')))) {
-      expandTurretSlots(game, 'enemy');
+    if (towers.includes(null) && buildTurret(game, team, type)) return;
+    const reserve = Q.add(stat(game, { type, team }, 'cost'), stat(game, { type: AGES[game.ages[team]].units[0], team }, 'cost'));
+    if (owned === towers.length && getExpansionState(game, team) !== 'max-slots' && Q.gte(game.gold[team], Q.add(reserve, getExpansionCost(game, team)))) {
+      expandTurretSlots(game, team);
       return;
     }
-    if (towers.includes(null) && Q.gte(game.gold.enemy, 70)) return;
+    if (towers.includes(null) && Q.gte(game.gold[team], 70)) return;
   }
-  const [melee, archer, heavy] = AGES[game.ages.enemy].units;
-  if (game.ai.strategy === 'siege') {
+  const [melee, archer, heavy] = AGES[game.ages[team]].units;
+  if (ai.strategy === 'siege') {
     // Save for a complete paid wave. Heavy troops lead, with ranged support behind.
     // Use visible defenses, not the player's wallet or pending orders, to pick a plan.
-    if (game.queues.enemy.length) return;
-    const desiredWave = playerTowers >= 2 && attributes(game, { type: heavy, team: 'enemy' }).baseRange ? [heavy, heavy, archer]
-      : [heavy, archer, game.ai.waves % 2 === 0 ? melee : archer];
-    const wave = desiredWave.filter(type => stat(game, { type, team: 'enemy' }, 'enabled'));
-    if (!wave.length || !stat(game, 'enemy', 'canRecruit')) return;
-    const cost = Q.sum(wave.map(type => stat(game, { type, team: 'enemy' }, 'cost')));
-    const armySize = game.units.filter(unit => unit.team === 'enemy').length;
-    if (armySize + wave.length > stat(game, 'enemy', 'armyLimit') || !canAfford(game.gold.enemy, cost)) return;
+    if (game.queues[team].length) return;
+    const desiredWave = opponentTowers >= 2 && attributes(game, { type: heavy, team }).baseRange ? [heavy, heavy, archer]
+      : [heavy, archer, ai.waves % 2 === 0 ? melee : archer];
+    const wave = desiredWave.filter(type => stat(game, { type, team }, 'enabled'));
+    if (!wave.length || !stat(game, team, 'canRecruit')) return;
+    const cost = Q.sum(wave.map(type => stat(game, { type, team }, 'cost')));
+    const armySize = game.units.filter(unit => unit.team === team).length;
+    if (armySize + wave.length > stat(game, team, 'armyLimit') || !canAfford(game.gold[team], cost)) return;
     for (const type of wave) {
-      if (recruit(game, type, 'enemy')) game.ai.orders++;
+      if (recruit(game, type, team)) ai.orders++;
     }
-    game.ai.waves++;
+    ai.waves++;
     return;
   }
-  if (game.queues.enemy.length >= 2) return;
+  if (game.queues[team].length >= 2) return;
   const army = [
-    ...game.units.filter(unit => unit.team === 'enemy').map(unit => unit.type),
-    ...game.queues.enemy.map(order => order.type),
+    ...game.units.filter(unit => unit.team === team).map(unit => unit.type),
+    ...game.queues[team].map(order => order.type),
   ];
   const frontline = army.filter(type => UNITS[type].role !== 'archer').length;
   const archers = army.filter(type => UNITS[type].role === 'archer').length;
   let type = melee;
   if (frontline > 0 && archers < Math.ceil(frontline / 2)) type = archer;
-  else if (game.ai.orders > 1 && !army.some(type => UNITS[type].role === 'heavy')) type = heavy;
+  else if (ai.orders > 1 && !army.some(type => UNITS[type].role === 'heavy')) type = heavy;
   // Under immediate pressure, buy an affordable defender instead of waiting for armor.
-  if (invaders.length && !canAfford(game.gold.enemy, stat(game, { type, team: 'enemy' }, 'cost'))) type = melee;
-  if (!stat(game, { type, team: 'enemy' }, 'enabled')) type = AGES[game.ages.enemy].units.find(candidate => stat(game, { type: candidate, team: 'enemy' }, 'enabled'));
-  if (type && recruit(game, type, 'enemy')) game.ai.orders++;
+  if (invaders.length && !canAfford(game.gold[team], stat(game, { type, team }, 'cost'))) type = melee;
+  if (!stat(game, { type, team }, 'enabled')) type = AGES[game.ages[team]].units.find(candidate => stat(game, { type: candidate, team }, 'enabled'));
+  if (type && recruit(game, type, team)) ai.orders++;
 }
 
 // All trait attacks enter the same hit/projectile paths as normal attacks.
@@ -713,7 +714,7 @@ export function updateGame(game, dt) {
   }
   for (const effect of game.effects) effect.life -= dt;
   game.effects = game.effects.filter(effect => effect.life > 0);
-  updateAI(game, dt);
+  updateCommander(game, dt);
   for (const team of TEAMS) updateTraining(game, team, dt);
   const hits = [];
   updateFields(game, dt, hits);

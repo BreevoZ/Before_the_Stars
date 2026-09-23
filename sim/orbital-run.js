@@ -1,4 +1,2 @@
 import { simulateOrbital } from './orbital.js';
-for (const options of [{}, { policy: 'nurture' }, { policy: 'tribute' }, { active: false }, { legacy: 10000 }]) {
-  const { session, ...result } = simulateOrbital(options); console.log(JSON.stringify({ options, ...result }));
-}
+for (const seed of [1,2,3,42,2026]) {const {session,...result}=simulateOrbital({seed});console.log(JSON.stringify({seed,...result}));}

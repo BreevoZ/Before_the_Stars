@@ -1,37 +1,33 @@
-// VI is a short, serial construction arc. VII can supply other bodies to the
-// same population / unrest / influence simulation without copying the economy.
-export const ORBITAL_RULES = Object.freeze({ version: 1, startingEnergy: 120, basePower: 2,
-  baseStorage: 400, storagePerBattery: 600, powerPerSolar: 3, powerPerReactor: 8,
-  ageProgress: 80, maxProgress: 320, eventInterval: 150, maxPopulation: 240,
-  baseLegacy: .75, baseResearch: .18, baseGrowth: .16, historyLimit: 12 });
-export const BODIES = Object.freeze({
-  earth: { name: '地球', subtitle: '废墟之上，文明再次萌芽', color: '#93b2a1', civilizations: [
-    { id: 'delta', name: '河口聚落', x: .39, y: .59, birth: 8, growth: 1.15, research: .95, unrest: .005, color: '#a7c8b8' },
-    { id: 'ridge', name: '山脊联盟', x: .62, y: .38, birth: 35, growth: .85, research: 1.2, unrest: .015, color: '#b8b595' },
-    { id: 'coast', name: '海岸诸邦', x: .69, y: .68, birth: 65, growth: 1.05, research: 1, unrest: .01, color: '#98b5c0' },
-  ] },
-  moon: { name: '月球', subtitle: '从远方的月光，到第二处家园', color: '#c0c1b0', civilizations: [] },
+// Orbital wars reuse the surface simulation; Legacy is the only orbital wallet.
+export const ORBITAL_RULES = Object.freeze({ version: 2, finalAge: 5, historyLimit: 12,
+  winterSeconds: 60, refugeeSeconds: 30, nuclearVisualSeconds: 7, minCivilizations: 4, maxCivilizations: 6,
+  warIncome: 2.5, warExperience: 2, warBaseHealth: 3, legacyPerExperience: 1 / 64,
+  defeatLegacy: 64, harvestLegacy: 192, nuclearLegacy: 96, maximumPower: 5 });
+export const SITES = Object.freeze([
+  {id:'delta',name:'河口',x:.36,y:.59}, {id:'ridge',name:'山脊',x:.59,y:.31},
+  {id:'coast',name:'海岸',x:.74,y:.55}, {id:'forest',name:'林地',x:.27,y:.34},
+  {id:'plains',name:'平原',x:.64,y:.70}, {id:'isles',name:'群岛',x:.82,y:.39},
+  {id:'valley',name:'谷地',x:.38,y:.41}, {id:'south',name:'南境',x:.43,y:.78},
+]);
+export const CIVILIZATION_NAMES = ['氏族','聚落','邦联','公社','部族','联盟'];
+const talent = (name,costs,requires,description,x,y,icon,extra={}) => ({name,costs,requires,description,x,y,icon,...extra});
+export const ORBITAL_TALENTS = Object.freeze({
+  protocol: talent('存续协议',[0],{},'继承地表篇。文明可以灭亡，轨道上的我们将继续存在。',450,790,'orbit',{root:true}),
+  monitor: talent('地面监控',[128],{protocol:1},'接入地表实况，观看双方 AI 的真实战争；开启干预路线。',450,630,'eye'),
+  patronage: talent('代理人战争',[256],{monitor:1},'花费 Legacy 强化指定文明的部队生命与伤害。',320,470,'sword'),
+  technology: talent('技术馈赠',[512],{patronage:1},'花费 Legacy 让选中文明立即进化一个时代。',250,310,'spark'),
+  regression: talent('知识封锁',[1024],{technology:1},'使一方倒退一个时代，销毁其超时代部队、武器和订单。',150,150,'lock'),
+  harvest: talent('轨道收割',[2048],{technology:1},'直接毁灭选中文明并收获 Legacy；不能对废墟重复收割。',365,150,'beam',{keystone:true}),
+  recovery: talent('遗产回收',[256,1024,4096],{protocol:1},'每级让轨道的战争、歼灭和核毁灭收益翻倍。',700,630,'archive'),
+  reseed: talent('播种计划',[128,512,2048],{protocol:1},'每级使核冬天和幸存文明等待新对手的时间减少 25%。',200,630,'leaf'),
+  diversity: talent('多元萌芽',[512,2048],{reseed:1},'提高每轮文明数量的下限，最多六个，产生更多战争与收割机会。',100,470,'nodes'),
+  weaving: talent('争端编织',[1024],{monitor:1},'可选自动配对空闲文明开战，优先匹配相近时代。',580,470,'link'),
+  outpost: talent('月球前哨',[16384],{recovery:2,reseed:2},'经历两次核毁灭后，将家园扩展到月面；轨道收益再翻倍。',700,310,'moon',{cycles:2,keystone:true}),
+  transit: talent('地月航行',[262144],{outpost:1,harvest:1},'经历四次核毁灭后贯通地月航线，完成 VI。VII 尚未开放。',600,70,'star',{cycles:4,keystone:true}),
 });
-export const CIVILIZATION_AGES = ['原始聚落', '城邦时代', '工艺文明', '工业文明', '信息文明'];
-export const POLICIES = Object.freeze({
-  nurture: { name: '扶植', description: '成长 ×1.3 · 遗产 ×0.75 · 降低纷争', growth: 1.3, legacy: .75, unrest: -.05, influence: .025 },
-  balance: { name: '共治', description: '平衡发展与贡纳 · 稳定影响力', growth: 1, legacy: 1, unrest: .012, influence: .012 },
-  tribute: { name: '征贡', description: '遗产 ×2 · 成长 ×0.8 · 持续增加纷争', growth: .8, legacy: 2, unrest: .10, influence: -.008 },
-});
-export const INTERVENTIONS = Object.freeze({
-  uplift: { name: '知识播种', energy: 60, cooldown: 45, description: '发展 +22 · 影响力 +6 · 纷争 +8' },
-  peace: { name: '调停纷争', energy: 40, cooldown: 40, description: '纷争 −35 · 影响力 +8' },
-  tribute: { name: '征收遗产', energy: 80, cooldown: 60, description: '立即征收一笔遗产 · 纷争 +25 · 影响力 −5' },
-});
-const structure = (name, site, legacy, energy, seconds, requires, description) => ({ name, site, legacy, energy, seconds, requires, description });
-export const ORBITAL_STRUCTURES = Object.freeze({
-  solar: structure('展开式太阳翼', 'orbit', [0, 0, 0], [40, 100, 200], [40, 50, 60], {}, '每级产能 +3 能量/秒；应急电源始终提供 2/秒。'),
-  habitat: structure('环形居住舱', 'orbit', [0, 120, 400], [100, 250, 500], [60, 80, 100], { solar: 1 }, '建立家园并接收地表遗产；每级增加居住空间与文明成长速度。'),
-  observer: structure('地表观测阵列', 'orbit', [80], [100], [60], { habitat: 1 }, '开启文明干预：知识播种、调停纷争与征收遗产。'),
-  battery: structure('储能阵列', 'orbit', [80, 200], [120, 220], [50, 70], { solar: 1 }, '每级储能上限 +600，为月面建设积蓄能量。'),
-  relay: structure('治理中继', 'orbit', [160, 600], [180, 500], [80, 100], { observer: 1 }, '每级地表遗产 ×1.6；可开启自动调停，仍消耗能量。'),
-  survey: structure('月面测绘', 'moon', [500], [600], [120], { habitat: 2, observer: 1, battery: 1 }, '任一地表文明达到工艺时代后，派出探测器开启月球开发。'),
-  outpost: structure('月球前哨', 'moon', [1200], [900], [150], { survey: 1, solar: 3 }, '建立月面基地，开始太阳能与地表联合供给。产能 +4 能量/秒。'),
-  reactor: structure('月面聚变堆', 'moon', [1800, 3600], [1000, 1400], [150, 120], { outpost: 1, battery: 2 }, '每级产能 +8 能量/秒，为深空航行提供稳定电力。'),
-  shipyard: structure('地月航行港', 'moon', [3200], [1600], [180], { habitat: 3, relay: 2, reactor: 1 }, '贯通地月运输，完成 VI。家园、能量与文明治理体系留给下一阶段。'),
+export const ORBITAL_ACTIONS = Object.freeze({
+  boost: {name:'军备扶持',talent:'patronage',baseCost:16,description:'部队生命与伤害 ×1.25，最多 5 次；现存部队按生命比例同步。'},
+  advance: {name:'技术馈赠',talent:'technology',baseCost:64,description:'进化一个时代，加入相应经验；不产生战争遗产。'},
+  regress: {name:'知识封锁',talent:'regression',baseCost:128,description:'倒退一个时代；销毁超时代部队、炮塔和订单，原有经验归零至该时代门槛。'},
+  harvest: {name:'毁灭收割',talent:'harvest',baseCost:0,description:'毁灭这一文明，终止其战争，立即收获其时代对应的遗产。'},
 });

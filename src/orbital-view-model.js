@@ -1,67 +1,63 @@
 import { Q } from './quantity.js';
-import { BODIES, CIVILIZATION_AGES, ORBITAL_STRUCTURES as S, POLICIES, INTERVENTIONS, ORBITAL_RULES as R } from './orbital-config.js';
-import { civilizationAge, civilizationRates, tributeReward } from './celestial-economy.js';
-import { orbitalRates, orbitalIncome, orbitalMilestone, getConstructionState, getInterventionState, findCivilization } from './orbital-game.js';
-export const orbitalTime = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
-const round = value => value.toFixed(1);
-export function buildOrbitalViewModel(session, { paused = false } = {}) {
-  const o = session.orbital, active = session.run.phase === 'orbital' && o?.started;
-  const vm = { 'body@data-orbital-active': String(Boolean(active)), '#orbital-game@hidden': !active };
-  if (!active) return vm;
-  const rates = orbitalRates(o), milestone = orbitalMilestone(o), moon = o.selectedBody === 'moon';
-  Object.assign(vm, {
-    '#colony-legacy': Q.format(session.permanent.legacy), '#colony-income': `+${round(orbitalIncome(o))}/秒`,
-    '#colony-energy': `${Q.format(Q.floor(o.energy))} / ${rates.capacity}`, '#colony-power': `+${rates.power}/秒`,
-    '#colony-energy@title': `应急电源 2 + 太阳翼 ${o.structures.solar * R.powerPerSolar} + 月球前哨 ${o.structures.outpost * 4} + 聚变堆 ${o.structures.reactor * R.powerPerReactor} 能量/秒`,
-    '#colony-income@title': '遗产取决于人口、时代、影响力与政策；纷争达到 65 时收入降为 40%。居住舱与治理中继提供额外加成。',
-    '#colony-time': orbitalTime(o.elapsed), '#colony-pause': paused ? '继续' : '暂停', '#colony-pause@aria-pressed': String(paused),
-    '#colony-speed': `${session.permanent.settings.speed}×`, '#colony-speed@hidden': session.debug === true,
-    '#colony-debug-speed@hidden': session.debug !== true, '#colony-debug-speed@value': String(session.debugSpeed ?? 1),
-    '#colony-objective': milestone.name, '#colony-objective-detail': milestone.detail,
-    '#colony-complete@hidden': o.completionAt === null,
-    '#colony-complete': o.completionAt === null ? '' : `VI 完成 · ${orbitalTime(o.completionAt)} · 地月航线已贯通`,
-    '#colony-body-name': BODIES[o.selectedBody].subtitle,
-    '#observe-earth@aria-pressed': String(!moon), '#observe-moon@aria-pressed': String(moon), '#observe-moon@disabled': !o.structures.survey,
-    '#colony-civilizations@hidden': moon, '#colony-civilization@hidden': moon, '#colony-lunar@hidden': !moon,
-    '#colony-lunar-detail': o.structures.outpost ? `月面前哨在线 · 聚变堆 ${o.structures.reactor} 级 · 能量供给 ${o.structures.outpost * 4 + o.structures.reactor * 8}/秒` : '探测器已绘制月面。建造前哨，让这片沉静的荒原成为第二处家园。',
-    '#colony-auto-row@hidden': !o.structures.relay, '#colony-auto@checked': o.autoStabilize,
-    '#colony-project': o.project ? `${S[o.project.key].name} · ${Math.ceil(o.project.remaining)} 秒` : '建造船待命',
-    '#colony-project-progress@value': o.project ? 1 - o.project.remaining / o.project.duration : 0,
-    '#colony-project-progress@aria-label': o.project ? `${S[o.project.key].name}建造进度` : '建造船待命',
+import { AGES } from './game-config.js';
+import { SITES, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as A, ORBITAL_RULES as R } from './orbital-config.js';
+import { findCivilization, getWarState, getInterventionState, interventionCost, getOrbitalTalentState } from './orbital-game.js';
+import { civilizationValue, orbitalYieldMultiplier } from './celestial-economy.js';
+export const orbitalTime = seconds => `${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`;
+export function orbitalTalentEffect(o,key,rank=o.talents[key]){
+  if(key==='recovery')return `遗产 ×${2**rank}`;
+  if(key==='reseed')return `核冬天 ${Math.round(R.winterSeconds*.75**rank)} 秒`;
+  if(key==='diversity')return `至少 ${Math.min(6,R.minCivilizations+rank)} 个文明`;
+  if(key==='outpost')return rank?'月面家园 · 遗产再 ×2':'仅地球轨道';
+  return rank?'已解锁':'未解锁';
+}
+export function buildOrbitalViewModel(s,{paused=false,talent='monitor'}={}){
+  const o=s.orbital,active=s.run.phase==='orbital'&&o?.started;
+  const v={'body@data-orbital-active':String(Boolean(active)),'#orbital-game@hidden':!active};if(!active)return v;
+  const alive=o.civilizations.filter(c=>c.alive),first=findCivilization(o,o.selectedCivilization),second=findCivilization(o,o.selectedOpponent),winter=o.phase==='winter';
+  Object.assign(v,{
+    '#colony-legacy':Q.format(s.permanent.legacy),'#orbit-tree-wallet':`${Q.format(s.permanent.legacy)} Legacy`,
+    '#colony-earned':`本阶段已收获 ${Q.format(o.legacyEarned)} · 收益 ×${orbitalYieldMultiplier(o)}`,
+    '#colony-time':orbitalTime(o.elapsed),'#colony-cycle':`第 ${o.cycle} 轮萌芽 · ${o.nuclearCycles} 次核毁灭`,
+    '#colony-pause':paused?'继续':'暂停','#colony-pause@aria-pressed':String(paused),
+    '#colony-speed':`${s.permanent.settings.speed}×`,'#colony-speed@hidden':s.debug===true,'#colony-debug-speed@hidden':s.debug!==true,'#colony-debug-speed@value':String(s.debugSpeed??1),
+    '#colony-objective':winter?'他们再次走到了终点。':'让地表的战火，照亮轨道。',
+    '#colony-objective-detail':winter?`全球文明已被核武毁灭。${Math.ceil(o.remaining)} 秒后，新的火种将在不同点位萌芽。`:'选择两个空闲文明，挑起战争。双方通过招募、杀敌与阵亡获得经验并进化。',
+    '#colony-fallout@hidden':!winter,'#colony-fallout':`+${Q.format(o.lastReward)} Legacy 已入账 · 核冬天 ${Math.ceil(o.remaining)} 秒`,
+    '#colony-complete@hidden':o.completionAt===null,'#colony-complete':`地月航线已贯通 · VI 完成 · VII 将在后续开放`,
+    '#colony-first@value':first?.site??'', '#colony-opponent@value':second?.site??'',
+    '#colony-start-war@disabled':getWarState(s,first?.id,second?.id)!=='ready',
+    '#colony-war-hint':{waiting:'等待文明重新萌芽。',selection:'请选择两个存活文明。',busy:'所选文明正在交战；每个文明同时参与一场战争。',ready:'免费挑起战争 · 战斗中的金币属于地面文明。'}[getWarState(s,first?.id,second?.id)],
+    '#colony-auto-row@hidden':!o.talents.weaving,'#colony-auto@checked':o.autoWar,
+    '#colony-refugees@hidden':winter||alive.length>=2,'#colony-refugees':`幸存者正在等待新的对手。新聚落即将从空闲点位萌芽。`,
+    '#colony-selected-name':first?`${first.name} · ${first.alive?AGES[first.age].numeral+' '+AGES[first.age].shortName:'废墟'}`:'选择一个文明',
+    '#colony-selected-stats':first?.alive?`军备扶持 ${first.power}/5 · 部队伤害与生命 ×${(1.25**first.power).toFixed(2)} · 收割价值 ${Q.format(civilizationValue(o,first))} Legacy`:'废墟没有可收割的遗产。',
+    '#colony-monitor-locked@hidden':Boolean(o.talents.monitor),'#colony-monitor@hidden':!o.talents.monitor,
+    '#colony-event':o.log.at(-1)?.text??'',
   });
-  for (const [key, spec] of Object.entries(S)) {
-    const level = o.structures[key], state = getConstructionState(session, key), max = level === spec.legacy.length;
-    const missing = Object.entries(spec.requires).filter(([id, rank]) => o.structures[id] < rank).map(([id, rank]) => `${S[id].name} ${rank} 级`);
-    const reason = { capacity: '需要扩建储能阵列', busy: '建造船忙碌', max: '已完成', prerequisite: `需要 ${missing.join('、')}`, civilization: '需要一个工艺文明', legacy: '遗产不足', energy: '储能不足', ready: level ? '升级' : '建造', locked: '未抵达轨道' }[state];
-    vm[`#build-${key}@disabled`] = state !== 'ready'; vm[`#build-${key}@title`] = reason;
-    vm[`#build-${key}-state`] = reason;
-    vm[`#build-${key}-rank`] = `${level} / ${spec.legacy.length}`;
-    vm[`#build-${key}-cost`] = max ? '设施已投入使用' : `${Q.format(spec.legacy[level])} Legacy · ${spec.energy[level]} 能量 · ${spec.seconds[level]} 秒`;
-    vm[`#build-${key}-card@class:is-built`] = max;
+  for(const site of SITES){const c=o.civilizations.find(c=>c.site===site.id),label=c?`${c.name} · ${c.alive?AGES[c.age].numeral+(c.warId?' 交战':''):'废墟'}`:`${site.name} · 尚无火种`;
+    v[`#site-${site.id}@title`]=label;v[`#site-${site.id}@aria-label`]=label;v[`#site-${site.id}@aria-pressed`]=String(c?.id===first?.id);v[`#site-${site.id}@disabled`]=!c;
+    v[`#site-${site.id}@data-state`]=c?.alive?(c.warId?'war':'alive'):'empty';v[`#site-${site.id}-age`]=c?.alive?AGES[c.age].numeral:'·';
+    for(const which of ['first','opponent']){v[`#${which}-${site.id}`]=label;v[`#${which}-${site.id}@disabled`]=!c?.alive;}
   }
-  for (const c of o.bodies.earth.civilizations) {
-    const name = BODIES.earth.civilizations.find(def => def.id === c.id).name;
-    vm[`#observe-${c.id}`] = `${name} · ${c.born ? CIVILIZATION_AGES[civilizationAge(c) - 1] : '等待火光'}`;
-    vm[`#observe-${c.id}@aria-pressed`] = String(o.selectedCivilization === c.id);
+  for(const [key,a]of Object.entries(A)){
+    const status=getInterventionState(s,first?.id,key),cost=first?interventionCost(o,first,key):a.baseCost;
+    v[`#intervene-${key}@disabled`]=status!=='ready';v[`#intervene-${key}-cost`]=key==='harvest'&&first?.alive?`+${Q.format(civilizationValue(o,first))} Legacy`:`${Q.format(cost)} Legacy`;
+    v[`#intervene-${key}-state`]={locked:`需要「${T[a.talent].name}」`,dead:'文明已消亡',max:'已达界限',legacy:'遗产不足',ready:'执行'}[status];
   }
-  const c = findCivilization(o, 'earth', o.selectedCivilization), cr = civilizationRates(c, rates);
-  const name = BODIES.earth.civilizations.find(def => def.id === c.id).name;
-  Object.assign(vm, {
-    '#colony-civ-name': name, '#colony-civ-age': c.born ? CIVILIZATION_AGES[civilizationAge(c) - 1] : '文明尚未诞生',
-    '#colony-population': Math.floor(c.population).toLocaleString('zh-CN'), '#colony-influence': `${Math.floor(c.influence)}%`,
-    '#colony-unrest': `${Math.floor(c.unrest)}${cr.war ? ' · 战乱' : ' · 平稳'}`, '#colony-unrest@class:at-war': cr.war,
-    '#colony-civ-income': `${round(cr.legacy)}/秒`, '#colony-research@value': c.progress / R.maxProgress,
-    '#colony-research@title': `发展 ${Math.floor(c.progress)} / ${R.maxProgress} · 每 ${R.ageProgress} 点进入下一时代`,
-    '#colony-policy@value': c.policy, '#colony-policy@disabled': !c.born || !o.structures.observer,
-    '#colony-policy-detail': o.structures.observer ? POLICIES[c.policy].description : '建造地表观测阵列后，可以改变政策和进行干预。',
-    '#colony-event': o.log.at(-1)?.text ?? '',
-  });
-  for (const [key, action] of Object.entries(INTERVENTIONS)) {
-    const state = getInterventionState(session, 'earth', c.id, key);
-    vm[`#intervene-${key}@disabled`] = state !== 'ready';
-    vm[`#intervene-${key}-cost`] = `${action.energy} 能量${key === 'tribute' ? ` · +${tributeReward(c, rates)} Legacy` : ''}`;
-    vm[`#intervene-${key}-state`] = { ready: '可执行', energy: '能量不足', cooldown: `${Math.ceil(c.cooldowns[key])} 秒冷却`, complete: '无需干预', locked: '等待观测阵列与文明' }[state];
+  for(let i=0;i<3;i++){const w=o.wars[i];v[`#watch-war-${i}@hidden`]=!w;v[`#watch-war-${i}`]=w?w.participants.map(id=>findCivilization(o,id).name).join(' ↔ '):'';v[`#watch-war-${i}@aria-pressed`]=String(w?.id===o.selectedWar);}
+  const w=o.wars.find(w=>w.id===o.selectedWar);v['#colony-battle@hidden']=!w;v['#colony-no-war@hidden']=Boolean(w);
+  for(const [i,team]of ['player','enemy'].entries())v[`#colony-war-${team}`]=w?`${findCivilization(o,w.participants[i]).name} · ${AGES[w.game.ages[team]].numeral} · 基地 ${Q.format(w.game.bases[team].hp)}/${Q.format(w.game.bases[team].maxHp)} · 金币 ${Q.format(Q.floor(w.game.gold[team]))} · 经验 ${Q.format(w.game.experience[team])}`:'';
+  for(const [key,t]of Object.entries(T)){
+    const rank=o.talents[key],status=getOrbitalTalentState(s,key);
+    v[`#orbit-node-${key}@data-state`]=status;v[`#orbit-node-${key}@aria-label`]=`${t.name}，${rank}/${t.costs.length} 级，${status==='max'?'已完成':`${t.costs[rank]} Legacy`}`;
+    v[`#orbit-rank-${key}`]='●'.repeat(rank)+'○'.repeat(t.costs.length-rank);v[`#orbit-cost-${key}`]=status==='max'?'已点亮':`${Q.format(t.costs[rank])} Legacy`;
+    for(const parent of Object.keys(t.requires))v[`#orbit-edge-${parent}-${key}@class:lit`]=rank>0;
   }
-  for (let i = 0; i < R.historyLimit; i++) { const e = o.log[o.log.length - i - 1]; vm[`#orbit-log-${i}`] = e ? `${orbitalTime(e.time)}  ${e.text}` : ''; vm[`#orbit-log-${i}@hidden`] = !e; }
-  return vm;
+  const t=T[talent],rank=o.talents[talent],status=getOrbitalTalentState(s,talent);
+  Object.assign(v,{'#orbit-detail-name':t.name,'#orbit-detail-description':t.description,'#orbit-detail-effect':`${orbitalTalentEffect(o,talent)} → ${orbitalTalentEffect(o,talent,Math.min(t.costs.length,rank+1))}`,
+    '#orbit-detail-requires':`${Object.entries(t.requires).map(([p,n])=>`${T[p].name} ${n} 级`).join(' + ')||'继承自地表篇'}${t.cycles?` · ${t.cycles} 次核毁灭（当前 ${o.nuclearCycles}）`:''}`,
+    '#orbit-buy@disabled':status!=='ready','#orbit-buy':status==='max'?'已点亮':`${Q.format(t.costs[rank])} Legacy · ${status==='ready'?'点亮天赋':status==='legacy'?'遗产不足':status==='cycles'?'等待核毁灭记录':'前置未满足'}`});
+  for(let i=0;i<R.historyLimit;i++){const e=o.log[o.log.length-1-i];v[`#orbit-log-${i}`]=e?`${orbitalTime(e.time)}  ${e.text}`:'';v[`#orbit-log-${i}@hidden`]=!e;}
+  return v;
 }

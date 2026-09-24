@@ -149,6 +149,10 @@ export function createTalentMap(getSession, changed) {
   details.addEventListener('pointerleave', () => { if (!pinned) scheduleHide(); });
   details.addEventListener('focusin', () => { pinned = true; clearTimeout(hideTimer); });
   el('close-talent-detail').addEventListener('click', () => closeDetail(true));
+  // Route strip: jump to a section of the map, as in the VI tree.
+  document.querySelectorAll('[data-home-route]').forEach(button => button.addEventListener('click', () => {
+    closeDetail(); el(`node-${button.dataset.homeRoute}`).scrollIntoView({ block: 'center', inline: 'center', behavior: reduced.matches ? 'instant' : 'smooth' });
+  }));
   screen.addEventListener('keydown', event => {
     if (event.key === 'Escape' && !details.hidden) { event.preventDefault(); event.stopPropagation(); closeDetail(true); }
   });

@@ -136,9 +136,9 @@
 
 @media (min-width: 741px) {
   #talents-panel { padding-bottom: 24px; }
-  .map-guide, .map-yield { position: absolute; right: 30px; margin: 0; text-align: right; font-size: 9px; }
-  .map-guide { bottom: 12px; }
-  .map-yield { bottom: -4px; font-size: 8px; }
+  /* Under the tree, after the legend, in reading order: never stacked on each other. */
+  .map-guide, .map-yield { margin: 4px 0 0; font-size: 9px; }
+  .map-yield { font-size: 8px; }
   #archives-dialog .bonus-details { position: absolute; bottom: 90px; left: 36px; z-index: 3; width: min(400px, 35vw); margin: 0; text-align: left; }
   #archives-dialog .bonus-details[open] { padding: 16px; border: 1px solid var(--color-home-archives-dialog-bonus-details-border); border-radius: 6px; background: var(--color-home-archives-dialog-bonus-details-surface); max-height: 55dvh; overflow: auto; }
 }
@@ -220,12 +220,12 @@ body:has(#archives-dialog[data-destruction]) #civilization-bar { display: none; 
   #archives-dialog .home-header, .orbit-talents-dialog > header { display: grid; grid-template-columns: 1fr auto 1fr; }
   #archives-dialog .home-nav, .orbit-talents-dialog > header > :last-child { justify-self: end; }
 }
-#archives-dialog[data-turning] *,#orbit-talents-dialog[data-turning] *{pointer-events:none!important}/* One shape legend for both star maps. */
-.tree-legend{position:absolute;right:28px;z-index:4;display:flex;gap:16px;font-size:10px;letter-spacing:1px;color:var(--muted);pointer-events:none}
+#archives-dialog[data-turning] *,#orbit-talents-dialog[data-turning] *{pointer-events:none!important}/* One shape legend for both star maps, as the last line under each tree. */
+.tree-legend{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 18px;font-size:10px;letter-spacing:1px;color:var(--muted);pointer-events:none}
 .tree-legend span{display:flex;align-items:center;gap:6px}.tree-legend svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.2}
-/* Legends sit in the header band, never over nodes. */
-#home-legend{position:relative;top:auto;right:auto;flex-shrink:0;justify-content:flex-end;padding:9px 36px;background:var(--color-home-home-header-surface);border-bottom:1px solid var(--color-home-home-header-border-bottom);z-index:3}#orbit-legend{top:139px;left:0;right:0;justify-content:flex-end;padding:9px 32px;background:var(--color-home-home-header-surface);border-bottom:1px solid #8eaaa515}
-@media(max-width:740px){.tree-legend{gap:10px;font-size:9px}#orbit-legend{top:160px;padding:7px 12px;flex-wrap:wrap;justify-content:center}.orbit-tree-scroll{inset:190px 0 40px!important}#home-legend{padding:7px 12px;flex-wrap:wrap;justify-content:center}}
+#orbit-legend{position:absolute;left:660px;top:1312px;transform:translateX(-50%);width:760px}
+#home-legend{margin:18px auto 4px}
+@media(max-width:740px){.tree-legend{gap:8px 12px;font-size:9px}#orbit-legend{width:480px}}
 .tree-legend .legend-main{color:var(--route-main)}.tree-legend .legend-main svg{stroke-width:1.6}
 .talent-node[data-state="max"] .node-name{top:calc(100% + 8px)}
 /* Owned and available must never look alike: an owned node is filled with its
@@ -237,3 +237,9 @@ body:has(#archives-dialog[data-destruction]) #civilization-bar { display: none; 
 .orbit-talents-dialog .orbit-node[data-state="ready"][data-owned="false"] .orbit-node-frame{stroke-dasharray:3 2.4}
 /* Edges run behind labels: names and prices carry a halo of the sky colour. */
 .node-name,.node-cost,.orbit-node-name,.orbit-node>small,.orbit-route{text-shadow:0 0 3px #0e181b,0 0 6px #0e181b,0 0 10px #0e181b}
+/* The surface map gets the same route strip as VI: sections from left to right,
+   the mainline in gold. It sits in the dialog's flex column under the header. */
+#archives-dialog .home-route-nav{position:relative;top:auto;flex-shrink:0;z-index:3}
+.home-route-nav button{color:var(--route-branch)}.home-route-nav [data-home-route="superSoldierPlan"]{color:var(--route-main)}
+.home-route-nav button{background:transparent;border:0;border-radius:0;box-shadow:none;font-size:10px;letter-spacing:2px;min-height:37px;padding:5px 12px}
+.home-route-nav{background:#0e181b40;border-bottom:1px solid #8eaaa515}

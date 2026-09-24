@@ -157,6 +157,7 @@ export function createOrbitalColonyUI(getSession,{commit,archive,save,speed,view
     if(lastPaint!==null&&timestamp>=lastPaint&&timestamp-lastPaint<1000/30)return;lastPaint=timestamp;
     if(voyage.active){voyage.tick(timestamp);return;}
     if(dialog.open){paintTree();return;}
+    if(solarTree.isOpen){solarTree.paintSky();return;}
     if(ringBuild?.start===null)ringBuild.start=ambient;
     const construction=ringBuild&&ringBuild.rank===o.talents.recovery&&!reduced.matches&&!paused?Math.min(1,(ambient-ringBuild.start)/2):1;
     const view=solar.view;solar.paint(ambient);

@@ -17,6 +17,7 @@ async function load(){
   frame=await mountFixture(serializeSession(session),false,'debug');frame.style.width=document.getElementById('width').value;timestamp=0;
   if(['launch','shipyard'].includes(stage))frame.contentDocument.getElementById('colony-pause').click();
   if(stage==='shipyard')frame.contentDocument.getElementById('colony-view-moon').click();
+  if(stage==='system'){const body=new URLSearchParams(location.search).get('body');if(body)frame.contentDocument.getElementById('solar-select-'+body)?.click();}
   if(stage==='finale')frame.contentDocument.querySelector('[data-debug-command="finale"]').click();
   } finally {loading=false;document.getElementById('reset').disabled=false;}
 }

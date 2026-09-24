@@ -130,6 +130,10 @@ function globe(ctx,cx,cy,r,o,{time=o.elapsed,camera=0,reducedMotion=false}={}){
   if(night)nuclearWinter(ctx,cx,cy,r,o,{time,rotation,camera,reducedMotion});
   ctx.restore();ctx.globalAlpha=1;ctx.strokeStyle='#b4cbb52b';ctx.lineWidth=.8;ctx.beginPath();ctx.arc(cx,cy,r,0,TAU);ctx.stroke();
 }
+// The atlas and satellite backdrops reuse the actual homeworld model.
+export function drawEarthSphere(ctx,x,y,r,{time=0,reducedMotion=false}={}){
+  globe(ctx,x,y,r,{elapsed:time,phase:'seeding',civilizations:[]},{time:reducedMotion?0:time,reducedMotion});
+}
 export function habitatSegments(rank){
   return Array.from({length:Math.min(R.habitatSections,Math.max(0,rank))},(_,i)=>({start:i*TAU/R.habitatSections,end:(i+1)*TAU/R.habitatSections}));
 }

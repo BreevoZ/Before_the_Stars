@@ -18,9 +18,52 @@ import { solarViewport, bodyAt, DESTINATIONS, drawSolarSystem, drawBodyPortrait 
 import { drawShipyard, ARK_COUNT } from '../src/shipyard-render.js';
 import { voyageFrame, voyageGeometry, voyageIllumination, arkPose, drawVoyageScene, voyageMars, VOYAGE_SECONDS } from '../src/voyage-scene.js';
 import { ANIMATION_CLIPS } from '../src/animation-clips.js';
+import { SATELLITES, satellitesOf, systemOf, destination } from '../src/solar-bodies.js';
+import { surfacePoint, spinOf } from '../src/planet-render.js';
+import { drawWorldScene, worldGeometry, satellitePose, satelliteAt } from '../src/solar-world-render.js';
 
 export function registerSolarTests(test, assert, near) {
   const throws=fn=>{let failed=false;try{fn();}catch{failed=true;}assert(failed,'Invalid shipyard record must be rejected');};
+  test('Worlds: observing all nine systems and their satellites never unlocks routes, advances wars or changes the ledger',()=>{
+    const s=voyageFixture(),raw=serializeSession(s);
+    assert(!DESTINATIONS.some(b=>b.id==='moon') && satellitesOf('earth').length===1 && systemOf('moon')==='earth');
+    assert(satellitesOf('mercury').length===0 && satellitesOf('venus').length===0);
+    for(const b of [...DESTINATIONS,...SATELLITES]){
+      const v=buildSolarViewModel(s,{view:b.id});assert(v['#colony-system@hidden'] && v['#colony-body-name']===b.name);
+      assert(v[`#solar-select-${systemOf(b.id)}@aria-pressed`]==='true');
+      for(const m of SATELLITES)assert(v[`#solar-moon-${m.id}@hidden`]===(m.parent!==systemOf(b.id)));
+      if(b.parent&&b.id!=='moon')assert(v['#solar-facility@hidden']&&v['#solar-colony@hidden']);
+    }
+    const mars=buildSolarViewModel(s,{view:'mars'}),venus=buildSolarViewModel(s,{view:'venus'});
+    assert(mars['#solar-select-mars@data-reach']==='transit'&&venus['#solar-select-venus@data-reach']==='survey'&&venus['#solar-facility-build@disabled']);
+    assert(serializeSession(s)===raw);
+  });
+  test('World geometry: self rotation stays on a sphere; orbiting moons have depth and cannot be clicked through their parent',()=>{
+    for(const t of [0,8,47,120]){const p=surfacePoint(.7,.4,spinOf(destination('mars'),t),.16);near(p.x*p.x+p.y*p.y+p.z*p.z,1);}
+    assert(surfacePoint(0,0,0).z>0 && surfacePoint(0,0,Math.PI).z<0);
+    for(const body of DESTINATIONS)for(const [w,h] of [[320,340],[900,500]]){
+      const g=worldGeometry(body,w,h);
+      for(const moon of satellitesOf(body.id))for(const t of [0,20,70,140]){
+        const p=satellitePose(moon,t,g);assert(p.x-p.r>=0&&p.x+p.r<=w&&p.y-p.r>=0&&p.y+p.r<h);
+        const hidden=p.z<0&&Math.hypot(p.x-g.x,p.y-g.y)<g.r+p.r;
+        if(hidden)assert(satelliteAt(body,w,h,t,p.x,p.y)?.id!==moon.id);
+        else assert(satelliteAt(body,w,h,t,p.x,p.y)?.id===moon.id);
+      }
+    }
+  });
+  test.browser('World rendering: distinct rotating spheres, rings and rocks; reduced motion freezes the whole local system without touching state',()=>{
+    const s=voyageFixture(),raw=serializeSession(s),c=document.createElement('canvas');c.width=900;c.height=500;const x=c.getContext('2d'),images=new Set();
+    for(const body of [...DESTINATIONS,...SATELLITES]){
+      drawWorldScene(x,900,500,body,s.orbital,{reducedMotion:true});const quiet=c.toDataURL();images.add(quiet);
+      drawWorldScene(x,900,500,body,{...s.orbital,elapsed:s.orbital.elapsed+31},{ambientTime:900,reducedMotion:true});assert(c.toDataURL()===quiet,body.id);
+    }
+    assert(images.size===DESTINATIONS.length+SATELLITES.length);
+    for(const id of ['mars','jupiter','saturn','uranus','belt']){
+      drawWorldScene(x,900,500,destination(id),s.orbital);const a=c.toDataURL();
+      drawWorldScene(x,900,500,destination(id),{...s.orbital,elapsed:s.orbital.elapsed+23});assert(c.toDataURL()!==a,id);
+    }
+    assert(serializeSession(s)===raw);
+  });
   test('Shipyard: seven paid ranks light seven arks, persist separately, and gate departure until the fleet is complete', () => {
     const clean=voyageReady({arks:0}),before=clean.permanent.legacy;let total=0;
     for(let rank=1;rank<=ARK_COUNT;rank++) {
@@ -61,10 +104,10 @@ export function registerSolarTests(test, assert, near) {
     assert(serializeSession(s)===raw);assert(purchaseOrbitalTalent(s,'voyage'));
     const vii=buildSolarViewModel(s,{view:'system',selected:'saturn'});
     assert(vii['#orbital-game@data-stage']==='VII' && !vii['#colony-system@hidden']);
-    assert(vii['#colony-body-name']==='土星' && vii['#colony-body-enter@hidden']);
-    assert(vii['#solar-body-note'].includes('后续开放') && vii['#shipyard-status'].includes('已启航'));
-    assert(DESTINATIONS.length===10 && new Set(DESTINATIONS.map(b=>b.id)).size===10);
-    assert(buildSolarViewModel(s,{selected:'moon'})['#colony-body-enter']==='进入月面家园 ↗');
+    assert(vii['#colony-body-name']==='土星' && vii['#colony-body-card@hidden']);
+    assert(vii['#solar-body-note'].includes('尚未开放') && vii['#shipyard-status'].includes('已启航'));
+    assert(DESTINATIONS.length===9 && new Set(DESTINATIONS.map(b=>b.id)).size===9);
+    assert(buildSolarViewModel(s,{view:'moon'})['#solar-parent']==='← 返回地球');
   });
   test('Arks: the pioneer fleet founds the Mars harbour; every other foothold is an ark dispatched from a drydock within reach', () => {
     const s=voyageFixture(),o=s.orbital,run=seconds=>{for(let i=0;i<Math.round(seconds*30);i++)updateOrbital(s,1/30);};
@@ -110,7 +153,7 @@ export function registerSolarTests(test, assert, near) {
     const kept=parseSession(JSON.stringify(v26));assert(kept.orbital.solar.facilities.jupiter===1&&kept.orbital.solar.talents.fusion===0,'Footholds built under v26 stay');
     const vi=voyageReady();vi.orbital.solar.facilities.venus=1;vi.orbital.solar.payments.venus=[FACILITIES.venus.costs[0]];
     let rejected=false;try{parseSession(serializeSession(vi));}catch{rejected=true;}assert(rejected,'Industry needs 远航协议');
-    const view=buildSolarViewModel(s,{view:'system',selected:'venus'});assert(!view['#solar-facility@hidden']&&view['#solar-facility-build'].includes('近日隔热')&&view['#solar-facility-build@disabled']);
+    const view=buildSolarViewModel(s,{view:'venus'});assert(!view['#solar-facility@hidden']&&view['#solar-facility-build'].includes('近日隔热')&&view['#solar-facility-build@disabled']);
     assert(buildSolarViewModel(s,{view:'system',selected:'mars'})['#colony-body-status'].includes('先遣编队'));
     assert(buildSolarViewModel(s,{view:'system',selected:'saturn'})['#solar-facility@hidden']);
   });
@@ -200,6 +243,21 @@ export function registerSolarTests(test, assert, near) {
     const frames=new Set();for(const t of [0,4,8,14,22,30]){drawVoyageScene(x,700,500,t);frames.add(c.toDataURL());}assert(frames.size===6);
     drawVoyageScene(x,700,500,0,{reducedMotion:true});const still=c.toDataURL();drawVoyageScene(x,700,500,12,{reducedMotion:true});assert(c.toDataURL()===still && serializeSession(s)===raw);
   });
+  test.browser('World economy UI: dispatch from Venus still pays once, lands while observing another world and restores its saved flight',async()=>{
+    const s=voyageFixture();setDebugLegacy(s,2**40);purchaseSolarTalent(s,'heat');
+    const before=s.permanent.legacy,frame=await mountFixture(serializeSession(s),false,'debug',{reducedMotion:true});
+    try{
+      const d=frame.contentDocument,w=frame.contentWindow,el=id=>d.getElementById(id);let now=0;
+      el('solar-select-venus').click();assert(!el('solar-facility-build').disabled && !el('solar-facility').hidden);
+      el('solar-facility-build').click();el('solar-facility-build').click();
+      const saved=parseSession(w.__storage.getItem(DEBUG_SAVE_KEY));assert(saved.orbital.solar.flights.length===1 && Q.eq(saved.permanent.legacy,Q.sub(before,FACILITIES.venus.costs[0])));
+      assert(el('solar-facility-build').disabled && el('solar-facility-build').textContent.includes('航行中'));
+      el('solar-select-saturn').click();for(let i=0;i<100;i++)w.__testFrame(now+=100);
+      el('solar-select-venus').click();w.__testFrame(now+=100);
+      assert(el('solar-facility-level').textContent==='1 / 5' && !el('solar-facility-build').disabled);
+      assert(el('solar-nav-state-venus').textContent==='驻地' && !d.body.dataset.fixtureError);
+    }finally{frame.remove();}
+  });
   test.browser('Shipyard UI: seven purchases update the lunar lights, gates, prices and persisted ranks without enabling early departure', async () => {
     const frame=await mountFixture(serializeSession(voyageReady({arks:0})),false,'debug',{reducedMotion:true});
     try {
@@ -269,26 +327,33 @@ export function registerSolarTests(test, assert, near) {
       } finally {frame.remove();}
     }
   });
-  test.browser('Solar UI: responsive catalogue, planet portraits, Earth and Moon navigation and shipyard gates work at 320/390/1100px', async () => {
+  test.browser('Solar UI: independent worlds, nested satellites and overview remain usable at 320/390/1100px', async () => {
     const frame=await mountFixture(serializeSession(voyageFixture()),false,'debug',{reducedMotion:true});
     try {
       const d=frame.contentDocument,w=frame.contentWindow,el=id=>d.getElementById(id);let now=0;
       for(const width of [320,390,1100]) {
         frame.style.width=`${width}px`;await new Promise(r=>setTimeout(r,35));w.__testFrame(now+=100);
+        el('solar-overview').click();w.__testFrame(now+=100);
         assert(d.documentElement.scrollWidth<=width+2,`System overflow at ${width}`);
-        const earth=el('solar-body-portrait').toDataURL();el('solar-select-saturn').click();w.__testFrame(now+=100);
-        assert(el('colony-body-name').textContent==='土星' && el('solar-body-portrait').toDataURL()!==earth);
         const chart=el('colony-system-canvas'),r=chart.getBoundingClientRect();near(chart.width/chart.height,r.width/r.height);
+        assert(!el('solar-navigation').hidden && !el('solar-select-moon'),'The Moon is not a top-level destination');
+        for(const body of DESTINATIONS){
+          el(`solar-select-${body.id}`).click();w.__testFrame(now+=100);
+          assert(el('orbital-game').dataset.view===body.id && el('colony-system').hidden);
+          assert(el(`solar-select-${body.id}`).getAttribute('aria-pressed')==='true');
+          if(body.id!=='earth')assert(!el('colony-body-card').hidden && el('colony-body-name').textContent===body.name);
+          assert(d.documentElement.scrollWidth<=width+2,`${body.id} overflow at ${width}`);
+        }
+        el('solar-select-saturn').click();
         el('solar-select-saturn').dispatchEvent(new w.KeyboardEvent('keydown',{code:'ArrowRight',bubbles:true}));assert(el('colony-body-name').textContent==='天王星');
-        // The catalogue is the only way in and out: Earth and the Moon open their views, any other body the atlas.
-        assert(el('solar-return').hidden);el('solar-select-earth').click();el('colony-body-enter').click();w.__testFrame(now+=100);
-        assert(el('orbital-game').dataset.view==='earth' && !el('colony-world').hidden && !el('solar-return').hidden && el('solar-jump-earth').getAttribute('aria-pressed')==='true');
-        el('solar-jump-moon').click();w.__testFrame(now+=100);assert(el('orbital-game').dataset.view==='moon' && !el('colony-shipyard').hidden);
-        assert(el('shipyard-status').textContent.includes('已启航') && d.documentElement.scrollWidth<=width+2);
-        el('shipyard-build').click();assert(el('orbit-talents-dialog').open && el('orbit-detail').textContent.includes('船坞'));el('close-orbit-talents').click();
-        el('solar-jump-mars').click();w.__testFrame(now+=100);assert(el('orbital-game').dataset.view==='system' && el('colony-body-name').textContent==='火星');
+        el('solar-select-jupiter').click();el('solar-moon-europa').click();w.__testFrame(now+=100);
+        assert(el('orbital-game').dataset.view==='europa' && el('solar-select-jupiter').getAttribute('aria-pressed')==='true' && el('solar-facility').hidden);
+        el('solar-parent').click();assert(el('orbital-game').dataset.view==='jupiter');
+        el('solar-select-earth').click();el('solar-moon-moon').click();w.__testFrame(now+=100);
+        assert(el('orbital-game').dataset.view==='moon' && !el('colony-shipyard').hidden && el('solar-select-earth').getAttribute('aria-pressed')==='true');
+        el('shipyard-build').click();assert(el('orbit-talents-dialog').open);el('close-orbit-talents').click();
+        el('solar-parent').click();assert(el('orbital-game').dataset.view==='earth');
         el('colony-talents').click();assert(el('solar-talents-dialog').open && !el('orbit-talents-dialog').open);el('close-solar-talents').click();
-        el('solar-select-earth').click();w.__testFrame(now+=100);
       }
       assert(!d.body.dataset.fixtureError,d.body.dataset.fixtureError);
     } finally {frame.remove();}

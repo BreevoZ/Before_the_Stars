@@ -1,7 +1,15 @@
 // Presentation catalogue. Satellites belong to a planetary system; observing
 // one never unlocks a route, facility, or colony in the economic simulation.
 import { BODIES, bodyById } from './solar-config.js';
-const moon=(id,name,parent,color,kind,orbit,size,phase,description)=>Object.freeze({id,name,parent,color,surface:kind,orbit,size,phase,kind:'moon',description});
+import { DAY_NIGHT_CYCLE_SECONDS, LUNAR_ORBIT_SECONDS } from './celestial-clock.js';
+// Real sidereal periods in Earth days (negative: retrograde, like Triton).
+// Every local system shares one clock, anchored so the Moon keeps VI's month:
+// all satellites keep their true ratios to each other. Orbit radii stay
+// compressed for readability, but their order is the real one.
+const PERIODS=Object.freeze({moon:27.322,phobos:.3189,deimos:1.2624,io:1.7691,europa:3.5512,ganymede:7.1546,callisto:16.689,enceladus:1.3702,titan:15.945,titania:8.7059,oberon:13.463,triton:-5.8769});
+export const SATELLITE_DAY_SECONDS=LUNAR_ORBIT_SECONDS/PERIODS.moon;
+export const satellitePeriodSeconds=m=>m.period*SATELLITE_DAY_SECONDS;
+const moon=(id,name,parent,color,kind,orbit,size,phase,description)=>Object.freeze({id,name,parent,color,surface:kind,orbit,size,phase,period:PERIODS[id],kind:'moon',description});
 export const SATELLITES=Object.freeze([
   moon('moon','月球','earth','#a6b6aa','rock',1.65,.23,.8,'最初的地外家园。月面工场、质量投射器与深空船坞，让文明的生产线延伸到地球之外。'),
   moon('phobos','火卫一','mars','#9c8975','rock',1.45,.065,1.4,'近处的岩石小卫星，沿着火星的弧面掠过。'),
@@ -22,11 +30,15 @@ export const destination=id=>bodyById(id)??SATELLITES.find(b=>b.id===id);
 export const systemOf=id=>destination(id)?.parent??id;
 export const satellitesOf=id=>SATELLITES.filter(b=>b.parent===id);
 export const bodyKindLabel=b=>b.id==='moon'?'月面家园':b.parent?'自然卫星':({home:'文明摇篮',habitable:'殖民世界',industrial:b.belt?'资源星域':'行星工业',relay:'深空前哨'}[b.kind]);
+// Planets turn at their real sidereal day on the surface clock (Earth: one VI
+// day). Mercury and Venus barely turn; Venus and Uranus turn backwards.
+const DAY=DAY_NIGHT_CYCLE_SECONDS;
 export const BODY_SURFACES=Object.freeze({
-  mercury:{surface:'rock',spin:180,tilt:.03},venus:{surface:'cloud',spin:-240,tilt:.04,atmosphere:'#d6bd86'},
-  earth:{surface:'earth',spin:120,tilt:.12,atmosphere:'#89b8ad'},mars:{surface:'mars',spin:150,tilt:.16,atmosphere:'#bd8d70'},
-  jupiter:{surface:'gas',spin:85,tilt:.05,atmosphere:'#bba283'},saturn:{surface:'gas',spin:100,tilt:.35,atmosphere:'#bbaa84',rings:{tilt:-.35,inner:1.18,outer:2.03}},
-  uranus:{surface:'gas',spin:140,tilt:1.64,atmosphere:'#9ac4c2',rings:{tilt:-1.64,inner:1.45,outer:1.53,faint:true}},
-  neptune:{surface:'gas',spin:120,tilt:.18,atmosphere:'#789bbd'},
+  mercury:{surface:'rock',spin:DAY*58.646,tilt:.03},venus:{surface:'cloud',spin:-DAY*243.02,tilt:.04,atmosphere:'#d6bd86'},
+  earth:{surface:'earth',spin:DAY,tilt:.12,atmosphere:'#89b8ad'},mars:{surface:'mars',spin:DAY*1.026,tilt:.16,atmosphere:'#bd8d70'},
+  jupiter:{surface:'gas',spin:DAY*.4135,tilt:.05,atmosphere:'#bba283'},saturn:{surface:'gas',spin:DAY*.444,tilt:.35,atmosphere:'#bbaa84',rings:{tilt:-.35,inner:1.18,outer:2.03}},
+  uranus:{surface:'gas',spin:-DAY*.7183,tilt:1.64,atmosphere:'#9ac4c2',rings:{tilt:-1.64,inner:1.45,outer:1.53,faint:true}},
+  neptune:{surface:'gas',spin:DAY*.6713,tilt:.18,atmosphere:'#789bbd'},
 });
-export const surfaceOf=b=>BODY_SURFACES[b.id]??{surface:b.surface??'rock',spin:180,tilt:.12};
+// Satellites are tidally locked: one turn per orbit, so the same face looks home.
+export const surfaceOf=b=>BODY_SURFACES[b.id]??{surface:b.surface??'rock',spin:b.period?satellitePeriodSeconds(b):180,tilt:.12};

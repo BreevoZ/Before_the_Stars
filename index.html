@@ -24,15 +24,14 @@
       <nav id="solar-navigation" class="solar-navigation" aria-label="行星际导航" hidden>
         <button id="solar-overview" class="solar-overview" type="button"><span data-icon="orbital"></span><span>太阳系总览<small id="solar-overview-progress"></small></span></button>
         <div id="solar-catalogue" class="solar-catalogue" role="group" aria-label="行星与星域"></div>
+        <div id="solar-moon-menu" class="solar-moon-menu" role="menu" hidden><small id="solar-moon-menu-title"></small><div id="solar-satellites"></div></div>
       </nav>
-      <nav id="solar-local" class="solar-local" aria-label="所属行星与卫星" hidden><span id="solar-local-title"></span><button id="solar-parent" type="button" hidden></button><div id="solar-satellites"></div><small id="solar-local-empty"></small></nav>
-      <div class="colony-heading"><div><p class="colony-eyebrow">TERRA / <span id="colony-time"></span></p><h2 id="colony-objective"></h2></div><div><small id="colony-cycle"></small><p id="colony-earned"></p></div></div>
+            <div class="colony-heading"><div><p class="colony-eyebrow">TERRA / <span id="colony-time"></span></p><h2 id="colony-objective"></h2></div><div><small id="colony-cycle"></small><p id="colony-earned"></p></div></div>
       <p id="colony-objective-detail" class="colony-intro"></p>
       <p id="colony-save-warning" role="status" hidden></p><p id="colony-fallout" class="colony-outcome" role="status" hidden></p><p id="colony-complete" role="status" hidden></p>
 
       <section id="colony-system" class="solar-observatory" aria-label="太阳系航图" hidden>
-        <header class="solar-heading"><div><p>SOL / INTERPLANETARY ATLAS</p><h2>我们的远方。</h2><span>一处家园，成为群星间的起点。</span><p id="solar-atlas-progress" class="solar-reach-progress"></p></div></header>
-        <div class="solar-telemetry"><div><small>母星信号</small><strong id="solar-home-signal"></strong></div><div><small>月面回流 · Legacy</small><strong id="solar-moon-income"></strong></div><div><small>行星工业 · Legacy</small><strong id="solar-industry-income"></strong></div><div><small>方舟编队</small><strong id="solar-fleet"></strong></div></div>
+                <div class="solar-telemetry"><div><small>母星信号</small><strong id="solar-home-signal"></strong></div><div><small>月面回流 · Legacy</small><strong id="solar-moon-income"></strong></div><div><small>行星工业 · Legacy</small><strong id="solar-industry-income"></strong></div><div><small>方舟编队</small><strong id="solar-fleet"></strong></div></div>
         <div class="solar-chart"><canvas id="colony-system-canvas" aria-label="太阳系公转航图；方向键选择，Enter 进入天体；也可使用顶部目录" tabindex="0"></canvas><div class="solar-chart-index" aria-hidden="true">SOL<span>01</span></div><p class="solar-chart-hint">选择天体 · 进入独立世界</p><button id="solar-replay" type="button">重温远航 ↗</button></div>
         <div class="solar-atlas-selection"><p id="solar-atlas-selection"></p><button id="solar-atlas-open" type="button"></button></div>
       </section>

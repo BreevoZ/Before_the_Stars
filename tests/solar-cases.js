@@ -31,7 +31,7 @@ export function registerSolarTests(test, assert, near) {
     for(const b of [...DESTINATIONS,...SATELLITES]){
       const v=buildSolarViewModel(s,{view:b.id});assert(v['#colony-system@hidden'] && v['#colony-body-name']===b.name);
       assert(v[`#solar-select-${systemOf(b.id)}@aria-pressed`]==='true');
-      for(const m of SATELLITES)assert(v[`#solar-moon-${m.id}@hidden`]===(m.parent!==systemOf(b.id)));
+      for(const m of SATELLITES)assert(v[`#solar-moon-${m.id}@aria-pressed`]===String(m.id===b.id));
       if(b.parent&&b.id!=='moon')assert(v['#solar-facility@hidden']&&v['#solar-colony@hidden']);
     }
     const mars=buildSolarViewModel(s,{view:'mars'}),venus=buildSolarViewModel(s,{view:'venus'});
@@ -107,7 +107,7 @@ export function registerSolarTests(test, assert, near) {
     assert(vii['#colony-body-name']==='土星' && vii['#colony-body-card@hidden']);
     assert(vii['#solar-body-note'].includes('尚未开放') && vii['#shipyard-status'].includes('已启航'));
     assert(DESTINATIONS.length===9 && new Set(DESTINATIONS.map(b=>b.id)).size===9);
-    assert(buildSolarViewModel(s,{view:'moon'})['#solar-parent']==='← 返回地球');
+    assert(buildSolarViewModel(s,{view:'europa'})['#solar-body-period'].startsWith('3.6 天')&&buildSolarViewModel(s,{view:'triton'})['#solar-body-period'].includes('逆行'));
   });
   test('Arks: the pioneer fleet founds the Mars harbour; every other foothold is an ark dispatched from a drydock within reach', () => {
     const s=voyageFixture(),o=s.orbital,run=seconds=>{for(let i=0;i<Math.round(seconds*30);i++)updateOrbital(s,1/30);};
@@ -346,13 +346,17 @@ export function registerSolarTests(test, assert, near) {
         }
         el('solar-select-saturn').click();
         el('solar-select-saturn').dispatchEvent(new w.KeyboardEvent('keydown',{code:'ArrowRight',bubbles:true}));assert(el('colony-body-name').textContent==='天王星');
-        el('solar-select-jupiter').click();el('solar-moon-europa').click();w.__testFrame(now+=100);
+        // Satellites drop down from their planet: hovering Jupiter lists exactly its four moons.
+        el('solar-select-jupiter').dispatchEvent(new w.PointerEvent('pointerenter',{pointerType:'mouse'}));
+        assert(!el('solar-moon-menu').hidden && !el('solar-moon-europa').hidden && el('solar-moon-titan').hidden && el('solar-moon-menu-title').textContent.includes('4 颗'));
+        el('solar-moon-europa').click();w.__testFrame(now+=100);assert(el('solar-moon-menu').hidden);
         assert(el('orbital-game').dataset.view==='europa' && el('solar-select-jupiter').getAttribute('aria-pressed')==='true' && el('solar-facility').hidden);
-        el('solar-parent').click();assert(el('orbital-game').dataset.view==='jupiter');
-        el('solar-select-earth').click();el('solar-moon-moon').click();w.__testFrame(now+=100);
+        el('solar-select-jupiter').click();assert(el('orbital-game').dataset.view==='jupiter');
+        el('solar-select-mercury').dispatchEvent(new w.PointerEvent('pointerenter',{pointerType:'mouse'}));assert(el('solar-moon-menu').hidden,'No menu without satellites');
+        el('solar-select-earth').click();el('solar-select-earth').dispatchEvent(new w.PointerEvent('pointerenter',{pointerType:'mouse'}));el('solar-moon-moon').click();w.__testFrame(now+=100);
         assert(el('orbital-game').dataset.view==='moon' && !el('colony-shipyard').hidden && el('solar-select-earth').getAttribute('aria-pressed')==='true');
         el('shipyard-build').click();assert(el('orbit-talents-dialog').open);el('close-orbit-talents').click();
-        el('solar-parent').click();assert(el('orbital-game').dataset.view==='earth');
+        el('solar-select-earth').click();assert(el('orbital-game').dataset.view==='earth');
         el('colony-talents').click();assert(el('solar-talents-dialog').open && !el('orbit-talents-dialog').open);el('close-solar-talents').click();
       }
       assert(!d.body.dataset.fixtureError,d.body.dataset.fixtureError);

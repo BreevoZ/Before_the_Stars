@@ -30,7 +30,7 @@ export function createSolarUI(getSession,{openTree,replay,commit,openSolarTree})
   for(const [i,b]of DESTINATIONS.entries()){
     const button=document.createElement('button');button.id=`solar-select-${b.id}`;button.type='button';button.setAttribute('aria-controls','colony-body-card');button.style.setProperty('--body-color',b.color);
     button.innerHTML=`<small>${String(i+1).padStart(2,'0')}</small><i aria-hidden="true"></i><span>${b.name}</span><em id="solar-nav-state-${b.id}"></em>`;
-    button.addEventListener('click',()=>choose(b.id));button.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight'].includes(e.code))return;e.preventDefault();const n=(i+(e.code==='ArrowLeft'?-1:1)+DESTINATIONS.length)%DESTINATIONS.length;choose(DESTINATIONS[n].id);el(`solar-select-${selected}`).focus();});el('solar-catalogue').append(button);
+    button.addEventListener('click',()=>choose(b.id));button.addEventListener('keydown',e=>{if(e.code==='ArrowDown'&&satellitesOf(b.id).length){e.preventDefault();openMenu(b.id);el(`solar-moon-${satellitesOf(b.id)[0].id}`).focus();return;}if(!['ArrowLeft','ArrowRight'].includes(e.code))return;e.preventDefault();const n=(i+(e.code==='ArrowLeft'?-1:1)+DESTINATIONS.length)%DESTINATIONS.length;choose(DESTINATIONS[n].id);el(`solar-select-${selected}`).focus();});el('solar-catalogue').append(button);
   }
   for(let i=0;i<Math.max(...Object.values(FACILITIES).map(f=>f.costs.length));i++){const li=document.createElement('li');li.id=`solar-facility-rank-${i+1}`;el('solar-facility-ranks').append(li);}
   // Building happens in the dossier of the body it stands on.
@@ -41,8 +41,30 @@ export function createSolarUI(getSession,{openTree,replay,commit,openSolarTree})
   el('solar-transfer-go').addEventListener('click',()=>{if(transferCivilization(getSession(),el('solar-transfer-civ').value)){civSignature='';commit();sync();}});
   el('solar-colony-tree').addEventListener('click',()=>openSolarTree?.('dome'));
   for(const id of ['earth','moon'])el(`colony-view-${id}`).addEventListener('click',()=>setView(id));
-  for(const m of SATELLITES){const button=document.createElement('button');button.id=`solar-moon-${m.id}`;button.type='button';button.textContent=m.name;button.addEventListener('click',()=>setView(m.id));el('solar-satellites').append(button);}
-  el('solar-parent').addEventListener('click',()=>setView(systemOf(view)));
+  // Satellites drop down from their planet: on hover or focus with a mouse or
+  // keyboard, and after a tap on touch screens. One menu, placed under the planet.
+  const menu=el('solar-moon-menu'),nav=el('solar-navigation');let menuFor=null,menuTimer=null;
+  for(const m of SATELLITES){const button=document.createElement('button');button.id=`solar-moon-${m.id}`;button.type='button';button.setAttribute('role','menuitem');button.style.setProperty('--body-color',m.color);
+    button.innerHTML=`<i aria-hidden="true"></i><span>${m.name}</span><small>${m.id==='moon'?'月面家园':m.period<0?'逆行卫星':'自然卫星'}</small>`;
+    button.addEventListener('click',()=>{closeMenu();setView(m.id);});
+    button.addEventListener('keydown',e=>{const list=satellitesOf(m.parent),i=list.indexOf(m);
+      if(['ArrowDown','ArrowUp'].includes(e.code)){e.preventDefault();el(`solar-moon-${list[(i+(e.code==='ArrowDown'?1:-1)+list.length)%list.length].id}`).focus();}
+      if(e.code==='Escape'){e.preventDefault();closeMenu();el(`solar-select-${m.parent}`).focus();}});
+    el('solar-satellites').append(button);}
+  function openMenu(id){clearTimeout(menuTimer);const moons=satellitesOf(id);if(!moons.length){closeMenu();return;}
+    menuFor=id;for(const m of SATELLITES)el(`solar-moon-${m.id}`).hidden=m.parent!==id;el('solar-moon-menu-title').textContent=`${destination(id).name} · ${moons.length} 颗卫星`;
+    const b=el(`solar-select-${id}`).getBoundingClientRect(),n=nav.getBoundingClientRect();menu.hidden=false;
+    menu.style.left=`${Math.max(0,Math.min(n.width-menu.offsetWidth,b.left-n.left))}px`;menu.style.top=`${b.bottom-n.top}px`;}
+  function closeMenu(){clearTimeout(menuTimer);menu.hidden=true;menuFor=null;}
+  const later=()=>{clearTimeout(menuTimer);menuTimer=setTimeout(closeMenu,180);};
+  for(const b of DESTINATIONS){const button=el(`solar-select-${b.id}`);
+    button.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse')openMenu(b.id);});button.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')later();});
+    button.addEventListener('pointerup',e=>{if(e.pointerType!=='mouse')setTimeout(()=>openMenu(b.id));});
+    button.addEventListener('focus',()=>{if(button.matches(':focus-visible'))openMenu(b.id);});}
+  menu.addEventListener('pointerenter',()=>clearTimeout(menuTimer));menu.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')later();});
+  nav.addEventListener('focusout',e=>{if(!nav.contains(e.relatedTarget))later();});
+  document.addEventListener('pointerdown',e=>{if(menuFor&&!nav.contains(e.target))closeMenu();});
+  el('solar-catalogue').addEventListener('scroll',closeMenu,{passive:true});
   el('solar-overview').addEventListener('click',()=>setView('system'));
   el('solar-atlas-open').addEventListener('click',()=>choose(selected));
   el('solar-replay').addEventListener('click',replay);el('shipyard-link').addEventListener('click',()=>setView('moon'));

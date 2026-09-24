@@ -19,10 +19,6 @@ export function buildSolarViewModel(s,{view='earth',selected='earth',transferCiv
     '#orbital-game@data-stage':vii?'VII':'VI','#orbital-game@data-view':view,'#colony-system@hidden':!vii||view!=='system',
     '#orbital-game@data-local-world':vii&&local,'#solar-navigation@hidden':!vii,'#colony-body-card@hidden':!vii||!local,
     '#solar-overview@aria-pressed':String(view==='system'),'#solar-overview-progress':`${reached} / ${DESTINATIONS.length} 驻地`,
-    '#solar-local@hidden':!vii||view==='system','#solar-local-title':`${root.name} / ${b.parent?'卫星观测':'行星系统'}`,
-    '#solar-parent@hidden':!b.parent,'#solar-parent':`← 返回${root.name}`,
-    '#solar-local-empty@hidden':Boolean(satellitesOf(root.id).length),'#solar-local-empty':root.belt?'主带 / 岩石与冰': '无天然卫星',
-    '#solar-atlas-progress':`${reached} 处驻地 / ${DESTINATIONS.length} 个行星与星域`,
     '#solar-atlas-selection':`${b.name} · ${bodyStatus(o,b)}`,'#solar-atlas-open':`进入${b.name}${b.belt?'星域':'系统'} ↗`,
     '#solar-home-signal':o.phase==='winter'?`核冬天 · ${Math.ceil(o.remaining)}s`:`${alive} 个文明 / ${o.wars.length} 场战争`,
     '#solar-moon-income':`+${Q.format(lunarLegacyRate(o))} / s`,'#solar-industry-income':vii?`+${Q.format(industryRate(o))} / s`:'远航后开放',
@@ -30,8 +26,8 @@ export function buildSolarViewModel(s,{view='earth',selected='earth',transferCiv
     '#colony-body-name':b.name,'#colony-body-kind':bodyKindLabel(b),'#colony-body-description':b.description,
     '#colony-body-status':b.id==='earth'?(o.phase==='winter'?'等待下一次文明萌芽':`${alive} 个文明 · 地表实况在线`):b.id==='moon'?`${Q.format(lunarLegacyRate(o))} Legacy/s · 月面生产中`:bodyStatus(o,b),
     '#solar-body-distance':b.parent?`${root.name}的卫星`:`${b.au} AU`,
-    '#solar-period-label':b.parent?'轨道归属':'公转周期',
-    '#solar-body-period':b.parent?`归属${root.name}系统`:`${(orbitalPeriod(b.au)/EARTH_YEAR_SECONDS).toFixed(b.au<2?2:1)} 地球年`,
+    '#solar-period-label':b.parent?'绕行周期':'公转周期',
+    '#solar-body-period':b.parent?`${Math.abs(b.period).toFixed(Math.abs(b.period)<2?2:1)} 天${b.period<0?' · 逆行':''}`:`${(orbitalPeriod(b.au)/EARTH_YEAR_SECONDS).toFixed(b.au<2?2:1)} 地球年`,
     '#solar-body-purpose':b.parent&&b.id!=='moon'?'卫星观测':facilityKey&&o.solar.facilities[facilityKey]?'工业驻地':{home:'观测 / 文明轮回',moon:'制造 / 深空船坞',habitable:'殖民候选地',industrial:'工业候选地',relay:'外太阳系勘察'}[b.kind],
     '#solar-body-note':owned?'家园仍在运转。':b.parent?'观测已接入。这里尚未建立驻地。':facilityKey?'驻地生产的遗产持续回流到共同的家园。':b.id===COLONY_RULES.target?'火星不会自行萌芽。文明来自地球的转运，核冬天仅影响这颗星球。':b.kind==='habitable'?'卫星等待着未来的殖民者。驻地建设尚未开放。':'遥远的观测信号。深空驻地尚未开放。',
     '#colony-shipyard@hidden':!o.talents.outpost,'#shipyard-status':vii?'七艘方舟已启航':ready?'七艘方舟 · 整备完成':`月面船坞 · 方舟 ${rank} / ${ARK_COUNT}`,
@@ -52,7 +48,7 @@ export function buildSolarViewModel(s,{view='earth',selected='earth',transferCiv
     v[`#solar-select-${d.id}@title`]=`${d.name} · ${bodyStatus(o,d)}`;
     v[`#solar-nav-state-${d.id}`]={home:'家园',reached:'驻地',transit:'航行中',available:'可派遣',survey:'待抵达'}[reachState(o,d)];
   }
-  for(const m of SATELLITES){v[`#solar-moon-${m.id}@hidden`]=m.parent!==root.id;v[`#solar-moon-${m.id}@aria-pressed`]=String(view===m.id);}
+  for(const m of SATELLITES)v[`#solar-moon-${m.id}@aria-pressed`]=String(view===m.id);
   // Mars: the dome, the window and the transfer from Earth.
   v['#solar-colony@hidden']=!vii||view!==COLONY_RULES.target;
   if(vii&&b.id===COLONY_RULES.target){

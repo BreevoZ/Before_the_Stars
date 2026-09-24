@@ -1,5 +1,5 @@
 import { drawPlanetSphere, surfacePoint, spinOf } from './planet-render.js';
-import { satellitesOf, destination, surfaceOf } from './solar-bodies.js';
+import { satellitesOf, destination, surfaceOf, satellitePeriodSeconds } from './solar-bodies.js';
 import { drawOrbitStars } from './orbital-render.js';
 import { drawArkLight, ARK_COUNT } from './ark-lights.js';
 import { facilityAt, arrived } from './solar-industry.js';
@@ -11,9 +11,9 @@ export function worldGeometry(body,w,h){
   return{x:w*.5,y:h*.51,r:Math.min(h*.34,w/(outer*2.35),h/(vertical*2.35)),outer};
 }
 const orbitTilt=moon=>-(surfaceOf(destination(moon.parent)).tilt??.12);
-// Orbit periods here are visual pacing in seconds, not astronomical units.
+// Real period ratios on the shared satellite clock; retrograde runs backwards.
 export function satellitePose(moon,time,g){
-  const a=moon.phase+time/(48+moon.orbit*37)*TAU*(moon.id==='triton'?-1:1),r=g.r*moon.orbit,tilt=orbitTilt(moon);
+  const a=moon.phase+time/satellitePeriodSeconds(moon)*TAU,r=g.r*moon.orbit,tilt=orbitTilt(moon);
   const x=Math.cos(a)*r,y=Math.sin(a)*r*.32;
   return{x:g.x+x*Math.cos(tilt)-y*Math.sin(tilt),y:g.y+x*Math.sin(tilt)+y*Math.cos(tilt),z:Math.sin(a),r:Math.max(2.4,g.r*moon.size)};
 }

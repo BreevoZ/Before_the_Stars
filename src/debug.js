@@ -1,9 +1,12 @@
-import { orbitalLegacySpent } from './orbital-game.js';
+import { orbitalLegacySpent, enterOrbital, purchaseOrbitalTalent, getOrbitalTalentState, startOrbitalWar, resolveOrbitalWar, updateOrbital } from './orbital-game.js';
+import { ORBITAL_TALENTS, ORBITAL_RULES } from './orbital-config.js';
+import { TALENTS, layerTalents } from './talents.js';
+import { automationUnlocked, LEGACY_ECONOMY, TALENT_LAYER_REQUIREMENT } from './progression-config.js';
 import { paidLegacy } from './legacy-ledger.js';
 import { Q } from './quantity.js';
 import { AGES, evolve, getEvolutionState } from './game.js';
 import { SURFACE } from './progression-config.js';
-import { createProgression, resolveBattle } from './progression.js';
+import { createProgression, resolveBattle, purchaseTalent, rebuildCivilization, transitionCivilization } from './progression.js';
 
 export const DEBUG_SPEEDS = Object.freeze([1, 5, 10, 20]);
 export const DEBUG_GOLD = 10000;
@@ -68,4 +71,58 @@ export function runDebugCommand(session, command) {
   game.bases[command === 'defeat' ? 'player' : 'enemy'].hp = 0;
   game.status = Q.eq(game.bases.player.hp, 0) ? (Q.eq(game.bases.enemy.hp, 0) ? 'draw' : 'lost') : 'won';
   return resolveBattle(session);
+}
+
+// ── Stage skips (debug saves only) ──
+// Both go through the production purchases: the prerequisites are bought or
+// played out for real, only the waiting is skipped, so the save stays valid.
+const BUDGET = 2 ** 36;
+// 存续协议: finish this run as a civilization victory, record the expedition
+// depth the protocol asks for, buy the unit layers up to 超级士兵计划, then sign.
+export function debugProtocol(session) {
+  if (session.debug !== true || session.run.phase === 'orbital') return false;
+  if (session.run.phase === 'victory') transitionCivilization(session, 'continue', session.run.battleId);
+  if (session.run.phase === 'defeat') rebuildCivilization(session, session.run.runId);
+  if (session.run.phase === 'battle' && !runDebugCommand(session, 'finale')) return false;
+  if (session.run.phase !== 'destruction') return false;
+  const p = session.permanent, depth = LEGACY_ECONOMY.bypasserChallenge;
+  p.completedCycles = Math.max(p.completedCycles, depth); p.deepestChallenge = Math.max(p.deepestChallenge ?? 0, depth);
+  p.automation.unlocked = automationUnlocked(p);
+  if (!setDebugLegacy(session, BUDGET)) return false;
+  if (!p.talents.spark) purchaseTalent(session, 'spark');
+  for (let layer = 1; layer <= 5; layer++)
+    for (const key of layerTalents(layer)) { if (layerTalents(layer).filter(k => p.talents[k] > 0).length >= TALENT_LAYER_REQUIREMENT) break; purchaseTalent(session, key); }
+  if (!p.talents.superSoldierPlan && !purchaseTalent(session, 'superSoldierPlan')) return false;
+  // The protocol takes the whole wallet: sign with the floor, like a fresh arrival.
+  if (!setDebugLegacy(session, TALENTS.bypasser.costs[0])) return false;
+  return purchaseTalent(session, 'bypasser');
+}
+// Two civilizations fight to the final age and one wins: a real annihilation.
+function annihilate(session) {
+  const o = session.orbital, idle = o.civilizations.filter(c => c.alive && !c.warId);
+  if (idle.length < 2 || !startOrbitalWar(session, idle[0].id, idle[1].id)) return false;
+  const war = o.wars.find(w => w.id === o.selectedWar);
+  for (const team of ['player', 'enemy']) { war.game.experience[team] = Q.max(war.game.experience[team], AGES[ORBITAL_RULES.finalAge].experienceRequired); while (war.game.ages[team] < ORBITAL_RULES.finalAge) evolve(war.game, team); }
+  war.game.bases.enemy.hp = 0; war.game.status = 'won';
+  return resolveOrbitalWar(session, war.id) && o.phase === 'winter';
+}
+const endWinter = session => { for (let i = 0; i < 20000 && session.orbital.phase === 'winter'; i++) updateOrbital(session, 1 / 20); };
+// 远航协议: buy the whole road to it (星环, 地月航线, 月面, 七座船坞), living
+// through as many annihilations as the gates ask for, and sign in a winter.
+export function debugVoyage(session) {
+  const o = session.orbital;
+  if (session.debug !== true || session.run.phase !== 'orbital' || !o || o.talents.voyage) return false;
+  if (!o.started) enterOrbital(session);
+  if (!setDebugLegacy(session, BUDGET)) return false;
+  const road = new Set(), add = key => { if (road.has(key)) return; road.add(key); Object.keys(ORBITAL_TALENTS[key].requires).forEach(add); };
+  add('voyage'); add('recovery'); road.delete('voyage');
+  for (let round = 0; round < 40; round++) {
+    let bought = true;
+    while (bought) { bought = false; for (const key of road) if (purchaseOrbitalTalent(session, key)) bought = true; }
+    if (getOrbitalTalentState(session, 'voyage') === 'ready') return purchaseOrbitalTalent(session, 'voyage');
+    if (o.phase === 'winter') endWinter(session);
+    if (!annihilate(session)) { endWinter(session); continue; }
+    setDebugLegacy(session, BUDGET);
+  }
+  return false;
 }

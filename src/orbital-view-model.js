@@ -57,7 +57,7 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
     '#solar-tree-income':paused?'已暂停':`行星际持续运转 · 工业 +${Q.format(industryRate(o))}/s`,
     '#orbit-tree-income':paused?'已暂停':`文明持续运转${o.talents.outpost?' · 月面 +'+Q.format(lunarLegacyRate(o))+'/s':''}`,
     '#colony-pause':paused?'继续':'暂停','#colony-pause@aria-pressed':String(paused),
-    '#colony-speed':`${s.permanent.settings.speed}×`,'#colony-speed@hidden':s.debug===true,'#colony-debug-speed@hidden':s.debug!==true,'#colony-debug-speed@value':String(s.debugSpeed??1),
+    '#colony-speed':`${s.permanent.settings.speed}×`,'#colony-speed@hidden':s.debug===true,'#colony-debug-speed@hidden':s.debug!==true,'#colony-debug-voyage@hidden':s.debug!==true||Boolean(o.talents.voyage),'#colony-debug-speed@value':String(s.debugSpeed??1),
     '#colony-objective':winter?'余烬，等待下一次黎明。':'地球之上，文明再生。',
     '#colony-objective-detail':winter?`全球文明已被核武毁灭。${Math.ceil(o.remaining)} 秒后，新的火种将在不同点位萌芽。`:'选择两个空闲文明，挑起战争。双方通过招募、杀敌与阵亡获得经验并进化。',
     '#colony-fallout@hidden':!winter,'#colony-fallout':`+${Q.format(o.lastReward)} Legacy 已入账 · 核冬天 ${Math.ceil(o.remaining)} 秒${getOrbitalTalentState(s,'voyage')==='ready'?' · 远航协议可以启航':''}`,

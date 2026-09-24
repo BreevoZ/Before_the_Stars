@@ -1,3 +1,4 @@
+import { debugVoyage } from './debug.js';
 import { createBindings } from './dom-bindings.js';
 import { SITES, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as A, ORBITAL_RULES as R } from './orbital-config.js';
 import { startOrbitalWar, intervene, purchaseOrbitalTalent, setSeedTendency } from './orbital-game.js';
@@ -146,6 +147,8 @@ export function createOrbitalColonyUI(getSession,{commit,archive,save,speed,view
   scroll.addEventListener('pointerup',()=>{drag=null;});scroll.addEventListener('pointercancel',()=>{drag=null;});
   for(let i=0;i<R.historyLimit;i++){const li=document.createElement('li');li.id=`orbit-log-${i}`;el('colony-log').append(li);}
   el('colony-archive').addEventListener('click',archive);el('colony-save').addEventListener('click',save);el('colony-speed').addEventListener('click',speed);
+  // Debug: skip to VII through the real purchases, then play the voyage as if bought.
+  el('colony-debug-voyage').addEventListener('click',()=>{if(!debugVoyage(getSession()))return;commit();openTree('voyage');voyage.present();});
   el('colony-debug-speed').addEventListener('change',e=>{const s=getSession(),speed=Number(e.target.value);if(s.debug&&[1,5,10,20].includes(speed)){s.debugSpeed=speed;commit();}});
   const battle=el('colony-battle'),renderBattle=createRenderer(battle);
   function canvasContext(canvas){const{width,height}=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);if(!width||!height)return null;

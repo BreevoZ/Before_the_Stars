@@ -12,7 +12,7 @@ import { createProgression, updateProgression, continueCivilization, rebuildCivi
 import { SAVE_INTERVAL, challengeName } from './progression-config.js';
 import { createTalentUI } from './talent-ui.js';
 import { createSaveStore, serializeSession, parseSession, MAX_SAVE_BYTES } from './save.js';
-import { createDebugProgression, supplyDebugRun, runDebugCommand, setDebugLegacy, DEBUG_SPEEDS } from './debug.js';
+import { createDebugProgression, supplyDebugRun, runDebugCommand, setDebugLegacy, debugProtocol, DEBUG_SPEEDS } from './debug.js';
 
 const el = id => document.getElementById(id);
 export { formatMultiplier } from './view-model.js';
@@ -138,6 +138,11 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
       const speed = Number(el('debug-speed').value);
       if (!DEBUG_SPEEDS.includes(speed)) return;
       session.debugSpeed = speed; save(); changed();
+    });
+    // Skip straight to VI: the same save, finale and launch as buying the protocol.
+    el('debug-protocol').addEventListener('click', () => {
+      if (!debugProtocol(session)) return;
+      shownFinaleRunId = `${session.run.runId}:orbital`; save(); changed(); orbital.present(true);
     });
     document.querySelectorAll('[data-debug-command]').forEach(button => button.addEventListener('click', () => {
       if (runDebugCommand(session, button.dataset.debugCommand)) { save(); changed();

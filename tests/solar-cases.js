@@ -6,7 +6,8 @@ import { purchaseOrbitalTalent, getOrbitalTalentState, orbitalLegacySpent } from
 import { ORBITAL_TALENTS } from '../src/orbital-config.js';
 import { v23Shipyards } from './fixtures/v23-shipyard.js';
 import { fromV23Record } from '../src/save-record.js';
-import { setDebugLegacy } from '../src/debug.js';
+import { setDebugLegacy, createDebugProgression, debugProtocol, debugVoyage } from '../src/debug.js';
+import { createProgression } from '../src/progression.js';
 import { drawLunarColony } from '../src/orbital-render.js';
 import { Q } from '../src/quantity.js';
 import { updateOrbital } from '../src/orbital-game.js';
@@ -162,6 +163,13 @@ export function registerSolarTests(test, assert, near) {
     assert(solarTalentState(s,'titan')==='planned'&&!purchaseSolarTalent(s,'titan'));
     const view=buildSolarViewModel(s,{view:'io'});assert(view['#solar-body-note'].includes('木星采集站 ×2'));
     const raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw);
+  });
+  test('Debug skips: 存续协议 and 远航协议 are signed through the real purchases, only in debug saves, and the saves stay valid', () => {
+    const plain=createProgression();assert(!debugProtocol(plain)&&plain.run.phase!=='orbital');
+    const s=createDebugProgression();assert(debugProtocol(s)&&s.run.phase==='orbital'&&s.permanent.talents.bypasser===1);
+    let raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw);
+    assert(debugVoyage(s)&&s.orbital.talents.voyage===1&&s.orbital.talents.shipyard===ARK_COUNT&&s.orbital.nuclearCycles>=ORBITAL_TALENTS.voyage.cycles);
+    raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw&&!debugVoyage(s),'Only once');
   });
   test('Map v30: v29 saves refund 近日隔热 and talents whose new prerequisite is missing, and keep a dome by granting 火星港 free', () => {
     const s=voyageFixture();setDebugLegacy(s,2**36);for(let i=0;i<30*(PIONEER.seconds+1);i++)updateOrbital(s,1/30);

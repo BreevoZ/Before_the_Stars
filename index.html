@@ -19,7 +19,7 @@
       <header class="colony-header">
         <div class="colony-wordmark"><span data-icon="protocol"></span><div><small>BEFORE THE STARS</small><h1><span id="colony-stage-numeral">VI</span> <span id="colony-stage-name">轨道文明</span></h1></div></div>
         <div class="colony-wallet"><span data-icon="legacy" aria-hidden="true"></span><strong id="colony-legacy"></strong><span>Legacy<small id="colony-income"></small></span></div>
-        <nav aria-label="轨道控制"><button id="colony-talents" class="colony-primary" type="button"><span data-icon="network"></span><span id="colony-talents-label">轨道天赋</span></button><button id="colony-pause" type="button" title="空格暂停 / 继续"></button><button id="colony-speed" type="button" title="R 切换速度"></button><select id="colony-debug-speed" aria-label="轨道调试速度" hidden><option value="1">1×</option><option value="5">5×</option><option value="10">10×</option><option value="20">20×</option></select><button id="colony-save" type="button">存档</button></nav>
+        <nav aria-label="轨道控制"><button id="colony-talents" class="colony-primary" type="button"><span data-icon="network"></span><span id="colony-talents-label">轨道天赋</span></button><button id="colony-pause" type="button" title="空格暂停 / 继续"></button><button id="colony-speed" type="button" title="R 切换速度"></button><select id="colony-debug-speed" aria-label="轨道调试速度" hidden><option value="1">1×</option><option value="5">5×</option><option value="10">10×</option><option value="20">20×</option></select><button id="colony-debug-voyage" type="button" title="调试：补齐星环、月面与船坞，经历所需的核毁灭，直接签署远航协议进入 VII" hidden>调试 · 直接远航</button><button id="colony-save" type="button">存档</button></nav>
       </header>
       <nav id="solar-navigation" class="solar-navigation" aria-label="行星际导航" hidden>
         <button id="solar-overview" class="solar-overview" type="button"><span data-icon="orbital"></span><span>太阳系总览<small id="solar-overview-progress"></small></span></button>
@@ -103,6 +103,7 @@
         <button type="button" data-debug-command="victory" title="摧毁当前敌方基地，走正常胜利流程">战役胜利</button>
         <button type="button" data-debug-command="finale" title="将敌人推进到未来并摧毁基地，测试遗产结算">终局结算</button>
         <button type="button" data-debug-command="defeat" title="摧毁我方基地，测试无奖励重试">战败</button>
+        <button id="debug-protocol" type="button" title="结束本轮为文明胜利，补齐远征深度与前置天赋，直接签署存续协议进入 VI">直接签署存续协议</button>
       </section>
       <section class="battle" aria-label="战场">
         <div class="battle-hud">

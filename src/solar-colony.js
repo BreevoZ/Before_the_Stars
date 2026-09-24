@@ -1,5 +1,5 @@
 // VII step 3 · launch windows and civilization transfer, plus the VII talent
-// tree (a first shape). The Earth stays the womb: a civilization that is not at
+// tree (a first shape) with the arks and drydocks that reach the other bodies. The Earth stays the womb: a civilization that is not at
 // war can be carried by ark to a colony dome. Windows are soft: aligned planets
 // make the crossing short and cheap; a launch against the window still flies,
 // but slower and dearer. Colony wars and uplift come in steps 4 and 5.
@@ -19,15 +19,26 @@ const node = (name, x, y, icon, branch, extra = {}) => Object.freeze({ name, x, 
 // Three routes like the other trees: industry on the left, the gold colony
 // mainline up the middle, navigation on the right. 远航协议 is the shared root.
 export const SOLAR_TALENTS = Object.freeze({
-  voyage: node('远航协议', 660, 1150, 'ark', 'root', { root: true, kind: 'keystone', finale: true, description: '七艘方舟已经启航。这一页星图从这里向外生长，也与轨道星图的顶端相连。' }),
-  // Industry: the footholds of step 2 as nodes; buying here is the same transaction as in the dossier.
-  venus: node('高空浮空城', 450, 935, 'cloud', 'industry', { facility: 'venus', requires: { voyage: 1 } }),
-  mercury: node('日冕阵列', 300, 780, 'corona', 'industry', { facility: 'mercury', requires: { venus: 1 } }),
-  belt: node('采矿舰队', 450, 780, 'mining', 'industry', { facility: 'belt', requires: { venus: 1 } }),
-  jupiter: node('气态采集站', 450, 615, 'gasgiant', 'industry', { facility: 'jupiter', requires: { belt: 1 } }),
+  voyage: node('远航协议', 660, 1150, 'ark', 'root', { root: true, kind: 'keystone', finale: true, description: '七艘方舟结成先遣编队驶向火星。这一页星图从这里向外生长，也与轨道星图的顶端相连。' }),
+  // Industry: arks and drydocks up the inner column, the footholds they reach
+  // beside it. Buying a foothold here is the same transaction as in the dossier.
+  heat: node('近日隔热', 330, 950, 'heatshield', 'industry', { costs: [12 * M], requires: { voyage: 1 },
+    description: '为方舟加装隔热外壳，让它能在金星与水星的高温中停靠。' }),
+  venus: node('高空浮空城', 330, 800, 'cloud', 'industry', { facility: 'venus', requires: { heat: 1 } }),
+  mercury: node('日冕阵列', 170, 690, 'corona', 'industry', { facility: 'mercury', requires: { venus: 1 } }),
+  harbor: node('火星船坞', 490, 950, 'harbor', 'industry', { costs: [24 * M], requires: { voyage: 1 }, arrival: 'mars',
+    description: '在先遣编队停泊的火星港建起船坞。此后方舟也可以从火星出发，把下一段航程缩短。' }),
+  nuclear: node('核热推进', 490, 790, 'thruster', 'industry', { costs: [64 * M], requires: { harbor: 1 },
+    description: '更强的方舟：单段航程从 0.8 AU 延长到 1.5 AU，航速更快。从火星港出发，可以抵达小行星带。' }),
+  belt: node('采矿舰队', 330, 650, 'mining', 'industry', { facility: 'belt', requires: { nuclear: 1 } }),
+  fusion: node('聚变推进', 490, 630, 'fusion', 'industry', { costs: [320 * M], requires: { nuclear: 1 },
+    description: '单段航程延长到 4 AU：从火星港出发，可以抵达木星。' }),
+  jupiter: node('气态采集站', 330, 490, 'gasgiant', 'industry', { facility: 'jupiter', requires: { fusion: 1 } }),
+  outpost: node('木星船坞', 490, 470, 'outpost', 'industry', { planned: true, requires: { fusion: 1 },
+    description: '在木星轨道建起船坞，作为飞往外太阳系的中转站。（后续开放）' }),
   // Mainline: dome → transfer → (colony protocol → deep relay → starship, planned).
   dome: node('火星穹顶', 660, 935, 'dome', 'main', { costs: [16 * M, 128 * M, G], requires: { voyage: 1 }, arrival: 'mars', kind: 'keystone',
-    description: '在火星上建起居住穹顶，每级可容纳两个殖民文明。需要火星方舟已经抵达。' }),
+    description: '在火星上建起居住穹顶，每级可容纳两个殖民文明。需要先遣编队已经抵达火星。' }),
   transfer: node('文明转运', 660, 775, 'transfer', 'main', { costs: [32 * M], requires: { dome: 1 }, kind: 'keystone',
     description: '从地球挑选一个不在交战的文明，装上方舟送往火星。地球的点位会空出来，新的文明照常萌芽。' }),
   uplift: node('殖民地存续协议', 660, 615, 'accord', 'main', { planned: true, requires: { transfer: 1 }, kind: 'keystone', description: '把存续协议递给殖民地的和平文明，或接管好战文明的核武，让它越过大过滤器。（第 5 步开放）' }),
@@ -44,7 +55,9 @@ export const SOLAR_TALENTS = Object.freeze({
     description: '用木星采集站的燃料逆窗加速：逆窗发射的航程与价格惩罚大幅减轻。需要气态采集站。' }),
 });
 export const SOLAR_TALENT_KEYS = Object.freeze(Object.entries(SOLAR_TALENTS).filter(([, t]) => !t.root && !t.planned && !t.facility).map(([key]) => key));
-export const emptyColonies = () => ({ talents: Object.fromEntries(SOLAR_TALENT_KEYS.map(key => [key, 0])), colonies: { mars: [] }, transfers: [], nextTransfer: 0 });
+// Save v26 knew only the colony and navigation talents; v27 added the arks and drydocks.
+export const V26_SOLAR_KEYS = Object.freeze(['dome', 'transfer', 'survey', 'hohmann', 'fleet', 'fuel']);
+export const emptyColonies = (keys = SOLAR_TALENT_KEYS) => ({ talents: Object.fromEntries(keys.map(key => [key, 0])), colonies: { mars: [] }, transfers: [], nextTransfer: 0 });
 
 // ── Talents ──
 export function solarTalentState(s, key) {

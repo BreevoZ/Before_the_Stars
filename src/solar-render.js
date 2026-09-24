@@ -1,6 +1,6 @@
 import { BODIES, SYSTEM, bodyPosition, orbitRadius, bodyById } from './solar-config.js';
 import { drawArk, ARK_COUNT } from './shipyard-render.js';
-import { ARK_ROUTES, FACILITIES, arkProgress } from './solar-industry.js';
+import { FACILITIES, docks, pioneerProgress, flightProgress } from './solar-industry.js';
 import { TAU } from './celestial-clock.js';
 const noise=n=>{let v=Math.imul(n^(n>>>16),0x21f0aaad);v=Math.imul(v^(v>>>15),0x735a2d97);return((v^(v>>>15))>>>0)/4294967296;};
 const disc=(c,x,y,r,fill)=>{c.beginPath();c.arc(x,y,r,0,TAU);c.fillStyle=fill;c.fill();};
@@ -49,17 +49,22 @@ export function drawSolarSystem(c,w,h,o,{ambientTime=o.elapsed,reducedMotion=fal
     c.textAlign=p.x<cx?'right':'left';const sign=p.x<cx?-1:1;c.fillStyle=active?'#e0d3af':'#a6b8b2';c.font=`${Math.max(active?12:10,(active?10:8)/v.scale)}px system-ui,sans-serif`;if(w>=600||active)c.fillText(b.name,p.x+sign*(r+13),p.y+4);
     if(b.id==='earth'){disc(c,p.x+r*2,p.y-r,2.1,'#b6c4b3');c.fillStyle='#869f96';c.font='8px ui-monospace,monospace';if(w>=600)c.fillText(o.phase==='winter'?'WINTER':'HOME',p.x+sign*(r+13),p.y+18);}
   }
-  if(o.talents.voyage){const home=bodyPosition(bodyById('earth'),clock);
-    // The seven arks really fly: each eases out along a gentle arc and, once
-    // there, stays as a beacon beside the body it reached.
-    ARK_ROUTES.forEach((route,i)=>{const end=bodyPosition(bodyById(route.body),clock),t=arkProgress(o,i),e=t*t*(3-2*t);
-      if(t<1){const mx=(home.x+end.x)/2,my=(home.y+end.y)/2-Math.hypot(end.x-home.x,end.y-home.y)*.18,u=1-e,x=u*u*home.x+2*u*e*mx+e*e*end.x,y=u*u*home.y+2*u*e*my+e*e*end.y;
-        c.strokeStyle='#a7b8b11f';c.setLineDash([2,8]);c.beginPath();c.moveTo(home.x,home.y);c.quadraticCurveTo(mx,my,end.x,end.y);c.stroke();c.setLineDash([]);
-        const dx=2*u*(mx-home.x)+2*e*(end.x-mx),dy=2*u*(my-home.y)+2*e*(end.y-my);drawArk(c,x,y,.105,{angle:Math.atan2(dx,-dy),thrust:reducedMotion?0:1});}
-      else{const r=Math.max(5,bodyById(route.body).size)*1.15;disc(c,end.x-r-5,end.y-r*.4,1.6,'#e6d6a4');}});
+  if(o.talents.voyage){const home=bodyPosition(bodyById('earth'),clock),place=id=>id==='moon'?home:bodyPosition(bodyById(id),clock);
+    // One eased arc between two moving bodies; returns the point and heading at t.
+    const arc=(from,to,t,lift=.18)=>{const e=t*t*(3-2*t),mx=(from.x+to.x)/2,my=(from.y+to.y)/2-Math.hypot(to.x-from.x,to.y-from.y)*lift,u=1-e;
+      return{x:u*u*from.x+2*u*e*mx+e*e*to.x,y:u*u*from.y+2*u*e*my+e*e*to.y,angle:Math.atan2(2*u*(mx-from.x)+2*e*(to.x-mx),-(2*u*(my-from.y)+2*e*(to.y-my))),mx,my};};
+    const trail=(from,to,p,color='#a7b8b11f')=>{c.strokeStyle=color;c.setLineDash([2,8]);c.beginPath();c.moveTo(from.x,from.y);c.quadraticCurveTo(p.mx,p.my,to.x,to.y);c.stroke();c.setLineDash([]);};
+    // The pioneer fleet: seven arks in a loose file to Mars, then moored there.
+    const mars=bodyPosition(bodyById('mars'),clock),marsR=Math.max(5,bodyById('mars').size)*1.15,t=pioneerProgress(o);
+    if(t<1){trail(home,mars,arc(home,mars,0));for(let i=0;i<ARK_COUNT;i++){const k=Math.max(0,Math.min(1,t*1.08-i*.012)),p=arc(home,mars,k),side=(i-3)*1.6;
+      drawArk(c,p.x+Math.cos(p.angle)*side,p.y+Math.sin(p.angle)*side,.07,{angle:p.angle,thrust:reducedMotion?0:1});}}
+    else for(let i=0;i<ARK_COUNT;i++){const a=-2.3+i*.24;disc(c,mars.x+Math.cos(a)*(marsR+5),mars.y+Math.sin(a)*(marsR+5),1,'#e6d6a4');}
+    // Drydocks: a small bracket beside every body arks can leave from.
+    for(const id of docks(o)){if(id==='moon')continue;const p=place(id),r=Math.max(5,bodyById(id).size)*1.15;c.strokeStyle='#e6d6a4b0';c.lineWidth=.8;c.beginPath();c.moveTo(p.x+r+4,p.y-4);c.lineTo(p.x+r+7,p.y-4);c.lineTo(p.x+r+7,p.y+4);c.lineTo(p.x+r+4,p.y+4);c.stroke();}
+    // Dispatched arks: from their drydock to the foothold they will found.
+    for(const f of o.solar.flights){const from=place(f.from),to=bodyPosition(bodyById(f.body),clock),p=arc(from,to,flightProgress(o,f));trail(from,to,arc(from,to,0));drawArk(c,p.x,p.y,.095,{angle:p.angle,thrust:reducedMotion?0:1});}
     // Transfers: a smaller ark per civilization in flight, Earth to Mars; the
     // dome's residents glow as a cluster on the planet.
-    const mars=bodyPosition(bodyById('mars'),clock);
     for(const t of o.solar.transfers){const e=Math.max(0,Math.min(1,(o.elapsed-t.departAt)/(t.arriveAt-t.departAt))),k=e*e*(3-2*e),mx=(home.x+mars.x)/2,my=(home.y+mars.y)/2-Math.hypot(mars.x-home.x,mars.y-home.y)*.25,u=1-k;
       c.strokeStyle='#e6d6a42b';c.setLineDash([1.5,5]);c.beginPath();c.moveTo(home.x,home.y);c.quadraticCurveTo(mx,my,mars.x,mars.y);c.stroke();c.setLineDash([]);
       const x=u*u*home.x+2*u*k*mx+k*k*mars.x,y=u*u*home.y+2*u*k*my+k*k*mars.y,dx=2*u*(mx-home.x)+2*k*(mars.x-mx),dy=2*u*(my-home.y)+2*k*(mars.y-my);drawArk(c,x,y,.085,{angle:Math.atan2(dx,-dy),thrust:reducedMotion?0:1});}

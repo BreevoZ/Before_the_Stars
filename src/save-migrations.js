@@ -10,9 +10,9 @@ import { getV8RunBonuses } from './progression-bonuses.js';
 import { createAutomation } from './automation.js';
 import { HISTORICAL_TALENTS, HISTORICAL_UPGRADE_COSTS } from './save-history.js';
 import { validateRecord } from './save-validation.js';
-import { emptyIndustry } from './solar-industry.js';
-import { emptyColonies } from './solar-colony.js';
-import { cloneRecord, toV8Record, fromV8Record, fromV9Record, fromV10Record, fromV11Record, fromV12Record, fromV13Record, fromV14Record, fromV15Record, fromV16Record, fromV17Record, fromV18Record, fromV19Record, fromV20Record, fromV21Record, fromV22Record, fromV23Record, fromV24Record, fromV25Record } from './save-record.js';
+import { emptyIndustry, emptyFlights } from './solar-industry.js';
+import { emptyColonies, V26_SOLAR_KEYS, SOLAR_TALENT_KEYS } from './solar-colony.js';
+import { cloneRecord, toV8Record, fromV8Record, fromV9Record, fromV10Record, fromV11Record, fromV12Record, fromV13Record, fromV14Record, fromV15Record, fromV16Record, fromV17Record, fromV18Record, fromV19Record, fromV20Record, fromV21Record, fromV22Record, fromV23Record, fromV24Record, fromV25Record, fromV26Record } from './save-record.js';
 import { TALENTS } from './talents.js';
 const teams = ['player', 'enemy'];
 
@@ -290,14 +290,22 @@ export function migrateV24(input) {
 // v26 adds VII colonies: the tree's own talents, the Mars dome and arks in flight.
 export function migrateV25(input) {
   const record=cloneRecord(input);
-  if(record.orbital){record.orbital.version=12;Object.assign(record.orbital.solar,emptyColonies());}
+  if(record.orbital){record.orbital.version=12;Object.assign(record.orbital.solar,emptyColonies(V26_SOLAR_KEYS));}
   record.version=26;return record;
 }
-export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9, 10: migrateV10, 11: migrateV11, 12: migrateV12, 13: migrateV13, 14: migrateV14, 15: migrateV15, 16: migrateV16, 17: migrateV17, 18: migrateV18, 19: migrateV19, 20: migrateV20, 21: migrateV21, 22: migrateV22, 23: migrateV23, 24: migrateV24, 25: migrateV25 });
+// v27: arks leave from drydocks. The pioneer fleet now flies only to Mars; new
+// ark and drydock talents start unowned, footholds already built stay built.
+export function migrateV26(input) {
+  const record=cloneRecord(input);
+  if(record.orbital){record.orbital.version=13;const sol=record.orbital.solar;
+    sol.talents=Object.fromEntries(SOLAR_TALENT_KEYS.map(key=>[key,sol.talents[key]??0]));Object.assign(sol,emptyFlights());}
+  record.version=27;return record;
+}
+export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9, 10: migrateV10, 11: migrateV11, 12: migrateV12, 13: migrateV13, 14: migrateV14, 15: migrateV15, 16: migrateV16, 17: migrateV17, 18: migrateV18, 19: migrateV19, 20: migrateV20, 21: migrateV21, 22: migrateV22, 23: migrateV23, 24: migrateV24, 25: migrateV25, 26: migrateV26 });
 export function migrateRecord(input) {
   let record = input;
   while (record.version < SAVE_VERSION) {
-    const hydrate = { 8: fromV8Record, 9: fromV9Record, 10: fromV10Record, 11: fromV11Record, 12: fromV12Record, 13: fromV13Record, 14: fromV14Record, 15: fromV15Record, 16: fromV16Record, 17: fromV17Record, 18: fromV18Record, 19: fromV19Record, 20: fromV20Record, 21: fromV21Record, 22: fromV22Record, 23: fromV23Record, 24: fromV24Record, 25: fromV25Record }[record.version];
+    const hydrate = { 8: fromV8Record, 9: fromV9Record, 10: fromV10Record, 11: fromV11Record, 12: fromV12Record, 13: fromV13Record, 14: fromV14Record, 15: fromV15Record, 16: fromV16Record, 17: fromV17Record, 18: fromV18Record, 19: fromV19Record, 20: fromV20Record, 21: fromV21Record, 22: fromV22Record, 23: fromV23Record, 24: fromV24Record, 25: fromV25Record, 26: fromV26Record }[record.version];
     validateRecord(hydrate ? hydrate(record) : record, record.version);
     record = MIGRATIONS[record.version](record);
   }

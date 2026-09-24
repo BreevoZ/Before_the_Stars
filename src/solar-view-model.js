@@ -5,9 +5,11 @@ import { ORBITAL_TALENTS as T } from './orbital-config.js';
 import { DESTINATIONS, destination, bodyKindLabel } from './solar-render.js';
 import { orbitalPeriod, EARTH_YEAR_SECONDS } from './solar-config.js';
 import { ARK_COUNT } from './shipyard-render.js';
-import { transferState, transferQuote, windowTiming, domeCapacity, colonistRate, colonyRate, COLONY_RULES } from './solar-colony.js';
+import { transferState, transferQuote, windowTiming, domeCapacity, colonistRate, colonyRate, COLONY_RULES, SOLAR_TALENTS, solarRank } from './solar-colony.js';
 import { AGES } from './game-config.js';
-import { FACILITIES, ARK_ROUTES, arrivalAt, arrived, facilityRate, facilityState, industryRate, industryBoost } from './solar-industry.js';
+import { FACILITIES, arrivalAt, arrived, facilityRate, facilityState, industryRate, industryBoost, flightTo, route, pioneerAt } from './solar-industry.js';
+import { bodyById } from './solar-config.js';
+const placeName=id=>id==='moon'?'月球':bodyById(id).name;
 export function buildSolarViewModel(s,{view='earth',selected='earth',transferCiv=''}={}){
   const o=s.orbital;if(!o?.started)return{};const vii=Boolean(o.talents.voyage),b=destination(selected)??destination('earth'),owned=['earth','moon'].includes(b.id),alive=o.civilizations.filter(c=>c.alive).length;
   const facilityKey=Object.keys(FACILITIES).find(k=>FACILITIES[k].body===b.id),gate=getOrbitalTalentState(s,'voyage'),rank=o.talents.shipyard,ready=rank===ARK_COUNT;
@@ -15,7 +17,7 @@ export function buildSolarViewModel(s,{view='earth',selected='earth',transferCiv
     '#orbital-game@data-stage':vii?'VII':'VI','#orbital-game@data-view':view,'#colony-system@hidden':!vii||view!=='system',
     '#solar-home-signal':o.phase==='winter'?`核冬天 · ${Math.ceil(o.remaining)}s`:`${alive} 个文明 / ${o.wars.length} 场战争`,
     '#solar-moon-income':`+${Q.format(lunarLegacyRate(o))} / s`,'#solar-industry-income':vii?`+${Q.format(industryRate(o))} / s`:'远航后开放',
-    '#solar-fleet':vii?`${ARK_ROUTES.filter(r=>arrived(o,r.body)).length} / ${ARK_COUNT} 艘已抵达`:`${ARK_COUNT} 艘 · 先遣编队`,
+    '#solar-fleet':!vii?`${ARK_COUNT} 艘 · 先遣编队`:arrived(o,'mars')?`火星港 · ${o.solar.flights.length} 艘在途`:`先遣编队 · ${Math.ceil(pioneerAt(o)-o.elapsed)}s 抵达火星`,
     '#colony-body-name':b.name,'#colony-body-kind':bodyKindLabel(b),'#colony-body-description':b.description,
     '#colony-body-status':b.id==='earth'?(o.phase==='winter'?'等待下一次文明萌芽':`${alive} 个文明 · 地表实况在线`):b.id==='moon'?`${Q.format(lunarLegacyRate(o))} Legacy/s · 月面生产中`:bodyStatus(o,b),
     '#solar-body-distance':b.id==='moon'?'地球卫星':`${b.au} AU`,
@@ -59,9 +61,11 @@ export function buildSolarViewModel(s,{view='earth',selected='earth',transferCiv
     for(let i=1;i<=5;i++){v[`#solar-facility-rank-${i}@hidden`]=i>f.costs.length;v[`#solar-facility-rank-${i}@class:built`]=i<=level;}
     const next=level<f.costs.length?level+1:level,rate=r=>r?f.base*2**(r-1)*industryBoost(o):0;
     v['#solar-facility-effect']=f.kind==='boost'?`行星工业产能 ×${2**level}${level<f.costs.length?` → ×${2**next}`:''}`:`${Q.format(facilityRate(o,facilityKey))} Legacy/s${level<f.costs.length?` → ${Q.format(rate(next))} Legacy/s`:''}`;
-    const cost=level<f.costs.length?Q.format(f.costs[level]):'',wait=Math.max(0,Math.ceil((arrivalAt(o,f.body)??0)-o.elapsed));
-    v['#solar-facility-build']={ready:`${level?'扩建':'建立驻地'} · ${cost} Legacy`,legacy:`${cost} Legacy · 遗产不足`,transit:`${f.via?'火星方舟':'方舟'}航行中 · ${wait} 秒后抵达`,
-      prerequisite:`需要先建立${Object.keys(f.requires??{}).map(k=>FACILITIES[k].name).join('、')}`,max:'已全部建成',locked:'远航后开放'}[state];
+    const cost=level<f.costs.length?Q.format(f.costs[level]):'',wait=Math.max(0,Math.ceil((arrivalAt(o,f.body)??0)-o.elapsed)),leg=route(o,f.body);
+    // The first rank sends an ark: say where from and for how long.
+    const dispatch=leg.blocked?'':`从${placeName(leg.from)}船坞出发 · 航程 ${leg.seconds} 秒`;
+    v['#solar-facility-build']={ready:level?`扩建 · ${cost} Legacy`:`派遣方舟 · ${cost} Legacy · ${dispatch}`,legacy:`${cost} Legacy · 遗产不足${level?'':` · ${dispatch}`}`,transit:`方舟航行中 · ${wait} 秒后抵达`,
+      prerequisite:facilityNeed(o,facilityKey),max:'已全部建成',locked:'远航后开放'}[state];
     v['#solar-facility-build@disabled']=state!=='ready';
   }
   return v;
@@ -70,10 +74,22 @@ export function buildSolarViewModel(s,{view='earth',selected='earth',transferCiv
 // what stands there.
 function bodyStatus(o,b){
   if(!o.talents.voyage)return '勘察记录 · 尚无驻地';
-  const key=Object.keys(FACILITIES).find(k=>FACILITIES[k].body===b.id),via=key?FACILITIES[key].via:null,at=arrivalAt(o,key?b.id:b.id);
-  if(at===null||(!key&&!ARK_ROUTES.some(r=>r.body===b.id)))return '勘察记录 · 尚无驻地';
-  if(!arrived(o,b.id))return `${via?'火星方舟':'方舟'}航行中 · 还有 ${Math.ceil(at-o.elapsed)} 秒抵达`;
-  if(key&&o.solar.facilities[key])return `驻地运转中 · +${Q.format(facilityRate(o,key))} Legacy/s${FACILITIES[key].kind==='boost'?` · 行星工业 ×${industryBoost(o)}`:''}`;
-  if(b.id===COLONY_RULES.target&&o.solar.talents.dome)return `火星穹顶 · ${o.solar.colonies.mars.length} / ${domeCapacity(o)} 居民 · +${Q.format(colonyRate(o))} Legacy/s`;
-  return key?'方舟已抵达 · 可以建立驻地':b.id===COLONY_RULES.target?'方舟已抵达 · 可以建起火星穹顶':'方舟已抵达 · 等待后续开发';
+  const key=Object.keys(FACILITIES).find(k=>FACILITIES[k].body===b.id),at=arrivalAt(o,b.id);
+  if(b.id===COLONY_RULES.target){
+    if(!arrived(o,b.id))return `先遣编队航行中 · 还有 ${Math.ceil(at-o.elapsed)} 秒抵达`;
+    const port=o.solar.talents.harbor?'火星船坞 · ':'';
+    return o.solar.talents.dome?`${port}火星穹顶 · ${o.solar.colonies.mars.length} / ${domeCapacity(o)} 居民 · +${Q.format(colonyRate(o))} Legacy/s`:`${port||'先遣编队已停泊 · '}可以建起火星穹顶`;
+  }
+  if(!key)return '勘察记录 · 尚无驻地';
+  if(flightTo(o,b.id))return `方舟航行中 · 还有 ${Math.ceil(at-o.elapsed)} 秒抵达`;
+  if(o.solar.facilities[key])return `驻地运转中 · +${Q.format(facilityRate(o,key))} Legacy/s${FACILITIES[key].kind==='boost'?` · 行星工业 ×${industryBoost(o)}`:''}`;
+  return route(o,b.id).blocked?'勘察记录 · 方舟尚无法抵达':'航线已通 · 可以派遣方舟';
+}
+// Why a foothold cannot be started yet: the tree's own prerequisites first,
+// then the route (hull or drive), then another foothold it depends on.
+export function facilityNeed(o,key){
+  const missing=Object.keys(SOLAR_TALENTS[key].requires).filter(p=>!solarRank(o,p));
+  if(missing.length)return `需要「${missing.map(p=>SOLAR_TALENTS[p].name).join('」「')}」`;
+  const leg=route(o,FACILITIES[key].body);if(leg.blocked)return leg.blocked==='hazard'?'方舟无法承受这里的环境':'航程不足 · 需要更强的推进或更近的船坞';
+  return `需要先建立${Object.keys(FACILITIES[key].requires??{}).map(k=>FACILITIES[k].name).join('、')}`;
 }

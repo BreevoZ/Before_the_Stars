@@ -9,8 +9,8 @@ import { createOrbitalState } from './orbital-game.js';
 import { warBonuses } from './orbital-war.js';
 import { rebirthDelay, refugeeDelay } from './celestial-economy.js';
 import { AGES } from './game-config.js';
-import { FACILITIES, arrived } from './solar-industry.js';
-import { SOLAR_TALENTS, SOLAR_TALENT_KEYS, solarRank, domeCapacity, fleetCapacity, COLONY_RULES } from './solar-colony.js';
+import { FACILITIES, arrived, facilityAt, docks, route } from './solar-industry.js';
+import { SOLAR_TALENTS, SOLAR_TALENT_KEYS, V26_SOLAR_KEYS, solarRank, domeCapacity, fleetCapacity, COLONY_RULES } from './solar-colony.js';
 function keys(value,expected,name){check(object(value)&&Object.keys(value).length===expected.length&&expected.every(k=>Object.hasOwn(value,k)),name);}
 const amount=v=>Q.valid(v)&&Q.gte(v,0);
 const whole=v=>amount(v)&&Q.isInteger(v);
@@ -23,19 +23,20 @@ export function validateOrbital(s,version){
   if(version>=23)check(int(o.seedTendency,0,3)&&(!o.seedTendency||o.talents.directed>0),'定向播种');
   if(version>=25){
     // Planetary industry: exact ledger, only on bodies whose ark has arrived.
-    const sol=o.solar,colonyKeys=version>=26?['talents','colonies','transfers','nextTransfer']:[];
-    keys(sol,['facilities','payments','produced','fraction',...colonyKeys],'行星工业字段');keys(sol.facilities,Object.keys(FACILITIES),'行星工业设施');
+    const sol=o.solar,colonyKeys=version>=26?['talents','colonies','transfers','nextTransfer']:[],flights=version>=27?sol.flights:[];
+    keys(sol,['facilities','payments','produced','fraction',...colonyKeys,...(version>=27?['flights']:[])],'行星工业字段');keys(sol.facilities,Object.keys(FACILITIES),'行星工业设施');
     const ledgerKeys=[...Object.keys(FACILITIES),...(version>=26?[...SOLAR_TALENT_KEYS,'transfers']:[])];
     check(object(sol.payments)&&Object.keys(sol.payments).every(k=>ledgerKeys.includes(k)),'行星工业账本');
     // v25 footholds only needed the belt before Jupiter; v26 roots the branch on Venus.
     const requiresOf=(key,f)=>version>=26?f.requires??{}:key==='jupiter'?{belt:1}:{};
     for(const [key,f]of Object.entries(FACILITIES)){const rank=sol.facilities[key],paid=sol.payments[key]??[];
-      check(int(rank,0,f.costs.length)&&Array.isArray(paid)&&paid.length===rank&&paid.every((cost,i)=>Q.eq(cost,f.costs[i])),'行星工业实付');
+      check(int(rank,0,f.costs.length)&&Array.isArray(paid)&&paid.length===rank+(Array.isArray(flights)&&flights.some(x=>x?.body===f.body)?1:0)&&paid.every((cost,i)=>Q.eq(cost,f.costs[i])),'行星工业实付');
       if(rank)check(o.talents.voyage>0&&arrived(o,f.body)&&Object.entries(requiresOf(key,f)).every(([other,level])=>sol.facilities[other]>=level),'行星工业前置');}
     check(whole(sol.produced)&&Q.lte(sol.produced,o.legacyEarned)&&num(sol.fraction,0,1)&&sol.fraction<1,'行星工业产出');
-    if(version>=26)validateColonies(o);
+    if(version>=26)validateColonies(o,version);
+    if(version>=27)validateFlights(o);
   }
-  check(o.version===(version===16?2:version===17?3:version===18?4:version===19?5:version===20?6:version===21?7:version===22?8:version===23?9:version===24?10:version===25?11:R.version)&&bool(o.started)&&num(o.elapsed)&&int(o.rng,0,4294967295),'轨道时钟与随机源');
+  check(o.version===(version===16?2:version===17?3:version===18?4:version===19?5:version===20?6:version===21?7:version===22?8:version===23?9:version===24?10:version===25?11:version===26?12:R.version)&&bool(o.started)&&num(o.elapsed)&&int(o.rng,0,4294967295),'轨道时钟与随机源');
   for(const key of ['cycle','settledCycle','nuclearCycles','nextCivilization','nextWar'])check(int(o[key]),key);
   check(o.nuclearCycles===o.settledCycle&&o.settledCycle<=o.cycle,'核毁灭凭据');
   check(['dormant','living','winter'].includes(o.phase)&&o.started===(o.phase!=='dormant'),'萌芽阶段');
@@ -108,9 +109,9 @@ export function validateOrbital(s,version){
 
 // VII colonies (v26): talents on their own ledger, the dome's residents and the
 // arks in flight. Transfers are paid; a civilization can only be in one place.
-function validateColonies(o){
-  const sol=o.solar;keys(sol.talents,SOLAR_TALENT_KEYS,'行星际天赋');
-  for(const key of SOLAR_TALENT_KEYS){const t=SOLAR_TALENTS[key],rank=sol.talents[key],paid=sol.payments[key]??[];
+function validateColonies(o,version){
+  const sol=o.solar,talentKeys=version>=27?SOLAR_TALENT_KEYS:V26_SOLAR_KEYS;keys(sol.talents,talentKeys,'行星际天赋');
+  for(const key of talentKeys){const t=SOLAR_TALENTS[key],rank=sol.talents[key],paid=sol.payments[key]??[];
     check(int(rank,0,t.costs.length)&&Array.isArray(paid)&&paid.length===rank&&paid.every((cost,i)=>Q.eq(cost,t.costs[i])),'行星际天赋实付');
     if(rank)check(o.talents.voyage>0&&Object.entries(t.requires).every(([p,n])=>solarRank(o,p)>=n)&&(!t.arrival||arrived(o,t.arrival))
       &&Object.entries(t.facility_gate??{}).every(([f,n])=>sol.facilities[f]>=n),'行星际天赋前置');}
@@ -123,4 +124,14 @@ function validateColonies(o){
   for(const t of sol.transfers){keys(t,['id','to','departAt','arriveAt','civ'],'转运字段');
     check(id(t.id)&&!transfers.has(t.id)&&t.to===COLONY_RULES.target&&num(t.departAt,0,o.elapsed)&&num(t.arriveAt)&&t.arriveAt>o.elapsed-1e-9&&t.arriveAt>t.departAt,'转运航程');transfers.add(t.id);civ(t.civ);}
   const paid=sol.payments.transfers??[];check(Array.isArray(paid)&&paid.length>=sol.transfers.length+sol.colonies.mars.length&&paid.every(cost=>whole(cost)&&Q.gt(cost,0)),'转运实付');
+}
+
+// Arks in flight (v27): one per unbuilt foothold, paid, from a drydock the
+// player owns, on a leg the current drive and hull can fly.
+function validateFlights(o){
+  const sol=o.solar,seen=new Set();check(Array.isArray(sol.flights),'方舟航程');
+  for(const f of sol.flights){keys(f,['body','from','departAt','arriveAt'],'方舟航程字段');const key=facilityAt(f.body);
+    check(key&&!seen.has(f.body)&&sol.facilities[key]===0&&docks(o).includes(f.from)&&!route(o,f.body).blocked
+      &&Object.entries(FACILITIES[key].requires??{}).every(([other,level])=>sol.facilities[other]>=level),'方舟航线');seen.add(f.body);
+    check(num(f.departAt,0,o.elapsed)&&num(f.arriveAt)&&f.arriveAt>o.elapsed-1e-9&&f.arriveAt>f.departAt,'方舟航行时间');}
 }

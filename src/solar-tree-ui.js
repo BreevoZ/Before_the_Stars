@@ -3,12 +3,13 @@
 import { createBindings } from './dom-bindings.js';
 import { icon } from './icons.js';
 import { SOLAR_TALENTS as T, purchaseSolarTalent } from './solar-colony.js';
+import { FACILITIES, flightTo } from './solar-industry.js';
 import { buildSolarTreeViewModel } from './solar-tree-view-model.js';
 import { drawOrbitalTalentSky } from './orbital-render.js';
 import { watchSeam } from './tree-flip.js';
 
 const NS = 'http://www.w3.org/2000/svg';
-const ROUTE_ROOT = { industry: 'venus', main: 'transfer', navigation: 'survey' };
+const ROUTE_ROOT = { industry: 'nuclear', main: 'transfer', navigation: 'survey' };
 export function createSolarTree(getSession, { commit, viewChanged, flipOrbit }) {
   const el = id => document.getElementById(id), bind = createBindings(document), dialog = el('solar-talents-dialog');
   const detail = el('solar-detail'), scroll = dialog.querySelector('.orbit-tree-scroll'), reduced = matchMedia('(prefers-reduced-motion: reduce)');
@@ -52,7 +53,8 @@ export function createSolarTree(getSession, { commit, viewChanged, flipOrbit }) 
   el('close-solar-detail').addEventListener('click', close);
   function buy(key) {
     if (!purchaseSolarTalent(getSession(), key)) return; talent = key; commit(); select(key, true);
-    el('solar-feedback').textContent = `${T[key].name} · 已点亮`;
+    const flying = T[key].facility && flightTo(getSession().orbital, FACILITIES[T[key].facility].body);
+    el('solar-feedback').textContent = `${T[key].name} · ${flying ? '方舟已出发' : '已点亮'}`;
     if (!reduced.matches) { el(`solar-node-${key}`).animate([{ scale: 1 }, { scale: 1.15 }, { scale: 1 }], { duration: 450 });
       for (const p of Object.keys(T[key].requires)) el(`solar-flow-${p}-${key}`).animate([{ strokeDashoffset: 1, opacity: 0 }, { opacity: 1, offset: .12 }, { strokeDashoffset: 0, opacity: 0 }], { duration: 900, easing: 'ease-in-out' }); }
   }

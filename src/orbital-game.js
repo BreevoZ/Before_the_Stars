@@ -3,15 +3,16 @@ import { ORBITAL_RULES as R, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as ACTIONS } 
 import { seedCivilizations, seedRefugee, orbitalYieldMultiplier, civilizationValue, rebirthDelay, refugeeDelay, lunarLegacyRate, nuclearMultiplier, bondRate, chronicleMultiplier } from './celestial-economy.js';
 import { createWar, updateWar, syncWarCivilizations, refreshWarBonuses, changeTechnology } from './orbital-war.js';
 import { AGES } from './game-config.js';
-import { emptyIndustry, industryRate, industrySpent } from './solar-industry.js';
+import { emptyIndustry, emptyFlights, industryRate, industrySpent, landFlights, FACILITIES, facilityAt } from './solar-industry.js';
 import { emptyColonies, colonyRate, landTransfers } from './solar-colony.js';
+import { bodyById } from './solar-config.js';
 
 export function createOrbitalState(seed = (Math.random()*4294967296)>>>0) {
   return {version:R.version,started:false,elapsed:0,rng:seed>>>0,cycle:0,settledCycle:0,nuclearCycles:0,
     phase:'dormant',remaining:0,winterDuration:0,refugeeRemaining:0,nextCivilization:0,nextWar:0,
     civilizations:[],wars:[],talents:Object.fromEntries(Object.keys(T).map(k=>[k,k==='protocol'?1:0])),
     payments:{},interventionSpent:0,legacyEarned:0,legacyFraction:0,lunarProduced:0,lunarFraction:0,lastReward:0,lastCatastropheAt:null,
-    selectedCivilization:null,selectedOpponent:null,selectedWar:null,autoWar:false,autoElapsed:0,completionAt:null,seedTendency:0,solar:{...emptyIndustry(),...emptyColonies()},
+    selectedCivilization:null,selectedOpponent:null,selectedWar:null,autoWar:false,autoElapsed:0,completionAt:null,seedTendency:0,solar:{...emptyIndustry(),...emptyColonies(),...emptyFlights()},
     log:[{time:0,text:'存续协议已生效。地表的战火，将成为轨道家园的遗产。'}]};
 }
 export function orbitalLegacySpent(o) {return o?Q.sum([Q.sum(Object.values(o.payments).flat()),o.interventionSpent,industrySpent(o)]):0;}
@@ -121,6 +122,7 @@ export function updateOrbital(s,dt,{paused=false,hidden=false}={}){
   if(lunarWhole){o.lunarProduced=Q.add(o.lunarProduced,lunarWhole);award(s,lunarWhole);}
   // VII industry runs on its own ledger, winter or not, like the moon.
   for(const t of landTransfers(o))log(o,`${t.civ.name}抵达火星穹顶，开始在新家园工作。`);
+  for(const f of landFlights(o))log(o,`方舟抵达${bodyById(f.body).name}，${FACILITIES[facilityAt(f.body)].name}开始运转。`);
   o.solar.fraction+=(industryRate(o)+colonyRate(o))*dt;const solarWhole=Math.floor(o.solar.fraction+1e-10);o.solar.fraction=Math.max(0,o.solar.fraction-solarWhole);
   if(solarWhole){o.solar.produced=Q.add(o.solar.produced,solarWhole);award(s,solarWhole);}
   if(o.phase==='winter'){

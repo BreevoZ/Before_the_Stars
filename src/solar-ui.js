@@ -2,7 +2,8 @@ import { createBindings } from './dom-bindings.js';
 import { buildSolarViewModel } from './solar-view-model.js';
 import { DESTINATIONS, destination, drawSolarSystem, drawBodyPortrait, bodyAt, solarViewport } from './solar-render.js';
 import { drawShipyard } from './shipyard-render.js';
-export function createSolarUI(getSession,{openTree,replay}){
+import { FACILITIES, buildFacility } from './solar-industry.js';
+export function createSolarUI(getSession,{openTree,replay,commit}){
   const el=id=>document.getElementById(id),bind=createBindings(document),reduced=matchMedia('(prefers-reduced-motion: reduce)');
   let view=null,selected='earth',hover=null,portraitKey=null;
   const allowed=next=>{const o=getSession().orbital;return next==='system'&&o?.talents.voyage?'system':next==='moon'&&o?.talents.outpost?'moon':next==='earth'?'earth':o?.talents.voyage?'system':'earth';};
@@ -14,6 +15,9 @@ export function createSolarUI(getSession,{openTree,replay}){
     button.innerHTML=`<small>${String(i+1).padStart(2,'0')}</small><i aria-hidden="true"></i><span>${b.name}</span>`;
     button.addEventListener('click',()=>choose(b.id));button.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight'].includes(e.code))return;e.preventDefault();const n=(i+(e.code==='ArrowLeft'?-1:1)+DESTINATIONS.length)%DESTINATIONS.length;choose(DESTINATIONS[n].id);el(`solar-select-${selected}`).focus();});el('solar-catalogue').append(button);
   }
+  for(let i=0;i<Math.max(...Object.values(FACILITIES).map(f=>f.costs.length));i++){const li=document.createElement('li');li.id=`solar-facility-rank-${i+1}`;el('solar-facility-ranks').append(li);}
+  // Building happens in the dossier of the body it stands on.
+  el('solar-facility-build').addEventListener('click',()=>{const key=Object.keys(FACILITIES).find(k=>FACILITIES[k].body===selected);if(key&&buildFacility(getSession(),key)){commit();sync();}});
   for(const id of ['system','earth','moon'])el(`colony-view-${id}`).addEventListener('click',()=>setView(id));
   el('solar-to-earth').addEventListener('click',()=>setView('earth'));el('solar-to-moon').addEventListener('click',()=>setView('moon'));
   el('colony-body-enter').addEventListener('click',()=>{if(['earth','moon'].includes(selected))setView(selected);});

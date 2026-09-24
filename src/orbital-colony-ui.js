@@ -120,7 +120,7 @@ export function createOrbitalColonyUI(getSession,{commit,archive,save,speed,view
     el(`orbit-node-${key??'protocol'}`).focus({preventScroll:true});if(key)selectTalent(key,true);viewChanged();
   }
   document.querySelectorAll('[data-orbit-route]').forEach(button=>button.addEventListener('click',()=>{closeDetail();el(`orbit-node-${button.dataset.orbitRoute}`).scrollIntoView({block:'center',inline:'center',behavior:reduced.matches?'instant':'smooth'});}));
-  const solar=createSolarUI(getSession,{openTree,replay:()=>{openTree('voyage');voyage.present();}});
+  const solar=createSolarUI(getSession,{openTree,commit,replay:()=>{openTree('voyage');voyage.present();}});
   const voyage=createVoyageUI({tree:dialog,arrive:()=>{solar.setView('system');sync();},changed:viewChanged});
   const setView=next=>solar.setView(next);
   const onMoon=e=>{const o=getSession().orbital;if(!o?.talents.transit)return false;const b=el('colony-world').getBoundingClientRect(),m=moonPosition(reduced.matches?0:o.elapsed);

@@ -8,6 +8,8 @@ import { fromV23Record } from '../src/save-record.js';
 import { setDebugLegacy } from '../src/debug.js';
 import { drawLunarColony } from '../src/orbital-render.js';
 import { Q } from '../src/quantity.js';
+import { updateOrbital } from '../src/orbital-game.js';
+import { FACILITIES, ARK_ROUTES, arrivalAt, arrived, facilityState, buildFacility, industryRate, facilityRate } from '../src/solar-industry.js';
 import { buildSolarViewModel } from '../src/solar-view-model.js';
 import { bodyPosition, BODIES } from '../src/solar-config.js';
 import { solarViewport, bodyAt, DESTINATIONS, drawSolarSystem, drawBodyPortrait } from '../src/solar-render.js';
@@ -58,9 +60,38 @@ export function registerSolarTests(test, assert, near) {
     const vii=buildSolarViewModel(s,{view:'system',selected:'saturn'});
     assert(vii['#orbital-game@data-stage']==='VII' && !vii['#colony-system@hidden']);
     assert(vii['#colony-body-name']==='土星' && vii['#colony-body-enter@hidden']);
-    assert(vii['#solar-body-note'].includes('尚未开放') && vii['#shipyard-status'].includes('已启航'));
+    assert(vii['#solar-body-note'].includes('后续开放') && vii['#shipyard-status'].includes('已启航'));
     assert(DESTINATIONS.length===10 && new Set(DESTINATIONS.map(b=>b.id)).size===10);
     assert(buildSolarViewModel(s,{selected:'moon'})['#colony-body-enter']==='进入月面家园 ↗');
+  });
+  test('Industry: each ark arrives on its own schedule; footholds need their ark, pay their price and produce on the ledger', () => {
+    const s=voyageFixture(),o=s.orbital,run=seconds=>{for(let i=0;i<Math.round(seconds*30);i++)updateOrbital(s,1/30);};
+    setDebugLegacy(s,'1e12');
+    assert(ARK_ROUTES.length===ARK_COUNT&&new Set(ARK_ROUTES.map(r=>r.body)).size===ARK_COUNT);
+    // Nothing has arrived at launch; the belt waits for Mars.
+    for(const key of Object.keys(FACILITIES))assert(facilityState(s,key)==='transit'&&!buildFacility(s,key));
+    near(arrivalAt(o,'venus'),o.completionAt+40);near(arrivalAt(o,'belt'),arrivalAt(o,'mars'));
+    run(41);assert(arrived(o,'venus')&&!arrived(o,'mercury')&&facilityState(s,'venus')==='ready');
+    const wallet=s.permanent.legacy,spent=orbitalLegacySpent(o);assert(buildFacility(s,'venus'));
+    assert(Q.eq(s.permanent.legacy,Q.sub(wallet,FACILITIES.venus.costs[0]))&&Q.eq(orbitalLegacySpent(o),Q.add(spent,FACILITIES.venus.costs[0])));
+    const earned=o.legacyEarned,produced=o.solar.produced;run(10);
+    near(Q.toNumber(Q.sub(o.solar.produced,produced)),FACILITIES.venus.base*10,FACILITIES.venus.base*.05);assert(Q.gt(o.legacyEarned,earned));
+    // Mercury multiplies every yield; Jupiter needs the belt first.
+    run(20);assert(buildFacility(s,'mercury'));assert(facilityRate(o,'venus')===FACILITIES.venus.base*2&&industryRate(o)===FACILITIES.venus.base*2);
+    run(240);assert(facilityState(s,'jupiter')==='prerequisite'&&buildFacility(s,'belt')&&buildFacility(s,'jupiter'));
+    const raw=serializeSession(s),back=parseSession(raw);assert(serializeSession(back)===raw&&back.orbital.solar.facilities.jupiter===1);
+    // A foothold recorded before its ark arrived, or at the wrong price, is rejected.
+    const early=JSON.parse(serializeSession(voyageFixture()));early.orbital.solar.facilities.venus=1;early.orbital.solar.payments.venus=[String(FACILITIES.venus.costs[0])];
+    let rejected=false;try{parseSession(JSON.stringify(early));}catch{rejected=true;}assert(rejected,'No foothold before the ark arrives');
+    const cheap=JSON.parse(raw);cheap.orbital.solar.payments.venus=['1'];rejected=false;try{parseSession(JSON.stringify(cheap));}catch{rejected=true;}assert(rejected,'Payments match the price');
+  });
+  test('Industry v25: a v24 save gains an empty ledger; VI saves never own footholds', () => {
+    const s=voyageFixture(),old=JSON.parse(serializeSession(s));old.version=24;old.orbital.version=10;delete old.orbital.solar;
+    const next=parseSession(JSON.stringify(old));assert(Object.values(next.orbital.solar.facilities).every(v=>v===0)&&Q.eq(next.orbital.solar.produced,0));
+    const vi=voyageReady();vi.orbital.solar.facilities.venus=1;vi.orbital.solar.payments.venus=[FACILITIES.venus.costs[0]];
+    let rejected=false;try{parseSession(serializeSession(vi));}catch{rejected=true;}assert(rejected,'Industry needs 远航协议');
+    const view=buildSolarViewModel(s,{view:'system',selected:'venus'});assert(!view['#solar-facility@hidden']&&view['#solar-facility-build'].includes('航行中')&&view['#solar-facility-build@disabled']);
+    assert(buildSolarViewModel(s,{view:'system',selected:'saturn'})['#solar-facility@hidden']);
   });
   test('Solar atlas: uniform projection and shared hit positions stay in bounds at desktop and mobile sizes', () => {
     for(const [w,h] of [[1400,700],[390,350],[320,350]]) {

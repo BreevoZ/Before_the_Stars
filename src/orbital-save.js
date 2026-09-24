@@ -9,6 +9,7 @@ import { createOrbitalState } from './orbital-game.js';
 import { warBonuses } from './orbital-war.js';
 import { rebirthDelay, refugeeDelay } from './celestial-economy.js';
 import { AGES } from './game-config.js';
+import { FACILITIES, arrived } from './solar-industry.js';
 function keys(value,expected,name){check(object(value)&&Object.keys(value).length===expected.length&&expected.every(k=>Object.hasOwn(value,k)),name);}
 const amount=v=>Q.valid(v)&&Q.gte(v,0);
 const whole=v=>amount(v)&&Q.isInteger(v);
@@ -17,9 +18,18 @@ export function validateOrbital(s,version){
   const o=s.orbital;if(s.run.phase!=='orbital'){check(o===undefined,'轨道阶段状态');return;}
   const V18=v18OrbitalTalents(T),V19=v19OrbitalTalents(T),V20=v20OrbitalTalents(T),V21=v21OrbitalTalents(T),V22=v22OrbitalTalents(T),V23=v23OrbitalTalents(T);
   const configs=version===16?Object.fromEntries(Object.entries(OLD).filter(([key])=>key!=='lunarIndustry')):version===17?OLD:version===18?V18:version===19?V19:version===20?V20:version===21?V21:version===22?V22:version===23?V23:T;
-  keys(o,Object.keys(createOrbitalState(1)).filter(key=>(version>=17||!['lunarProduced','lunarFraction'].includes(key))&&(version>=23||key!=='seedTendency')),'轨道字段');
+  keys(o,Object.keys(createOrbitalState(1)).filter(key=>(version>=17||!['lunarProduced','lunarFraction'].includes(key))&&(version>=23||key!=='seedTendency')&&(version>=25||key!=='solar')),'轨道字段');
   if(version>=23)check(int(o.seedTendency,0,3)&&(!o.seedTendency||o.talents.directed>0),'定向播种');
-  check(o.version===(version===16?2:version===17?3:version===18?4:version===19?5:version===20?6:version===21?7:version===22?8:version===23?9:R.version)&&bool(o.started)&&num(o.elapsed)&&int(o.rng,0,4294967295),'轨道时钟与随机源');
+  if(version>=25){
+    // Planetary industry: exact ledger, only on bodies whose ark has arrived.
+    const sol=o.solar;keys(sol,['facilities','payments','produced','fraction'],'行星工业字段');keys(sol.facilities,Object.keys(FACILITIES),'行星工业设施');
+    check(object(sol.payments)&&Object.keys(sol.payments).every(k=>Object.hasOwn(FACILITIES,k)),'行星工业账本');
+    for(const [key,f]of Object.entries(FACILITIES)){const rank=sol.facilities[key],paid=sol.payments[key]??[];
+      check(int(rank,0,f.costs.length)&&Array.isArray(paid)&&paid.length===rank&&paid.every((cost,i)=>Q.eq(cost,f.costs[i])),'行星工业实付');
+      if(rank)check(o.talents.voyage>0&&arrived(o,f.body)&&Object.entries(f.requires??{}).every(([other,level])=>sol.facilities[other]>=level),'行星工业前置');}
+    check(whole(sol.produced)&&Q.lte(sol.produced,o.legacyEarned)&&num(sol.fraction,0,1)&&sol.fraction<1&&(Object.values(sol.facilities).some(Boolean)||Q.eq(sol.produced,0)&&sol.fraction===0),'行星工业产出');
+  }
+  check(o.version===(version===16?2:version===17?3:version===18?4:version===19?5:version===20?6:version===21?7:version===22?8:version===23?9:version===24?10:R.version)&&bool(o.started)&&num(o.elapsed)&&int(o.rng,0,4294967295),'轨道时钟与随机源');
   for(const key of ['cycle','settledCycle','nuclearCycles','nextCivilization','nextWar'])check(int(o[key]),key);
   check(o.nuclearCycles===o.settledCycle&&o.settledCycle<=o.cycle,'核毁灭凭据');
   check(['dormant','living','winter'].includes(o.phase)&&o.started===(o.phase!=='dormant'),'萌芽阶段');

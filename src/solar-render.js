@@ -1,5 +1,6 @@
 import { BODIES, SYSTEM, bodyPosition, orbitRadius, bodyById } from './solar-config.js';
 import { drawArk, ARK_COUNT } from './shipyard-render.js';
+import { ARK_ROUTES, FACILITIES, arkProgress } from './solar-industry.js';
 import { TAU } from './celestial-clock.js';
 const noise=n=>{let v=Math.imul(n^(n>>>16),0x21f0aaad);v=Math.imul(v^(v>>>15),0x735a2d97);return((v^(v>>>15))>>>0)/4294967296;};
 const disc=(c,x,y,r,fill)=>{c.beginPath();c.arc(x,y,r,0,TAU);c.fillStyle=fill;c.fill();};
@@ -49,8 +50,18 @@ export function drawSolarSystem(c,w,h,o,{ambientTime=o.elapsed,reducedMotion=fal
     if(b.id==='earth'){disc(c,p.x+r*2,p.y-r,2.1,'#b6c4b3');c.fillStyle='#869f96';c.font='8px ui-monospace,monospace';if(w>=600)c.fillText(o.phase==='winter'?'WINTER':'HOME',p.x+sign*(r+13),p.y+18);}
   }
   if(o.talents.voyage){const home=bodyPosition(bodyById('earth'),clock);
-    for(let i=0;i<ARK_COUNT;i++){const end=bodyPosition(BODIES.filter(b=>!b.belt&&b.id!=='earth')[i],clock),fraction=.17+i*.055,x=home.x+(end.x-home.x)*fraction,y=home.y+(end.y-home.y)*fraction;
-      c.strokeStyle='#a7b8b11f';c.setLineDash([2,8]);c.beginPath();c.moveTo(home.x,home.y);c.lineTo(end.x,end.y);c.stroke();c.setLineDash([]);drawArk(c,x,y,.105,{angle:Math.atan2(end.x-home.x,home.y-end.y),thrust:0});}
+    // The seven arks really fly: each eases out along a gentle arc and, once
+    // there, stays as a beacon beside the body it reached.
+    ARK_ROUTES.forEach((route,i)=>{const end=bodyPosition(bodyById(route.body),clock),t=arkProgress(o,i),e=t*t*(3-2*t);
+      if(t<1){const mx=(home.x+end.x)/2,my=(home.y+end.y)/2-Math.hypot(end.x-home.x,end.y-home.y)*.18,u=1-e,x=u*u*home.x+2*u*e*mx+e*e*end.x,y=u*u*home.y+2*u*e*my+e*e*end.y;
+        c.strokeStyle='#a7b8b11f';c.setLineDash([2,8]);c.beginPath();c.moveTo(home.x,home.y);c.quadraticCurveTo(mx,my,end.x,end.y);c.stroke();c.setLineDash([]);
+        const dx=2*u*(mx-home.x)+2*e*(end.x-mx),dy=2*u*(my-home.y)+2*e*(end.y-my);drawArk(c,x,y,.105,{angle:Math.atan2(dx,-dy),thrust:reducedMotion?0:1});}
+      else{const r=Math.max(5,bodyById(route.body).size)*1.15;disc(c,end.x-r-5,end.y-r*.4,1.6,'#e6d6a4');}});
+    // Footholds: one light per built rank, circling the body (the belt's fleet rides the belt).
+    for(const [key,f] of Object.entries(FACILITIES)){const rank=o.solar.facilities[key];if(!rank)continue;
+      if(f.body==='belt'){for(let k=0;k<rank*3;k++){const a=k*2.1+clock*.004,rr=orbitRadius(2.4+(k%3)*.3);disc(c,cx+Math.cos(a)*rr,cy+Math.sin(a)*rr*tilt,1.3,'#efdca6');}continue;}
+      const p=bodyPosition(bodyById(f.body),clock),r=Math.max(5,bodyById(f.body).size)*1.15+4;
+      for(let k=0;k<rank;k++){const a=k/rank*TAU+(reducedMotion?0:clock*.05);disc(c,p.x+Math.cos(a)*r,p.y+Math.sin(a)*r*.6,1.2,'#f1e2b0');}}
   }
   c.textAlign='left';c.fillStyle='#5e7a80';c.font='8px ui-monospace,monospace';c.fillText('HELIOCENTRIC SURVEY  /  ORBITS NOT TO SCALE',40,464);c.textAlign='right';c.fillText('30 AU  /  OUTER SYSTEM',960,464);c.restore();
 }

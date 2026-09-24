@@ -33,3 +33,9 @@
 @media(prefers-reduced-motion:reduce){.voyage-dialog *{transition:none!important}}
 
 #colony-lunar-arks{display:block;margin-top:10px;color:var(--gold)}
+/* A foothold in the dossier: name and level, rank pips, what it does, one action. */
+.solar-facility{margin-top:18px;padding-top:14px;border-top:1px solid var(--solar-line)}
+.solar-facility .solar-eyebrow{display:flex;justify-content:space-between;gap:12px;margin-bottom:10px}#solar-facility-name{color:var(--solar-paper);letter-spacing:2px}
+.solar-facility-ranks{display:flex;gap:6px;padding:0;margin:0 0 10px;list-style:none}.solar-facility-ranks li{width:18px;height:3px;background:#8ca4a633}.solar-facility-ranks li.built{background:var(--solar-brass)}
+#solar-facility-description,#solar-facility-effect{font-size:10px;line-height:1.8;color:var(--solar-muted);margin:0 0 6px;max-width:430px}#solar-facility-effect{color:var(--solar-paper)}
+#solar-facility-build{padding:8px 0;min-height:0;font-size:11px;color:var(--solar-brass)}#solar-facility-build:disabled{color:var(--solar-muted);cursor:default}

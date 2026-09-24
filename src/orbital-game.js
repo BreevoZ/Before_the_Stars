@@ -3,16 +3,17 @@ import { ORBITAL_RULES as R, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as ACTIONS } 
 import { seedCivilizations, seedRefugee, orbitalYieldMultiplier, civilizationValue, rebirthDelay, refugeeDelay, lunarLegacyRate, nuclearMultiplier, bondRate, chronicleMultiplier } from './celestial-economy.js';
 import { createWar, updateWar, syncWarCivilizations, refreshWarBonuses, changeTechnology } from './orbital-war.js';
 import { AGES } from './game-config.js';
+import { emptyIndustry, industryRate, industrySpent } from './solar-industry.js';
 
 export function createOrbitalState(seed = (Math.random()*4294967296)>>>0) {
   return {version:R.version,started:false,elapsed:0,rng:seed>>>0,cycle:0,settledCycle:0,nuclearCycles:0,
     phase:'dormant',remaining:0,winterDuration:0,refugeeRemaining:0,nextCivilization:0,nextWar:0,
     civilizations:[],wars:[],talents:Object.fromEntries(Object.keys(T).map(k=>[k,k==='protocol'?1:0])),
     payments:{},interventionSpent:0,legacyEarned:0,legacyFraction:0,lunarProduced:0,lunarFraction:0,lastReward:0,lastCatastropheAt:null,
-    selectedCivilization:null,selectedOpponent:null,selectedWar:null,autoWar:false,autoElapsed:0,completionAt:null,seedTendency:0,
+    selectedCivilization:null,selectedOpponent:null,selectedWar:null,autoWar:false,autoElapsed:0,completionAt:null,seedTendency:0,solar:emptyIndustry(),
     log:[{time:0,text:'存续协议已生效。地表的战火，将成为轨道家园的遗产。'}]};
 }
-export function orbitalLegacySpent(o) {return o?Q.add(Q.sum(Object.values(o.payments).flat()),o.interventionSpent):0;}
+export function orbitalLegacySpent(o) {return o?Q.sum([Q.sum(Object.values(o.payments).flat()),o.interventionSpent,industrySpent(o)]):0;}
 function log(o,text){o.log.push({time:o.elapsed,text});if(o.log.length>R.historyLimit)o.log.shift();}
 function award(s,amount){if(Q.lte(amount,0))return;s.orbital.legacyEarned=Q.add(s.orbital.legacyEarned,amount);s.permanent.totalLegacy=Q.add(s.permanent.totalLegacy,amount);s.permanent.legacy=Q.add(s.permanent.legacy,amount);}
 const active=s=>s.run.phase==='orbital' && s.orbital?.started;
@@ -117,6 +118,9 @@ export function updateOrbital(s,dt,{paused=false,hidden=false}={}){
   o.lunarFraction+=lunarLegacyRate(o)*dt;
   const lunarWhole=Math.floor(o.lunarFraction+1e-10);o.lunarFraction=Math.max(0,o.lunarFraction-lunarWhole);
   if(lunarWhole){o.lunarProduced=Q.add(o.lunarProduced,lunarWhole);award(s,lunarWhole);}
+  // VII industry runs on its own ledger, winter or not, like the moon.
+  o.solar.fraction+=industryRate(o)*dt;const solarWhole=Math.floor(o.solar.fraction+1e-10);o.solar.fraction=Math.max(0,o.solar.fraction-solarWhole);
+  if(solarWhole){o.solar.produced=Q.add(o.solar.produced,solarWhole);award(s,solarWhole);}
   if(o.phase==='winter'){
     // 余烬观测: the winter itself pays out half the last annihilation, evenly.
     if(o.talents.fallout&&o.winterDuration>0){o.legacyFraction+=Q.toNumber(o.lastReward)*R.falloutShare/o.winterDuration*Math.min(dt,o.remaining);

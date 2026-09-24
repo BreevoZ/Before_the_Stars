@@ -34,6 +34,7 @@ export function mapSessionQuantities(session, convert) {
     for(const c of o.civilizations){field(c,'experience');field(c,'gold');}
     for(const costs of Object.values(o.payments))for(let i=0;i<costs.length;i++)field(costs,i);
     for(const war of o.wars)mapBattleQuantities(war.game,convert,[],session.version);
+    if(session.version>=25){field(o.solar,'produced');for(const costs of Object.values(o.solar.payments))for(let i=0;i<costs.length;i++)field(costs,i);}
   }
   return session;
 }

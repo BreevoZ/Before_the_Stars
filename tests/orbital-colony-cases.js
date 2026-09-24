@@ -125,7 +125,7 @@ export function registerOrbitalColonyTests(test,assert,near){
   });
   test('v22: 轨道收割 moves under 知识封锁, earlier harvesters keep it with a free lock, and eight civilizations can fight four wars',()=>{
     const s=colonyFixture({legacy:100000,talents:['monitor','patronage']});
-    const old=JSON.parse(serializeSession(s));old.version=21;old.orbital.version=7;delete old.orbital.seedTendency;
+    const old=JSON.parse(serializeSession(s));old.version=21;old.orbital.version=7;delete old.orbital.seedTendency;delete old.orbital.solar;
     for(const key of ['overview','quickening','chronicle','directed','fallout'])delete old.orbital.talents[key];
     old.orbital.talents.harvest=1;old.orbital.payments.harvest=['2048'];
     const migrated=parseSession(JSON.stringify(old));

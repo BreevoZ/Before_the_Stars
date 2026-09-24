@@ -12,7 +12,7 @@ import { purchaseTalent } from '../src/talents.js';
 import { createGame, recruit, evolve, getIncomeRate, AGES } from '../src/game.js';
 import { serializeSession, parseSession, createSaveStore, SAVE_KEY, BACKUP_KEY } from '../src/save.js';
 import { MIGRATIONS } from '../src/save-migrations.js';
-import { cloneRecord, fromSaveRecord, fromV8Record, fromV9Record, fromV10Record, fromV11Record, fromV12Record, fromV13Record, fromV14Record, fromV15Record, fromV16Record, fromV17Record, fromV18Record, fromV19Record, fromV20Record, fromV21Record, fromV22Record, fromV23Record } from '../src/save-record.js';
+import { cloneRecord, fromSaveRecord, fromV8Record, fromV9Record, fromV10Record, fromV11Record, fromV12Record, fromV13Record, fromV14Record, fromV15Record, fromV16Record, fromV17Record, fromV18Record, fromV19Record, fromV20Record, fromV21Record, fromV22Record, fromV23Record, fromV24Record } from '../src/save-record.js';
 import { validateRecord } from '../src/save-validation.js';
 import { SAVE_VERSION } from '../src/progression-config.js';
 import { record as capturedV7 } from './fixtures/v7-save.js';
@@ -127,7 +127,7 @@ export function registerArchitectureTests(test, assert) {
     delete old.run.talents; delete old.run.challengeLevel; delete old.run.autoTurn;
     delete old.game.modifiers.bounty; delete old.game.enemyModifiers;
     for (let version = 1; version < SAVE_VERSION; version++) {
-      const hydrate = { 8: fromV8Record, 9: fromV9Record, 10: fromV10Record, 11: fromV11Record, 12: fromV12Record, 13: fromV13Record, 14: fromV14Record, 15: fromV15Record, 16: fromV16Record, 17: fromV17Record, 18: fromV18Record, 19: fromV19Record, 20: fromV20Record, 21: fromV21Record, 22: fromV22Record, 23: fromV23Record }[version];
+      const hydrate = { 8: fromV8Record, 9: fromV9Record, 10: fromV10Record, 11: fromV11Record, 12: fromV12Record, 13: fromV13Record, 14: fromV14Record, 15: fromV15Record, 16: fromV16Record, 17: fromV17Record, 18: fromV18Record, 19: fromV19Record, 20: fromV20Record, 21: fromV21Record, 22: fromV22Record, 23: fromV23Record, 24: fromV24Record }[version];
       validateRecord(hydrate ? hydrate(old) : old, version);
       const source = freeze(old), before = json(source), next = MIGRATIONS[version](source);
       assert(next.version === version + 1 && next !== source && next.game !== source.game);

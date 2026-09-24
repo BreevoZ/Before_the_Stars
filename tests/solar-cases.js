@@ -280,11 +280,15 @@ export function registerSolarTests(test, assert, near) {
         assert(el('colony-body-name').textContent==='土星' && el('solar-body-portrait').toDataURL()!==earth);
         const chart=el('colony-system-canvas'),r=chart.getBoundingClientRect();near(chart.width/chart.height,r.width/r.height);
         el('solar-select-saturn').dispatchEvent(new w.KeyboardEvent('keydown',{code:'ArrowRight',bubbles:true}));assert(el('colony-body-name').textContent==='天王星');
-        el('solar-to-earth').click();w.__testFrame(now+=100);assert(el('orbital-game').dataset.view==='earth' && !el('colony-world').hidden);
-        el('colony-view-moon').click();w.__testFrame(now+=100);assert(el('orbital-game').dataset.view==='moon' && !el('colony-shipyard').hidden);
+        // The catalogue is the only way in and out: Earth and the Moon open their views, any other body the atlas.
+        assert(el('solar-return').hidden);el('solar-select-earth').click();el('colony-body-enter').click();w.__testFrame(now+=100);
+        assert(el('orbital-game').dataset.view==='earth' && !el('colony-world').hidden && !el('solar-return').hidden && el('solar-jump-earth').getAttribute('aria-pressed')==='true');
+        el('solar-jump-moon').click();w.__testFrame(now+=100);assert(el('orbital-game').dataset.view==='moon' && !el('colony-shipyard').hidden);
         assert(el('shipyard-status').textContent.includes('已启航') && d.documentElement.scrollWidth<=width+2);
         el('shipyard-build').click();assert(el('orbit-talents-dialog').open && el('orbit-detail').textContent.includes('船坞'));el('close-orbit-talents').click();
-        el('colony-view-system').click();el('solar-select-earth').click();w.__testFrame(now+=100);
+        el('solar-jump-mars').click();w.__testFrame(now+=100);assert(el('orbital-game').dataset.view==='system' && el('colony-body-name').textContent==='火星');
+        el('colony-talents').click();assert(el('solar-talents-dialog').open && !el('orbit-talents-dialog').open);el('close-solar-talents').click();
+        el('solar-select-earth').click();w.__testFrame(now+=100);
       }
       assert(!d.body.dataset.fixtureError,d.body.dataset.fixtureError);
     } finally {frame.remove();}

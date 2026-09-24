@@ -131,12 +131,12 @@ export function createOrbitalColonyUI(getSession,{commit,archive,save,speed,view
     return Math.hypot((e.clientX-b.left)*1000/b.width-m.x,(e.clientY-b.top)*620/b.height-m.y)<m.m*1.8&&m.depth>-.2;};
   el('colony-world').addEventListener('click',e=>{if(onMoon(e))setView('moon');});
   el('colony-world').addEventListener('pointermove',e=>{el('colony-world').dataset.moonHover=String(Boolean(getSession().orbital?.talents.outpost&&onMoon(e)));});
-  el('colony-talents').addEventListener('click',()=>openTree());el('colony-unlock-monitor').addEventListener('click',()=>openTree('monitor'));
+  // In VII the header opens the newest page; VI stays one flip below it.
+  el('colony-talents').addEventListener('click',()=>getSession().orbital?.talents.voyage?solarTree.open():openTree());el('colony-unlock-monitor').addEventListener('click',()=>openTree('monitor'));
   el('colony-build-habitat').addEventListener('click',()=>openTree('recovery'));el('colony-lunar-upgrade').addEventListener('click',()=>openTree('lunarIndustry'));
   el('orbit-flip-surface').addEventListener('click',()=>flipSurface());watchSeam(scroll,1,()=>{if(dialog.open)flipSurface();});
   // The top of this page meets VII at 远航协议.
   el('orbit-flip-solar').addEventListener('click',()=>flipStage('solar','orbit'));watchSeam(scroll,-1,()=>{if(dialog.open&&getSession().orbital?.talents.voyage)flipStage('solar','orbit');});
-  el('solar-open-tree').addEventListener('click',()=>solarTree.open());
   el('orbit-buy').addEventListener('click',()=>buy(talent));el('close-orbit-talents').addEventListener('click',()=>dialog.close());
   dialog.addEventListener('close',()=>{closeDetail();viewChanged();});scroll.addEventListener('scroll',positionDetail,{passive:true});
   dialog.addEventListener('cancel',e=>{if(selected){e.preventDefault();closeDetail();}});

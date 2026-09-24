@@ -13,7 +13,9 @@ export function createSolarUI(getSession,{openTree,replay,commit,openSolarTree})
   function syncCivOptions(o){const select=el('solar-transfer-civ'),list=o.civilizations.filter(c=>c.alive),signature=list.map(c=>`${c.id}:${c.age}:${c.warId?1:0}`).join('|');
     if(signature===civSignature)return;civSignature=signature;const keep=select.value;select.replaceChildren(...list.map(c=>{const option=document.createElement('option');option.value=c.id;option.textContent=`${c.name} · ${AGES[c.age].numeral}${c.warId?' · 交战中':''}`;return option;}));
     select.value=list.some(c=>c.id===keep)?keep:(list.find(c=>!c.warId)?.id??list[0]?.id??'');}
-  function sync(){const s=getSession();if(!s.orbital?.started)return;view=allowed(view);el('colony-map').dataset.view=view;for(const id of ['system','earth','moon'])el(`colony-view-${id}`).setAttribute('aria-pressed',String(view===id));
+  function sync(){const s=getSession();if(!s.orbital?.started)return;view=allowed(view);el('colony-map').dataset.view=view;for(const id of ['earth','moon'])el(`colony-view-${id}`).setAttribute('aria-pressed',String(view===id));
+    // VII: the same ten bodies lead back out of the Earth and Moon views.
+    el('solar-return').hidden=!s.orbital.talents.voyage||view==='system';for(const d of DESTINATIONS)el(`solar-jump-${d.id}`).setAttribute('aria-pressed',String(d.id===view));
     syncCivOptions(s.orbital);bind(buildSolarViewModel(s,{view,selected,transferCiv:el('solar-transfer-civ').value}));}
   function setView(next){view=allowed(next);sync();}
   function choose(id){if(!destination(id))return;selected=id;sync();}
@@ -29,9 +31,12 @@ export function createSolarUI(getSession,{openTree,replay,commit,openSolarTree})
   el('solar-transfer-civ').addEventListener('change',sync);
   el('solar-transfer-go').addEventListener('click',()=>{if(transferCivilization(getSession(),el('solar-transfer-civ').value)){civSignature='';commit();sync();}});
   el('solar-colony-tree').addEventListener('click',()=>openSolarTree?.('dome'));
-  for(const id of ['system','earth','moon'])el(`colony-view-${id}`).addEventListener('click',()=>setView(id));
-  el('solar-to-earth').addEventListener('click',()=>setView('earth'));el('solar-to-moon').addEventListener('click',()=>setView('moon'));
-  el('colony-body-enter').addEventListener('click',()=>{if(['earth','moon'].includes(selected))setView(selected);});
+  for(const id of ['earth','moon'])el(`colony-view-${id}`).addEventListener('click',()=>setView(id));
+  // Earth and the Moon open their own views; every other body opens the atlas on it.
+  const go=id=>{selected=id;setView(['earth','moon'].includes(id)?id:'system');scrollTo({top:0,behavior:'instant'});};
+  for(const [i,b]of DESTINATIONS.entries()){const button=document.createElement('button');button.id=`solar-jump-${b.id}`;button.type='button';button.style.setProperty('--body-color',b.color);
+    button.innerHTML=`<small>${String(i+1).padStart(2,'0')}</small><i aria-hidden="true"></i><span>${b.name}</span>`;button.addEventListener('click',()=>go(b.id));el('solar-return').append(button);}
+  el('colony-body-enter').addEventListener('click',()=>{if(['earth','moon'].includes(selected))go(selected);});
   el('solar-replay').addEventListener('click',replay);el('shipyard-link').addEventListener('click',()=>setView('moon'));
   el('shipyard-build').addEventListener('click',()=>openTree('shipyard'));el('shipyard-voyage').addEventListener('click',()=>getSession().orbital.talents.voyage?replay():openTree('voyage'));
   const canvas=el('colony-system-canvas');

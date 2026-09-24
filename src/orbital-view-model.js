@@ -46,7 +46,7 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
     '#colony-legacy':Q.format(s.permanent.legacy),'#orbit-tree-wallet':Q.format(s.permanent.legacy),
     '#colony-earned':`本阶段已收获 ${Q.format(o.legacyEarned)} · 收益 ×${orbitalYieldMultiplier(o)}`,
     '#colony-income':o.talents.outpost?`月面 +${Q.format(lunarLegacyRate(o))}/s`:'文明遗产',
-    '#colony-lunar@hidden':!o.talents.outpost,'#colony-view-moon@hidden':!o.talents.outpost,'#colony-view-system@hidden':!o.talents.voyage,'#orbit-flip-solar@hidden':!o.talents.voyage,
+    '#colony-lunar@hidden':!o.talents.outpost,'#colony-view-moon@hidden':!o.talents.outpost,'#colony-view-tabs@hidden':Boolean(o.talents.voyage),'#colony-talents-label':o.talents.voyage?'行星际星图':'轨道天赋','#orbit-flip-solar@hidden':!o.talents.voyage,
     // VII extends VI: the same observatory, renamed once the ark is launched.
     '#colony-stage-numeral':o.talents.voyage?'VII':'VI','#colony-stage-name':o.talents.voyage?'行星际':'轨道文明','#colony-lunar-rate':Q.format(lunarLegacyRate(o)),
     '#colony-lunar-level':`自动工场 ${o.talents.lunarIndustry} / 4 · ${3+o.talents.lunarIndustry*2} 处设施 · ${o.talents.massDriver?'质量投射器运行中':'穿梭货运'}`,

@@ -170,10 +170,10 @@ export function registerOrbitalColonyTests(test,assert,near){
     const before=wo.legacyEarned;advance(w,rebirthDelay(wo)+1);near(Q.toNumber(Q.sub(wo.legacyEarned,before)),10000*R.falloutShare,2);
   });
   test('VII opens as an extension: 远航协议 keeps VI running, renames the observatory and adds the solar system tab',()=>{
-    const before=voyageReady(),vm0=buildOrbitalViewModel(before);assert(vm0['#colony-view-system@hidden']===true&&vm0['#colony-stage-numeral']==='VI');
+    const before=voyageReady(),vm0=buildOrbitalViewModel(before);assert(vm0['#colony-view-tabs@hidden']===false&&vm0['#colony-talents-label']==='轨道天赋'&&vm0['#colony-stage-numeral']==='VI');
     const wallet=before.permanent.legacy;assert(purchaseOrbitalTalent(before,'voyage'));const o=before.orbital;
     assert(Q.eq(before.permanent.legacy,Q.sub(wallet,T.voyage.costs[0])),'The ark costs its price, not the whole wallet');
-    const vm=buildOrbitalViewModel(before);assert(vm['#colony-view-system@hidden']===false&&vm['#colony-stage-numeral']==='VII'&&vm['#colony-stage-name']==='行星际');
+    const vm=buildOrbitalViewModel(before);assert(vm['#colony-view-tabs@hidden']===true&&vm['#colony-talents-label']==='行星际星图'&&vm['#colony-stage-numeral']==='VII'&&vm['#colony-stage-name']==='行星际');
     const civs=o.nuclearCycles;advance(before,R.winterSeconds+5);assert(o.phase==='living'&&o.civilizations.some(c=>c.alive)&&o.nuclearCycles===civs,'Earth keeps seeding after the launch');
     const raw=serializeSession(before);assert(serializeSession(parseSession(raw))===raw);
   });

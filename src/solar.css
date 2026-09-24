@@ -44,3 +44,4 @@
 .solar-transfer-pick{display:flex;align-items:center;gap:10px;font-size:10px;color:var(--solar-muted);margin-bottom:8px}.solar-transfer-pick select{min-height:32px;font-size:11px;flex:1;max-width:240px}
 #solar-transfer-quote{font-size:10px;line-height:1.8;color:var(--solar-paper);margin:0 0 4px}#solar-transfer-go,#solar-colony-tree{padding:6px 0;min-height:0;font-size:11px;color:var(--solar-brass)}#solar-transfer-go:disabled{color:var(--solar-muted);cursor:default}
 .solar-colonists{list-style:none;padding:0;margin:10px 0 4px;display:grid;gap:4px;font-size:10px;color:var(--solar-muted)}.solar-colonists li[data-transit="true"]{color:var(--solar-brass)}
+.solar-return{margin-top:14px}

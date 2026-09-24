@@ -10,6 +10,7 @@ import { warBonuses } from './orbital-war.js';
 import { rebirthDelay, refugeeDelay } from './celestial-economy.js';
 import { AGES } from './game-config.js';
 import { FACILITIES, arrived, facilityAt, docks, route } from './solar-industry.js';
+import { WORLDS, COLONY_WAR } from './colony-war.js';
 import { SOLAR_TALENTS, SOLAR_TALENT_KEYS, V26_SOLAR_KEYS, solarRank, domeCapacity, fleetCapacity, COLONY_RULES } from './solar-colony.js';
 function keys(value,expected,name){check(object(value)&&Object.keys(value).length===expected.length&&expected.every(k=>Object.hasOwn(value,k)),name);}
 const amount=v=>Q.valid(v)&&Q.gte(v,0);
@@ -36,7 +37,7 @@ export function validateOrbital(s,version){
     if(version>=26)validateColonies(o,version);
     if(version>=27)validateFlights(o);
   }
-  check(o.version===(version===16?2:version===17?3:version===18?4:version===19?5:version===20?6:version===21?7:version===22?8:version===23?9:version===24?10:version===25?11:version===26?12:R.version)&&bool(o.started)&&num(o.elapsed)&&int(o.rng,0,4294967295),'轨道时钟与随机源');
+  check(o.version===(version===16?2:version===17?3:version===18?4:version===19?5:version===20?6:version===21?7:version===22?8:version===23?9:version===24?10:version===25?11:version===26?12:version===27?13:R.version)&&bool(o.started)&&num(o.elapsed)&&int(o.rng,0,4294967295),'轨道时钟与随机源');
   for(const key of ['cycle','settledCycle','nuclearCycles','nextCivilization','nextWar'])check(int(o[key]),key);
   check(o.nuclearCycles===o.settledCycle&&o.settledCycle<=o.cycle,'核毁灭凭据');
   check(['dormant','living','winter'].includes(o.phase)&&o.started===(o.phase!=='dormant'),'萌芽阶段');
@@ -115,15 +116,18 @@ function validateColonies(o,version){
     check(int(rank,0,t.costs.length)&&Array.isArray(paid)&&paid.length===rank&&paid.every((cost,i)=>Q.eq(cost,t.costs[i])),'行星际天赋实付');
     if(rank)check(o.talents.voyage>0&&Object.entries(t.requires).every(([p,n])=>solarRank(o,p)>=n)&&(!t.arrival||arrived(o,t.arrival))
       &&Object.entries(t.facility_gate??{}).every(([f,n])=>sol.facilities[f]>=n),'行星际天赋前置');}
-  keys(sol.colonies,['mars'],'殖民地');check(Array.isArray(sol.colonies.mars)&&Array.isArray(sol.transfers)&&int(sol.nextTransfer),'殖民地列表');
-  check(sol.colonies.mars.length+sol.transfers.length<=domeCapacity(o)&&sol.transfers.length<=fleetCapacity(o)&&(sol.transfers.length+sol.colonies.mars.length===0||sol.talents.transfer>0),'殖民容量');
+  keys(sol.colonies,['mars'],'殖民地');const world=sol.colonies.mars,residents=version>=28?world?.civs:world;
+  check(Array.isArray(residents)&&Array.isArray(sol.transfers)&&int(sol.nextTransfer),'殖民地列表');
+  check(residents.length+sol.transfers.length<=domeCapacity(o)&&sol.transfers.length<=fleetCapacity(o)&&(sol.transfers.length+residents.length===0||sol.talents.transfer>0),'殖民容量');
   const ids=new Set(o.civilizations.map(c=>c.id)),civ=c=>{keys(c,['id','name','age','tendency','doctrine'],'殖民文明');
     check(id(c.id)&&!ids.has(c.id)&&typeof c.name==='string'&&c.name.length<=24&&int(c.age,1,R.finalAge)&&int(c.tendency,0,3)&&int(c.doctrine,0,5),'殖民文明状态');ids.add(c.id);};
-  for(const c of sol.colonies.mars){const {arrivedAt,...rest}=c;civ(rest);check(num(arrivedAt,0,o.elapsed),'殖民抵达时间');}
+  for(const c of residents){const {arrivedAt,progress,warId,...rest}=version>=28?c:{...c,progress:0,warId:null};civ(rest);check(num(arrivedAt,0,o.elapsed),'殖民抵达时间');
+    check(num(progress,0,1)&&progress<1&&(warId===null||id(warId)),'殖民文明进度');}
+  if(version>=28)validateWorld(world,'mars');
   const transfers=new Set();
   for(const t of sol.transfers){keys(t,['id','to','departAt','arriveAt','civ'],'转运字段');
     check(id(t.id)&&!transfers.has(t.id)&&t.to===COLONY_RULES.target&&num(t.departAt,0,o.elapsed)&&num(t.arriveAt)&&t.arriveAt>o.elapsed-1e-9&&t.arriveAt>t.departAt,'转运航程');transfers.add(t.id);civ(t.civ);}
-  const paid=sol.payments.transfers??[];check(Array.isArray(paid)&&paid.length>=sol.transfers.length+sol.colonies.mars.length&&paid.every(cost=>whole(cost)&&Q.gt(cost,0)),'转运实付');
+  const paid=sol.payments.transfers??[];check(Array.isArray(paid)&&paid.length>=sol.transfers.length+residents.length&&paid.every(cost=>whole(cost)&&Q.gt(cost,0)),'转运实付');
 }
 
 // Arks in flight (v27): one per unbuilt foothold, paid, from a drydock the
@@ -134,4 +138,21 @@ function validateFlights(o){
     check(key&&!seen.has(f.body)&&sol.facilities[key]===0&&docks(o).includes(f.from)&&!route(o,f.body).blocked
       &&Object.entries(FACILITIES[key].requires??{}).every(([other,level])=>sol.facilities[other]>=level),'方舟航线');seen.add(f.body);
     check(num(f.departAt,0,o.elapsed)&&num(f.arriveAt)&&f.arriveAt>o.elapsed-1e-9&&f.arriveAt>f.departAt,'方舟航行时间');}
+}
+
+// A colony world (v28): its phase and winter clock, and the abstract wars
+// between its residents. A war names exactly the two residents fighting it.
+function validateWorld(w,key){
+  const env=WORLDS[key],R=COLONY_WAR;
+  keys(w,['phase','remaining','civs','wars','nextWar','fuse','nuclear'],'殖民世界');
+  check(['living','winter'].includes(w.phase)&&num(w.remaining,0,env.winter)&&int(w.nextWar)&&num(w.fuse,0,env.fuse)&&int(w.nuclear)&&Array.isArray(w.wars),'殖民世界状态');
+  check(w.phase==='winter'?w.remaining>0&&w.civs.length===0&&w.wars.length===0:w.remaining===0,'殖民核冬天');
+  const fighting=new Map(),seen=new Set();
+  for(const war of w.wars){keys(war,['id','sides','base','elapsed','tempo','luck','surge','nextSurge'],'殖民战争字段');
+    check(id(war.id)&&!seen.has(war.id)&&Array.isArray(war.sides)&&war.sides.length===2&&war.sides[0]!==war.sides[1],'殖民战争双方');seen.add(war.id);
+    for(const side of war.sides){check(!fighting.has(side),'殖民战争重复参战');fighting.set(side,war.id);}
+    check([war.base,war.luck,war.surge].every(a=>Array.isArray(a)&&a.length===2)&&war.base.every(b=>num(b,0,1))&&num(war.elapsed)&&num(war.nextSurge)
+      &&num(war.tempo,R.tempoMin,R.tempoMin+R.tempoSpan)&&war.luck.every(x=>num(x,R.luckMin,R.luckMin+R.luckSpan))&&war.surge.every(x=>num(x,R.surgeMin,R.surgeMin+R.surgeSpan)),'殖民战争状态');}
+  for(const c of w.civs)check(c.warId===(fighting.get(c.id)??null),'殖民战争引用');
+  check(fighting.size===w.wars.length*2&&[...fighting.keys()].every(side=>w.civs.some(c=>c.id===side)),'殖民战争成员');
 }

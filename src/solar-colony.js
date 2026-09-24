@@ -7,13 +7,15 @@ import { Q } from './quantity.js';
 import { TAU } from './celestial-clock.js';
 import { bodyById, bodyAngle, orbitalPeriod } from './solar-config.js';
 import { FACILITIES, arrived, facilityState, buildFacility } from './solar-industry.js';
+import { emptyWorld, colonistRate, colonyIncome } from './colony-war.js';
+export { colonistRate } from './colony-war.js';
 
 const M = 2 ** 20, G = 2 ** 30;
 export const COLONY_RULES = Object.freeze({
   // A Hohmann transfer to Mars leaves when Mars leads the Earth by about 44°.
   target: 'mars', lead: .77, window: .8, hohmannWindow: .45,
   travelSeconds: 60, lateTravel: 2, fuelLateTravel: 1.4, lateCost: 3, fuelLateCost: 1.5,
-  domeCapacity: 2, colonistBase: 16384, transferBase: 4 * M,
+  domeCapacity: 2, transferBase: 4 * M,
 });
 const node = (name, x, y, icon, branch, extra = {}) => Object.freeze({ name, x, y, icon, branch, requires: {}, costs: [], ...extra });
 // Three routes like the other trees: industry on the left, the gold colony
@@ -57,7 +59,7 @@ export const SOLAR_TALENTS = Object.freeze({
 export const SOLAR_TALENT_KEYS = Object.freeze(Object.entries(SOLAR_TALENTS).filter(([, t]) => !t.root && !t.planned && !t.facility).map(([key]) => key));
 // Save v26 knew only the colony and navigation talents; v27 added the arks and drydocks.
 export const V26_SOLAR_KEYS = Object.freeze(['dome', 'transfer', 'survey', 'hohmann', 'fleet', 'fuel']);
-export const emptyColonies = (keys = SOLAR_TALENT_KEYS) => ({ talents: Object.fromEntries(keys.map(key => [key, 0])), colonies: { mars: [] }, transfers: [], nextTransfer: 0 });
+export const emptyColonies = (keys = SOLAR_TALENT_KEYS) => ({ talents: Object.fromEntries(keys.map(key => [key, 0])), colonies: { mars: emptyWorld() }, transfers: [], nextTransfer: 0 });
 
 // ── Talents ──
 export function solarTalentState(s, key) {
@@ -111,7 +113,7 @@ export function windowTiming(o) {
 // ── Transfers ──
 export const domeCapacity = o => o.solar.talents.dome * COLONY_RULES.domeCapacity;
 export const fleetCapacity = o => 1 + o.solar.talents.fleet;
-export const colonyCount = o => o.solar.colonies.mars.length + o.solar.transfers.length;
+export const colonyCount = o => o.solar.colonies.mars.civs.length + o.solar.transfers.length;
 export function transferQuote(o, civ) {
   const open = windowOpen(o), fuel = o.solar.talents.fuel > 0;
   const base = COLONY_RULES.transferBase * 2 ** (civ.age - 1);
@@ -122,6 +124,7 @@ export function transferState(s, civId) {
   const o = s.orbital;
   if (!o?.talents.voyage || !o.solar.talents.transfer) return 'locked';
   if (o.phase !== 'living') return 'winter';
+  if (o.solar.colonies[COLONY_RULES.target].phase !== 'living') return 'colonyWinter';
   const civ = o.civilizations.find(c => c.id === civId);
   if (!civ?.alive) return 'selection';
   if (civ.warId) return 'war';
@@ -146,10 +149,9 @@ export function landTransfers(o) {
   const landed = o.solar.transfers.filter(t => o.elapsed >= t.arriveAt - 1e-9);
   if (!landed.length) return [];
   o.solar.transfers = o.solar.transfers.filter(t => !landed.includes(t));
-  for (const t of landed) o.solar.colonies[t.to].push({ ...t.civ, arrivedAt: t.arriveAt });
+  for (const t of landed) o.solar.colonies[t.to].civs.push({ ...t.civ, arrivedAt: t.arriveAt, progress: 0, warId: null });
   return landed;
 }
-// Until colony wars exist (step 4) a colonist works: its age doubles its yield.
-export const colonistRate = civ => COLONY_RULES.colonistBase * 2 ** (civ.age - 1);
-export const colonyRate = o => o.solar.colonies.mars.reduce((sum, civ) => sum + colonistRate(civ), 0);
+// A colonist works while its world is not in winter: its age doubles its yield (see colony-war.js).
+export const colonyRate = colonyIncome;
 export const transferValue = civ => COLONY_RULES.transferBase * 2 ** (civ.age - 1);

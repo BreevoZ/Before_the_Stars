@@ -5,7 +5,8 @@ import { createGame, updateGame, updateCommander, evolve, AGES, UNITS, TURRETS }
 import { createBonusStack, stat } from './stats.js';
 import { ORBITAL_RULES as R, TENDENCIES } from './orbital-config.js';
 const TEAMS=['player','enemy'];
-export function warBonuses(civilizations) {
+// env: the planet's own effects (VII colonies), applied to both sides alike.
+export function warBonuses(civilizations, env = {}) {
   const effects=[];
   for (const [i,c] of civilizations.entries()) {
     const team=TEAMS[i], source={kind:'status',id:`orbit:${c.id}`,label:`${c.name} · 轨道战争`};
@@ -25,12 +26,13 @@ export function warBonuses(civilizations) {
     const tendency=TENDENCIES[c.tendency??0];
     if(tendency)for(const [key,value]of Object.entries(tendency.effects))effects.push({target:{stat:key,team,...(['damage','health'].includes(key)?{kind:'unit'}:key==='experience'?{kind:'reward'}:{})},
       type:'multiply',value,source:{...source,id:`orbit:${c.id}:tendency`,label:`${c.name} · ${tendency.name}`}});
+    if(env.damage)add('damage',env.damage,'unit');
     add('armyLimit',12,undefined,'override');add('queueLimit',4,undefined,'override');
   }
   return createBonusStack(effects);
 }
-export function createWar(id, civilizations) {
-  const game=createGame({mode:'incremental',ages:Object.fromEntries(TEAMS.map((t,i)=>[t,civilizations[i].age])),bonuses:warBonuses(civilizations)});
+export function createWar(id, civilizations, env) {
+  const game=createGame({mode:'incremental',ages:Object.fromEntries(TEAMS.map((t,i)=>[t,civilizations[i].age])),bonuses:warBonuses(civilizations,env)});
   game.ai.enabled=false;
   const commanders=Object.fromEntries(TEAMS.map((t,i)=>[t,{enabled:true,cooldown:1+i*.15,orders:civilizations[i].profile,strategy:'balanced',waves:0}]));
   for(const [i,team] of TEAMS.entries()) {game.gold[team]=civilizations[i].gold;game.experience[team]=civilizations[i].experience;}

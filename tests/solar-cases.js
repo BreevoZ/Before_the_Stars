@@ -105,7 +105,7 @@ export function registerSolarTests(test, assert, near) {
     const s=voyageFixture(),old=JSON.parse(serializeSession(s));old.version=24;old.orbital.version=10;delete old.orbital.solar;
     const next=parseSession(JSON.stringify(old));assert(Object.values(next.orbital.solar.facilities).every(v=>v===0)&&Q.eq(next.orbital.solar.produced,0));
     assert(next.orbital.solar.flights.length===0&&next.orbital.solar.talents.harbor===0);
-    setDebugLegacy(s,2**40);const v26=JSON.parse(serializeSession(s));v26.version=26;v26.orbital.version=12;delete v26.orbital.solar.flights;for(const k of ['heat','harbor','nuclear','fusion'])delete v26.orbital.solar.talents[k];
+    setDebugLegacy(s,2**40);const v26=JSON.parse(serializeSession(s));v26.version=26;v26.orbital.version=12;delete v26.orbital.solar.flights;v26.orbital.solar.colonies={mars:[]};for(const k of ['heat','harbor','nuclear','fusion'])delete v26.orbital.solar.talents[k];
     v26.orbital.solar.facilities.jupiter=1;v26.orbital.solar.payments.jupiter=[String(FACILITIES.jupiter.costs[0])];
     const kept=parseSession(JSON.stringify(v26));assert(kept.orbital.solar.facilities.jupiter===1&&kept.orbital.solar.talents.fusion===0,'Footholds built under v26 stay');
     const vi=voyageReady();vi.orbital.solar.facilities.venus=1;vi.orbital.solar.payments.venus=[FACILITIES.venus.costs[0]];
@@ -130,12 +130,12 @@ export function registerSolarTests(test, assert, near) {
     assert(transferCivilization(s,civ.id)&&!o.civilizations.some(c=>c.id===civ.id)&&o.solar.transfers.length===1&&Q.eq(s.permanent.legacy,Q.sub(wallet,quote.cost)));
     const second=o.civilizations.find(c=>c.alive&&!c.warId);assert(!second||transferState(s,second.id)==='fleet','One transfer ark until 转运舰队');
     const raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw);
-    run(quote.seconds+1);assert(o.solar.transfers.length===0&&o.solar.colonies.mars.length===1&&colonyRate(o)===colonistRate(civ));
+    run(quote.seconds+1);assert(o.solar.transfers.length===0&&o.solar.colonies.mars.civs.length===1&&colonyRate(o)===colonistRate(civ));
     const produced=o.solar.produced;run(10);assert(Q.toNumber(Q.sub(o.solar.produced,produced))>=colonyRate(o)*9);
     // Capacity: two residents per dome rank.
     assert(domeCapacity(o)===COLONY_RULES.domeCapacity);
     // Tampering: a colonist over capacity, or a transfer without payment, is rejected.
-    const over=JSON.parse(serializeSession(s));over.orbital.solar.colonies.mars.push({...over.orbital.solar.colonies.mars[0],id:'c9-99'},{...over.orbital.solar.colonies.mars[0],id:'c9-98'});
+    const over=JSON.parse(serializeSession(s));over.orbital.solar.colonies.mars.civs.push({...over.orbital.solar.colonies.mars.civs[0],id:'c9-99'},{...over.orbital.solar.colonies.mars.civs[0],id:'c9-98'});
     let rejected=false;try{parseSession(JSON.stringify(over));}catch{rejected=true;}assert(rejected,'Dome capacity holds');
     const unpaid=JSON.parse(serializeSession(s));unpaid.orbital.solar.payments.transfers=[];rejected=false;try{parseSession(JSON.stringify(unpaid));}catch{rejected=true;}assert(rejected,'Every transfer is paid');
   });
@@ -151,7 +151,7 @@ export function registerSolarTests(test, assert, near) {
     assert(solarTalentState(s,'starship')==='planned'&&!purchaseSolarTalent(s,'starship'));
     assert(buildSolarTreeViewModel(s,{talent:'starship',selected:true})['#solar-buy@disabled']);
     const old=JSON.parse(serializeSession(voyageFixture()));old.version=25;old.orbital.version=11;for(const k of ['talents','colonies','transfers','nextTransfer','flights'])delete old.orbital.solar[k];
-    const next=parseSession(JSON.stringify(old));assert(next.orbital.solar.colonies.mars.length===0&&next.orbital.solar.talents.dome===0);
+    const next=parseSession(JSON.stringify(old));assert(next.orbital.solar.colonies.mars.civs.length===0&&next.orbital.solar.talents.dome===0);
   });
   test('Solar atlas: uniform projection and shared hit positions stay in bounds at desktop and mobile sizes', () => {
     for(const [w,h] of [[1400,700],[390,350],[320,350]]) {

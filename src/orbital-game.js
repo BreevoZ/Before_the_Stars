@@ -5,6 +5,7 @@ import { createWar, updateWar, syncWarCivilizations, refreshWarBonuses, changeTe
 import { AGES } from './game-config.js';
 import { emptyIndustry, emptyFlights, industryRate, industrySpent, landFlights, FACILITIES, facilityAt } from './solar-industry.js';
 import { emptyColonies, colonyRate, landTransfers } from './solar-colony.js';
+import { updateColonies } from './colony-war.js';
 import { bodyById } from './solar-config.js';
 
 export function createOrbitalState(seed = (Math.random()*4294967296)>>>0) {
@@ -123,6 +124,9 @@ export function updateOrbital(s,dt,{paused=false,hidden=false}={}){
   // VII industry runs on its own ledger, winter or not, like the moon.
   for(const t of landTransfers(o))log(o,`${t.civ.name}抵达火星穹顶，开始在新家园工作。`);
   for(const f of landFlights(o))log(o,`方舟抵达${bodyById(f.body).name}，${FACILITIES[facilityAt(f.body)].name}开始运转。`);
+  // Colony worlds fight and burn on their own clocks; Earth's phase never stops them.
+  const colonies=updateColonies(o,dt);for(const text of colonies.logs)log(o,text);
+  if(colonies.reward){o.solar.produced=Q.add(o.solar.produced,colonies.reward);award(s,colonies.reward);}
   o.solar.fraction+=(industryRate(o)+colonyRate(o))*dt;const solarWhole=Math.floor(o.solar.fraction+1e-10);o.solar.fraction=Math.max(0,o.solar.fraction-solarWhole);
   if(solarWhole){o.solar.produced=Q.add(o.solar.produced,solarWhole);award(s,solarWhole);}
   if(o.phase==='winter'){

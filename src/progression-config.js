@@ -37,7 +37,7 @@ export function getChallengeModifiers(level = 0, rules = 11) {
   return Object.fromEntries(Object.entries(table).filter(([key]) => key !== 'maxLevel')
     .map(([key, base]) => [key, Q.pow(base, level)]));
 }
-export const SAVE_VERSION = 27;
+export const SAVE_VERSION = 28;
 export const SAVE_INTERVAL = 10;
 export function getBonuses(levels) {
   return { income: Q.pow(UPGRADES.production.base, levels.production), experience: Q.pow(UPGRADES.warfare.base, levels.warfare) };

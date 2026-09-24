@@ -68,7 +68,14 @@ export function drawSolarSystem(c,w,h,o,{ambientTime=o.elapsed,reducedMotion=fal
     for(const t of o.solar.transfers){const e=Math.max(0,Math.min(1,(o.elapsed-t.departAt)/(t.arriveAt-t.departAt))),k=e*e*(3-2*e),mx=(home.x+mars.x)/2,my=(home.y+mars.y)/2-Math.hypot(mars.x-home.x,mars.y-home.y)*.25,u=1-k;
       c.strokeStyle='#e6d6a42b';c.setLineDash([1.5,5]);c.beginPath();c.moveTo(home.x,home.y);c.quadraticCurveTo(mx,my,mars.x,mars.y);c.stroke();c.setLineDash([]);
       const x=u*u*home.x+2*u*k*mx+k*k*mars.x,y=u*u*home.y+2*u*k*my+k*k*mars.y,dx=2*u*(mx-home.x)+2*k*(mars.x-mx),dy=2*u*(my-home.y)+2*k*(mars.y-my);drawArk(c,x,y,.085,{angle:Math.atan2(dx,-dy),thrust:reducedMotion?0:1});}
-    o.solar.colonies.mars.forEach((civ,i)=>{const a=i*2.4+.6,r=Math.max(5,bodyById('mars').size)*1.15*.55;disc(c,mars.x+Math.cos(a)*r,mars.y+Math.sin(a)*r,1.1+civ.age*.15,'#f3d99a');});
+    // Mars: residents as warm lights, a red pulse between two at war, and a grey
+    // veil with its own clock while the planet lies in nuclear winter.
+    const world=o.solar.colonies.mars,residentAt=i=>{const a=i*2.4+.6,r=marsR*.55;return{x:mars.x+Math.cos(a)*r,y:mars.y+Math.sin(a)*r};};
+    world.civs.forEach((civ,i)=>{const p=residentAt(i);disc(c,p.x,p.y,1.1+civ.age*.15,civ.warId?'#f0a47c':'#f3d99a');});
+    for(const war of world.wars){const [a,b]=war.sides.map(id=>residentAt(world.civs.findIndex(x=>x.id===id))),pulse=reducedMotion?.6:.45+.35*Math.sin(clock*4);
+      c.strokeStyle=`rgba(236,128,92,${pulse})`;c.lineWidth=.8;c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();}
+    if(world.phase==='winter'){disc(c,mars.x,mars.y,marsR+.5,'#7f8a8ecc');c.fillStyle='#b8c3c4';c.font='8px ui-monospace,monospace';c.textAlign=mars.x<cx?'right':'left';
+      if(w>=600)c.fillText(`WINTER ${Math.ceil(world.remaining)}s`,mars.x+(mars.x<cx?-1:1)*(marsR+13),mars.y+18);}
     // Footholds: one light per built rank, circling the body (the belt's fleet rides the belt).
     for(const [key,f] of Object.entries(FACILITIES)){const rank=o.solar.facilities[key];if(!rank)continue;
       if(f.body==='belt'){for(let k=0;k<rank*3;k++){const a=k*2.1+clock*.004,rr=orbitRadius(2.4+(k%3)*.3);disc(c,cx+Math.cos(a)*rr,cy+Math.sin(a)*rr*tilt,1.3,'#efdca6');}continue;}
@@ -81,4 +88,6 @@ export function bodyAt(o,x,y,{reducedMotion=false,tolerance=15}={}){
   let best=null,distance=Infinity;for(const b of BODIES){if(b.belt)continue;const p=bodyPosition(b,reducedMotion?0:o.elapsed),d=Math.hypot(x-p.x,y-p.y);if(d<Math.max(b.size,6)+tolerance&&d<distance){best=b;distance=d;}}
   if(!best){const r=Math.hypot(x-SYSTEM.cx,(y-SYSTEM.cy)/SYSTEM.tilt);if(r>orbitRadius(2.2)&&r<orbitRadius(3.3))best=bodyById('belt');}return best;
 }
-export function drawBodyPortrait(c,w,h,b,o){c.clearRect(0,0,w,h);if(b.belt){for(let i=0;i<32;i++)disc(c,w*.2+noise(i+1)*w*.6,h*.2+noise(i+41)*h*.6,2+noise(i+100)*7,'#85938d');return;}drawSolarBody(c,b,w/2,h/2,Math.min(w,h)*(b.rings?.25:.38),{time:0,ring:b.id==='earth'?o.talents.recovery:0});}
+export function drawBodyPortrait(c,w,h,b,o){c.clearRect(0,0,w,h);if(b.belt){for(let i=0;i<32;i++)disc(c,w*.2+noise(i+1)*w*.6,h*.2+noise(i+41)*h*.6,2+noise(i+100)*7,'#85938d');return;}const r=Math.min(w,h)*(b.rings?.25:.38);drawSolarBody(c,b,w/2,h/2,r,{time:0,ring:b.id==='earth'?o.talents.recovery:0});
+  // A colony in nuclear winter: ash veils the whole disc.
+  if(o.solar?.colonies?.[b.id]?.phase==='winter')disc(c,w/2,h/2,r,'#8a9496b8');}

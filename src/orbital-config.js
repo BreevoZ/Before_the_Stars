@@ -1,5 +1,5 @@
 // Orbital wars reuse the surface simulation; Legacy is the only orbital wallet.
-export const ORBITAL_RULES = Object.freeze({ version: 13, finalAge: 5, historyLimit: 12,
+export const ORBITAL_RULES = Object.freeze({ version: 14, finalAge: 5, historyLimit: 12,
   winterSeconds: 60, refugeeSeconds: 30, nuclearVisualSeconds: 7, minCivilizations: 4, maxCivilizations: 8, maxWars: 4,
   habitatSections: 7, arkCount: 7, lunarRotationSeconds: 180, lunarBaseIncome: 512, warIncome: 2.5, warBaseHealth: 3,
   // A civilization should take minutes, not one, to climb from I to V: each

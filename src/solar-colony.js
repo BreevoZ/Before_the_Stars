@@ -39,11 +39,12 @@ export const SOLAR_TALENTS = Object.freeze({
   outpost: node('木星船坞', 490, 470, 'outpost', 'industry', { planned: true, requires: { fusion: 1 },
     description: '在木星轨道建起船坞，作为飞往外太阳系的中转站。（后续开放）' }),
   // Mainline: dome → transfer → (colony protocol → deep relay → starship, planned).
-  dome: node('火星穹顶', 660, 935, 'dome', 'main', { costs: [16 * M, 128 * M, G], requires: { voyage: 1 }, arrival: 'mars', kind: 'keystone',
-    description: '在火星上建起居住穹顶，每级可容纳两个殖民文明。需要先遣编队已经抵达火星。' }),
+  dome: node('火星穹顶', 660, 935, 'dome', 'main', { costs: [16 * M, 128 * M, G, 8 * G, 64 * G], requires: { voyage: 1 }, arrival: 'mars', kind: 'keystone',
+    description: '在火星上建起居住穹顶，每座容纳两个殖民文明；升格文明会永久住在穹顶里。需要先遣编队已经抵达火星。' }),
   transfer: node('文明转运', 660, 775, 'transfer', 'main', { costs: [32 * M], requires: { dome: 1 }, kind: 'keystone',
     description: '从地球挑选一个不在交战的文明，装上方舟送往火星。地球的点位会空出来，新的文明照常萌芽。' }),
-  uplift: node('殖民地存续协议', 660, 615, 'accord', 'main', { planned: true, requires: { transfer: 1 }, kind: 'keystone', description: '把存续协议递给殖民地的和平文明，或接管好战文明的核武，让它越过大过滤器。（第 5 步开放）' }),
+  uplift: node('殖民地存续协议', 660, 615, 'accord', 'main', { costs: [192 * M], requires: { transfer: 1 }, kind: 'keystone',
+    description: '让殖民文明越过大过滤器：第五时代的和平文明可以谈判签署存续协议；两个第五时代文明交战、一方基地跌破 35% 时，可以接管双方核武——败方覆灭但没有核毁灭，胜方升格。升格文明永久住在穹顶里，不再参战，产出是第五时代居民的 4 倍。' }),
   relay: node('深空中继', 660, 455, 'relay', 'main', { planned: true, requires: { uplift: 1 }, description: '在天王星与海王星建立中继，听见太阳系之外。（后续开放）' }),
   starship: node('星际方舟', 660, 250, 'starship', 'main', { planned: true, requires: { relay: 1 }, finale: true, kind: 'keystone', description: 'VII 的终点：驶出日球层，前往 VIII 的星海。（后续开放）' }),
   // Navigation: survey the windows, widen them, carry more, fly against them.
@@ -59,6 +60,8 @@ export const SOLAR_TALENTS = Object.freeze({
 export const SOLAR_TALENT_KEYS = Object.freeze(Object.entries(SOLAR_TALENTS).filter(([, t]) => !t.root && !t.planned && !t.facility).map(([key]) => key));
 // Save v26 knew only the colony and navigation talents; v27 added the arks and drydocks.
 export const V26_SOLAR_KEYS = Object.freeze(['dome', 'transfer', 'survey', 'hohmann', 'fleet', 'fuel']);
+// v29 added 殖民地存续协议 (it was a planned node before).
+export const V28_SOLAR_KEYS = Object.freeze(['heat', 'harbor', 'nuclear', 'fusion', 'dome', 'transfer', 'survey', 'hohmann', 'fleet', 'fuel']);
 export const emptyColonies = (keys = SOLAR_TALENT_KEYS) => ({ talents: Object.fromEntries(keys.map(key => [key, 0])), colonies: { mars: emptyWorld() }, transfers: [], nextTransfer: 0 });
 
 // ── Talents ──
@@ -113,7 +116,8 @@ export function windowTiming(o) {
 // ── Transfers ──
 export const domeCapacity = o => o.solar.talents.dome * COLONY_RULES.domeCapacity;
 export const fleetCapacity = o => 1 + o.solar.talents.fleet;
-export const colonyCount = o => o.solar.colonies.mars.civs.length + o.solar.transfers.length;
+// Uplifted civilizations keep their place under the dome for good.
+export const colonyCount = o => o.solar.colonies.mars.civs.length + o.solar.colonies.mars.uplifted.length + o.solar.transfers.length;
 export function transferQuote(o, civ) {
   const open = windowOpen(o), fuel = o.solar.talents.fuel > 0;
   const base = COLONY_RULES.transferBase * 2 ** (civ.age - 1);
@@ -149,7 +153,7 @@ export function landTransfers(o) {
   const landed = o.solar.transfers.filter(t => o.elapsed >= t.arriveAt - 1e-9);
   if (!landed.length) return [];
   o.solar.transfers = o.solar.transfers.filter(t => !landed.includes(t));
-  for (const t of landed) o.solar.colonies[t.to].civs.push({ ...t.civ, arrivedAt: t.arriveAt, progress: 0, warId: null });
+  for (const t of landed) o.solar.colonies[t.to].civs.push({ ...t.civ, arrivedAt: t.arriveAt, progress: 0, warId: null, accord: null });
   return landed;
 }
 // A colonist works while its world is not in winter: its age doubles its yield (see colony-war.js).

@@ -18,6 +18,7 @@ export function solarTalentEffect(o, key, rank = solarRank(o, key)) {
   if (key === 'harbor') return rank ? '方舟可以从火星出发' : '方舟只能从月球出发';
   if (key === 'nuclear' || key === 'fusion') { const d = DRIVES.find(x => x.talent === key), prev = DRIVES[DRIVES.indexOf(d) - 1]; return `单段航程 ${(rank ? d : prev).range} AU`; }
   if (key === 'dome') return rank ? `可容纳 ${rank * COLONY_RULES.domeCapacity} 个殖民文明` : '火星尚无穹顶';
+  if (key === 'uplift') return rank ? '可以谈判存续协议、接管核武' : '殖民文明终将核毁灭';
   if (key === 'transfer') return rank ? '可以从地球转运文明' : '文明只能留在地球';
   if (key === 'survey') return rank ? '档案显示窗口对齐与倒计时' : '窗口只能靠经验判断';
   if (key === 'hohmann') { const deg = Math.round((COLONY_RULES.window + (rank ? COLONY_RULES.hohmannWindow : 0)) * 180 / Math.PI); return `窗口宽度 ±${deg}°`; }

@@ -148,7 +148,7 @@ export function registerSolarTests(test, assert, near) {
     const s=voyageFixture(),old=JSON.parse(serializeSession(s));old.version=24;old.orbital.version=10;delete old.orbital.solar;
     const next=parseSession(JSON.stringify(old));assert(Object.values(next.orbital.solar.facilities).every(v=>v===0)&&Q.eq(next.orbital.solar.produced,0));
     assert(next.orbital.solar.flights.length===0&&next.orbital.solar.talents.harbor===0);
-    setDebugLegacy(s,2**40);const v26=JSON.parse(serializeSession(s));v26.version=26;v26.orbital.version=12;delete v26.orbital.solar.flights;v26.orbital.solar.colonies={mars:[]};for(const k of ['heat','harbor','nuclear','fusion'])delete v26.orbital.solar.talents[k];
+    setDebugLegacy(s,2**40);const v26=JSON.parse(serializeSession(s));v26.version=26;v26.orbital.version=12;delete v26.orbital.solar.flights;v26.orbital.solar.colonies={mars:[]};for(const k of ['heat','harbor','nuclear','fusion','uplift'])delete v26.orbital.solar.talents[k];
     v26.orbital.solar.facilities.jupiter=1;v26.orbital.solar.payments.jupiter=[String(FACILITIES.jupiter.costs[0])];
     const kept=parseSession(JSON.stringify(v26));assert(kept.orbital.solar.facilities.jupiter===1&&kept.orbital.solar.talents.fusion===0,'Footholds built under v26 stay');
     const vi=voyageReady();vi.orbital.solar.facilities.venus=1;vi.orbital.solar.payments.venus=[FACILITIES.venus.costs[0]];
@@ -167,7 +167,7 @@ export function registerSolarTests(test, assert, near) {
   test('Transfer: an idle Earth civilization flies to the Mars dome, pays by age and window, frees its site and works on arrival', () => {
     const s=voyageFixture(),o=s.orbital,run=seconds=>{for(let i=0;i<Math.round(seconds*30);i++)updateOrbital(s,1/30);};setDebugLegacy(s,'1e13');
     assert(solarTalentState(s,'dome')==='transit'&&!purchaseSolarTalent(s,'dome'),'The dome waits for the Mars ark');
-    run(95);assert(purchaseSolarTalent(s,'dome')&&purchaseSolarTalent(s,'transfer')&&solarTalentState(s,'uplift')==='planned');
+    run(95);assert(purchaseSolarTalent(s,'dome')&&purchaseSolarTalent(s,'transfer')&&solarTalentState(s,'uplift')==='ready');
     run(70);assert(o.phase==='living');const civ=o.civilizations.find(c=>c.alive&&!c.warId);assert(civ&&transferState(s,civ.id)==='ready');
     const quote=transferQuote(o,civ),wallet=s.permanent.legacy;assert(Q.eq(quote.cost,COLONY_RULES.transferBase*2**(civ.age-1)*(quote.open?1:COLONY_RULES.lateCost)));
     assert(transferCivilization(s,civ.id)&&!o.civilizations.some(c=>c.id===civ.id)&&o.solar.transfers.length===1&&Q.eq(s.permanent.legacy,Q.sub(wallet,quote.cost)));

@@ -33,9 +33,17 @@ function footholds(c,g,body,o,time){
   if(world?.phase==='winter'){
     c.save();c.beginPath();c.arc(g.x,g.y,g.r,0,TAU);c.clip();c.fillStyle='#8c989079';c.fillRect(g.x-g.r,g.y-g.r,g.r*2,g.r*2);c.restore();
   }
-  const points=(world?.civs??[]).map((civ,i)=>({civ,p:surfacePoint(.4+i*2.4,Math.sin(i*2.1)*.6,spin,profile.tilt)}));
+  // Every built dome sits at a fixed site on the surface and turns with it;
+  // its two households glow inside, uplifted ones in gold.
+  const domes=body.id==='mars'?o.solar.talents.dome:0,homes=world?[...world.uplifted.map(civ=>({civ,up:true})),...world.civs.map(civ=>({civ,up:false}))]:[];
+  const site=d=>surfacePoint(.4+d*2.4,Math.sin(d*2.1)*.6,spin,profile.tilt);
+  const points=homes.map((h,i)=>({...h,p:site(Math.floor(i/2)),offset:i%2?1:-1}));
   c.save();c.beginPath();c.arc(g.x,g.y,g.r,0,TAU);c.clip();
-  for(const {civ,p} of points)if(p.z>.05){const x=g.x+p.x*g.r,y=g.y+p.y*g.r;drawArkLight(c,x,y,{radius:1+civ.age*.15,glow:5+civ.age,brightness:.85});}
+  for(let d=0;d<domes;d++){const p=site(d);if(p.z<=.05)continue;const x=g.x+p.x*g.r,y=g.y+p.y*g.r,r=Math.max(4,g.r*.07)*(.4+.6*p.z);
+    c.strokeStyle=world.phase==='winter'?'#c9d3d3aa':'#e6ddc288';c.lineWidth=.8;c.beginPath();c.ellipse(x,y,r,r*(.35+.65*p.z),0,Math.PI,TAU);c.stroke();
+    c.fillStyle='#e6ddc214';c.fill();}
+  for(const {civ,up,p,offset} of points)if(p.z>.05){const x=g.x+p.x*g.r+offset*Math.max(1.5,g.r*.02),y=g.y+p.y*g.r-1;
+    drawArkLight(c,x,y,up?{radius:1.7,glow:9,brightness:1}:{radius:1+civ.age*.15,glow:5+civ.age,brightness:world.phase==='winter'?.3:.85});}
   for(const war of world?.wars??[]){const pair=war.sides.map(id=>points.find(p=>p.civ.id===id)?.p);if(pair.some(p=>!p||p.z<.05))continue;
     const [a,b]=pair;c.strokeStyle='#cb987c99';c.lineWidth=.8;c.setLineDash([2,4]);c.beginPath();c.moveTo(g.x+a.x*g.r,g.y+a.y*g.r);c.quadraticCurveTo(g.x+(a.x+b.x)*g.r*.5,g.y+(a.y+b.y)*g.r*.5-12,g.x+b.x*g.r,g.y+b.y*g.r);c.stroke();c.setLineDash([]);
   }c.restore();

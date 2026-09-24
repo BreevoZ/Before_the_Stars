@@ -6,7 +6,8 @@ import { drawWorldScene, satelliteAt } from './solar-world-render.js';
 import { drawShipyard } from './shipyard-render.js';
 import { FACILITIES, buildFacility } from './solar-industry.js';
 import { transferCivilization } from './solar-colony.js';
-import { watchColonyWar, liveColonyWar } from './colony-war.js';
+import { watchColonyWar, liveColonyWar, startAccord, seizeArsenals } from './colony-war.js';
+import { drawDomes } from './dome-render.js';
 import { createRenderer } from './render.js';
 import { AGES } from './game-config.js';
 export function createSolarUI(getSession,{openTree,replay,commit,openSolarTree}){
@@ -35,7 +36,10 @@ export function createSolarUI(getSession,{openTree,replay,commit,openSolarTree})
   for(let i=0;i<Math.max(...Object.values(FACILITIES).map(f=>f.costs.length));i++){const li=document.createElement('li');li.id=`solar-facility-rank-${i+1}`;el('solar-facility-ranks').append(li);}
   // Building happens in the dossier of the body it stands on.
   el('solar-facility-build').addEventListener('click',()=>{const key=Object.keys(FACILITIES).find(k=>FACILITIES[k].body===selected);if(key&&buildFacility(getSession(),key)){commit();sync();}});
-  for(let i=0;i<8;i++){const li=document.createElement('li');li.id=`solar-colonist-${i}`;el('solar-colonists').append(li);}
+  for(let i=0;i<10;i++){const li=document.createElement('li');li.id=`solar-colonist-${i}`;li.innerHTML=`<span id="solar-colonist-text-${i}"></span><button id="solar-colonist-act-${i}" type="button" hidden></button>`;el('solar-colonists').append(li);
+    el(`solar-colonist-act-${i}`).addEventListener('click',()=>{const civ=getSession().orbital.solar.colonies.mars.civs[i];if(civ&&startAccord(getSession(),'mars',civ.id)){commit();sync();}});
+    const up=document.createElement('li');up.id=`solar-uplifted-${i}`;up.hidden=true;el('solar-uplifted-list').append(up);}
+  for(let i=0;i<3;i++)el(`solar-seize-${i}`).addEventListener('click',()=>{const war=getSession().orbital.solar.colonies.mars.wars[i];if(war&&seizeArsenals(getSession(),'mars',war.id)){commit();sync();}});
   el('solar-transfer-civ').addEventListener('change',sync);
   for(let i=0;i<3;i++)el(`solar-war-${i}`).addEventListener('click',()=>{const war=getSession().orbital.solar.colonies.mars.wars[i];if(!war)return;watching=watching===war.id?null:war.id;sync();});
   el('solar-transfer-go').addEventListener('click',()=>{if(transferCivilization(getSession(),el('solar-transfer-civ').value)){civSignature='';commit();sync();}});
@@ -90,6 +94,7 @@ export function createSolarUI(getSession,{openTree,replay,commit,openSolarTree})
     }else if(!['earth','moon'].includes(view)){
       const q=context(worldCanvas),body=destination(view);if(q&&body)drawWorldScene(q.ctx,q.width,q.height,body,o,{ambientTime:ambient,reducedMotion:reduced.matches,hover:moonHover});
     }
+    if(view==='mars'){const q=context(el('solar-dome'));if(q)drawDomes(q.ctx,q.width,q.height,o,{time:reduced.matches?0:ambient});}
     // The renderer sizes its own canvas; it is created the first time a war is watched.
     const live=watching&&liveColonyWar(o);if(live&&el('solar-battle').getBoundingClientRect().width){renderBattle??=createRenderer(el('solar-battle'));renderBattle(live.game,{skyTime:o.elapsed,lunarTime:o.elapsed});}
     if(view==='moon'){const p=context(el('shipyard-canvas'));if(p)drawShipyard(p.ctx,p.width,p.height,o,{time:ambient,reducedMotion:reduced.matches});}

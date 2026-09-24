@@ -4,6 +4,13 @@
 // Earth is not touched by it, and nothing grows back on its own: a colony only
 // fills again when the next ark lands.
 //
+// Step 5 · uplift. A colony civilization can cross the great filter two ways:
+// a peaceful one at the final age signs 存续协议 after a negotiation at peace;
+// in any war between two final-age civilizations the player can seize both
+// arsenals when the end is near, so the loser falls without a nuclear
+// annihilation and the winner is uplifted. Uplifted civilizations stay in the
+// dome for good, out of every war and winter, and produce more.
+//
 // Every colony war runs on an abstract model (a few numbers per second). The
 // one war the player is watching is instantiated as a real battle from that
 // state, runs for real while watched, and is folded back when it is not.
@@ -16,7 +23,7 @@ const FINAL_AGE = 5;
 // Each world changes how its colonists live. Mars is scarce and harsh: less
 // income, deadlier wars, and idle neighbours do not stay idle for long.
 export const WORLDS = Object.freeze({
-  mars: Object.freeze({ name: '火星', income: .75, damage: 1.5, fuse: 20, winter: 120 }),
+  mars: Object.freeze({ name: '火星', income: .75, damage: 1.5, fuse: 20, winter: 120, hardens: true }),
 });
 // Fitted to headless real wars (tests/fixtures/colony-war-reference.js): about
 // 34 s of war per age, an even war lasting ~800 s, one age of advantage
@@ -28,9 +35,14 @@ export const COLONY_WAR = Object.freeze({
   defeatSeconds: 30, nuclearSeconds: 90,
 });
 export const COLONIST_BASE = 16384;
-export const emptyWorld = () => ({ phase: 'living', remaining: 0, civs: [], wars: [], nextWar: 0, fuse: 0, nuclear: 0 });
+const M = 2 ** 20;
+export const UPLIFT = Object.freeze({ accordCost: 64 * M, accordSeconds: 60, seizeCost: 128 * M, seizeThreshold: .35, rate: 4, warlike: 1 });
+export const emptyWorld = () => ({ phase: 'living', remaining: 0, civs: [], wars: [], uplifted: [], nextWar: 0, fuse: 0, nuclear: 0 });
 export const colonistRate = (civ, world = 'mars') => COLONIST_BASE * 2 ** (civ.age - 1) * WORLDS[world].income;
-export const worldIncome = (o, world) => { const w = o.solar.colonies[world]; return w.phase === 'living' ? w.civs.reduce((sum, c) => sum + colonistRate(c, world), 0) : 0; };
+// Uplifted civilizations work through winters: they are past the filter.
+export const upliftedRate = (world = 'mars') => COLONIST_BASE * 2 ** (FINAL_AGE - 1) * WORLDS[world].income * UPLIFT.rate;
+export const worldIncome = (o, world) => { const w = o.solar.colonies[world];
+  return (w.phase === 'living' ? w.civs.reduce((sum, c) => sum + colonistRate(c, world), 0) : 0) + w.uplifted.length * upliftedRate(world); };
 export const colonyIncome = o => Object.keys(WORLDS).reduce((sum, world) => sum + worldIncome(o, world), 0);
 export const settlementValue = (civs, world, seconds) => Math.floor(civs.reduce((sum, c) => sum + colonistRate(c, world), 0) * seconds);
 
@@ -74,7 +86,7 @@ function fold(world, war, real) {
 // ── Abstract war ──
 export function startColonyWar(o, key, a, b) {
   const world = o.solar.colonies[key], war = { id: `${key}-${++world.nextWar}`, sides: [a.id, b.id], base: [1, 1], elapsed: 0,
-    tempo: COLONY_WAR.tempoMin + COLONY_WAR.tempoSpan * nextRandom(o), luck: [0, 1].map(() => COLONY_WAR.luckMin + COLONY_WAR.luckSpan * nextRandom(o)), surge: [1, 1], nextSurge: 0 };
+    tempo: COLONY_WAR.tempoMin + COLONY_WAR.tempoSpan * nextRandom(o), luck: [0, 1].map(() => COLONY_WAR.luckMin + COLONY_WAR.luckSpan * nextRandom(o)), surge: [1, 1], nextSurge: 0, seized: false };
   a.warId = b.warId = war.id; world.wars.push(war); return war;
 }
 // One step of an abstract war. Returns 'won' | 'lost' | 'draw' | null (from side 0's view).
@@ -110,8 +122,14 @@ export function updateColonies(o, dt) {
       if (world.remaining <= 1e-8) { world.phase = 'living'; world.remaining = 0; logs.push(`${env.name}的核冬天结束，穹顶可以再次接收文明。`); }
       continue;
     }
-    // Idle neighbours pick a fight: the two youngest idle colonists, after a short fuse.
-    const idle = world.civs.filter(c => !c.warId).sort((a, b) => a.age - b.age);
+    // Negotiations advance at peace; a finished one uplifts the civilization.
+    for (const c of [...world.civs]) if (c.accord !== null && !c.warId) {
+      c.accord = Math.min(1, c.accord + dt / UPLIFT.accordSeconds);
+      if (c.accord >= 1) logs.push(uplift(o, key, c, 'accord'));
+    }
+    // Idle neighbours pick a fight: the two youngest idle colonists, after a
+    // short fuse. A civilization at the negotiating table is left alone.
+    const idle = world.civs.filter(c => !c.warId && c.accord === null).sort((a, b) => a.age - b.age);
     if (idle.length >= 2) { world.fuse += dt; if (world.fuse >= env.fuse) { world.fuse = 0; startColonyWar(o, key, idle[0], idle[1]); logs.push(`${env.name}：${idle[0].name}与${idle[1].name}开战。`); } }
     else world.fuse = 0;
     const view = watched.get(o);
@@ -133,13 +151,26 @@ export function updateColonies(o, dt) {
 export function resolveColonyWar(o, key, war, result) {
   const world = o.solar.colonies[key], env = WORLDS[key], civs = war.sides.map(id => world.civs.find(c => c.id === id));
   world.wars = world.wars.filter(w => w !== war); live.delete(war);
-  // Two future-age civilizations ending a war: the whole planet burns.
-  if (result !== 'draw' && civs.every(c => c.age === FINAL_AGE)) return burnWorld(o, key);
+  // Two future-age civilizations ending a war: the whole planet burns, unless
+  // the player holds both arsenals.
+  if (result !== 'draw' && !war.seized && civs.every(c => c.age === FINAL_AGE)) return burnWorld(o, key);
   const losers = result === 'draw' ? civs : [civs[result === 'won' ? 1 : 0]];
   const reward = settlementValue(losers, key, COLONY_WAR.defeatSeconds);
   world.civs = world.civs.filter(c => !losers.includes(c));
+  const winner = civs.find(c => !losers.includes(c));
+  if (winner && war.seized) { for (const c of civs) c.warId = null; const text = uplift(o, key, winner, 'seizure');
+    return { reward, text: `${env.name}：核武已被接管，${losers[0].name}覆灭，没有核毁灭。${text}` }; }
+  // Mars hardens whoever survives it.
+  if (winner && env.hardens) winner.tendency = UPLIFT.warlike;
   for (const c of civs) c.warId = null;
   return { reward, text: `${env.name}：${losers.map(c => c.name).join('、')}覆灭，收获 ${Q.format(reward)} Legacy。` };
+}
+function uplift(o, key, civ, via) {
+  const world = o.solar.colonies[key], env = WORLDS[key];
+  world.civs = world.civs.filter(c => c !== civ);
+  const { progress, warId, accord, ...kept } = civ;
+  world.uplifted.push({ ...kept, age: FINAL_AGE, via, upliftedAt: o.elapsed });
+  return `${env.name}：${civ.name}${via === 'accord' ? '签署存续协议' : '在你的控制下停战'}，成为升格文明，永久留在穹顶。`;
 }
 function burnWorld(o, key) {
   const world = o.solar.colonies[key], env = WORLDS[key], reward = settlementValue(world.civs, key, COLONY_WAR.nuclearSeconds);
@@ -147,5 +178,40 @@ function burnWorld(o, key) {
   world.civs = []; world.wars = []; world.fuse = 0; world.nuclear++; world.phase = 'winter'; world.remaining = env.winter;
   // Arks already on their way wait in orbit until the winter lifts.
   for (const t of o.solar.transfers) if (t.to === key) t.arriveAt = Math.max(t.arriveAt, o.elapsed + env.winter);
-  return { reward, text: `${env.name}核毁灭：殖民文明全部消亡，收获 ${Q.format(reward)} Legacy。${env.name}进入核冬天，地球不受影响。` };
+  return { reward, text: `${env.name}核毁灭：殖民文明全部消亡，收获 ${Q.format(reward)} Legacy。${env.name}进入核冬天${world.uplifted.length ? '，升格文明安然无恙' : ''}，地球不受影响。` };
+}
+
+// ── Uplift actions ── both are paid from the wallet and ledgered in o.solar.payments.
+const upliftOpen = o => o?.talents.voyage > 0 && o.solar.talents.uplift > 0;
+export const peaceful = civ => civ.tendency !== UPLIFT.warlike;
+export function accordState(s, key, id) {
+  const o = s.orbital, world = o?.solar.colonies[key], civ = world?.civs.find(c => c.id === id);
+  if (!upliftOpen(o)) return 'locked';
+  if (!civ) return 'selection';
+  if (civ.accord !== null) return 'negotiating';
+  if (!peaceful(civ)) return 'warlike';
+  if (civ.age < FINAL_AGE) return 'age';
+  if (civ.warId) return 'war';
+  return Q.gte(s.permanent.legacy, UPLIFT.accordCost) ? 'ready' : 'legacy';
+}
+export function startAccord(s, key, id) {
+  if (accordState(s, key, id) !== 'ready') return false;
+  const o = s.orbital, civ = o.solar.colonies[key].civs.find(c => c.id === id);
+  s.permanent.legacy = Q.sub(s.permanent.legacy, UPLIFT.accordCost); (o.solar.payments.accords ??= []).push(UPLIFT.accordCost);
+  civ.accord = 0; return true;
+}
+export function seizeState(s, key, id) {
+  const o = s.orbital, world = o?.solar.colonies[key], war = world?.wars.find(w => w.id === id);
+  if (!upliftOpen(o)) return 'locked';
+  if (!war) return 'selection';
+  if (war.seized) return 'seized';
+  if (war.sides.some(side => world.civs.find(c => c.id === side).age < FINAL_AGE)) return 'age';
+  if (Math.min(...war.base) >= UPLIFT.seizeThreshold) return 'early';
+  return Q.gte(s.permanent.legacy, UPLIFT.seizeCost) ? 'ready' : 'legacy';
+}
+export function seizeArsenals(s, key, id) {
+  if (seizeState(s, key, id) !== 'ready') return false;
+  const o = s.orbital, war = o.solar.colonies[key].wars.find(w => w.id === id);
+  s.permanent.legacy = Q.sub(s.permanent.legacy, UPLIFT.seizeCost); (o.solar.payments.seizures ??= []).push(UPLIFT.seizeCost);
+  war.seized = true; return true;
 }

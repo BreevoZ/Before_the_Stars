@@ -79,3 +79,16 @@
 #solar-satellites{display:grid}#solar-satellites button{display:grid;grid-template-columns:10px 1fr auto;align-items:center;gap:10px;text-align:left;padding:9px 10px;min-height:40px;font-size:11px;border-radius:0;color:var(--solar-paper)}
 #solar-satellites button[hidden]{display:none}#solar-satellites button i{width:8px;height:8px;border-radius:50%;background:var(--body-color)}#solar-satellites button small{font-size:8px;color:var(--solar-muted);letter-spacing:1px}
 #solar-satellites button:is(:hover,:focus-visible){background:#bdc9b812;color:var(--solar-brass)}#solar-satellites button[aria-pressed="true"]{color:var(--solar-brass)}
+.solar-dome-panel{grid-column:1/-1;margin:14px 0 6px}.solar-dome-panel canvas{display:block;width:100%;height:190px;border:1px solid var(--solar-line)}.solar-dome-panel small{display:block;font-size:9px;letter-spacing:1px;color:var(--solar-muted);margin-top:6px}
+.solar-colonists li{display:flex;justify-content:space-between;align-items:center;gap:12px}.solar-colonists li[data-accord="true"]{color:var(--solar-brass)}
+.solar-colonists li button{padding:4px 0;min-height:0;font-size:10px;color:var(--solar-brass);flex-shrink:0}.solar-colonists li button:disabled{color:var(--solar-muted);cursor:default}
+.solar-uplifted{margin:10px 0}.solar-uplifted ol{list-style:none;padding:0;margin:6px 0 0;display:grid;gap:4px;font-size:10px;color:#f0d496}
+.solar-war-row{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--solar-line)}.solar-war-row:has(>button:first-child[hidden]){display:none}.solar-war-row>button{border:0!important}
+.solar-seize{font-size:10px!important;color:#f0c67e!important;flex-shrink:0}.solar-seize:disabled{color:var(--solar-muted)!important;cursor:default}
+.solar-world>.solar-colony{display:block}
+.solar-colony-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(0,1fr);gap:28px;margin:14px 0 6px}
+.solar-colony-block{border-top:1px solid var(--solar-line);padding-top:12px;min-width:0}.solar-colony-block h4{font-size:9px;letter-spacing:3px;font-weight:500;color:var(--solar-muted);margin:0 0 10px}
+.solar-colony-block .solar-colonists{margin-top:0}.solar-colony-empty{font-size:10px;color:var(--solar-muted);margin:0}.solar-colony-empty:empty{display:none}
+.solar-colony-block .solar-transfer-pick{display:grid;gap:6px;font-size:9px;letter-spacing:1px;color:var(--solar-muted);margin:8px 0}.solar-colony-block .solar-transfer-pick select{width:100%}
+.solar-war-row{flex-wrap:wrap}.solar-war-row>button{text-align:left}
+@media(max-width:900px){.solar-colony-grid{grid-template-columns:1fr;gap:18px}}

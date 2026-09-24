@@ -57,6 +57,8 @@ export function drawSolarSystem(c,w,h,o,{ambientTime=o.elapsed,reducedMotion=fal
     // veil with its own clock while the planet lies in nuclear winter.
     const world=o.solar.colonies.mars,residentAt=i=>{const a=i*2.4+.6,r=marsR*.55;return{x:mars.x+Math.cos(a)*r,y:mars.y+Math.sin(a)*r};};
     world.civs.forEach((civ,i)=>{const p=residentAt(i);disc(c,p.x,p.y,1.1+civ.age*.15,civ.warId?'#f0a47c':'#f3d99a');});
+    // Uplifted civilizations: a steady golden ring around the planet, winter or not.
+    world.uplifted.forEach((civ,i)=>{const a=i*.9-1.2;disc(c,mars.x+Math.cos(a)*(marsR+2.5),mars.y+Math.sin(a)*(marsR+2.5),1.5,'#ffd98a');});
     for(const war of world.wars){const [a,b]=war.sides.map(id=>residentAt(world.civs.findIndex(x=>x.id===id))),pulse=reducedMotion?.6:.45+.35*Math.sin(clock*4);
       c.strokeStyle=`rgba(236,128,92,${pulse})`;c.lineWidth=.8;c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();}
     if(world.phase==='winter'){disc(c,mars.x,mars.y,marsR+.5,'#7f8a8ecc');c.fillStyle='#b8c3c4';c.font='8px ui-monospace,monospace';c.textAlign=mars.x<cx?'right':'left';

@@ -9,7 +9,9 @@ import { transferState, transferQuote, windowTiming, domeCapacity, colonistRate,
 import { AGES } from './game-config.js';
 import { FACILITIES, arrivalAt, arrived, facilityRate, facilityState, industryRate, industryBoost, flightTo, route, pioneerAt } from './solar-industry.js';
 import { bodyById } from './solar-config.js';
-import { WORLDS } from './colony-war.js';
+import { WORLDS, UPLIFT, accordState, seizeState, upliftedRate } from './colony-war.js';
+import { TENDENCIES } from './orbital-config.js';
+const temper=c=>TENDENCIES[c.tendency]?.name??'无倾向';
 const placeName=id=>id==='moon'?'月球':bodyById(id).name;
 export function buildSolarViewModel(s,{view='earth',selected='earth',transferCiv='',watching=null}={}){
   const o=s.orbital;if(!o?.started)return{};const vii=Boolean(o.talents.voyage),b=destination(view==='system'?selected:view)??destination(selected)??destination('earth'),owned=['earth','moon'].includes(b.id),alive=o.civilizations.filter(c=>c.alive).length;
@@ -54,16 +56,20 @@ export function buildSolarViewModel(s,{view='earth',selected='earth',transferCiv
   if(vii&&b.id===COLONY_RULES.target){
     const sol=o.solar,world=sol.colonies.mars,residents=world.civs,flights=sol.transfers,cap=domeCapacity(o),timing=windowTiming(o),civ=o.civilizations.find(c=>c.id===transferCiv),state=transferState(s,transferCiv);
     const winter=world.phase==='winter',env=WORLDS.mars,idle=residents.filter(c=>!c.warId).length;
-    v['#solar-colony-capacity']=winter?`核冬天 · ${Math.ceil(world.remaining)} 秒`:sol.talents.dome?`${residents.length} / ${cap} 居民${flights.length?` · 在途 ${flights.length}`:''}`:'尚无穹顶';
+    v['#solar-colony-capacity']=winter?`核冬天 · ${Math.ceil(world.remaining)} 秒`:sol.talents.dome?`${residents.length+world.uplifted.length} / ${cap} 户${flights.length?` · 在途 ${flights.length}`:''}`:'尚无穹顶';
+    v['#solar-wars-empty']=world.wars.length?'':winter?'核冬天中没有战争。':'暂无战争。';
     v['#solar-colony@data-winter']=String(winter);
     // What the planet is doing: its own winter, its wars, or the fuse between idle neighbours.
     v['#solar-colony-status']=winter?`火星核冬天：穹顶暂时无法居住，在途的方舟停在轨道上等待。地球不受影响。${world.nuclear>1?`（第 ${world.nuclear} 次）`:''}`
-      :world.wars.length?`${world.wars.length} 场战争 · 两个第五时代文明结束战争时，火星将核毁灭。`
+      :world.wars.length?`${world.wars.length} 场战争 · 两个第五时代文明结束战争时，火星将核毁灭${sol.talents.uplift?'，除非你接管它们的核武':''}。`
       :idle>=2?`火星资源稀缺：闲置的邻居 ${Math.ceil(env.fuse-world.fuse)} 秒内会开战。`:residents.length?'火星收入 ×0.75，战争伤害 ×1.5。':'';
     world.wars.forEach((war,i)=>{if(i>2)return;const [a,b]=war.sides.map(id=>residents.find(c=>c.id===id));
       v[`#solar-war-${i}`]=`${a.name} ${AGES[a.age].numeral} ⚔ ${b.name} ${AGES[b.age].numeral} · 基地 ${Math.round(war.base[0]*100)}% : ${Math.round(war.base[1]*100)}% · ${watching===war.id?'观看中':'观看'}`;
-      v[`#solar-war-${i}@aria-pressed`]=String(watching===war.id);});
-    for(let i=0;i<3;i++)v[`#solar-war-${i}@hidden`]=!world.wars[i];
+      v[`#solar-war-${i}@aria-pressed`]=String(watching===war.id);
+      // Seizing the arsenals: only in a final-age war, only at the brink.
+      const seize=seizeState(s,'mars',war.id);v[`#solar-seize-${i}@hidden`]=['locked','age'].includes(seize);v[`#solar-seize-${i}@disabled`]=seize!=='ready';
+      v[`#solar-seize-${i}`]={ready:`接管双方核武 · ${Q.format(UPLIFT.seizeCost)} Legacy`,early:`接管核武 · 等待一方基地跌破 ${Math.round(UPLIFT.seizeThreshold*100)}%`,seized:'核武已接管 · 胜者将升格',legacy:`${Q.format(UPLIFT.seizeCost)} Legacy · 遗产不足`}[seize]??'';});
+    for(let i=0;i<3;i++){v[`#solar-war-${i}@hidden`]=!world.wars[i];if(!world.wars[i])v[`#solar-seize-${i}@hidden`]=true;}
     const shown=world.wars.find(w=>w.id===watching);v['#solar-battle-panel@hidden']=!shown;
     if(shown){const [a,b]=shown.sides.map(id=>residents.find(c=>c.id===id));v['#solar-battle-hud']=`◀ ${a.name} · ${AGES[a.age].numeral} · 基地 ${Math.round(shown.base[0]*100)}%　　${b.name} · ${AGES[b.age].numeral} · 基地 ${Math.round(shown.base[1]*100)}% ▶`;}
     v['#solar-window']=sol.talents.survey?(timing.open?`地火窗口开启 · ${Math.ceil(timing.seconds)} 秒后关闭`:`地火窗口关闭 · ${Math.ceil(timing.seconds)} 秒后开启 · 逆窗发射更慢更贵`):(timing.open?'地火窗口开启':'地火窗口关闭 · 逆窗发射更慢更贵');
@@ -72,9 +78,18 @@ export function buildSolarViewModel(s,{view='earth',selected='earth',transferCiv
     v['#solar-transfer-quote']=quote?`${civ.name} · ${AGES[civ.age].numeral} · ${Q.format(quote.cost)} Legacy · 航程 ${Math.round(quote.seconds)} 秒${quote.open?'':' · 逆窗'} · 抵达后 +${Q.format(colonistRate(civ))} Legacy/s`:'';
     v['#solar-transfer-go']={ready:'发射方舟 ↗',locked:'需要「文明转运」',winter:'地球正处于核冬天',colonyWinter:'火星正处于核冬天',selection:'选择一个地球文明',war:'该文明正在交战',capacity:sol.talents.dome?'穹顶已满 · 扩建火星穹顶':'需要「火星穹顶」',fleet:'转运方舟都在途中',legacy:'遗产不足'}[state];
     v['#solar-transfer-go@disabled']=state!=='ready';
-    const rows=[...residents.map(c=>({text:`${c.name} · ${AGES[c.age].numeral} · +${Q.format(colonistRate(c))} Legacy/s${c.warId?' · 交战中':''}`,transit:false})),
+    // Each resident carries its own path past the filter: an accord if it is peaceful.
+    const rows=[...residents.map(c=>({civ:c,text:`${c.name} · ${AGES[c.age].numeral} · ${temper(c)} · +${Q.format(colonistRate(c))} Legacy/s${c.warId?' · 交战中':''}`,transit:false})),
       ...flights.map(t=>({text:`${t.civ.name} · 航行中 · ${Math.max(0,Math.ceil(t.arriveAt-o.elapsed))} 秒`,transit:true}))];
-    for(let i=0;i<8;i++){v[`#solar-colonist-${i}@hidden`]=!rows[i];v[`#solar-colonist-${i}`]=rows[i]?.text??'';v[`#solar-colonist-${i}@data-transit`]=String(Boolean(rows[i]?.transit));}
+    for(let i=0;i<10;i++){const row=rows[i],accord=row?.civ?accordState(s,'mars',row.civ.id):'locked';
+      v[`#solar-colonist-${i}@hidden`]=!row;v[`#solar-colonist-text-${i}`]=row?.text??'';v[`#solar-colonist-${i}@data-transit`]=String(Boolean(row?.transit));
+      v[`#solar-colonist-${i}@data-accord`]=String(row?.civ?.accord!=null);
+      v[`#solar-colonist-act-${i}@hidden`]=['locked','selection','warlike'].includes(accord);v[`#solar-colonist-act-${i}@disabled`]=accord!=='ready';
+      v[`#solar-colonist-act-${i}`]={ready:`签署存续协议 · ${Q.format(UPLIFT.accordCost)}`,negotiating:`谈判中 ${Math.floor((row?.civ?.accord??0)*100)}%`,age:'第五时代后可谈判',war:'交战中 · 无法谈判',legacy:`${Q.format(UPLIFT.accordCost)} · 遗产不足`}[accord]??'';}
+    const uplifted=world.uplifted;v['#solar-uplifted@hidden']=!uplifted.length;
+    v['#solar-uplifted-title']=`升格文明 · ${uplifted.length} · +${Q.format(uplifted.length*upliftedRate('mars'))} Legacy/s`;
+    for(let i=0;i<10;i++){const c=uplifted[i];v[`#solar-uplifted-${i}@hidden`]=!c;v[`#solar-uplifted-${i}`]=c?`★ ${c.name} · ${c.via==='accord'?'签署存续协议':'核武被接管后停战'} · +${Q.format(upliftedRate('mars'))} Legacy/s`:'';}
+    v['#solar-dome-caption']=sol.talents.dome?`${sol.talents.dome} / ${SOLAR_TALENTS.dome.costs.length} 座穹顶 · 每座两户 · ${residents.length+uplifted.length+flights.length} / ${cap} 已占用${uplifted.length?` · 其中 ${uplifted.length} 户已升格`:''}`:'火星尚无穹顶：在行星际星图中建起第一座。';
   }
   // The foothold on the selected body, if it has one.
   const f=facilityKey&&FACILITIES[facilityKey],state=f?facilityState(s,facilityKey):'locked',level=f?o.solar.facilities[facilityKey]:0;
@@ -105,7 +120,7 @@ export function bodyStatus(o,b){
     if(!arrived(o,b.id))return `先遣编队航行中 · 还有 ${Math.ceil(at-o.elapsed)} 秒抵达`;
     const port=o.solar.talents.harbor?'火星船坞 · ':'',world=o.solar.colonies.mars;
     if(world.phase==='winter')return `${port}火星核冬天 · 还有 ${Math.ceil(world.remaining)} 秒`;
-    return o.solar.talents.dome?`${port}火星穹顶 · ${world.civs.length} / ${domeCapacity(o)} 居民${world.wars.length?` · ${world.wars.length} 场战争`:''} · +${Q.format(colonyRate(o))} Legacy/s`:`${port||'先遣编队已停泊 · '}可以建起火星穹顶`;
+    return o.solar.talents.dome?`${port}火星穹顶 · ${world.civs.length+world.uplifted.length} / ${domeCapacity(o)} 居民${world.uplifted.length?` · ${world.uplifted.length} 个升格文明`:''}${world.wars.length?` · ${world.wars.length} 场战争`:''} · +${Q.format(colonyRate(o))} Legacy/s`:`${port||'先遣编队已停泊 · '}可以建起火星穹顶`;
   }
   if(!key)return '勘察记录 · 尚无驻地';
   if(flightTo(o,b.id))return `方舟航行中 · 还有 ${Math.ceil(at-o.elapsed)} 秒抵达`;

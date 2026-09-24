@@ -16,8 +16,8 @@ const M = 2 ** 20, G = 2 ** 30;
 const facility = (name, body, costs, kind, description, extra = {}) => Object.freeze({ name, body, costs: Object.freeze(costs), kind, description, ...extra });
 export const FACILITIES = Object.freeze({
   venus: facility('高空浮空城', 'venus', [8 * M, 32 * M, 128 * M, 512 * M, 2 * G], 'yield', '在五十公里高空的温和云层里，浮空城采集大气，持续回流 Legacy。', { base: 32768 }),
-  mercury: facility('日冕阵列', 'mercury', [32 * M, 256 * M, 2 * G, 16 * G], 'boost', '贴近太阳铺开的集能阵列，为所有行星工业供能：每级产能翻倍。'),
-  belt: facility('采矿舰队', 'belt', [64 * M, 256 * M, G, 4 * G, 16 * G], 'yield', '以火星驻地为中转，开采小行星的金属与冰。', { base: 262144, via: 'mars' }),
+  mercury: facility('日冕阵列', 'mercury', [32 * M, 256 * M, 2 * G, 16 * G], 'boost', '贴近太阳铺开的集能阵列，为所有行星工业供能：每级产能翻倍。', { requires: { venus: 1 } }),
+  belt: facility('采矿舰队', 'belt', [64 * M, 256 * M, G, 4 * G, 16 * G], 'yield', '以火星驻地为中转，开采小行星的金属与冰。', { base: 262144, via: 'mars', requires: { venus: 1 } }),
   jupiter: facility('气态采集站', 'jupiter', [512 * M, 2 * G, 8 * G, 32 * G], 'yield', '在木星高层大气中采集氦与氢，是太阳系里最大的产能。', { base: 2 * M, requires: { belt: 1 } }),
 });
 export const emptyIndustry = () => ({ facilities: Object.fromEntries(Object.keys(FACILITIES).map(key => [key, 0])), payments: {}, produced: 0, fraction: 0 });

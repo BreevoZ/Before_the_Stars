@@ -214,18 +214,18 @@ body:has(#archives-dialog[data-destruction]) #civilization-bar { display: none; 
 #flip-orbit { display: block; margin: 14px auto 0; font-size: 10px; letter-spacing: 2px; min-height: 36px; }
 #flip-orbit[hidden] { display: none; }
 
-#archives-dialog[data-flipping]::backdrop,#orbit-talents-dialog[data-flipping]::backdrop{background:transparent}
+#archives-dialog[data-flipping]::backdrop,:is(#orbit-talents-dialog,#solar-talents-dialog)[data-flipping]::backdrop{background:transparent}
 /* Both star maps share one header grid, so the wallet stays put when the page turns. */
 @media (min-width: 741px) {
   #archives-dialog .home-header, .orbit-talents-dialog > header { display: grid; grid-template-columns: 1fr auto 1fr; }
   #archives-dialog .home-nav, .orbit-talents-dialog > header > :last-child { justify-self: end; }
 }
-#archives-dialog[data-turning] *,#orbit-talents-dialog[data-turning] *{pointer-events:none!important}/* One shape legend for both star maps, as the last line under each tree. */
+#archives-dialog[data-turning] *,:is(#orbit-talents-dialog,#solar-talents-dialog)[data-turning] *{pointer-events:none!important}/* One shape legend for both star maps, as the last line under each tree. */
 .tree-legend{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 18px;font-size:10px;letter-spacing:1px;color:var(--muted);pointer-events:none}
 .tree-legend span{display:flex;align-items:center;gap:6px}.tree-legend svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.2}
-#orbit-legend{position:absolute;left:660px;top:1312px;transform:translateX(-50%);width:760px}
+:is(#orbit-legend,#solar-legend){position:absolute;left:660px;top:1312px;transform:translateX(-50%);width:760px}
 #home-legend{margin:18px auto 4px}
-@media(max-width:740px){.tree-legend{gap:8px 12px;font-size:9px}#orbit-legend{width:480px}}
+@media(max-width:740px){.tree-legend{gap:8px 12px;font-size:9px}:is(#orbit-legend,#solar-legend){width:480px}}
 .tree-legend .legend-main{color:var(--route-main)}.tree-legend .legend-main svg{stroke-width:1.6}
 .talent-node[data-state="max"] .node-name{top:calc(100% + 8px)}
 /* Owned and available must never look alike: an owned node is filled with its
@@ -239,7 +239,10 @@ body:has(#archives-dialog[data-destruction]) #civilization-bar { display: none; 
 .node-name,.node-cost,.orbit-node-name,.orbit-node>small,.orbit-route{text-shadow:0 0 3px #0e181b,0 0 6px #0e181b,0 0 10px #0e181b}
 /* The surface map gets the same route strip as VI: sections from left to right,
    the mainline in gold. It sits in the dialog's flex column under the header. */
-#archives-dialog .home-route-nav{position:relative;top:auto;flex-shrink:0;z-index:3}
-.home-route-nav button{color:var(--route-branch)}.home-route-nav [data-home-route="superSoldierPlan"]{color:var(--route-main)}
-.home-route-nav button{background:transparent;border:0;border-radius:0;box-shadow:none;font-size:10px;letter-spacing:2px;min-height:37px;padding:5px 12px}
+#archives-dialog .home-route-nav{position:relative;top:auto;flex-shrink:0;z-index:3;min-height:0}
+/* One route strip for every star map: branch sections green, the mainline gold,
+   the same box and hover everywhere. */
+nav.orbit-route-nav button{font-size:10px;letter-spacing:2px;min-height:37px;padding:5px 12px;border:1px solid transparent;border-radius:4px;background:transparent;box-shadow:none;color:var(--route-branch)}
+nav.orbit-route-nav [data-orbit-route="recovery"],nav.orbit-route-nav [data-home-route="superSoldierPlan"],nav.orbit-route-nav [data-solar-route="main"]{color:var(--route-main)}
+nav.orbit-route-nav button:hover{color:var(--gold);background:var(--color-home-talent-node-fill)}
 .home-route-nav{background:#0e181b40;border-bottom:1px solid #8eaaa515}

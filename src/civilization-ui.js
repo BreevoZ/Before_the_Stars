@@ -150,28 +150,36 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     save(); changed();
     if (key === 'bypasser') orbital.present(true);
   });
-  // VI and the surface are two pages of one tree, joined at 存续协议.
+  // Three pages of one tree: the surface and VI meet at 存续协议, VI and VII at
+  // 远航协议. Each seam names the shared node on both sides and the way back.
   let flipping = false;
-  const orbitTree = el('orbit-talents-dialog');
-  const pages = { surface: { dialog, page: el('home-scroll'), sky: el('home-sky') }, orbit: { dialog: orbitTree, page: orbitTree.querySelector('.orbit-tree-scroll'), sky: el('orbit-tree-sky') } };
-  async function flipTo(target) {
-    if (flipping || !session.orbital?.started) return;
+  const orbitTree = el('orbit-talents-dialog'), solarTree = el('solar-talents-dialog');
+  const pages = { surface: { dialog, page: el('home-scroll'), sky: el('home-sky') }, orbit: { dialog: orbitTree, page: orbitTree.querySelector('.orbit-tree-scroll'), sky: el('orbit-tree-sky') },
+    solar: { dialog: solarTree, page: solarTree.querySelector('.orbit-tree-scroll'), sky: el('solar-tree-sky') } };
+  const SEAMS = { 'surface|orbit': { surface: ['node-bypasser', 'flip-orbit'], orbit: ['orbit-node-protocol', 'orbit-flip-surface'] },
+    'orbit|solar': { orbit: ['orbit-node-voyage', 'orbit-flip-solar'], solar: ['solar-node-voyage', 'solar-flip-orbit'] } };
+  const seamOf = (a, b) => SEAMS[`${a}|${b}`] ?? SEAMS[`${b}|${a}`];
+  async function flipTo(target, from) {
+    const seam = seamOf(from, target);
+    if (flipping || !seam || !session.orbital?.started || (target === 'solar' && !session.orbital.talents.voyage)) return;
     flipping = true;
-    const toSurface = target === 'surface', leaving = pages[toSurface ? 'orbit' : 'surface'], entering = pages[target];
-    const from = nodeCenter(el(toSurface ? 'orbit-node-protocol' : 'node-bypasser'));
-    if (toSurface) { if (!dialog.open) dialog.showModal(); talentControls.open(false, 'bypasser'); changed(); }
-    else colony.openTree();
-    const cleanup = await flipPages({ leaving, entering, from, to: nodeCenter(el(toSurface ? 'node-bypasser' : 'orbit-node-protocol')), reduced: matchMedia('(prefers-reduced-motion: reduce)').matches });
+    // The shared node must be on screen on the page being left before it is measured.
+    el(seam[from][0]).scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const leaving = pages[from], entering = pages[target], anchor = nodeCenter(el(seam[from][0]));
+    if (target === 'surface') { if (!dialog.open) dialog.showModal(); talentControls.open(false, 'bypasser'); changed(); }
+    else if (target === 'orbit') colony.openTree(null, { anchor: from === 'solar' ? 'voyage' : null });
+    else colony.solarTree.open();
+    const cleanup = await flipPages({ leaving, entering, from: anchor, to: nodeCenter(el(seam[target][0])), reduced: matchMedia('(prefers-reduced-motion: reduce)').matches });
     leaving.dialog.close(); if (typeof cleanup === 'function') cleanup();
     // Focus the way back, not the node: focusing a node opens its detail card.
-    el(toSurface ? 'flip-orbit' : 'orbit-flip-surface').focus({ preventScroll: true });
+    el(seam[target][1]).focus({ preventScroll: true });
     flipping = false; changed();
   }
-  // Escape cannot close either page while it is turning.
+  // Escape cannot close any page while it is turning.
   for (const page of Object.values(pages)) page.dialog.addEventListener('cancel', event => { if (page.dialog.dataset.turning) event.preventDefault(); });
-  el('flip-orbit').addEventListener('click', () => flipTo('orbit'));
-  watchSeam(el('home-scroll'), -1, () => { if (dialog.open && !el('flip-orbit').hidden) flipTo('orbit'); });
-  const colony = createOrbitalColonyUI(() => session, { viewChanged: () => changed(), commit: () => { save(); changed(); }, flipSurface: () => flipTo('surface'),
+  el('flip-orbit').addEventListener('click', () => flipTo('orbit', 'surface'));
+  watchSeam(el('home-scroll'), -1, () => { if (dialog.open && !el('flip-orbit').hidden) flipTo('orbit', 'surface'); });
+  const colony = createOrbitalColonyUI(() => session, { viewChanged: () => changed(), commit: () => { save(); changed(); }, flipSurface: () => flipTo('surface', 'orbit'), flipStage: flipTo,
     archive: () => { if (!dialog.open) dialog.showModal(); talentControls.open(false); changed(); }, save: openSave, speed: cycleSpeed });
   const orbital = createOrbitalUI({ review: () => talentControls.open(false), save: openSave, enter: () => {
     if (enterOrbital(session)) save();

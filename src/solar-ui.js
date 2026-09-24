@@ -3,11 +3,18 @@ import { buildSolarViewModel } from './solar-view-model.js';
 import { DESTINATIONS, destination, drawSolarSystem, drawBodyPortrait, bodyAt, solarViewport } from './solar-render.js';
 import { drawShipyard } from './shipyard-render.js';
 import { FACILITIES, buildFacility } from './solar-industry.js';
-export function createSolarUI(getSession,{openTree,replay,commit}){
+import { transferCivilization } from './solar-colony.js';
+import { AGES } from './game-config.js';
+export function createSolarUI(getSession,{openTree,replay,commit,openSolarTree}){
   const el=id=>document.getElementById(id),bind=createBindings(document),reduced=matchMedia('(prefers-reduced-motion: reduce)');
-  let view=null,selected='earth',hover=null,portraitKey=null;
+  let view=null,selected='earth',hover=null,portraitKey=null,civSignature='';
   const allowed=next=>{const o=getSession().orbital;return next==='system'&&o?.talents.voyage?'system':next==='moon'&&o?.talents.outpost?'moon':next==='earth'?'earth':o?.talents.voyage?'system':'earth';};
-  function sync(){const s=getSession();if(!s.orbital?.started)return;view=allowed(view);el('colony-map').dataset.view=view;for(const id of ['system','earth','moon'])el(`colony-view-${id}`).setAttribute('aria-pressed',String(view===id));bind(buildSolarViewModel(s,{view,selected}));}
+  // Earth civilizations that could board an ark: rebuilt only when the list changes.
+  function syncCivOptions(o){const select=el('solar-transfer-civ'),list=o.civilizations.filter(c=>c.alive),signature=list.map(c=>`${c.id}:${c.age}:${c.warId?1:0}`).join('|');
+    if(signature===civSignature)return;civSignature=signature;const keep=select.value;select.replaceChildren(...list.map(c=>{const option=document.createElement('option');option.value=c.id;option.textContent=`${c.name} · ${AGES[c.age].numeral}${c.warId?' · 交战中':''}`;return option;}));
+    select.value=list.some(c=>c.id===keep)?keep:(list.find(c=>!c.warId)?.id??list[0]?.id??'');}
+  function sync(){const s=getSession();if(!s.orbital?.started)return;view=allowed(view);el('colony-map').dataset.view=view;for(const id of ['system','earth','moon'])el(`colony-view-${id}`).setAttribute('aria-pressed',String(view===id));
+    syncCivOptions(s.orbital);bind(buildSolarViewModel(s,{view,selected,transferCiv:el('solar-transfer-civ').value}));}
   function setView(next){view=allowed(next);sync();}
   function choose(id){if(!destination(id))return;selected=id;sync();}
   for(const [i,b]of DESTINATIONS.entries()){
@@ -18,6 +25,10 @@ export function createSolarUI(getSession,{openTree,replay,commit}){
   for(let i=0;i<Math.max(...Object.values(FACILITIES).map(f=>f.costs.length));i++){const li=document.createElement('li');li.id=`solar-facility-rank-${i+1}`;el('solar-facility-ranks').append(li);}
   // Building happens in the dossier of the body it stands on.
   el('solar-facility-build').addEventListener('click',()=>{const key=Object.keys(FACILITIES).find(k=>FACILITIES[k].body===selected);if(key&&buildFacility(getSession(),key)){commit();sync();}});
+  for(let i=0;i<8;i++){const li=document.createElement('li');li.id=`solar-colonist-${i}`;el('solar-colonists').append(li);}
+  el('solar-transfer-civ').addEventListener('change',sync);
+  el('solar-transfer-go').addEventListener('click',()=>{if(transferCivilization(getSession(),el('solar-transfer-civ').value)){civSignature='';commit();sync();}});
+  el('solar-colony-tree').addEventListener('click',()=>openSolarTree?.('dome'));
   for(const id of ['system','earth','moon'])el(`colony-view-${id}`).addEventListener('click',()=>setView(id));
   el('solar-to-earth').addEventListener('click',()=>setView('earth'));el('solar-to-moon').addEventListener('click',()=>setView('moon'));
   el('colony-body-enter').addEventListener('click',()=>{if(['earth','moon'].includes(selected))setView(selected);});

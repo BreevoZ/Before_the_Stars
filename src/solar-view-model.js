@@ -5,8 +5,10 @@ import { ORBITAL_TALENTS as T } from './orbital-config.js';
 import { DESTINATIONS, destination, bodyKindLabel } from './solar-render.js';
 import { orbitalPeriod, EARTH_YEAR_SECONDS } from './solar-config.js';
 import { ARK_COUNT } from './shipyard-render.js';
+import { transferState, transferQuote, windowTiming, domeCapacity, colonistRate, colonyRate, COLONY_RULES } from './solar-colony.js';
+import { AGES } from './game-config.js';
 import { FACILITIES, ARK_ROUTES, arrivalAt, arrived, facilityRate, facilityState, industryRate, industryBoost } from './solar-industry.js';
-export function buildSolarViewModel(s,{view='earth',selected='earth'}={}){
+export function buildSolarViewModel(s,{view='earth',selected='earth',transferCiv=''}={}){
   const o=s.orbital;if(!o?.started)return{};const vii=Boolean(o.talents.voyage),b=destination(selected)??destination('earth'),owned=['earth','moon'].includes(b.id),alive=o.civilizations.filter(c=>c.alive).length;
   const facilityKey=Object.keys(FACILITIES).find(k=>FACILITIES[k].body===b.id),gate=getOrbitalTalentState(s,'voyage'),rank=o.talents.shipyard,ready=rank===ARK_COUNT;
   const v={
@@ -20,7 +22,7 @@ export function buildSolarViewModel(s,{view='earth',selected='earth'}={}){
     '#solar-body-period':b.id==='moon'?'地月运输网':`${(orbitalPeriod(b.au)/EARTH_YEAR_SECONDS).toFixed(b.au<2?2:1)} 地球年`,
     '#solar-body-purpose':facilityKey&&o.solar.facilities[facilityKey]?'工业驻地':{home:'观测 / 文明轮回',moon:'制造 / 深空船坞',habitable:'殖民候选地',industrial:'工业候选地',relay:'外太阳系勘察'}[b.kind],
     '#colony-body-enter@hidden':!owned,'#colony-body-enter':b.id==='moon'?'进入月面家园 ↗':'接入地球观测 ↗',
-    '#solar-body-note':owned?'家园仍在运转。':facilityKey?'驻地建成后产出计入 Legacy，暂停与离线时不推进。':b.kind==='habitable'?'殖民将在后续开放：先要把地球的文明运过来。':'深空中继将在后续开放，它通往 VIII。',
+    '#solar-body-note':owned?'家园仍在运转。':facilityKey?'驻地建成后产出计入 Legacy，暂停与离线时不推进。':b.id===COLONY_RULES.target?'殖民地之间的战争、独立的核冬天与升格将在后续开放。':b.kind==='habitable'?'殖民将在后续开放：先要把地球的文明运过来。':'深空中继将在后续开放，它通往 VIII。',
     '#colony-shipyard@hidden':!o.talents.outpost,'#shipyard-status':vii?'七艘方舟已启航':ready?'七艘方舟 · 整备完成':`月面船坞 · 方舟 ${rank} / ${ARK_COUNT}`,
     '#shipyard-detail':vii?'七点灯火已离开月面。家园与工场继续留在后方。':ready?'七艘方舟已经齐备。等待完整星环和核冬天中的远航窗口。':'每完成一级，月面就会多一处灯火。七艘方舟将带着文明的遗产，分赴深空。',
     '#shipyard-build':ready?'查看船坞档案 ↗':`建造第 ${rank+1} 艘 · ${Q.format(T.shipyard.costs[rank])} Legacy ↗`,
@@ -34,6 +36,21 @@ export function buildSolarViewModel(s,{view='earth',selected='earth'}={}){
     '#solar-selected-id':`${String(DESTINATIONS.findIndex(d=>d.id===b.id)+1).padStart(2,'0')} / ${b.id.toUpperCase()}`,
   };
   for(const d of DESTINATIONS)v[`#solar-select-${d.id}@aria-pressed`]=String(d.id===b.id);
+  // Mars: the dome, the window and the transfer from Earth.
+  v['#solar-colony@hidden']=!vii||b.id!==COLONY_RULES.target;
+  if(vii&&b.id===COLONY_RULES.target){
+    const sol=o.solar,residents=sol.colonies.mars,flights=sol.transfers,cap=domeCapacity(o),timing=windowTiming(o),civ=o.civilizations.find(c=>c.id===transferCiv),state=transferState(s,transferCiv);
+    v['#solar-colony-capacity']=sol.talents.dome?`${residents.length} / ${cap} 居民${flights.length?` · 在途 ${flights.length}`:''}`:'尚无穹顶';
+    v['#solar-window']=sol.talents.survey?(timing.open?`地火窗口开启 · ${Math.ceil(timing.seconds)} 秒后关闭`:`地火窗口关闭 · ${Math.ceil(timing.seconds)} 秒后开启 · 逆窗发射更慢更贵`):(timing.open?'地火窗口开启':'地火窗口关闭 · 逆窗发射更慢更贵');
+    v['#solar-window@data-open']=String(timing.open);
+    const quote=civ?transferQuote(o,civ):null;
+    v['#solar-transfer-quote']=quote?`${civ.name} · ${AGES[civ.age].numeral} · ${Q.format(quote.cost)} Legacy · 航程 ${Math.round(quote.seconds)} 秒${quote.open?'':' · 逆窗'} · 抵达后 +${Q.format(colonistRate(civ))} Legacy/s`:'';
+    v['#solar-transfer-go']={ready:'发射方舟 ↗',locked:'需要「文明转运」',winter:'地球正处于核冬天',selection:'选择一个地球文明',war:'该文明正在交战',capacity:sol.talents.dome?'穹顶已满 · 扩建火星穹顶':'需要「火星穹顶」',fleet:'转运方舟都在途中',legacy:'遗产不足'}[state];
+    v['#solar-transfer-go@disabled']=state!=='ready';
+    const rows=[...residents.map(c=>({text:`${c.name} · ${AGES[c.age].numeral} · +${Q.format(colonistRate(c))} Legacy/s`,transit:false})),
+      ...flights.map(t=>({text:`${t.civ.name} · 航行中 · ${Math.max(0,Math.ceil(t.arriveAt-o.elapsed))} 秒`,transit:true}))];
+    for(let i=0;i<8;i++){v[`#solar-colonist-${i}@hidden`]=!rows[i];v[`#solar-colonist-${i}`]=rows[i]?.text??'';v[`#solar-colonist-${i}@data-transit`]=String(Boolean(rows[i]?.transit));}
+  }
   // The foothold on the selected body, if it has one.
   const f=facilityKey&&FACILITIES[facilityKey],state=f?facilityState(s,facilityKey):'locked',level=f?o.solar.facilities[facilityKey]:0;
   v['#solar-facility@hidden']=!f||!vii;
@@ -57,5 +74,6 @@ function bodyStatus(o,b){
   if(at===null||(!key&&!ARK_ROUTES.some(r=>r.body===b.id)))return '勘察记录 · 尚无驻地';
   if(!arrived(o,b.id))return `${via?'火星方舟':'方舟'}航行中 · 还有 ${Math.ceil(at-o.elapsed)} 秒抵达`;
   if(key&&o.solar.facilities[key])return `驻地运转中 · +${Q.format(facilityRate(o,key))} Legacy/s${FACILITIES[key].kind==='boost'?` · 行星工业 ×${industryBoost(o)}`:''}`;
-  return key?'方舟已抵达 · 可以建立驻地':'方舟已抵达 · 等待后续开发';
+  if(b.id===COLONY_RULES.target&&o.solar.talents.dome)return `火星穹顶 · ${o.solar.colonies.mars.length} / ${domeCapacity(o)} 居民 · +${Q.format(colonyRate(o))} Legacy/s`;
+  return key?'方舟已抵达 · 可以建立驻地':b.id===COLONY_RULES.target?'方舟已抵达 · 可以建起火星穹顶':'方舟已抵达 · 等待后续开发';
 }

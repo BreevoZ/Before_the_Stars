@@ -10,6 +10,8 @@ import { drawLunarColony } from '../src/orbital-render.js';
 import { Q } from '../src/quantity.js';
 import { updateOrbital } from '../src/orbital-game.js';
 import { FACILITIES, ARK_ROUTES, arrivalAt, arrived, facilityState, buildFacility, industryRate, facilityRate } from '../src/solar-industry.js';
+import { SOLAR_TALENTS, solarTalentState, purchaseSolarTalent, windowOpen, windowTiming, transferState, transferCivilization, transferQuote, domeCapacity, colonyRate, colonistRate, COLONY_RULES } from '../src/solar-colony.js';
+import { buildSolarTreeViewModel } from '../src/solar-tree-view-model.js';
 import { buildSolarViewModel } from '../src/solar-view-model.js';
 import { bodyPosition, BODIES } from '../src/solar-config.js';
 import { solarViewport, bodyAt, DESTINATIONS, drawSolarSystem, drawBodyPortrait } from '../src/solar-render.js';
@@ -92,6 +94,43 @@ export function registerSolarTests(test, assert, near) {
     let rejected=false;try{parseSession(serializeSession(vi));}catch{rejected=true;}assert(rejected,'Industry needs 远航协议');
     const view=buildSolarViewModel(s,{view:'system',selected:'venus'});assert(!view['#solar-facility@hidden']&&view['#solar-facility-build'].includes('航行中')&&view['#solar-facility-build@disabled']);
     assert(buildSolarViewModel(s,{view:'system',selected:'saturn'})['#solar-facility@hidden']);
+  });
+  test('Windows: the Earth–Mars alignment opens and closes on the synodic clock, and the countdown lands on the change', () => {
+    const o=voyageFixture().orbital,start=o.elapsed;let changes=0,was=windowOpen(o);
+    for(let t=0;t<3000;t+=5){o.elapsed=start+t;const now=windowOpen(o);if(now!==was){changes++;was=now;}}
+    assert(changes>=2,'A Mars synodic period brings both an opening and a closing');
+    o.elapsed=start;const timing=windowTiming(o);o.elapsed=start+timing.seconds+.5;assert(windowOpen(o)!==timing.open,'The countdown ends where the window changes');
+    o.elapsed=start+timing.seconds-.5;assert(windowOpen(o)===timing.open);
+  });
+  test('Transfer: an idle Earth civilization flies to the Mars dome, pays by age and window, frees its site and works on arrival', () => {
+    const s=voyageFixture(),o=s.orbital,run=seconds=>{for(let i=0;i<Math.round(seconds*30);i++)updateOrbital(s,1/30);};setDebugLegacy(s,'1e13');
+    assert(solarTalentState(s,'dome')==='transit'&&!purchaseSolarTalent(s,'dome'),'The dome waits for the Mars ark');
+    run(95);assert(purchaseSolarTalent(s,'dome')&&purchaseSolarTalent(s,'transfer')&&solarTalentState(s,'uplift')==='planned');
+    run(70);assert(o.phase==='living');const civ=o.civilizations.find(c=>c.alive&&!c.warId);assert(civ&&transferState(s,civ.id)==='ready');
+    const quote=transferQuote(o,civ),wallet=s.permanent.legacy;assert(Q.eq(quote.cost,COLONY_RULES.transferBase*2**(civ.age-1)*(quote.open?1:COLONY_RULES.lateCost)));
+    assert(transferCivilization(s,civ.id)&&!o.civilizations.some(c=>c.id===civ.id)&&o.solar.transfers.length===1&&Q.eq(s.permanent.legacy,Q.sub(wallet,quote.cost)));
+    const second=o.civilizations.find(c=>c.alive&&!c.warId);assert(!second||transferState(s,second.id)==='fleet','One transfer ark until 转运舰队');
+    const raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw);
+    run(quote.seconds+1);assert(o.solar.transfers.length===0&&o.solar.colonies.mars.length===1&&colonyRate(o)===colonistRate(civ));
+    const produced=o.solar.produced;run(10);assert(Q.toNumber(Q.sub(o.solar.produced,produced))>=colonyRate(o)*9);
+    // Capacity: two residents per dome rank.
+    assert(domeCapacity(o)===COLONY_RULES.domeCapacity);
+    // Tampering: a colonist over capacity, or a transfer without payment, is rejected.
+    const over=JSON.parse(serializeSession(s));over.orbital.solar.colonies.mars.push({...over.orbital.solar.colonies.mars[0],id:'c9-99'},{...over.orbital.solar.colonies.mars[0],id:'c9-98'});
+    let rejected=false;try{parseSession(JSON.stringify(over));}catch{rejected=true;}assert(rejected,'Dome capacity holds');
+    const unpaid=JSON.parse(serializeSession(s));unpaid.orbital.solar.payments.transfers=[];rejected=false;try{parseSession(JSON.stringify(unpaid));}catch{rejected=true;}assert(rejected,'Every transfer is paid');
+  });
+  test('VII tree: the root is owned, facilities are the same nodes as in the dossiers, planned nodes cannot be bought, and v25 saves gain empty colonies', () => {
+    const s=voyageFixture(),o=s.orbital;setDebugLegacy(s,'1e13');
+    let v=buildSolarTreeViewModel(s,{talent:'venus',selected:true});
+    assert(v['#solar-node-voyage@data-state']==='max'&&v['#solar-node-venus@data-state']==='cycles'&&v['#solar-gate-venus'].startsWith('方舟'));
+    for(let i=0;i<30*41;i++)updateOrbital(s,1/30);
+    v=buildSolarTreeViewModel(s,{talent:'venus',selected:true});assert(v['#solar-node-venus@data-state']==='ready'&&v['#solar-buy'].includes('建立驻地'));
+    assert(purchaseSolarTalent(s,'venus')&&o.solar.facilities.venus===1,'Buying the node builds the foothold');
+    assert(solarTalentState(s,'starship')==='planned'&&!purchaseSolarTalent(s,'starship'));
+    assert(buildSolarTreeViewModel(s,{talent:'starship',selected:true})['#solar-buy@disabled']);
+    const old=JSON.parse(serializeSession(voyageFixture()));old.version=25;old.orbital.version=11;for(const k of ['talents','colonies','transfers','nextTransfer'])delete old.orbital.solar[k];
+    const next=parseSession(JSON.stringify(old));assert(next.orbital.solar.colonies.mars.length===0&&next.orbital.solar.talents.dome===0);
   });
   test('Solar atlas: uniform projection and shared hit positions stay in bounds at desktop and mobile sizes', () => {
     for(const [w,h] of [[1400,700],[390,350],[320,350]]) {

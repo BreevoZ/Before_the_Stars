@@ -4,6 +4,7 @@ import { SITES, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as A, ORBITAL_RULES as R, 
 import { findCivilization, getWarState, getInterventionState, interventionCost, getOrbitalTalentState } from './orbital-game.js';
 import { civilizationValue, orbitalYieldMultiplier, lunarLegacyRate, cycleStartedAt, doomsdayMultiplier, chronicleMultiplier } from './celestial-economy.js';
 import { TRAITS } from './traits.js';
+import { industryRate } from './solar-industry.js';
 import { warOdds } from './orbital-war.js';
 import { siteDaylight } from './celestial-clock.js';
 export const orbitalTime = seconds => `${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`;
@@ -45,14 +46,15 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
     '#colony-legacy':Q.format(s.permanent.legacy),'#orbit-tree-wallet':Q.format(s.permanent.legacy),
     '#colony-earned':`本阶段已收获 ${Q.format(o.legacyEarned)} · 收益 ×${orbitalYieldMultiplier(o)}`,
     '#colony-income':o.talents.outpost?`月面 +${Q.format(lunarLegacyRate(o))}/s`:'文明遗产',
-    '#colony-lunar@hidden':!o.talents.outpost,'#colony-view-moon@hidden':!o.talents.outpost,'#colony-view-system@hidden':!o.talents.voyage,
+    '#colony-lunar@hidden':!o.talents.outpost,'#colony-view-moon@hidden':!o.talents.outpost,'#colony-view-system@hidden':!o.talents.voyage,'#orbit-flip-solar@hidden':!o.talents.voyage,
     // VII extends VI: the same observatory, renamed once the ark is launched.
     '#colony-stage-numeral':o.talents.voyage?'VII':'VI','#colony-stage-name':o.talents.voyage?'行星际':'轨道文明','#colony-lunar-rate':Q.format(lunarLegacyRate(o)),
     '#colony-lunar-level':`自动工场 ${o.talents.lunarIndustry} / 4 · ${3+o.talents.lunarIndustry*2} 处设施 · ${o.talents.massDriver?'质量投射器运行中':'穿梭货运'}`,
     '#colony-lunar-produced':`累计生产 ${Q.format(o.lunarProduced)} Legacy`,'#colony-habitat-state':`${o.talents.recovery} / ${R.habitatSections} 段 · 遗产 ×${2**o.talents.recovery}`,
     '#colony-time':orbitalTime(o.elapsed),
     '#colony-cycle':`第 ${o.cycle} 轮萌芽 · ${o.nuclearCycles} 次核毁灭${o.talents.doomsday&&!winter?` · 末日时钟 ${orbitalTime(Math.max(0,o.elapsed-cycleStartedAt(o)))} · 核毁灭 ×${doomsdayMultiplier(o).toFixed(2)}`:''}`,
-    '#orbit-tree-pause':paused?'继续':'暂停','#orbit-tree-pause@aria-pressed':String(paused),
+    '#orbit-tree-pause':paused?'继续':'暂停','#orbit-tree-pause@aria-pressed':String(paused),'#solar-tree-pause':paused?'继续':'暂停','#solar-tree-pause@aria-pressed':String(paused),
+    '#solar-tree-income':paused?'已暂停':`行星际持续运转 · 工业 +${Q.format(industryRate(o))}/s`,
     '#orbit-tree-income':paused?'已暂停':`文明持续运转${o.talents.outpost?' · 月面 +'+Q.format(lunarLegacyRate(o))+'/s':''}`,
     '#colony-pause':paused?'继续':'暂停','#colony-pause@aria-pressed':String(paused),
     '#colony-speed':`${s.permanent.settings.speed}×`,'#colony-speed@hidden':s.debug===true,'#colony-debug-speed@hidden':s.debug!==true,'#colony-debug-speed@value':String(s.debugSpeed??1),

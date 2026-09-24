@@ -57,6 +57,13 @@ export function drawSolarSystem(c,w,h,o,{ambientTime=o.elapsed,reducedMotion=fal
         c.strokeStyle='#a7b8b11f';c.setLineDash([2,8]);c.beginPath();c.moveTo(home.x,home.y);c.quadraticCurveTo(mx,my,end.x,end.y);c.stroke();c.setLineDash([]);
         const dx=2*u*(mx-home.x)+2*e*(end.x-mx),dy=2*u*(my-home.y)+2*e*(end.y-my);drawArk(c,x,y,.105,{angle:Math.atan2(dx,-dy),thrust:reducedMotion?0:1});}
       else{const r=Math.max(5,bodyById(route.body).size)*1.15;disc(c,end.x-r-5,end.y-r*.4,1.6,'#e6d6a4');}});
+    // Transfers: a smaller ark per civilization in flight, Earth to Mars; the
+    // dome's residents glow as a cluster on the planet.
+    const mars=bodyPosition(bodyById('mars'),clock);
+    for(const t of o.solar.transfers){const e=Math.max(0,Math.min(1,(o.elapsed-t.departAt)/(t.arriveAt-t.departAt))),k=e*e*(3-2*e),mx=(home.x+mars.x)/2,my=(home.y+mars.y)/2-Math.hypot(mars.x-home.x,mars.y-home.y)*.25,u=1-k;
+      c.strokeStyle='#e6d6a42b';c.setLineDash([1.5,5]);c.beginPath();c.moveTo(home.x,home.y);c.quadraticCurveTo(mx,my,mars.x,mars.y);c.stroke();c.setLineDash([]);
+      const x=u*u*home.x+2*u*k*mx+k*k*mars.x,y=u*u*home.y+2*u*k*my+k*k*mars.y,dx=2*u*(mx-home.x)+2*k*(mars.x-mx),dy=2*u*(my-home.y)+2*k*(mars.y-my);drawArk(c,x,y,.085,{angle:Math.atan2(dx,-dy),thrust:reducedMotion?0:1});}
+    o.solar.colonies.mars.forEach((civ,i)=>{const a=i*2.4+.6,r=Math.max(5,bodyById('mars').size)*1.15*.55;disc(c,mars.x+Math.cos(a)*r,mars.y+Math.sin(a)*r,1.1+civ.age*.15,'#f3d99a');});
     // Footholds: one light per built rank, circling the body (the belt's fleet rides the belt).
     for(const [key,f] of Object.entries(FACILITIES)){const rank=o.solar.facilities[key];if(!rank)continue;
       if(f.body==='belt'){for(let k=0;k<rank*3;k++){const a=k*2.1+clock*.004,rr=orbitRadius(2.4+(k%3)*.3);disc(c,cx+Math.cos(a)*rr,cy+Math.sin(a)*rr*tilt,1.3,'#efdca6');}continue;}

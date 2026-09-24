@@ -28,6 +28,11 @@ const html = await (await fetch('../index.html')).text();
 document.open();
 document.write(html.replace('<head>', `<head><base href="${root}"><script type="importmap">${map}<\/script>`));
 document.close();
+// Visibility belongs to the fixture's synthetic clock, just like storage and
+// requestAnimationFrame. Chrome may occlude offscreen test iframes during a
+// long suite; that must not silently pause simulated time. Pause/visibility
+// cases explicitly redefine this property and dispatch visibilitychange.
+Object.defineProperty(document, 'hidden', { configurable: true, value: false });
 window.addEventListener('error', event => { document.body.dataset.fixtureError = event.error?.stack ?? event.message; });
 window.addEventListener('unhandledrejection', event => { document.body.dataset.fixtureError = String(event.reason?.stack ?? event.reason); });
 </script></body></html>

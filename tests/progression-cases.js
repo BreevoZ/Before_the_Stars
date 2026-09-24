@@ -32,9 +32,8 @@ export async function mountFixture(raw, unavailable = false, mode = 'incremental
   await new Promise((resolve, reject) => {
     const start = performance.now();
     const poll = () => {
-      // document.write can finish before Chrome publishes the new frame's
-      // visibility. Wait for the real visible document before driving its
-      // synthetic clock; individual tests still exercise hidden-page pauses.
+      // Wait for the synthetic clock and initial visible state to be ready.
+      // Individual cases still exercise hidden-page pauses explicitly.
       if (frame.contentWindow?.__testFrame && frame.contentDocument?.readyState === 'complete' && frame.contentDocument?.getElementById('income-rate') && !frame.contentDocument.hidden) resolve();
       else if (performance.now() - start > 15000) reject(new Error('Incremental fixture did not load'));
       else setTimeout(poll, 25);

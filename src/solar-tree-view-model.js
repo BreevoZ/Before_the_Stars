@@ -40,7 +40,8 @@ function legText(o, key) {
 }
 export function buildSolarTreeViewModel(s, { talent = 'dome', selected = false } = {}) {
   const o = s.orbital, v = {};
-  if (!o?.started) return v;
+  // The VII page only exists after 远航协议; VI syncs it every frame, so stay empty.
+  if (!o?.started || !o.talents.voyage) return v;
   v['#solar-tree-wallet'] = Q.format(s.permanent.legacy);
   for (const [key, t] of Object.entries(T)) {
     const costs = solarCosts(key), rank = solarRank(o, key), state = solarTalentState(s, key), max = costs.length;
@@ -49,7 +50,7 @@ export function buildSolarTreeViewModel(s, { talent = 'dome', selected = false }
     v[`#solar-rank-${key}`] = t.root ? '●' : t.planned ? '' : '●'.repeat(rank) + '○'.repeat(Math.max(0, max - rank));
     v[`#solar-cost-${key}`] = t.root || t.planned || state === 'max' || (t.facility && state === 'transit') ? '' : Q.format(costs[rank]);
     v[`#solar-gate-${key}`] = state === 'max' ? '' : gate(o, key);
-    v[`#solar-node-${key}@aria-label`] = `${t.name}，${t.planned ? '规划中' : state === 'max' ? '已完成' : `${Q.format(costs[rank])} Legacy`}`;
+    v[`#solar-node-${key}@aria-label`] = `${t.name}，${t.planned ? '规划中' : state === 'max' || rank >= max ? '已完成' : `${Q.format(costs[rank])} Legacy`}`;
     for (const parent of Object.keys(t.requires)) v[`#solar-edge-${parent}-${key}@class:lit`] = rank > 0;
   }
   const t = T[talent], rank = solarRank(o, talent), state = solarTalentState(s, talent), costs = solarCosts(talent);

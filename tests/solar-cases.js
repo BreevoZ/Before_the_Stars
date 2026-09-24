@@ -95,6 +95,12 @@ export function registerSolarTests(test, assert, near) {
     raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw);
     const cheap=JSON.parse(raw);cheap.orbital.solar.payments.venus=['1'];rejects(JSON.stringify(cheap),'Payments match the price');
   });
+  test('VI: before 远航协议 every VII view model builds without throwing (VI syncs them every frame)', () => {
+    for(const s of [voyageReady(),lunarFixture()]){
+      assert(Object.keys(buildSolarTreeViewModel(s,{talent:'venus',selected:true})).length===0);
+      for(const d of DESTINATIONS)buildSolarViewModel(s,{view:'earth',selected:d.id});
+    }
+  });
   test('Industry v25–v27: older saves gain empty ledgers and new talents; VI saves never own footholds', () => {
     const s=voyageFixture(),old=JSON.parse(serializeSession(s));old.version=24;old.orbital.version=10;delete old.orbital.solar;
     const next=parseSession(JSON.stringify(old));assert(Object.values(next.orbital.solar.facilities).every(v=>v===0)&&Q.eq(next.orbital.solar.produced,0));

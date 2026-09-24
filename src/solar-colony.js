@@ -18,91 +18,89 @@ export const COLONY_RULES = Object.freeze({
   domeCapacity: 2, transferBase: 4 * M,
 });
 const node = (name, x, y, icon, column, extra = {}) => Object.freeze({ name, x, y, icon, column, requires: {}, costs: [], ...extra });
-// The VII map is a fan: 远航协议 at the bottom links one large node per world,
-// ordered outward from the Sun, and every world grows its own talents upwards.
-// Only Mars carries the gold mainline (the colony, then the way to VIII); every
-// other column is green. Satellites will branch off beside their planet.
-export const SOLAR_MAP = Object.freeze({ width: 3580, height: 1990 });
-export const SOLAR_COLUMNS = Object.freeze({ mercury: 250, venus: 690, mars: 1130, belt: 1570, jupiter: 2010, saturn: 2450, uranus: 2890, neptune: 3330 });
-const X = SOLAR_COLUMNS, ROW = Object.freeze([1480, 1270, 1070, 870, 670]);
-const moon = (id, name, x, y, icon, parent, cost, description, extra = {}) => node(name, x, y, icon, SOLAR_TALENTS_COLUMN[parent], { satellite: id, kind: 'keystone', costs: [cost], requires: { [parent]: 1 }, description, ...extra });
-const SOLAR_TALENTS_COLUMN = Object.freeze({ harbor: 'mars', jupiter: 'jupiter', saturn: 'saturn', uranus: 'uranus', neptune: 'neptune' });
-const world = (key, name, icon, extra) => node(name, X[key], ROW[0], icon, key, { kind: 'planet', requires: { voyage: 1 }, ...extra });
+// The VII map: a gold axis of technology up the middle, each step opening the
+// next worlds out from the Sun; beside it, one framed region per world, two per
+// tier, left and right. A region grows outwards from its world's large node:
+// the planet's own talents along the lower row, its moons along the upper one.
+// The axis leads on to VIII (Stellar): the Sun itself.
+export const SOLAR_AXIS = 1400;
+const BOTTOM = 2700, TIER = 480, tierY = tier => BOTTOM - 240 - tier * TIER;
+// Every region is the same frame: from the axis gap out to a fixed width, one tier high.
+export const regionFrame = r => ({ left: r.side < 0 ? SOLAR_AXIS - 1150 : SOLAR_AXIS + 150, right: r.side < 0 ? SOLAR_AXIS - 150 : SOLAR_AXIS + 1150, top: tierY(r.tier) - 325, bottom: tierY(r.tier) + 105 });
+export const SOLAR_MAP = Object.freeze({ width: 2800, height: BOTTOM + 250 });
+const at = (side, tier, col, row = 0) => ({ x: SOLAR_AXIS + side * (260 + 190 * col), y: tierY(tier) - 190 * row });
+// id, name, subtitle, side (-1 left / 1 right), tier.
+export const SOLAR_REGIONS = Object.freeze([
+  ['earth', '地月港', 'EARTH–MOON · 转运与方舟', -1, 0], ['mars', '火星', 'MARS · 殖民世界', 1, 0],
+  ['mercury', '水星', 'MERCURY · 近日工业', -1, 1], ['venus', '金星', 'VENUS · 云层与大气', 1, 1],
+  ['belt', '小行星带', 'MAIN BELT · 采矿与铸造', -1, 2], ['jupiter', '木星', 'JUPITER · 气态巨行星', 1, 2],
+  ['saturn', '土星', 'SATURN · 冰环', -1, 3], ['uranus', '天王星', 'URANUS · 冰巨星', 1, 3],
+  ['neptune', '海王星', 'NEPTUNE · 太阳系边缘', -1, 4], ['reserve', '外太阳系', 'KUIPER BELT · 预留', 1, 4],
+].map(([id, name, en, side, tier]) => Object.freeze({ id, name, en, side, tier, reserved: id === 'reserve' })));
+const R = Object.fromEntries(SOLAR_REGIONS.map(r => [r.id, r]));
+const place = (region, col, row, name, icon, extra) => { const r = R[region]; return node(name, at(r.side, r.tier, col, row).x, at(r.side, r.tier, col, row).y, icon, region, extra); };
+const world = (region, name, icon, gate, extra) => place(region, 0, 0, name, icon, { kind: 'planet', requires: { [gate]: 1 }, ...extra });
+const moon = (id, region, col, name, icon, parent, cost, description, extra = {}) => place(region, col, 1, name, icon, { satellite: id, kind: 'keystone', costs: cost ? [cost] : [], requires: { [parent]: 1 }, description, ...extra });
+const axis = (name, tier, icon, cost, requires, description, extra = {}) => node(name, SOLAR_AXIS, tierY(tier), icon, 'axis', { costs: cost ? [cost] : [], requires, gold: true, description, ...extra });
 export const SOLAR_TALENTS = Object.freeze({
-  voyage: node('远航协议', X.mars, 1760, 'ark', 'root', { root: true, kind: 'keystone', finale: true, gold: true, description: '七艘方舟结成先遣编队驶向火星。这一页星图从这里向外生长，也与轨道星图的顶端相连。' }),
-  // Mercury: the corona array, sails and a furnace close to the Sun.
-  mercury: world('mercury', '水星 · 日冕阵列', 'corona', { facility: 'mercury' }),
-  solarSail: node('光帆加速', X.mercury, ROW[1], 'solarsail', 'mercury', { costs: [256 * M], requires: { mercury: 1 },
-    description: '水星的日冕为方舟张开光帆：所有方舟与转运方舟的航程缩短 30%。' }),
-  smelter: node('近日熔炉', X.mercury, ROW[2], 'furnace', 'mercury', { costs: [2 * G], requires: { solarSail: 1 },
-    description: '在水星的昼面冶炼金属：所有行星工业产能再乘 1.5。' }),
-  // Venus: the cloud city, then what its air can do for others.
-  venus: world('venus', '金星 · 高空浮空城', 'cloud', { facility: 'venus' }),
-  refinery: node('大气提纯', X.venus, ROW[1], 'refinery', 'venus', { costs: [256 * M], requires: { venus: 1 },
-    description: '浮空城开始提纯硫酸云：金星浮空城的产出翻倍。' }),
-  greenhouse: node('温室气体输送', X.venus, ROW[2], 'greenhouse', 'venus', { costs: [G], requires: { refinery: 1 },
-    description: '把金星的温室气体送往火星，让稀薄的大气变暖：火星居民与升格文明的产出从 ×0.75 恢复到 ×1。' }),
-  // Mars: the harbour where the fleet moors, the gold colony mainline, the arks' first upgrades and the Earth–Mars transfer.
-  harbor: world('mars', '火星 · 火星港', 'harbor', { costs: [24 * M], arrival: 'mars', gold: true,
+  voyage: node('远航协议', SOLAR_AXIS, BOTTOM, 'ark', 'axis', { root: true, kind: 'keystone', finale: true, gold: true, description: '七艘方舟结成先遣编队驶向火星。这一页星图从这里向上生长，也与轨道星图的顶端相连。' }),
+  // The axis: each technology opens the next worlds out from the Sun.
+  heat: axis('耐热外壳', 1, 'heatshield', 12 * M, { voyage: 1 }, '为方舟加装耐热外壳，让它能在水星与金星的高温中停靠。解锁：水星、金星。'),
+  mining: axis('小行星采矿', 2, 'drill', 320 * M, { heat: 1 }, '在主带补给、造出聚变引擎：方舟航速 ×1.6。解锁：小行星带、木星。'),
+  deepDrive: axis('深空推进', 3, 'deepdrive', 16 * G, { mining: 1 }, '能穿越巨行星之间漫长空隙的推进：方舟航速 ×2.2。解锁：土星、天王星。'),
+  relay: axis('深空中继', 4, 'relay', 128 * G, { deepDrive: 1 }, '在外太阳系布下通讯中继，方舟不再与火星失联。解锁：海王星。'),
+  dyson: node('戴森群计划', SOLAR_AXIS, tierY(4) - 300, 'dyson', 'axis', { planned: true, requires: { relay: 1 }, finale: true, kind: 'keystone', gold: true, gate: '需要一个升格文明',
+    description: 'VII 的终点：把整个太阳系的工业转向太阳，开始建造戴森群，进入 VIII · 恒星。需要深空中继与至少一个升格文明。（后续开放）' }),
+  // Earth–Moon: the harbour that is always there, the Earth–Mars crossing.
+  moonPort: world('earth', '地月港 · 月面船坞', 'lunarport', 'voyage', { root: true, description: 'VI 的月面船坞与地月航线。转运方舟从这里出发前往火星。' }),
+  survey: place('earth', 1, 0, '航线测绘', 'chart', { costs: [8 * M], requires: { moonPort: 1 }, kind: 'specialist', description: '在勘察档案中显示地火窗口的对齐程度与下一次开启的倒计时。' }),
+  hohmann: place('earth', 2, 0, '轨道计算', 'orbital', { costs: [96 * M], requires: { survey: 1 }, description: '更精确的转移轨道：发射窗口的宽度增加一半以上。' }),
+  fleet: place('earth', 1, 1, '转运舰队', 'convoy', { costs: [256 * M, 2 * G], requires: { survey: 1 }, description: '每级多一艘转运方舟，可同时在途的转运加一。' }),
+  // Mars: the harbour where the fleet moors, then the colony.
+  harbor: world('mars', '火星 · 火星港', 'harbor', 'voyage', { costs: [24 * M], arrival: 'mars',
     description: '先遣编队停泊的地方。建起船坞后，停泊的方舟可以一艘艘派往其他世界；每派出一艘，火星旁就少一点灯火。' }),
-  dome: node('火星穹顶', X.mars, ROW[1], 'dome', 'mars', { costs: [16 * M, 128 * M, G, 8 * G, 64 * G], requires: { harbor: 1 }, kind: 'keystone', gold: true,
+  dome: place('mars', 1, 0, '火星穹顶', 'dome', { costs: [16 * M, 128 * M, G, 8 * G, 64 * G], requires: { harbor: 1 }, kind: 'keystone',
     description: '在火星上建起居住穹顶，每座容纳两个殖民文明；升格文明会永久住在穹顶里。' }),
-  transfer: node('文明转运', X.mars, ROW[2], 'transfer', 'mars', { costs: [32 * M], requires: { dome: 1 }, kind: 'keystone', gold: true,
+  transfer: place('mars', 2, 0, '文明转运', 'transfer', { costs: [32 * M], requires: { dome: 1 }, kind: 'keystone',
     description: '从地球挑选一个不在交战的文明，装上方舟送往火星。地球的点位会空出来，新的文明照常萌芽。' }),
-  uplift: node('殖民地存续协议', X.mars, ROW[3], 'accord', 'mars', { costs: [192 * M], requires: { transfer: 1 }, kind: 'keystone', gold: true,
+  uplift: place('mars', 3, 0, '殖民地存续协议', 'accord', { costs: [192 * M], requires: { transfer: 1 }, kind: 'keystone',
     description: '让殖民文明越过大过滤器：第五时代的和平文明可以谈判签署存续协议；两个第五时代文明交战、一方基地跌破 35% 时，可以接管双方核武——败方覆灭但没有核毁灭，胜方升格。升格文明永久住在穹顶里，不再参战，产出是第五时代居民的 4 倍。' }),
-  starship: node('星际方舟', X.mars, 430, 'starship', 'mars', { planned: true, requires: { uplift: 1 }, finale: true, kind: 'keystone', gold: true, gate: '需要海王星的深空中继',
-    description: 'VII 的终点：驶出日球层，前往 VIII 的星海。需要升格文明与海王星的深空中继。（后续开放）' }),
-  nuclear: node('核热推进', X.mars - 140, ROW[1], 'thruster', 'mars', { costs: [64 * M], requires: { harbor: 1 },
-    description: '更强的方舟：单段航程从 0.8 AU 延长到 1.5 AU，航速更快。从火星港出发，可以抵达水星与小行星带。' }),
-  survey: node('航线测绘', X.mars - 260, ROW[1], 'chart', 'mars', { costs: [8 * M], requires: { harbor: 1 }, kind: 'specialist',
-    description: '在勘察档案中显示地火窗口的对齐程度与下一次开启的倒计时。' }),
-  hohmann: node('轨道计算', X.mars - 260, ROW[2], 'orbital', 'mars', { costs: [96 * M], requires: { survey: 1 },
-    description: '更精确的转移轨道：发射窗口的宽度增加一半以上。' }),
-  fleet: node('转运舰队', X.mars - 140, ROW[2], 'convoy', 'mars', { costs: [256 * M, 2 * G], requires: { survey: 1 },
-    description: '每级多一艘转运方舟，可同时在途的转运加一。' }),
-  // The belt: metal for faster drives and for new arks.
-  belt: world('belt', '小行星带 · 采矿舰队', 'mining', { facility: 'belt' }),
-  fusion: node('聚变推进', X.belt, ROW[1], 'fusion', 'belt', { costs: [320 * M], requires: { belt: 1 },
-    description: '用小行星的金属造出聚变引擎：单段航程延长到 4 AU，从火星港可以抵达木星。' }),
-  arkForge: node('方舟铸造', X.belt, ROW[2], 'arkforge', 'belt', { costs: [2 * G, 8 * G, 32 * G], requires: { fusion: 1 },
-    description: '采矿舰队的金属在火星港铸成新的方舟：每级多一艘停泊的方舟。' }),
-  // Jupiter: fuel, the first outer drydock, and the drive that crosses the giants.
-  jupiter: world('jupiter', '木星 · 气态采集站', 'gasgiant', { facility: 'jupiter' }),
-  fuel: node('木星燃料', X.jupiter, ROW[1], 'fuelcell', 'jupiter', { costs: [G], requires: { jupiter: 1 },
-    description: '用木星采集站的燃料逆窗加速：地火转运逆窗发射的航程与价格惩罚大幅减轻。' }),
-  jupiterDock: node('木星船坞', X.jupiter, ROW[2], 'outpost', 'jupiter', { costs: [4 * G], requires: { fuel: 1 },
-    description: '在木星轨道建起船坞：方舟可以在这里中转，飞向更远的世界。' }),
-  deepDrive: node('深空推进', X.jupiter, ROW[3], 'deepdrive', 'jupiter', { costs: [16 * G], requires: { jupiterDock: 1 },
-    description: '单段航程延长到 15 AU：从火星港直达土星；经木星船坞中转可以抵达天王星。' }),
-  // The outer giants: ice, the far drydock and the relay that opens VIII.
-  saturn: world('saturn', '土星 · 冰环采集站', 'ringplanet', { facility: 'saturn' }),
-  iceWater: node('冰水补给', X.saturn, ROW[1], 'icewater', 'saturn', { costs: [8 * G], requires: { saturn: 1 },
-    description: '土星环的冰送进火星穹顶：每座穹顶多住一户。' }),
-  uranus: world('uranus', '天王星 · 冰巨星采集站', 'icegiant', { facility: 'uranus' }),
-  uranusDock: node('天王星船坞', X.uranus, ROW[1], 'anchor', 'uranus', { costs: [64 * G], requires: { uranus: 1 },
-    description: '太阳系外缘的船坞：方舟经这里中转，可以抵达海王星。' }),
-  neptune: world('neptune', '海王星 · 深空前哨', 'trident', { facility: 'neptune' }),
-  relay: node('深空中继', X.neptune, ROW[1], 'relay', 'neptune', { planned: true, requires: { neptune: 1 },
-    description: '在海王星建立深空中继，听见太阳系之外。它与升格文明一起打开星际方舟。（后续开放）' }),
-  // Satellites branch beside their planet. A moon's station is set down by a
-  // lander from the planet's own station: no new ark leaves Mars for it.
-  phobos: moon('phobos', '火卫一 · 轨道升降站', X.mars + 140, ROW[1], 'elevator', 'harbor', 256 * M, '从火卫一向火星放下缆绳：文明转运的价格降低 25%。'),
-  deimos: moon('deimos', '火卫二 · 转运泊位', X.mars + 280, ROW[1], 'berth', 'harbor', 512 * M, '转运方舟在火卫二减速入轨：文明转运的航程缩短 20%。'),
-  io: moon('io', '木卫一 · 火山热电', X.jupiter - 140, ROW[1], 'volcano', 'jupiter', 8 * G, '木卫一的火山为采集站供热：木星气态采集站产出翻倍。'),
-  europa: moon('europa', '木卫二 · 冰下海洋', X.jupiter - 280, ROW[1], 'ocean', 'jupiter', 16 * G, '冰壳之下的海洋让升格文明找到新的研究方向：升格文明的产出 ×1.5。'),
-  ganymede: moon('ganymede', '木卫三 · 磁层船坞', X.jupiter + 140, ROW[1], 'magnet', 'jupiter', 16 * G, '在木卫三的磁层里铸造方舟：多一艘停泊在火星港的方舟。'),
-  callisto: moon('callisto', '木卫四 · 外缘补给站', X.jupiter + 280, ROW[1], 'depot', 'jupiter', 32 * G, '辐射带之外的补给站：所有方舟与转运方舟的航程再缩短 20%。'),
-  enceladus: moon('enceladus', '土卫二 · 冰羽采集', X.saturn + 140, ROW[1], 'plume', 'saturn', 32 * G, '收集土卫二喷出的冰羽：土星冰环采集站产出翻倍。'),
-  titan: moon('titan', '土卫六 · 甲烷湖前哨', X.saturn + 280, ROW[1], 'lake', 'saturn', 0, '厚雾之下的甲烷湖，是火星之后的下一个殖民世界。（后续开放）', { planned: true, costs: [] }),
-  titania: moon('titania', '天卫三 · 冰岩采集', X.uranus + 140, ROW[1], 'crystal', 'uranus', 128 * G, '天卫三的冰岩里藏着更多氘：冰巨星采集站产出翻倍。'),
-  oberon: moon('oberon', '天卫四 · 深空工坊', X.uranus + 280, ROW[1], 'workshop', 'uranus', 256 * G, '远离太阳的精密工坊：所有行星工业产能 ×1.25。'),
-  triton: moon('triton', '海卫一 · 逆行观测站', X.neptune + 140, ROW[1], 'telescope', 'neptune', 512 * G, '沿着逆行轨道观测海王星的风暴：深空前哨产出翻倍。'),
+  phobos: moon('phobos', 'mars', 1, '火卫一 · 轨道升降站', 'elevator', 'harbor', 256 * M, '从火卫一向火星放下缆绳：文明转运的价格降低 25%。'),
+  deimos: moon('deimos', 'mars', 2, '火卫二 · 转运泊位', 'berth', 'harbor', 512 * M, '转运方舟在火卫二减速入轨：文明转运的航程缩短 20%。'),
+  // Mercury and Venus, behind the heat shield.
+  mercury: world('mercury', '水星 · 日冕阵列', 'corona', 'heat', { facility: 'mercury' }),
+  solarSail: place('mercury', 1, 0, '光帆加速', 'solarsail', { costs: [256 * M], requires: { mercury: 1 }, description: '水星的日冕为方舟张开光帆：所有方舟与转运方舟的航程缩短 30%。' }),
+  smelter: place('mercury', 2, 0, '近日熔炉', 'furnace', { costs: [2 * G], requires: { solarSail: 1 }, description: '在水星的昼面冶炼金属：所有行星工业产能再乘 1.5。' }),
+  venus: world('venus', '金星 · 高空浮空城', 'cloud', 'heat', { facility: 'venus' }),
+  refinery: place('venus', 1, 0, '大气提纯', 'refinery', { costs: [256 * M], requires: { venus: 1 }, description: '浮空城开始提纯硫酸云：金星浮空城的产出翻倍。' }),
+  greenhouse: place('venus', 2, 0, '温室气体输送', 'greenhouse', { costs: [G], requires: { refinery: 1 }, description: '把金星的温室气体送往火星，让稀薄的大气变暖：火星居民与升格文明的产出从 ×0.75 恢复到 ×1。' }),
+  // The belt and Jupiter, once arks can mine and refuel.
+  belt: world('belt', '小行星带 · 采矿舰队', 'mining', 'mining', { facility: 'belt' }),
+  arkForge: place('belt', 1, 0, '方舟铸造', 'arkforge', { costs: [2 * G, 8 * G, 32 * G], requires: { belt: 1 }, description: '采矿舰队的金属在火星港铸成新的方舟：每级多一艘停泊的方舟。' }),
+  jupiter: world('jupiter', '木星 · 气态采集站', 'gasgiant', 'mining', { facility: 'jupiter' }),
+  fuel: place('jupiter', 1, 0, '木星燃料', 'fuelcell', { costs: [G], requires: { jupiter: 1 }, description: '用木星采集站的燃料逆窗加速：地火转运逆窗发射的航程与价格惩罚大幅减轻。' }),
+  io: moon('io', 'jupiter', 1, '木卫一 · 火山热电', 'volcano', 'jupiter', 8 * G, '木卫一的火山为采集站供热：木星气态采集站产出翻倍。'),
+  europa: moon('europa', 'jupiter', 2, '木卫二 · 冰下海洋', 'ocean', 'jupiter', 16 * G, '冰壳之下的海洋让升格文明找到新的研究方向：升格文明的产出 ×1.5。'),
+  ganymede: moon('ganymede', 'jupiter', 3, '木卫三 · 磁层船坞', 'magnet', 'jupiter', 16 * G, '在木卫三的磁层里铸造方舟：多一艘停泊在火星港的方舟。'),
+  callisto: moon('callisto', 'jupiter', 4, '木卫四 · 外缘补给站', 'depot', 'jupiter', 32 * G, '辐射带之外的补给站：所有方舟与转运方舟的航程再缩短 20%。'),
+  // The ice giants, once the deep drive crosses the gaps.
+  saturn: world('saturn', '土星 · 冰环采集站', 'ringplanet', 'deepDrive', { facility: 'saturn' }),
+  iceWater: place('saturn', 1, 0, '冰水补给', 'icewater', { costs: [8 * G], requires: { saturn: 1 }, description: '土星环的冰送进火星穹顶：每座穹顶多住一户。' }),
+  enceladus: moon('enceladus', 'saturn', 1, '土卫二 · 冰羽采集', 'plume', 'saturn', 32 * G, '收集土卫二喷出的冰羽：土星冰环采集站产出翻倍。'),
+  titan: moon('titan', 'saturn', 2, '土卫六 · 甲烷湖前哨', 'lake', 'saturn', 0, '厚雾之下的甲烷湖，是火星之后的下一个殖民世界。（后续开放）', { planned: true }),
+  uranus: world('uranus', '天王星 · 冰巨星采集站', 'icegiant', 'deepDrive', { facility: 'uranus' }),
+  titania: moon('titania', 'uranus', 1, '天卫三 · 冰岩采集', 'crystal', 'uranus', 128 * G, '天卫三的冰岩里藏着更多氘：冰巨星采集站产出翻倍。'),
+  oberon: moon('oberon', 'uranus', 2, '天卫四 · 深空工坊', 'workshop', 'uranus', 256 * G, '远离太阳的精密工坊：所有行星工业产能 ×1.25。'),
+  // Neptune, at the edge, once the relay keeps arks in touch.
+  neptune: world('neptune', '海王星 · 深空前哨', 'trident', 'relay', { facility: 'neptune' }),
+  triton: moon('triton', 'neptune', 1, '海卫一 · 逆行观测站', 'telescope', 'neptune', 512 * G, '沿着逆行轨道观测海王星的风暴：深空前哨产出翻倍。'),
 });
 export const SOLAR_TALENT_KEYS = Object.freeze(Object.entries(SOLAR_TALENTS).filter(([, t]) => !t.root && !t.planned && !t.facility).map(([key]) => key));
 // Save v26 knew only the colony and navigation talents; v27 added the arks and drydocks.
 export const V26_SOLAR_KEYS = Object.freeze(['dome', 'transfer', 'survey', 'hohmann', 'fleet', 'fuel']);
-// v29 added 殖民地存续协议 (it was a planned node before); v30 rebuilt the map by world.
+// v29 added 殖民地存续协议 (it was a planned node before); v30 rebuilt the map by world;
+// v31 put the technology on a central axis.
+export const V30_SOLAR_KEYS = Object.freeze(['solarSail', 'smelter', 'refinery', 'greenhouse', 'harbor', 'dome', 'transfer', 'uplift', 'nuclear', 'survey', 'hohmann', 'fleet', 'fusion', 'arkForge', 'fuel', 'jupiterDock', 'deepDrive', 'iceWater', 'uranusDock', 'phobos', 'deimos', 'io', 'europa', 'ganymede', 'callisto', 'enceladus', 'titania', 'oberon', 'triton']);
 export const V29_SOLAR_KEYS = Object.freeze(['heat', 'harbor', 'nuclear', 'fusion', 'dome', 'transfer', 'uplift', 'survey', 'hohmann', 'fleet', 'fuel']);
 export const V28_SOLAR_KEYS = Object.freeze(['heat', 'harbor', 'nuclear', 'fusion', 'dome', 'transfer', 'survey', 'hohmann', 'fleet', 'fuel']);
 export const emptyColonies = (keys = SOLAR_TALENT_KEYS) => ({ talents: Object.fromEntries(keys.map(key => [key, 0])), colonies: { mars: emptyWorld() }, transfers: [], nextTransfer: 0 });

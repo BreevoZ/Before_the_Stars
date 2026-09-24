@@ -2,32 +2,32 @@
 // its styles. 远航协议 is its root and the seam to the VI page below.
 import { createBindings } from './dom-bindings.js';
 import { icon } from './icons.js';
-import { SOLAR_TALENTS as T, SOLAR_MAP, SOLAR_COLUMNS, purchaseSolarTalent } from './solar-colony.js';
+import { SOLAR_TALENTS as T, SOLAR_MAP, SOLAR_REGIONS, regionFrame, purchaseSolarTalent } from './solar-colony.js';
 import { FACILITIES, flightTo } from './solar-industry.js';
 import { buildSolarTreeViewModel } from './solar-tree-view-model.js';
 import { drawOrbitalTalentSky } from './orbital-render.js';
 import { watchSeam } from './tree-flip.js';
 
 const NS = 'http://www.w3.org/2000/svg';
-// The route bar jumps to each world's large node.
-const ROUTE_ROOT = { mercury: 'mercury', venus: 'venus', mars: 'harbor', belt: 'belt', jupiter: 'jupiter', saturn: 'saturn', uranus: 'uranus', neptune: 'neptune' };
-const COLUMN_NAMES = { mercury: '水星', venus: '金星', mars: '火星', belt: '小行星带', jupiter: '木星', saturn: '土星', uranus: '天王星', neptune: '海王星' };
+// The route bar jumps to the axis or to each world's large node.
+const ROUTE_ROOT = { axis: 'heat', earth: 'moonPort', mars: 'harbor', mercury: 'mercury', venus: 'venus', belt: 'belt', jupiter: 'jupiter', saturn: 'saturn', uranus: 'uranus', neptune: 'neptune' };
 const routeOf = t => t.gold ? (t.root ? 'root' : 'main') : 'branch';
 export function createSolarTree(getSession, { commit, viewChanged, flipOrbit }) {
   const el = id => document.getElementById(id), bind = createBindings(document), dialog = el('solar-talents-dialog');
   const detail = el('solar-detail'), scroll = dialog.querySelector('.orbit-tree-scroll'), reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let talent = 'dome', selected = false, pinned = false, hideTimer, skySize = null;
   dialog.querySelectorAll('[data-icon]').forEach(node => { node.innerHTML = icon(node.dataset.icon); });
-  // The map is as wide as the solar system: size it, and hang the seam, the legend and a title over every column.
+  // Size the map, and hang the seam and the legend under the root.
   const map = dialog.querySelector('.orbit-tree-map'), root = T.voyage;
   map.style.width = `${SOLAR_MAP.width}px`; map.style.height = `${SOLAR_MAP.height}px`; const edges = el('solar-tree-edges'); edges.setAttribute('viewBox', `0 0 ${SOLAR_MAP.width} ${SOLAR_MAP.height}`); edges.style.width = map.style.width; edges.style.height = map.style.height;
   Object.assign(el('solar-flip-orbit').style, { left: `${root.x}px`, top: `${root.y + 92}px` }); Object.assign(el('solar-legend').style, { left: `${root.x}px`, top: `${root.y + 140}px` });
-  for (const [column, x] of Object.entries(SOLAR_COLUMNS)) {
-    const label = document.createElement('span'), top = Math.min(...Object.values(T).filter(t => t.column === column).map(t => t.y));
-    label.className = `orbit-route solar-column-label${column === 'mars' ? ' route-home' : ' route-life'}`; label.style.left = `${x}px`; label.style.top = `${top - 118}px`;
-    const main = Object.values(T).filter(t => t.column === column && t.kind !== 'planet' && !t.satellite), moons = Object.values(T).filter(t => t.column === column && t.satellite).length;
-    label.innerHTML = `${COLUMN_NAMES[column]}<small>${[...main.slice(0, 4).map(t => t.name), ...(moons ? [`${moons} 颗卫星`] : [])].join(' · ') || '—'}</small>`;
-    map.append(label);
+  // One framed region per world, behind its nodes: title in the outer top corner.
+  for (const region of SOLAR_REGIONS) {
+    const box = document.createElement('div'), { left, right, top, bottom } = regionFrame(region);
+    box.className = 'solar-region'; box.dataset.side = region.side > 0 ? 'right' : 'left'; if (region.reserved) box.dataset.reserved = 'true';
+    Object.assign(box.style, { left: `${left}px`, top: `${top}px`, width: `${right - left}px`, height: `${bottom - top}px` });
+    box.innerHTML = `<strong>${region.name}</strong><small>${region.en}</small>`;
+    map.prepend(box);
   }
   for (const [key, t] of Object.entries(T)) {
     for (const parent of Object.keys(t.requires)) {

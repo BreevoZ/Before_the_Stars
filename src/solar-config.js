@@ -5,7 +5,7 @@ import { TAU } from './celestial-clock.js';
 
 export const EARTH_YEAR_SECONDS = 900;
 // kind: home (Earth, where civilizations arise), moon, habitable (colonies),
-// industrial (facilities only), relay (outer system, the way to VIII).
+// industrial (facilities only), relay (the outer edge of the system).
 const body = (id, name, au, size, kind, color, description, extra = {}) => Object.freeze({ id, name, au, size, kind, color, description, ...extra });
 export const BODIES = Object.freeze([
   body('mercury', '水星', .39, 4, 'industrial', '#a79c8a', '离太阳最近的岩石。适合铺设太阳能阵列，为所有行星工业供能。', { phase: 1.1 }),
@@ -16,7 +16,7 @@ export const BODIES = Object.freeze([
   body('jupiter', '木星', 5.2, 16, 'industrial', '#c9a57c', '气态巨行星。采集燃料，缩短航程、放宽发射窗口。木卫二的冰下海洋可以殖民。', { phase: 4.2 }),
   body('saturn', '土星', 9.5, 13, 'habitable', '#d6c08e', '带环的气态巨行星。土卫六的甲烷湖与极寒考验每一个殖民文明。', { phase: 1.2, rings: true }),
   body('uranus', '天王星', 19.2, 9, 'relay', '#9cc3c4', '冰巨星。外太阳系的深空中继从这里开始。', { phase: 5.4 }),
-  body('neptune', '海王星', 30, 9, 'relay', '#6f8fc0', '太阳系的边缘。越过这里，就是 VIII 的星海。', { phase: 3.3 }),
+  body('neptune', '海王星', 30, 9, 'relay', '#6f8fc0', '太阳系的边缘。深空中继让方舟在这里也能与火星保持联系。', { phase: 3.3 }),
 ]);
 export const bodyById = id => BODIES.find(b => b.id === id);
 export const orbitalPeriod = au => EARTH_YEAR_SECONDS * au ** 1.5;

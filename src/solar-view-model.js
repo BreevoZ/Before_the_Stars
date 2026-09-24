@@ -141,6 +141,6 @@ export function facilityNeed(o,key){
   const need=reachNeed(o,FACILITIES[key].body);
   if(need==='需火星港')return '需要「火星港」：方舟停泊在火星';
   if(need==='无停泊方舟')return '火星港没有停泊的方舟 · 在小行星带铸造新方舟';
-  const relay=need.match(/^需(.+)中转$/),drive=need.match(/^需(.+)$/);
-  return relay?`航程不足 · 需要「${relay[1]}」中转`:drive?`航程不足 · 需要「${drive[1]}」`:'暂时无法派遣';
+  const tech=need.match(/^需(.+)$/);
+  return tech?`需要中轴科技「${tech[1]}」`:'暂时无法派遣';
 }

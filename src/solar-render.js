@@ -1,6 +1,6 @@
 import { BODIES, SYSTEM, bodyPosition, orbitRadius, bodyById } from './solar-config.js';
 import { drawArk, ARK_COUNT } from './shipyard-render.js';
-import { FACILITIES, docks, pioneerProgress, flightLeg, arksMoored, arrived, flightTo } from './solar-industry.js';
+import { FACILITIES, pioneerProgress, flightLeg, arksMoored, arrived, flightTo } from './solar-industry.js';
 import { drawArkLight } from './ark-lights.js';
 import { TAU } from './celestial-clock.js';
 const noise=n=>{let v=Math.imul(n^(n>>>16),0x21f0aaad);v=Math.imul(v^(v>>>15),0x735a2d97);return((v^(v>>>15))>>>0)/4294967296;};
@@ -47,8 +47,6 @@ export function drawSolarSystem(c,w,h,o,{ambientTime=o.elapsed,reducedMotion=fal
     if(t<1){trail(home,mars,arc(home,mars,0));for(let i=0;i<ARK_COUNT;i++){const k=Math.max(0,Math.min(1,t*1.08-i*.012)),p=arc(home,mars,k),side=(i-3)*1.6;
       drawArk(c,p.x+Math.cos(p.angle)*side,p.y+Math.sin(p.angle)*side,.07,{angle:p.angle,thrust:reducedMotion?0:1});}}
     else for(let i=0;i<arksMoored(o);i++){const a=-2.3+i*.24;light(mars.x+Math.cos(a)*(marsR+5),mars.y+Math.sin(a)*(marsR+5));}
-    // Drydocks: a small bracket beside every body arks can pass through.
-    for(const id of docks(o)){const p=place(id),r=Math.max(5,bodyById(id).size)*1.15;c.strokeStyle='#e6d6a4b0';c.lineWidth=.8;c.beginPath();c.moveTo(p.x+r+4,p.y-4);c.lineTo(p.x+r+7,p.y-4);c.lineTo(p.x+r+7,p.y+4);c.lineTo(p.x+r+4,p.y+4);c.stroke();}
     for(const f of o.solar.flights){const stops=[f.from,...(f.via??[]),f.body].map(place),leg=flightLeg(o,f),a=place(leg.from),b=place(leg.to),p=arc(a,b,leg.t,.12);
       stops.slice(1).forEach((q,i)=>trail(stops[i],q,arc(stops[i],q,0,.12)));light(p.x,p.y,6);}
     // Stations: the ark that founded each foothold, beside its world (on the belt, in it).

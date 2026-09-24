@@ -1,9 +1,10 @@
-// VII · arks, drydocks and planetary industry. The seven lunar arks fly out
-// together as one pioneer fleet and moor at the Mars harbour: from then on a
-// light at Mars is an ark waiting there. Every foothold elsewhere is founded by
-// sending one of them: it leaves Mars, flies leg by leg through the drydocks in
-// range of its drive, and becomes the station where it lands. New arks come only
-// from the belt's forges. Industry pays Legacy on its own ledger (o.solar).
+// VII · arks and planetary industry. The seven lunar arks fly out together as
+// one pioneer fleet and moor at the Mars harbour: from then on a light at Mars
+// is an ark waiting there. Every foothold elsewhere is founded by sending one of
+// them straight from Mars, and each world opens with one technology on the
+// VII map's central axis (heat for the inner planets, mining for the belt and
+// Jupiter, the deep drive for the ice giants, the relay for Neptune). New arks
+// come only from the belt's forges. Industry pays Legacy on its own ledger.
 import { Q } from './quantity.js';
 import { bodyById } from './solar-config.js';
 import { ORBITAL_RULES } from './orbital-config.js';
@@ -14,15 +15,15 @@ export const auOf = id => id === 'moon' ? 1 : bodyById(id).au;
 export const legDistance = (from, to) => Math.abs(auOf(to) - auOf(from));
 // The pioneer fleet: seven arks, Moon to Mars, from the moment of 远航协议.
 export const PIONEER = Object.freeze({ from: 'moon', to: 'mars', seconds: legSeconds(legDistance('moon', 'mars')) });
-// Drives are VII talents; the first comes with 远航协议. range is one leg in AU.
+// The technology each world waits for, and how fast arks fly once it is known.
+export const GATES = Object.freeze({ mercury: 'heat', venus: 'heat', belt: 'mining', jupiter: 'mining', saturn: 'deepDrive', uranus: 'deepDrive', neptune: 'relay' });
 export const DRIVES = Object.freeze([
-  Object.freeze({ talent: null, name: '化学推进', range: .8, speed: 1 }),
-  Object.freeze({ talent: 'nuclear', name: '核热推进', range: 1.5, speed: 1.25 }),
-  Object.freeze({ talent: 'fusion', name: '聚变推进', range: 4, speed: 1.6 }),
-  Object.freeze({ talent: 'deepDrive', name: '深空推进', range: 15, speed: 2.2 }),
+  Object.freeze({ talent: null, name: '化学推进', speed: 1 }),
+  Object.freeze({ talent: 'mining', name: '聚变引擎', speed: 1.6 }),
+  Object.freeze({ talent: 'deepDrive', name: '深空推进', speed: 2.2 }),
 ]);
-// Drydocks an ark can leave from or pass through, and the talent that builds each.
-export const DOCKS = Object.freeze({ mars: 'harbor', jupiter: 'jupiterDock', uranus: 'uranusDock' });
+// v30 arks could pass through these drydocks; they are kept only to read old flights.
+export const OLD_DOCKS = Object.freeze(['jupiter', 'uranus']);
 
 const M = 2 ** 20, G = 2 ** 30, T = 2 ** 40;
 // yield: Legacy per second, doubling with every rank after the first.
@@ -47,7 +48,6 @@ export const emptyFlights = () => ({ flights: [] });
 // ── Arks ──
 const talent = (o, key) => o.solar.talents?.[key] ?? 0;
 export const drive = o => DRIVES.filter(d => !d.talent || talent(o, d.talent)).at(-1);
-export const docks = o => Object.entries(DOCKS).filter(([, key]) => talent(o, key)).map(([body]) => body);
 export const pioneerAt = o => o.completionAt === null ? null : o.completionAt + PIONEER.seconds;
 export const pioneerProgress = o => o.completionAt === null ? 0 : Math.max(0, Math.min(1, (o.elapsed - o.completionAt) / PIONEER.seconds));
 // 光帆加速 shortens every flight, arks and transfers alike.
@@ -58,25 +58,13 @@ export const arkTotal = o => ORBITAL_RULES.arkCount + talent(o, 'arkForge') + ta
 // Arks away: those in flight and those that became a station.
 export const arksAway = o => (o.solar.flights?.length ?? 0) + Object.values(o.solar.facilities).filter(rank => rank > 0).length;
 export const arksMoored = o => arrived(o, PIONEER.to) ? Math.max(0, arkTotal(o) - arksAway(o)) : 0;
-// The way to a body: from Mars, through drydocks, each leg within the drive's
-// range; the quickest such path. Or why no ark can go yet.
+// The way to a body: straight from Mars once its technology is known, or why
+// no ark can go yet (no harbour, no technology, no ark moored).
 export function route(o, body) {
   if (!talent(o, 'harbor')) return { blocked: 'harbor' };
-  const d = drive(o), factor = flightFactor(o), stops = docks(o).filter(id => id !== body);
-  const time = (a, b) => legSeconds(legDistance(a, b), d.speed) * factor;
-  const best = { mars: { seconds: 0, via: [] } }, open = ['mars'], done = new Set();
-  while (open.length) {
-    open.sort((a, b) => best[a].seconds - best[b].seconds); const at = open.shift(); if (done.has(at)) continue; done.add(at);
-    if (at === body) break;
-    for (const next of [...stops, body]) {
-      if (done.has(next) || legDistance(at, next) > d.range + 1e-9) continue;
-      const seconds = best[at].seconds + time(at, next);
-      if (!best[next] || seconds < best[next].seconds) { best[next] = { seconds, via: at === 'mars' ? [] : [...best[at].via, at] }; open.push(next); }
-    }
-  }
-  if (!best[body]) return { blocked: 'range', distance: Math.min(...[...stops, 'mars'].map(id => legDistance(id, body))) };
+  if (GATES[body] && !talent(o, GATES[body])) return { blocked: 'tech', need: GATES[body] };
   if (!arksMoored(o)) return { blocked: 'fleet' };
-  return { from: 'mars', via: best[body].via, seconds: Math.round(best[body].seconds) };
+  return { from: 'mars', via: [], seconds: Math.round(legSeconds(legDistance('mars', body), drive(o).speed) * flightFactor(o)) };
 }
 // Where an ark is along its legs: the waypoint it left, the next one and how far between.
 export function flightLeg(o, f) {

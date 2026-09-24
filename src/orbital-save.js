@@ -9,9 +9,9 @@ import { createOrbitalState } from './orbital-game.js';
 import { warBonuses } from './orbital-war.js';
 import { rebirthDelay, refugeeDelay } from './celestial-economy.js';
 import { AGES } from './game-config.js';
-import { FACILITIES, V29_FACILITY_KEYS, DOCKS, arrived, facilityAt, arksAway, arkTotal } from './solar-industry.js';
+import { FACILITIES, V29_FACILITY_KEYS, OLD_DOCKS, arrived, facilityAt, arksAway, arkTotal } from './solar-industry.js';
 import { WORLDS, COLONY_WAR, UPLIFT } from './colony-war.js';
-import { SOLAR_TALENTS, SOLAR_TALENT_KEYS, V26_SOLAR_KEYS, V28_SOLAR_KEYS, V29_SOLAR_KEYS, solarRank, domeCapacity, fleetCapacity, COLONY_RULES } from './solar-colony.js';
+import { SOLAR_TALENTS, SOLAR_TALENT_KEYS, V26_SOLAR_KEYS, V28_SOLAR_KEYS, V29_SOLAR_KEYS, V30_SOLAR_KEYS, solarRank, domeCapacity, fleetCapacity, COLONY_RULES } from './solar-colony.js';
 function keys(value,expected,name){check(object(value)&&Object.keys(value).length===expected.length&&expected.every(k=>Object.hasOwn(value,k)),name);}
 const amount=v=>Q.valid(v)&&Q.gte(v,0);
 const whole=v=>amount(v)&&Q.isInteger(v);
@@ -37,7 +37,7 @@ export function validateOrbital(s,version){
     if(version>=26)validateColonies(o,version);
     if(version>=27)validateFlights(o,version);
   }
-  check(o.version===(version===16?2:version===17?3:version===18?4:version===19?5:version===20?6:version===21?7:version===22?8:version===23?9:version===24?10:version===25?11:version===26?12:version===27?13:version===28?14:version===29?15:R.version)&&bool(o.started)&&num(o.elapsed)&&int(o.rng,0,4294967295),'轨道时钟与随机源');
+  check(o.version===(version===16?2:version===17?3:version===18?4:version===19?5:version===20?6:version===21?7:version===22?8:version===23?9:version===24?10:version===25?11:version===26?12:version===27?13:version===28?14:version===29?15:version===30?16:R.version)&&bool(o.started)&&num(o.elapsed)&&int(o.rng,0,4294967295),'轨道时钟与随机源');
   for(const key of ['cycle','settledCycle','nuclearCycles','nextCivilization','nextWar'])check(int(o[key]),key);
   check(o.nuclearCycles===o.settledCycle&&o.settledCycle<=o.cycle,'核毁灭凭据');
   check(['dormant','living','winter'].includes(o.phase)&&o.started===(o.phase!=='dormant'),'萌芽阶段');
@@ -112,14 +112,14 @@ export function validateOrbital(s,version){
 // arks in flight. Transfers are paid; a civilization can only be in one place.
 // Before v30 the map had other shapes: an old save is checked for its own keys
 // and prices; its prerequisites belong to that old map and are not re-derived.
-const solarKeysOf=version=>version>=30?SOLAR_TALENT_KEYS:version>=29?V29_SOLAR_KEYS:version>=27?V28_SOLAR_KEYS:V26_SOLAR_KEYS;
-const OLD_COSTS=Object.freeze({heat:[12*2**20]});
+const solarKeysOf=version=>version>=31?SOLAR_TALENT_KEYS:version>=30?V30_SOLAR_KEYS:version>=29?V29_SOLAR_KEYS:version>=27?V28_SOLAR_KEYS:V26_SOLAR_KEYS;
+const OLD_COSTS=Object.freeze({heat:[12*2**20],nuclear:[64*2**20],fusion:[320*2**20],jupiterDock:[4*2**30],uranusDock:[64*2**30]});
 function validateColonies(o,version){
   const sol=o.solar,talentKeys=solarKeysOf(version);keys(sol.talents,talentKeys,'行星际天赋');
   for(const key of talentKeys){const t=SOLAR_TALENTS[key],costs=t?.costs??OLD_COSTS[key],rank=sol.talents[key],paid=sol.payments[key]??[];
     // 火星港 was granted free (a recorded 0) to v29 saves that already had a dome.
     check(int(rank,0,costs.length)&&Array.isArray(paid)&&paid.length===rank&&paid.every((cost,i)=>Q.eq(cost,costs[i])||key==='harbor'&&Q.eq(cost,0)),'行星际天赋实付');
-    if(rank&&version>=30)check(o.talents.voyage>0&&Object.entries(t.requires).every(([p,n])=>solarRank(o,p)>=n)&&(!t.arrival||arrived(o,t.arrival)),'行星际天赋前置');}
+    if(rank&&version>=31)check(o.talents.voyage>0&&Object.entries(t.requires).every(([p,n])=>solarRank(o,p)>=n)&&(!t.arrival||arrived(o,t.arrival)),'行星际天赋前置');}
   keys(sol.colonies,['mars'],'殖民地');const world=sol.colonies.mars,residents=version>=28?world?.civs:world,uplifted=version>=29?world?.uplifted:[];
   check(Array.isArray(residents)&&Array.isArray(sol.transfers)&&int(sol.nextTransfer),'殖民地列表');
   check(Array.isArray(uplifted),'升格文明列表');
@@ -148,7 +148,7 @@ function validateColonies(o,version){
 function validateFlights(o,version){
   const sol=o.solar,seen=new Set();check(Array.isArray(sol.flights),'方舟航程');
   for(const f of sol.flights){keys(f,['body','from',...(version>=30?['via']:[]),'departAt','arriveAt'],'方舟航程字段');const key=facilityAt(f.body);
-    check(key&&!seen.has(f.body)&&sol.facilities[key]===0&&['moon','mars'].includes(f.from)&&(version<30||Array.isArray(f.via)&&f.via.every(d=>Object.hasOwn(DOCKS,d)&&d!==f.body)),'方舟航线');seen.add(f.body);
+    check(key&&!seen.has(f.body)&&sol.facilities[key]===0&&['moon','mars'].includes(f.from)&&(version<30||Array.isArray(f.via)&&f.via.every(d=>OLD_DOCKS.includes(d)&&d!==f.body)),'方舟航线');seen.add(f.body);
     check(num(f.departAt,0,o.elapsed)&&num(f.arriveAt)&&f.arriveAt>o.elapsed-1e-9&&f.arriveAt>f.departAt,'方舟航行时间');}
   if(version>=30)check(arksAway(o)<=arkTotal(o),'方舟数量');
 }

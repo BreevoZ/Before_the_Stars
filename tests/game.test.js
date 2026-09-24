@@ -1,6 +1,7 @@
 import { collectCases } from './cases.js';
 
-const tests = collectCases({ browser: true });
+const filter = new URLSearchParams(location.search).get('filter');
+const tests = collectCases({ browser: true }).filter(test => !filter || test.name.toLowerCase().includes(filter.toLowerCase()));
 let failures = 0;
 for (const { name, run } of tests) {
   const item = document.createElement('li');

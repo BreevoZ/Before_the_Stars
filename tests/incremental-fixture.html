@@ -14,7 +14,12 @@ if (reducedMotion) {
 }
 window.__confirmMessages = [];
 window.confirm = message => { window.__confirmMessages.push(message); return Boolean(window.__confirm); };
-window.requestAnimationFrame = callback => (window.__testFrame = callback, 1);
+// A frame may contain several callbacks (including browser/tooling helpers).
+// Replacing a single callback can silently lose the game's next frame.
+let frameId=0;const callbacks=new Map();
+function advanceFrame(timestamp){const pending=[...callbacks.values()];callbacks.clear();document.body.dataset.fixtureFrames=String(pending.length);for(const callback of pending)callback(timestamp);}
+window.requestAnimationFrame = callback => {const id=++frameId;callbacks.set(id,callback);window.__testFrame=advanceFrame;return id;};
+window.cancelAnimationFrame = id => callbacks.delete(id);
 const fixture = URL.createObjectURL(new Blob([`export * from '${root}src/save.js?isolated';
 import { createSaveStore as original } from '${root}src/save.js?isolated';
 export function createSaveStore(unused, options) { return original(() => window.__storage, options); }`], { type: 'text/javascript' }));
@@ -23,4 +28,6 @@ const html = await (await fetch('../index.html')).text();
 document.open();
 document.write(html.replace('<head>', `<head><base href="${root}"><script type="importmap">${map}<\/script>`));
 document.close();
+window.addEventListener('error', event => { document.body.dataset.fixtureError = event.error?.stack ?? event.message; });
+window.addEventListener('unhandledrejection', event => { document.body.dataset.fixtureError = String(event.reason?.stack ?? event.reason); });
 </script></body></html>

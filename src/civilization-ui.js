@@ -247,8 +247,8 @@ export function createCivilizationUI(onChange, { debug = false } = {}) {
     },
     get session() { return session; },
     get homeOpen() { return dialog.open || Boolean(session.orbital?.started); },
-    get paused() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open || debugDialog.open || colony.treeOpen; },
-    get modalOpen() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open || debugDialog.open || colony.treeOpen; },
+    get paused() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open || debugDialog.open || colony.cinematicOpen; },
+    get modalOpen() { return dialog.open || saveDialog.open || autoDialog.open || challengeDialog.open || debugDialog.open || colony.treeOpen || colony.cinematicOpen; },
     get canStep() { return session.game.status === 'playing' || canAutoContinue(session) || Boolean(session.orbital?.started); },
     get timeScale() { return debug ? session.debugSpeed : session.permanent.settings.speed; },
     sync, save, open, cycleSpeed, animate(timestamp) {

@@ -112,15 +112,3 @@ body[data-orbital-active="true"] .game-shell{display:none}
 #colony-map .colony-lunar>div{padding:26px 30px;max-width:44%}#colony-world{cursor:default}#colony-world[data-moon-hover="true"]{cursor:pointer}
 @media(max-width:740px){#colony-map .colony-lunar>div{max-width:60%;padding:18px}#colony-map .colony-lunar p:not(.colony-eyebrow){display:none}}
 .colony-pair .colony-side-label{color:var(--side)}
-/* VII: the solar system replaces the Earth as the main observation view. */
-#colony-map .colony-system{position:absolute;inset:0;z-index:2;display:none;border-radius:inherit;overflow:hidden}
-#colony-map[data-view="system"] .colony-system{display:block}#colony-map[data-view="system"] .orbit-site,#colony-map[data-view="system"]>.colony-map-caption{display:none}
-#colony-system-canvas{position:absolute;inset:0;width:100%;height:100%;cursor:default}#colony-system-canvas[data-hover="true"]{cursor:pointer}
-.colony-body-card{position:absolute;left:22px;bottom:44px;width:250px;padding:14px 16px;border:1px solid var(--line);border-radius:6px;background:#0c1618d9;backdrop-filter:blur(6px);font-size:10px;line-height:1.7;color:var(--muted)}
-.colony-body-card small{display:block;letter-spacing:2px;font-size:9px}.colony-body-card strong{display:block;font-size:15px;font-weight:450;letter-spacing:2px;color:var(--color-home-text);margin:4px 0 6px}
-.colony-body-card p{margin:0 0 6px}#colony-body-status{color:var(--route-main)}#colony-body-enter{padding:6px 0;min-height:0;font-size:11px;color:var(--route-main)}
-.colony-system-title{position:absolute;left:0;right:0;top:14%;margin:0;text-align:center;font-size:26px;letter-spacing:10px;color:var(--route-main);opacity:0;pointer-events:none}
-.colony-system-title small{display:block;margin-top:12px;font-size:11px;letter-spacing:4px;color:var(--muted)}
-.colony-system-title.playing{animation:system-title 6.5s ease-in-out both}
-@keyframes system-title{0%,45%{opacity:0;transform:translateY(8px)}62%,85%{opacity:1;transform:none}100%{opacity:0}}
-@media(max-width:740px){.colony-body-card{left:10px;right:10px;width:auto;bottom:34px}}

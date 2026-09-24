@@ -345,14 +345,14 @@ export function registerOrbitalColonyTests(test,assert,near){
       el('orbit-buy').click();assert(el('colony-lunar-rate').textContent===Q.format(R.lunarBaseIncome*2));el('close-orbit-talents').click();
       for(let i=0;i<10;i++)w.__testFrame(now+=100);el('colony-pause').click();const wallet=el('colony-legacy').textContent;
       for(let i=0;i<10;i++)w.__testFrame(now+=100);assert(el('colony-legacy').textContent===wallet);
-      el('colony-save').click();el('manual-save').click();const saved=parseSession(w.__storage.getItem(DEBUG_SAVE_KEY));assert(saved.orbital.talents.lunarIndustry===1&&saved.orbital.lunarProduced>0);
+      el('colony-save').click();el('manual-save').click();const saved=parseSession(w.__storage.getItem(DEBUG_SAVE_KEY));assert(saved.orbital.talents.lunarIndustry===1&&saved.orbital.lunarProduced>0,`Lunar clock: hidden=${d.hidden}, frames=${d.body.dataset.fixtureFrames}, production=${saved.orbital.lunarProduced}, error=${d.body.dataset.fixtureError}`);
     }finally{frame.remove();}
   });
   test.browser('Orbital UI: pair civilizations, buy monitoring on the SVG tree, watch real combat, pause, intervene and restore',async()=>{
     let frame=await mountFixture(serializeSession(colonyFixture({legacy:10000})),false,'debug',{reducedMotion:true}),raw;
     try{const doc=frame.contentDocument,win=frame.contentWindow,el=id=>doc.getElementById(id);let now=0;const tick=n=>{for(let i=0;i<n;i++)win.__testFrame(now+=100);};
       assert(!el('orbital-game').hidden&&el('colony-monitor').hidden);el('colony-start-war').click();tick(10);
-      el('colony-talents').click();assert(el('orbit-talents-dialog').open);const before=el('colony-time').textContent;tick(10);assert(el('colony-time').textContent===before);
+      el('colony-talents').click();assert(el('orbit-talents-dialog').open);const before=el('colony-time').textContent;tick(10);assert(el('colony-time').textContent!==before,`VI tree clock: hidden=${doc.hidden}, frames=${doc.body.dataset.fixtureFrames}, time=${before}/${el('colony-time').textContent}, dialogs=${[...doc.querySelectorAll('dialog[open]')].map(x=>x.id)}`);
       el('orbit-node-monitor').click();el('orbit-buy').click();assert(el('orbit-node-monitor').dataset.state==='max'&&el('orbit-cost-monitor').textContent==='');
       el('orbit-node-patronage').dispatchEvent(new win.MouseEvent('dblclick',{bubbles:true}));assert(el('orbit-node-patronage').dataset.state==='max');
       el('close-orbit-talents').click();tick(20);assert(!el('colony-monitor').hidden&&!el('colony-battle').hidden&&el('colony-war-player').textContent.includes('金币'));
@@ -367,7 +367,7 @@ export function registerOrbitalColonyTests(test,assert,near){
     const frame=await mountFixture(serializeSession(seed),false,'debug');
     try{const doc=frame.contentDocument,win=frame.contentWindow,el=id=>doc.getElementById(id);
       el('watch-war-0').click();assert(el('colony-selected-name').textContent.includes(seed.orbital.civilizations[0].name));
-      const other=findCivilization(seed.orbital,seed.orbital.wars[1].participants[1]);el(`site-${other.site}`).click();assert(el('watch-war-1').getAttribute('aria-pressed')==='true'&&el('colony-first').value===other.site);
+      const other=findCivilization(seed.orbital,seed.orbital.wars[1].participants[1]);el(`site-${other.site}`).click();assert(el('watch-war-1').getAttribute('aria-pressed')==='true'&&el('colony-opponent').value===other.site&&el('colony-target').dataset.side==='enemy');
       for(const width of [320,390,1100]){frame.style.width=`${width}px`;await new Promise(r=>setTimeout(r,35));win.__testFrame(100);
         assert(doc.documentElement.scrollWidth<=width+2);assert(el('colony-start-war').getBoundingClientRect().height>=40);
         el('colony-talents').click();el('orbit-node-monitor').click();assert(el('orbit-tree-edges').querySelectorAll('path').length>=11);assert(el('orbit-node-protocol').getBoundingClientRect().width>=64);
@@ -382,7 +382,7 @@ export function registerOrbitalColonyTests(test,assert,near){
     const frame=await mountFixture(serializeSession(seed),false,'debug',{reducedMotion:true});
     try{const doc=frame.contentDocument,win=frame.contentWindow,el=id=>doc.getElementById(id);let now=0;el('colony-start-war').click();
       for(let i=0;i<1000&&el('colony-fallout').hidden;i++)win.__testFrame(now+=100);
-      assert(!el('colony-fallout').hidden,'Real AI battle must reach a nuclear winner');el('colony-save').click();el('manual-save').click();const saved=parseSession(win.__storage.getItem(DEBUG_SAVE_KEY));
+      assert(!el('colony-fallout').hidden,`Real AI battle must reach a nuclear winner: hidden=${doc.hidden}, frames=${doc.body.dataset.fixtureFrames}, time=${el('colony-time').textContent}`);el('colony-save').click();el('manual-save').click();const saved=parseSession(win.__storage.getItem(DEBUG_SAVE_KEY));
       assert(saved.orbital.nuclearCycles===1&&saved.orbital.civilizations.every(c=>!c.alive));el('close-save').click();for(let i=0;i<40;i++)win.__testFrame(now+=100);
       assert(el('colony-fallout').hidden&&el('colony-cycle').textContent.includes('第 2 轮'));
     }finally{frame.remove();}

@@ -13,6 +13,7 @@ import { TRAITS } from './traits.js';
 import { TRAIT_DESCRIPTIONS } from './talents.js';
 import { BASE_DESIGNS } from './base-layouts.js';
 import { drawOrbitalScene, ORBITAL_SECONDS } from './orbital-scene.js';
+import { drawVoyageScene, VOYAGE_SECONDS } from './voyage-scene.js';
 import { drawDestructionScene, DESTRUCTION_SECONDS, createDestructionPreview } from './destruction-scene.js';
 
 export const CLIP_SECONDS = 8;
@@ -38,6 +39,7 @@ export const ANIMATION_CLIPS = [
   { id: 'stars', category: 'scene', kind: 'stars', name: '星空闪烁', note: '夜间原速 · 每颗星拥有独立的闪烁节奏' },
   { id: 'civilization-destruction', category: 'scene', kind: 'destruction', name: '文明毁灭 · 最后的反扑', note: '超级士兵出动 → 核武库启动 → 世界毁灭 → 废墟静默 · 22 秒压缩到 8 秒，可拖动预览' },
   { id: 'orbital-launch', category: 'scene', kind: 'orbital', name: 'VI · 轨道启航', note: '36 艘火箭从废墟升空，镜头进入星空 · 24 秒演出压缩到 8 秒，可拖动预览' },
+  { id: 'interplanetary-voyage', category: 'scene', kind: 'voyage', name: 'VII · 月面远航', note: '月球升出地平线 → 六艘方舟分赴深空 → 行星际文明 · 22 秒压缩到 8 秒，可拖动预览' },
 ];
 
 function soldier(id, type, team, x) {
@@ -148,6 +150,9 @@ export function createClipPainter(canvas, clip) {
     ctx.fillStyle = '#1d2d24'; ctx.fillRect(0, 0, width, height);
     if (clip.kind === 'orbital') {
       ctx.scale(ratio, ratio); drawOrbitalScene(ctx, bounds.width, bounds.height, time / CLIP_SECONDS * ORBITAL_SECONDS, { reducedMotion }); return;
+    }
+    if (clip.kind === 'voyage') {
+      ctx.scale(ratio, ratio); drawVoyageScene(ctx, bounds.width, bounds.height, time / CLIP_SECONDS * VOYAGE_SECONDS, { reducedMotion }); return;
     }
     if (clip.kind === 'destruction') {
       ctx.scale(ratio, ratio); drawDestructionScene(ctx, bounds.width, bounds.height, time / CLIP_SECONDS * DESTRUCTION_SECONDS, { game: finale, reducedMotion }); return;

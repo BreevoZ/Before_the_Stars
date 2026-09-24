@@ -208,6 +208,7 @@ function togglePause() {
 byId('pause-battle').hidden = false;
 byId('pause-battle').addEventListener('click', togglePause);
 byId('colony-pause').addEventListener('click', togglePause);
+byId('orbit-tree-pause').addEventListener('click', togglePause);
 byId('help').addEventListener('click', openHelp);
 byId('close-help').addEventListener('click', closeHelp);
 helpDialog.addEventListener('cancel', event => {

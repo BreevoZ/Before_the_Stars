@@ -9,15 +9,15 @@ import { AGES, UNITS } from './game-config.js';
 import { TRAITS } from './traits.js';
 import { localSkyTime } from './celestial-clock.js';
 import { watchSeam } from './tree-flip.js';
-import { drawSolarSystem, bodyAt, bodyKindLabel } from './solar-render.js';
-import { bodyById, bodyPosition } from './solar-config.js';
+import { createSolarUI } from './solar-ui.js';
+import { createVoyageUI } from './voyage-ui.js';
 const branch = key => T[key].branch;
 const military=['doctrines','superSoldiers','sniper'];
 export function createOrbitalColonyUI(getSession,{commit,archive,save,speed,viewChanged,flipSurface}) {
   const el=id=>document.getElementById(id),bind=createBindings(document),dialog=el('orbit-talents-dialog');
   const detail=el('orbit-detail'),scroll=dialog.querySelector('.orbit-tree-scroll');
   const reduced=matchMedia('(prefers-reduced-motion: reduce)');
-  let talent='monitor',selected=false,pinned=false,paused=false,ambient=0,last=null,lastPaint=null,hideTimer,treeSize=null,ringBuild=null,view=null,systemHover=null,systemSelected=null,introStart=null;
+  let talent='monitor',selected=false,pinned=false,paused=false,ambient=0,last=null,lastPaint=null,hideTimer,treeSize=null,ringBuild=null;
   document.querySelectorAll('#orbital-game [data-icon], #orbit-talents-dialog [data-icon]').forEach(node=>{node.innerHTML=icon(node.dataset.icon);});
   function selectCivilization(site,key){
     const o=getSession().orbital,c=o?.civilizations.find(c=>c.site===site);if(!c)return;
@@ -107,51 +107,22 @@ export function createOrbitalColonyUI(getSession,{commit,archive,save,speed,view
   el('close-orbit-detail').addEventListener('click',closeDetail);
   function buy(key){
     if(!purchaseOrbitalTalent(getSession(),key))return;if(key==='recovery')ringBuild={rank:getSession().orbital.talents.recovery,start:null};talent=key;commit();
-    if(key==='voyage'){dialog.close();startIntro();return;}selectTalent(key,true);
+    if(key==='voyage'){voyage.present();return;}selectTalent(key,true);
     el('orbit-feedback').textContent=`${T[key].name} · 已点亮 ${getSession().orbital.talents[key]} 级`;
     if(!reduced.matches){el(`orbit-node-${key}`).animate([{scale:1},{scale:1.15},{scale:1}],{duration:450});
       el('orbit-tree-wallet').animate([{transform:'translateY(-4px)',opacity:.5},{transform:'translateY(0)',opacity:1}],{duration:450});
       for(const p of Object.keys(T[key].requires))el(`orbit-flow-${p}-${key}`).animate([{strokeDashoffset:1,opacity:0},{opacity:1,offset:.12},{strokeDashoffset:0,opacity:0}],{duration:900,easing:'ease-in-out'});}
   }
   function openTree(key=null){
-    if(!getSession().orbital?.started)return;
+    if(!getSession().orbital?.started||voyage.active)return;
     closeDetail();if(!dialog.open)dialog.showModal();sync();paintTree();
     el(`orbit-node-${key??'protocol'}`).scrollIntoView({block:key?'center':'end',inline:'center'});
     el(`orbit-node-${key??'protocol'}`).focus({preventScroll:true});if(key)selectTalent(key,true);viewChanged();
   }
   document.querySelectorAll('[data-orbit-route]').forEach(button=>button.addEventListener('click',()=>{closeDetail();el(`orbit-node-${button.dataset.orbitRoute}`).scrollIntoView({block:'center',inline:'center',behavior:reduced.matches?'instant':'smooth'});}));
-  // Observation window: the solar system once VII is open (it replaces the
-  // Earth as the default view), the Earth, and the moon base.
-  const allowedView=next=>{const o=getSession().orbital;return next==='system'&&o?.talents.voyage?'system':next==='moon'&&o?.talents.outpost?'moon':next==='earth'?'earth':o?.talents.voyage?'system':'earth';};
-  const markView=()=>{el('colony-map').dataset.view=view;for(const id of ['system','earth','moon'])el(`colony-view-${id}`).setAttribute('aria-pressed',String(view===id));};
-  const setView=next=>{view=allowedView(next);markView();lastPaint=null;paint();};
-  for(const id of ['system','earth','moon'])el(`colony-view-${id}`).addEventListener('click',()=>setView(id));
-  // Pointer on the orrery: hover previews a body, a click pins it; Earth opens its close-up.
-  const systemPoint=e=>{const b=el('colony-system-canvas').getBoundingClientRect();return[(e.clientX-b.left)*1000/b.width,(e.clientY-b.top)*620/b.height];};
-  el('colony-system-canvas').addEventListener('pointermove',e=>{const o=getSession().orbital;if(!o)return;const b=bodyAt(o,...systemPoint(e),{reducedMotion:reduced.matches});
-    systemHover=b?.id??null;el('colony-system-canvas').dataset.hover=String(Boolean(b));syncBodyCard();});
-  el('colony-system-canvas').addEventListener('pointerleave',()=>{systemHover=null;syncBodyCard();});
-  el('colony-system-canvas').addEventListener('click',e=>{const o=getSession().orbital;if(!o)return;const b=bodyAt(o,...systemPoint(e),{reducedMotion:reduced.matches});
-    if(b?.id==='earth'&&systemSelected==='earth'){setView('earth');return;}systemSelected=b?.id??null;syncBodyCard();});
-  el('colony-body-enter').addEventListener('click',()=>{if(systemSelected==='earth')setView('earth');});
-  function syncBodyCard(){
-    const o=getSession().orbital,b=bodyById(systemHover??systemSelected??'');el('colony-body-card').hidden=!b;if(!b||!o)return;
-    el('colony-body-kind').textContent=bodyKindLabel(b);el('colony-body-name').textContent=b.name;el('colony-body-description').textContent=b.description;
-    const alive=o.civilizations.filter(c=>c.alive).length;
-    el('colony-body-status').textContent=b.id==='earth'?(o.phase==='winter'?'核冬天 · 等待新的萌芽':`${alive} 个文明 · ${o.wars.length} 场战争`):'尚未开发 · 行星开发将在后续版本开放';
-    el('colony-body-enter').hidden=b.id!=='earth';
-  }
-  // Launching the ark: the Earth view shrinks into its place on the orrery while
-  // the solar system opens around it, and the ark climbs away from Earth.
-  function startIntro(){
-    const o=getSession().orbital;if(!o?.talents.voyage)return;setView('system');
-    if(reduced.matches)return;
-    const e=bodyPosition(bodyById('earth'),o.elapsed),origin=`${e.x/10}% ${e.y/6.2}%`,timing={duration:4800,easing:'cubic-bezier(.6,0,.2,1)'};
-    introStart=performance.now();el('colony-system').style.transformOrigin=origin;
-    el('colony-system').animate([{opacity:0,transform:'scale(3.2)'},{opacity:1,transform:'scale(1)'}],timing);
-    el('colony-world').animate([{opacity:1,transform:'none'},{opacity:0,transform:`translate(${e.x/10-50}%,${e.y/6.2-51.9}%) scale(.02)`}],timing);
-    const title=el('colony-system-title');title.classList.remove('playing');void title.offsetWidth;title.classList.add('playing');
-  }
+  const solar=createSolarUI(getSession,{openTree,replay:()=>{openTree('voyage');voyage.present();}});
+  const voyage=createVoyageUI({tree:dialog,arrive:()=>{solar.setView('system');sync();},changed:viewChanged});
+  const setView=next=>solar.setView(next);
   const onMoon=e=>{const o=getSession().orbital;if(!o?.talents.transit)return false;const b=el('colony-world').getBoundingClientRect(),m=moonPosition(reduced.matches?0:o.elapsed);
     return Math.hypot((e.clientX-b.left)*1000/b.width-m.x,(e.clientY-b.top)*620/b.height-m.y)<m.m*1.8&&m.depth>-.2;};
   el('colony-world').addEventListener('click',e=>{if(onMoon(e))setView('moon');});
@@ -177,22 +148,21 @@ export function createOrbitalColonyUI(getSession,{commit,archive,save,speed,view
     const o=getSession().orbital;if(!o?.started||document.hidden){last=null;lastPaint=null;return;}
     if(last!==null&&!paused&&!reduced.matches)ambient+=Math.max(0,Math.min(.1,(timestamp-last)/1000));last=timestamp;
     if(lastPaint!==null&&timestamp>=lastPaint&&timestamp-lastPaint<1000/30)return;lastPaint=timestamp;
+    if(voyage.active){voyage.tick(timestamp);return;}
     if(dialog.open){paintTree();return;}
     if(ringBuild?.start===null)ringBuild.start=ambient;
     const construction=ringBuild&&ringBuild.rank===o.talents.recovery&&!reduced.matches&&!paused?Math.min(1,(ambient-ringBuild.start)/2):1;
-    const wanted=allowedView(view);if(wanted!==view){view=wanted;markView();}
-    const introProgress=introStart===null?null:(timestamp-introStart)/6500;if(introProgress!==null&&introProgress>=1)introStart=null;
-    if(view==='system'){const q=canvasContext(el('colony-system-canvas'));if(q)drawSolarSystem(q.ctx,q.width,q.height,o,{ambientTime:ambient,reducedMotion:reduced.matches,hover:systemHover,selected:systemSelected,intro:introProgress});}
-    const p=view==='earth'||introStart!==null?canvasContext(el('colony-world')):null;if(p)drawOrbitalColony(p.ctx,p.width,p.height,o,{ambientTime:ambient,reducedMotion:reduced.matches,construction});
+    const view=solar.view;solar.paint(ambient);
+    const p=view==='earth'?canvasContext(el('colony-world')):null;if(p)drawOrbitalColony(p.ctx,p.width,p.height,o,{ambientTime:ambient,reducedMotion:reduced.matches,construction});
     if(construction===1)ringBuild=null;
     for(const site of SITES){const pos=sitePosition(site,reduced.matches?0:o.elapsed),node=el(`site-${site.id}`);node.style.left=`${pos.x/10}%`;node.style.top=`${pos.y/6.2}%`;node.hidden=!pos.visible;}
     const war=o.wars.find(w=>w.id===o.selectedWar);
-    if(o.talents.monitor&&war){const site=SITES.find(site=>site.id===o.civilizations.find(c=>c.id===war.participants[0]).site);renderBattle(war.game,{skyTime:localSkyTime(o.elapsed,site),lunarTime:o.elapsed});}
-    if(o.talents.overview&&o.wars.length&&(lastThumbs===null||timestamp-lastThumbs>=100||timestamp<lastThumbs)){lastThumbs=timestamp;
+    if(view==='earth'&&o.talents.monitor&&war){const site=SITES.find(site=>site.id===o.civilizations.find(c=>c.id===war.participants[0]).site);renderBattle(war.game,{skyTime:localSkyTime(o.elapsed,site),lunarTime:o.elapsed});}
+    if(view==='earth'&&o.talents.overview&&o.wars.length&&(lastThumbs===null||timestamp-lastThumbs>=100||timestamp<lastThumbs)){lastThumbs=timestamp;
       o.wars.forEach((w,i)=>{const thumb=thumbs[i];if(!thumb.canvas.getBoundingClientRect().width)return;thumb.render??=createRenderer(thumb.canvas);
         const site=SITES.find(site=>site.id===o.civilizations.find(c=>c.id===w.participants[0]).site);thumb.render(w.game,{skyTime:localSkyTime(o.elapsed,site),lunarTime:o.elapsed});});}
     if(view==='moon'&&o.talents.outpost){const p=canvasContext(el('colony-moon'));if(p)drawLunarColony(p.ctx,p.width,p.height,o,{ambientTime:ambient,reducedMotion:reduced.matches});}
   }
-  function sync(options={}){if(Object.hasOwn(options,'paused'))paused=options.paused;bind(buildOrbitalViewModel(getSession(),{paused,...options,talent,selected}));if(view==='system')syncBodyCard();}
-  return{sync,paint,openTree,get treeOpen(){return dialog.open;},dismiss(){dialog.close();}};
+  function sync(options={}){if(Object.hasOwn(options,'paused'))paused=options.paused;bind(buildOrbitalViewModel(getSession(),{paused,...options,talent,selected}));solar.sync();}
+  return{sync,paint,openTree,get treeOpen(){return dialog.open;},get cinematicOpen(){return voyage.active;},dismiss(){voyage.dismiss();solar.reset();dialog.close();}};
 }

@@ -32,7 +32,7 @@ export async function mountFixture(raw, unavailable = false, mode = 'incremental
   await new Promise((resolve, reject) => {
     const start = performance.now();
     const poll = () => {
-      if (frame.contentWindow?.__testFrame && frame.contentDocument?.getElementById('income-rate')) resolve();
+      if (frame.contentWindow?.__testFrame && frame.contentDocument?.readyState === 'complete' && frame.contentDocument?.getElementById('income-rate')) resolve();
       else if (performance.now() - start > 15000) reject(new Error('Incremental fixture did not load'));
       else setTimeout(poll, 25);
     }; poll();

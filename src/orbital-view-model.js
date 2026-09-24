@@ -25,7 +25,7 @@ export function orbitalTalentEffect(o,key,rank=o.talents[key]){
   if(key==='outpost')return rank?`${lunar()} Legacy/s · 战争再 ×2`:'尚未建立月面基地';
   if(key==='lunarIndustry')return `${lunar(rank)} Legacy/s`;
   if(key==='massDriver')return rank?`货运加速 · ${lunar(undefined,rank)} Legacy/s`:'货运舱按常规节奏发射';
-  if(key==='shipyard')return rank?'方舟正在船坞中成形':'尚无远航船坞';
+  if(key==='shipyard')return rank?'六艘方舟整备完成':'尚无远航船坞';
   if(key==='voyage')return rank?'方舟已下水 · 行星际空间已打开':'等待启航';
   if(key==='airdrop')return rank?`空投 ${R.airdropGold}× 时代起始金币，每个文明最多 ${R.maximumAirdrops} 次`:'无法向地表投送物资';
   if(key==='intel')return rank?'显示开战前与交战中的胜率预估':'战局只能凭经验判断';
@@ -52,6 +52,8 @@ export function buildOrbitalViewModel(s,{paused=false,talent='monitor',selected=
     '#colony-lunar-produced':`累计生产 ${Q.format(o.lunarProduced)} Legacy`,'#colony-habitat-state':`${o.talents.recovery} / ${R.habitatSections} 段 · 遗产 ×${2**o.talents.recovery}`,
     '#colony-time':orbitalTime(o.elapsed),
     '#colony-cycle':`第 ${o.cycle} 轮萌芽 · ${o.nuclearCycles} 次核毁灭${o.talents.doomsday&&!winter?` · 末日时钟 ${orbitalTime(Math.max(0,o.elapsed-cycleStartedAt(o)))} · 核毁灭 ×${doomsdayMultiplier(o).toFixed(2)}`:''}`,
+    '#orbit-tree-pause':paused?'继续':'暂停','#orbit-tree-pause@aria-pressed':String(paused),
+    '#orbit-tree-income':paused?'已暂停':`文明持续运转${o.talents.outpost?' · 月面 +'+Q.format(lunarLegacyRate(o))+'/s':''}`,
     '#colony-pause':paused?'继续':'暂停','#colony-pause@aria-pressed':String(paused),
     '#colony-speed':`${s.permanent.settings.speed}×`,'#colony-speed@hidden':s.debug===true,'#colony-debug-speed@hidden':s.debug!==true,'#colony-debug-speed@value':String(s.debugSpeed??1),
     '#colony-objective':winter?'余烬，等待下一次黎明。':'地球之上，文明再生。',

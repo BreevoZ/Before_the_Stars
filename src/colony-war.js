@@ -41,8 +41,11 @@ export const emptyWorld = () => ({ phase: 'living', remaining: 0, civs: [], wars
 export const colonistRate = (civ, world = 'mars') => COLONIST_BASE * 2 ** (civ.age - 1) * WORLDS[world].income;
 // Uplifted civilizations work through winters: they are past the filter.
 export const upliftedRate = (world = 'mars') => COLONIST_BASE * 2 ** (FINAL_AGE - 1) * WORLDS[world].income * UPLIFT.rate;
+// 温室气体输送 lifts Mars from its scarcity back to Earth's level.
+export const worldWarmth = (o, world) => world === 'mars' && o.solar.talents.greenhouse ? 1 / WORLDS[world].income : 1;
 export const worldIncome = (o, world) => { const w = o.solar.colonies[world];
-  return (w.phase === 'living' ? w.civs.reduce((sum, c) => sum + colonistRate(c, world), 0) : 0) + w.uplifted.length * upliftedRate(world); };
+  // 木卫二's ocean gives the uplifted something new to study.
+  return ((w.phase === 'living' ? w.civs.reduce((sum, c) => sum + colonistRate(c, world), 0) : 0) + w.uplifted.length * upliftedRate(world) * (o.solar.talents.europa ? 1.5 : 1)) * worldWarmth(o, world); };
 export const colonyIncome = o => Object.keys(WORLDS).reduce((sum, world) => sum + worldIncome(o, world), 0);
 export const settlementValue = (civs, world, seconds) => Math.floor(civs.reduce((sum, c) => sum + colonistRate(c, world), 0) * seconds);
 

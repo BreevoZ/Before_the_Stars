@@ -10,13 +10,23 @@ import { purchaseSolarTalent, transferState, transferCivilization, COLONY_RULES 
 import { buildSolarViewModel } from '../src/solar-view-model.js';
 import { mountFixture } from './progression-cases.js';
 
+// A current record written back into v29's shape (the map before it was rebuilt by world).
+export function toV29(record) {
+  const sol = record.orbital.solar, keys = ['heat', 'harbor', 'nuclear', 'fusion', 'dome', 'transfer', 'uplift', 'survey', 'hohmann', 'fleet', 'fuel'];
+  record.version = 29; record.orbital.version = 15;
+  sol.talents = Object.fromEntries(keys.map(k => [k, sol.talents[k] ?? 0]));
+  for (const k of Object.keys(sol.payments)) if (!['venus', 'mercury', 'belt', 'jupiter', 'transfers', 'accords', 'seizures', ...keys].includes(k)) delete sol.payments[k];
+  for (const k of ['saturn', 'uranus', 'neptune']) delete sol.facilities[k];
+  sol.flights = sol.flights.map(({ via, ...f }) => f);
+  return record;
+}
 const median = xs => { const s = [...xs].sort((a, b) => a - b); return s[s.length >> 1]; };
 function batch(a, b, n = 300) { const rs = []; for (let i = 1; i <= n; i++) rs.push(simulateColonyWar(a, b, { seed: i * 7919 })); return rs; }
 // A Mars with two colonists, the second landed; nothing else on it.
 function marsFixture({ count = 2, age = null, uplift = false } = {}) {
   const s = voyageFixture(), o = s.orbital, run = n => { for (let i = 0; i < Math.round(n * 30); i++) updateOrbital(s, 1 / 30); };
   setDebugLegacy(s, 2 ** 36); run(65);
-  for (const key of ['dome', 'transfer', 'survey', 'fleet', ...(uplift ? ['uplift'] : [])]) purchaseSolarTalent(s, key);
+  for (const key of ['harbor', 'dome', 'transfer', 'survey', 'fleet', ...(uplift ? ['uplift'] : [])]) purchaseSolarTalent(s, key);
   run(70);
   for (let k = 0; k < count; k++) { const civ = o.civilizations.find(c => c.alive && !c.warId); if (age) { civ.age = age; civ.tendency = 0; } transferCivilization(s, civ.id); }
   // Stop the moment both land, before the fuse between them runs out.
@@ -73,7 +83,7 @@ export function registerColonyWarTests(test, assert, near) {
   });
   test('Colony wars v28: v27 residents keep their age and start at peace; broken wars are rejected', () => {
     const { s, o } = marsFixture(), old = JSON.parse(serializeSession(s));
-    old.version = 27; old.orbital.version = 13; delete old.orbital.solar.talents.uplift; old.orbital.solar.colonies = { mars: old.orbital.solar.colonies.mars.civs.map(({ progress, warId, accord, ...c }) => c) };
+    toV29(old); old.version = 27; old.orbital.version = 13; delete old.orbital.solar.talents.uplift; old.orbital.solar.colonies = { mars: old.orbital.solar.colonies.mars.civs.map(({ progress, warId, accord, ...c }) => c) };
     const next = parseSession(JSON.stringify(old)), world = next.orbital.solar.colonies.mars;
     assert(world.phase === 'living' && world.civs.length === 2 && world.civs.every(c => c.progress === 0 && c.warId === null) && world.wars.length === 0);
     updateColonies(o, WORLDS.mars.fuse + .1); const raw = JSON.parse(serializeSession(s));
@@ -135,7 +145,7 @@ export function registerColonyWarTests(test, assert, near) {
   });
   test('Uplift v29: v28 colonies gain an empty uplifted list, residents are not negotiating and no war is seized', () => {
     const { s, run } = marsFixture(); run(WORLDS.mars.fuse + .5); const old = JSON.parse(serializeSession(s));
-    old.version = 28; old.orbital.version = 14; delete old.orbital.solar.talents.uplift; const mars = old.orbital.solar.colonies.mars; delete mars.uplifted;
+    toV29(old); old.version = 28; old.orbital.version = 14; delete old.orbital.solar.talents.uplift; const mars = old.orbital.solar.colonies.mars; delete mars.uplifted;
     mars.civs = mars.civs.map(({ accord, ...c }) => c); mars.wars = mars.wars.map(({ seized, ...w }) => w);
     const next = parseSession(JSON.stringify(old)).orbital.solar;
     assert(next.talents.uplift === 0 && next.colonies.mars.uplifted.length === 0 && next.colonies.mars.civs.every(c => c.accord === null) && next.colonies.mars.wars.every(w => w.seized === false));

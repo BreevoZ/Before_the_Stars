@@ -1,6 +1,7 @@
 import { BODIES, SYSTEM, bodyPosition, orbitRadius, bodyById } from './solar-config.js';
 import { drawArk, ARK_COUNT } from './shipyard-render.js';
-import { FACILITIES, docks, pioneerProgress, flightProgress, arrived, flightTo } from './solar-industry.js';
+import { FACILITIES, docks, pioneerProgress, flightLeg, arksMoored, arrived, flightTo } from './solar-industry.js';
+import { drawArkLight } from './ark-lights.js';
 import { TAU } from './celestial-clock.js';
 const noise=n=>{let v=Math.imul(n^(n>>>16),0x21f0aaad);v=Math.imul(v^(v>>>15),0x735a2d97);return((v^(v>>>15))>>>0)/4294967296;};
 const disc=(c,x,y,r,fill)=>{c.beginPath();c.arc(x,y,r,0,TAU);c.fillStyle=fill;c.fill();};
@@ -39,35 +40,27 @@ export function drawSolarSystem(c,w,h,o,{ambientTime=o.elapsed,reducedMotion=fal
     const arc=(from,to,t,lift=.18)=>{const e=t*t*(3-2*t),mx=(from.x+to.x)/2,my=(from.y+to.y)/2-Math.hypot(to.x-from.x,to.y-from.y)*lift,u=1-e;
       return{x:u*u*from.x+2*u*e*mx+e*e*to.x,y:u*u*from.y+2*u*e*my+e*e*to.y,angle:Math.atan2(2*u*(mx-from.x)+2*e*(to.x-mx),-(2*u*(my-from.y)+2*e*(to.y-my))),mx,my};};
     const trail=(from,to,p,color='#a7b8b11f')=>{c.strokeStyle=color;c.setLineDash([2,8]);c.beginPath();c.moveTo(from.x,from.y);c.quadraticCurveTo(p.mx,p.my,to.x,to.y);c.stroke();c.setLineDash([]);};
-    // The pioneer fleet: seven arks in a loose file to Mars, then moored there.
-    const mars=bodyPosition(bodyById('mars'),clock),marsR=Math.max(5,bodyById('mars').size)*1.15,t=pioneerProgress(o);
+    // Every light here is an ark. The pioneer fleet flies in a loose file to
+    // Mars and moors there; a dispatched ark leaves the moored row, flies its
+    // legs through the drydocks and stays at the world it founded.
+    const mars=bodyPosition(bodyById('mars'),clock),marsR=Math.max(5,bodyById('mars').size)*1.15,t=pioneerProgress(o),light=(x,y,glow=4)=>drawArkLight(c,x,y,{radius:1,glow,brightness:.95});
     if(t<1){trail(home,mars,arc(home,mars,0));for(let i=0;i<ARK_COUNT;i++){const k=Math.max(0,Math.min(1,t*1.08-i*.012)),p=arc(home,mars,k),side=(i-3)*1.6;
       drawArk(c,p.x+Math.cos(p.angle)*side,p.y+Math.sin(p.angle)*side,.07,{angle:p.angle,thrust:reducedMotion?0:1});}}
-    else for(let i=0;i<ARK_COUNT;i++){const a=-2.3+i*.24;disc(c,mars.x+Math.cos(a)*(marsR+5),mars.y+Math.sin(a)*(marsR+5),1,'#e6d6a4');}
-    // Drydocks: a small bracket beside every body arks can leave from.
-    for(const id of docks(o)){if(id==='moon')continue;const p=place(id),r=Math.max(5,bodyById(id).size)*1.15;c.strokeStyle='#e6d6a4b0';c.lineWidth=.8;c.beginPath();c.moveTo(p.x+r+4,p.y-4);c.lineTo(p.x+r+7,p.y-4);c.lineTo(p.x+r+7,p.y+4);c.lineTo(p.x+r+4,p.y+4);c.stroke();}
-    // Dispatched arks: from their drydock to the foothold they will found.
-    for(const f of o.solar.flights){const from=place(f.from),to=bodyPosition(bodyById(f.body),clock),p=arc(from,to,flightProgress(o,f));trail(from,to,arc(from,to,0));drawArk(c,p.x,p.y,.095,{angle:p.angle,thrust:reducedMotion?0:1});}
-    // Transfers: a smaller ark per civilization in flight, Earth to Mars; the
-    // dome's residents glow as a cluster on the planet.
-    for(const t of o.solar.transfers){const e=Math.max(0,Math.min(1,(o.elapsed-t.departAt)/(t.arriveAt-t.departAt))),k=e*e*(3-2*e),mx=(home.x+mars.x)/2,my=(home.y+mars.y)/2-Math.hypot(mars.x-home.x,mars.y-home.y)*.25,u=1-k;
-      c.strokeStyle='#e6d6a42b';c.setLineDash([1.5,5]);c.beginPath();c.moveTo(home.x,home.y);c.quadraticCurveTo(mx,my,mars.x,mars.y);c.stroke();c.setLineDash([]);
-      const x=u*u*home.x+2*u*k*mx+k*k*mars.x,y=u*u*home.y+2*u*k*my+k*k*mars.y,dx=2*u*(mx-home.x)+2*k*(mars.x-mx),dy=2*u*(my-home.y)+2*k*(mars.y-my);drawArk(c,x,y,.085,{angle:Math.atan2(dx,-dy),thrust:reducedMotion?0:1});}
-    // Mars: residents as warm lights, a red pulse between two at war, and a grey
-    // veil with its own clock while the planet lies in nuclear winter.
-    const world=o.solar.colonies.mars,residentAt=i=>{const a=i*2.4+.6,r=marsR*.55;return{x:mars.x+Math.cos(a)*r,y:mars.y+Math.sin(a)*r};};
-    world.civs.forEach((civ,i)=>{const p=residentAt(i);disc(c,p.x,p.y,1.1+civ.age*.15,civ.warId?'#f0a47c':'#f3d99a');});
-    // Uplifted civilizations: a steady golden ring around the planet, winter or not.
-    world.uplifted.forEach((civ,i)=>{const a=i*.9-1.2;disc(c,mars.x+Math.cos(a)*(marsR+2.5),mars.y+Math.sin(a)*(marsR+2.5),1.5,'#ffd98a');});
-    for(const war of world.wars){const [a,b]=war.sides.map(id=>residentAt(world.civs.findIndex(x=>x.id===id))),pulse=reducedMotion?.6:.45+.35*Math.sin(clock*4);
-      c.strokeStyle=`rgba(236,128,92,${pulse})`;c.lineWidth=.8;c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();}
+    else for(let i=0;i<arksMoored(o);i++){const a=-2.3+i*.24;light(mars.x+Math.cos(a)*(marsR+5),mars.y+Math.sin(a)*(marsR+5));}
+    // Drydocks: a small bracket beside every body arks can pass through.
+    for(const id of docks(o)){const p=place(id),r=Math.max(5,bodyById(id).size)*1.15;c.strokeStyle='#e6d6a4b0';c.lineWidth=.8;c.beginPath();c.moveTo(p.x+r+4,p.y-4);c.lineTo(p.x+r+7,p.y-4);c.lineTo(p.x+r+7,p.y+4);c.lineTo(p.x+r+4,p.y+4);c.stroke();}
+    for(const f of o.solar.flights){const stops=[f.from,...(f.via??[]),f.body].map(place),leg=flightLeg(o,f),a=place(leg.from),b=place(leg.to),p=arc(a,b,leg.t,.12);
+      stops.slice(1).forEach((q,i)=>trail(stops[i],q,arc(stops[i],q,0,.12)));light(p.x,p.y,6);}
+    // Stations: the ark that founded each foothold, beside its world (on the belt, in it).
+    for(const [key,f] of Object.entries(FACILITIES)){if(!o.solar.facilities[key])continue;
+      if(f.body==='belt'){const a=2.2+clock*.004,rr=orbitRadius(2.7);light(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr*tilt);continue;}
+      const p=bodyPosition(bodyById(f.body),clock),r=Math.max(5,bodyById(f.body).size)*1.15+4,a=reducedMotion?0:clock*.05;light(p.x+Math.cos(a)*r,p.y+Math.sin(a)*r*.6);}
+    // Transfer arks: Earth to Mars, one light per civilization on board.
+    for(const tr of o.solar.transfers){const p=arc(home,mars,Math.max(0,Math.min(1,(o.elapsed-tr.departAt)/(tr.arriveAt-tr.departAt))),.25);trail(home,mars,arc(home,mars,0,.25),'#e6d6a42b');light(p.x,p.y,5);}
+    // Mars keeps its own winter: a grey veil and a clock, nothing more.
+    const world=o.solar.colonies.mars;
     if(world.phase==='winter'){disc(c,mars.x,mars.y,marsR+.5,'#7f8a8ecc');c.fillStyle='#b8c3c4';c.font='8px ui-monospace,monospace';c.textAlign=mars.x<cx?'right':'left';
       if(w>=600)c.fillText(`WINTER ${Math.ceil(world.remaining)}s`,mars.x+(mars.x<cx?-1:1)*(marsR+13),mars.y+18);}
-    // Footholds: one light per built rank, circling the body (the belt's fleet rides the belt).
-    for(const [key,f] of Object.entries(FACILITIES)){const rank=o.solar.facilities[key];if(!rank)continue;
-      if(f.body==='belt'){for(let k=0;k<rank*3;k++){const a=k*2.1+clock*.004,rr=orbitRadius(2.4+(k%3)*.3);disc(c,cx+Math.cos(a)*rr,cy+Math.sin(a)*rr*tilt,1.3,'#efdca6');}continue;}
-      const p=bodyPosition(bodyById(f.body),clock),r=Math.max(5,bodyById(f.body).size)*1.15+4;
-      for(let k=0;k<rank;k++){const a=k/rank*TAU+(reducedMotion?0:clock*.05);disc(c,p.x+Math.cos(a)*r,p.y+Math.sin(a)*r*.6,1.2,'#f1e2b0');}}
   }
   c.textAlign='left';c.fillStyle='#5e7a80';c.font='8px ui-monospace,monospace';c.fillText('HELIOCENTRIC SURVEY  /  ORBITS NOT TO SCALE',40,464);c.textAlign='right';c.fillText('30 AU  /  OUTER SYSTEM',960,464);c.restore();
 }

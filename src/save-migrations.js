@@ -10,10 +10,10 @@ import { getV8RunBonuses } from './progression-bonuses.js';
 import { createAutomation } from './automation.js';
 import { HISTORICAL_TALENTS, HISTORICAL_UPGRADE_COSTS } from './save-history.js';
 import { validateRecord } from './save-validation.js';
-import { emptyIndustry, emptyFlights } from './solar-industry.js';
+import { emptyIndustry, emptyFlights, FACILITIES, V29_FACILITY_KEYS } from './solar-industry.js';
 import { emptyWorld } from './colony-war.js';
-import { emptyColonies, V26_SOLAR_KEYS, V28_SOLAR_KEYS } from './solar-colony.js';
-import { cloneRecord, toV8Record, fromV8Record, fromV9Record, fromV10Record, fromV11Record, fromV12Record, fromV13Record, fromV14Record, fromV15Record, fromV16Record, fromV17Record, fromV18Record, fromV19Record, fromV20Record, fromV21Record, fromV22Record, fromV23Record, fromV24Record, fromV25Record, fromV26Record, fromV27Record, fromV28Record } from './save-record.js';
+import { emptyColonies, V26_SOLAR_KEYS, V28_SOLAR_KEYS, SOLAR_TALENTS, SOLAR_TALENT_KEYS } from './solar-colony.js';
+import { cloneRecord, toV8Record, fromV8Record, fromV9Record, fromV10Record, fromV11Record, fromV12Record, fromV13Record, fromV14Record, fromV15Record, fromV16Record, fromV17Record, fromV18Record, fromV19Record, fromV20Record, fromV21Record, fromV22Record, fromV23Record, fromV24Record, fromV25Record, fromV26Record, fromV27Record, fromV28Record, fromV29Record } from './save-record.js';
 import { TALENTS } from './talents.js';
 const teams = ['player', 'enemy'];
 
@@ -285,7 +285,7 @@ export function migrateV23(input) {
 // already launched keep flying from the original 远航协议 time.
 export function migrateV24(input) {
   const record=cloneRecord(input);
-  if(record.orbital){record.orbital.version=11;record.orbital.solar=emptyIndustry();}
+  if(record.orbital){record.orbital.version=11;record.orbital.solar=emptyIndustry(V29_FACILITY_KEYS);}
   record.version=25;return record;
 }
 // v26 adds VII colonies: the tree's own talents, the Mars dome and arks in flight.
@@ -318,11 +318,28 @@ export function migrateV28(input) {
     sol.colonies={mars:{...mars,uplifted:[],civs:mars.civs.map(c=>({...c,accord:null})),wars:mars.wars.map(w=>({...w,seized:false}))}};}
   record.version=29;return record;
 }
-export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9, 10: migrateV10, 11: migrateV11, 12: migrateV12, 13: migrateV13, 14: migrateV14, 15: migrateV15, 16: migrateV16, 17: migrateV17, 18: migrateV18, 19: migrateV19, 20: migrateV20, 21: migrateV21, 22: migrateV22, 23: migrateV23, 24: migrateV24, 25: migrateV25, 26: migrateV26, 27: migrateV27, 28: migrateV28 });
+// v30: the VII map by world. 近日隔热 is gone and refunded; the three outer
+// footholds start unbuilt; arks in flight record the drydocks they pass. A save
+// with a dome but no 火星港 is granted the harbour free, and any talent whose
+// new prerequisite is not met is refunded (its payment removed).
+export function migrateV29(input) {
+  const record=cloneRecord(input);
+  if(record.orbital){record.orbital.version=16;const sol=record.orbital.solar,old=sol.talents;
+    delete sol.payments.heat;
+    sol.talents=Object.fromEntries(SOLAR_TALENT_KEYS.map(key=>[key,old[key]??0]));
+    if(sol.talents.dome&&!sol.talents.harbor){sol.talents.harbor=1;sol.payments.harbor=[0];}
+    for(const key of Object.keys(FACILITIES))sol.facilities[key]??=0;
+    sol.flights=sol.flights.map(f=>({...f,via:[]}));
+    const rank=key=>SOLAR_TALENTS[key].facility?sol.facilities[SOLAR_TALENTS[key].facility]:SOLAR_TALENTS[key].root?1:sol.talents[key]??0;
+    for(let changed=true;changed;){changed=false;
+      for(const key of SOLAR_TALENT_KEYS)if(sol.talents[key]&&Object.entries(SOLAR_TALENTS[key].requires).some(([p,n])=>rank(p)<n)){sol.talents[key]=0;delete sol.payments[key];changed=true;}}}
+  record.version=30;return record;
+}
+export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9, 10: migrateV10, 11: migrateV11, 12: migrateV12, 13: migrateV13, 14: migrateV14, 15: migrateV15, 16: migrateV16, 17: migrateV17, 18: migrateV18, 19: migrateV19, 20: migrateV20, 21: migrateV21, 22: migrateV22, 23: migrateV23, 24: migrateV24, 25: migrateV25, 26: migrateV26, 27: migrateV27, 28: migrateV28, 29: migrateV29 });
 export function migrateRecord(input) {
   let record = input;
   while (record.version < SAVE_VERSION) {
-    const hydrate = { 8: fromV8Record, 9: fromV9Record, 10: fromV10Record, 11: fromV11Record, 12: fromV12Record, 13: fromV13Record, 14: fromV14Record, 15: fromV15Record, 16: fromV16Record, 17: fromV17Record, 18: fromV18Record, 19: fromV19Record, 20: fromV20Record, 21: fromV21Record, 22: fromV22Record, 23: fromV23Record, 24: fromV24Record, 25: fromV25Record, 26: fromV26Record, 27: fromV27Record, 28: fromV28Record }[record.version];
+    const hydrate = { 8: fromV8Record, 9: fromV9Record, 10: fromV10Record, 11: fromV11Record, 12: fromV12Record, 13: fromV13Record, 14: fromV14Record, 15: fromV15Record, 16: fromV16Record, 17: fromV17Record, 18: fromV18Record, 19: fromV19Record, 20: fromV20Record, 21: fromV21Record, 22: fromV22Record, 23: fromV23Record, 24: fromV24Record, 25: fromV25Record, 26: fromV26Record, 27: fromV27Record, 28: fromV28Record, 29: fromV29Record }[record.version];
     validateRecord(hydrate ? hydrate(record) : record, record.version);
     record = MIGRATIONS[record.version](record);
   }

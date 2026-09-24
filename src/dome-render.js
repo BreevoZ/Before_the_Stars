@@ -2,7 +2,7 @@
 // each. Uplifted civilizations hold their place for good (warm towers), living
 // residents grow with their age, a negotiation draws a ring, and a nuclear
 // winter frosts everything except what has already crossed the filter.
-import { SOLAR_TALENTS, COLONY_RULES } from './solar-colony.js';
+import { SOLAR_TALENTS, householdsPerDome } from './solar-colony.js';
 const TAU = Math.PI * 2;
 const disc = (c, x, y, r, fill) => { c.beginPath(); c.arc(x, y, r, 0, TAU); c.fillStyle = fill; c.fill(); };
 const noise = n => { n = Math.imul(n ^ (n >>> 16), 0x21f0aaad); n = Math.imul(n ^ (n >>> 15), 0x735a2d97); return ((n ^ (n >>> 15)) >>> 0) / 4294967296; };
@@ -36,8 +36,9 @@ export function drawDomes(c, w, h, o, { time = 0 } = {}) {
       c.fillStyle = '#8a7c6a88'; c.font = '9px system-ui,sans-serif'; c.textAlign = 'center'; c.fillText('未建', x, ground - radius * .45); continue; }
     c.fillStyle = winter ? '#aeb8b91c' : '#c9d6c90f'; c.fill(); c.clip();
     // Two households per dome, side by side.
-    for (let k = 0; k < COLONY_RULES.domeCapacity; k++) {
-      const home = homes[d * COLONY_RULES.domeCapacity + k], hx = x + (k ? 1 : -1) * radius * .38;
+    const per = householdsPerDome(o);
+    for (let k = 0; k < per; k++) {
+      const home = homes[d * per + k], hx = x + ((k + .5) / per - .5) * radius * 1.3;
       if (!home) continue;
       const { civ, kind } = home, age = kind === 'uplifted' ? 5 : civ.age, lit = !winter || kind === 'uplifted';
       if (kind === 'incoming') { c.strokeStyle = '#e6d6a466'; c.setLineDash([2, 3]); c.strokeRect(hx - 6, ground - 10, 12, 10); c.setLineDash([]); continue; }
@@ -55,8 +56,9 @@ export function drawDomes(c, w, h, o, { time = 0 } = {}) {
     c.fillStyle = '#b9ab8e'; c.font = '8px ui-monospace,monospace'; c.textAlign = 'center'; c.fillText(`DOME ${String(d + 1).padStart(2, '0')}`, x, ground + 14);
   }
   // Residents at war: a thin red arc between the two households.
+  const per = householdsPerDome(o);
   for (const war of world.wars) {
-    const at = war.sides.map(id => homes.findIndex(hm => hm.civ.id === id)).map(i => ({ x: span * (Math.floor(i / 2) + .5) + (i % 2 ? 1 : -1) * radius * .38, y: ground - radius * .62 }));
+    const at = war.sides.map(id => homes.findIndex(hm => hm.civ.id === id)).map(i => ({ x: span * (Math.floor(i / per) + .5) + ((i % per + .5) / per - .5) * radius * 1.3, y: ground - radius * .62 }));
     if (at.some(p => !Number.isFinite(p.x))) continue;
     c.strokeStyle = war.seized ? '#e8d49a99' : '#ec805c88'; c.setLineDash([2, 4]); c.lineWidth = 1; c.beginPath(); c.moveTo(at[0].x, at[0].y);
     c.quadraticCurveTo((at[0].x + at[1].x) / 2, Math.min(at[0].y, at[1].y) - radius * .5, at[1].x, at[1].y); c.stroke(); c.setLineDash([]);

@@ -2,31 +2,45 @@
 // its styles. 远航协议 is its root and the seam to the VI page below.
 import { createBindings } from './dom-bindings.js';
 import { icon } from './icons.js';
-import { SOLAR_TALENTS as T, purchaseSolarTalent } from './solar-colony.js';
+import { SOLAR_TALENTS as T, SOLAR_MAP, SOLAR_COLUMNS, purchaseSolarTalent } from './solar-colony.js';
 import { FACILITIES, flightTo } from './solar-industry.js';
 import { buildSolarTreeViewModel } from './solar-tree-view-model.js';
 import { drawOrbitalTalentSky } from './orbital-render.js';
 import { watchSeam } from './tree-flip.js';
 
 const NS = 'http://www.w3.org/2000/svg';
-const ROUTE_ROOT = { industry: 'nuclear', main: 'transfer', navigation: 'survey' };
+// The route bar jumps to each world's large node.
+const ROUTE_ROOT = { mercury: 'mercury', venus: 'venus', mars: 'harbor', belt: 'belt', jupiter: 'jupiter', saturn: 'saturn', uranus: 'uranus', neptune: 'neptune' };
+const COLUMN_NAMES = { mercury: '水星', venus: '金星', mars: '火星', belt: '小行星带', jupiter: '木星', saturn: '土星', uranus: '天王星', neptune: '海王星' };
+const routeOf = t => t.gold ? (t.root ? 'root' : 'main') : 'branch';
 export function createSolarTree(getSession, { commit, viewChanged, flipOrbit }) {
   const el = id => document.getElementById(id), bind = createBindings(document), dialog = el('solar-talents-dialog');
   const detail = el('solar-detail'), scroll = dialog.querySelector('.orbit-tree-scroll'), reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let talent = 'dome', selected = false, pinned = false, hideTimer, skySize = null;
   dialog.querySelectorAll('[data-icon]').forEach(node => { node.innerHTML = icon(node.dataset.icon); });
+  // The map is as wide as the solar system: size it, and hang the seam, the legend and a title over every column.
+  const map = dialog.querySelector('.orbit-tree-map'), root = T.voyage;
+  map.style.width = `${SOLAR_MAP.width}px`; map.style.height = `${SOLAR_MAP.height}px`; const edges = el('solar-tree-edges'); edges.setAttribute('viewBox', `0 0 ${SOLAR_MAP.width} ${SOLAR_MAP.height}`); edges.style.width = map.style.width; edges.style.height = map.style.height;
+  Object.assign(el('solar-flip-orbit').style, { left: `${root.x}px`, top: `${root.y + 92}px` }); Object.assign(el('solar-legend').style, { left: `${root.x}px`, top: `${root.y + 140}px` });
+  for (const [column, x] of Object.entries(SOLAR_COLUMNS)) {
+    const label = document.createElement('span'), top = Math.min(...Object.values(T).filter(t => t.column === column).map(t => t.y));
+    label.className = `orbit-route solar-column-label${column === 'mars' ? ' route-home' : ' route-life'}`; label.style.left = `${x}px`; label.style.top = `${top - 118}px`;
+    const main = Object.values(T).filter(t => t.column === column && t.kind !== 'planet' && !t.satellite), moons = Object.values(T).filter(t => t.column === column && t.satellite).length;
+    label.innerHTML = `${COLUMN_NAMES[column]}<small>${[...main.slice(0, 4).map(t => t.name), ...(moons ? [`${moons} 颗卫星`] : [])].join(' · ') || '—'}</small>`;
+    map.append(label);
+  }
   for (const [key, t] of Object.entries(T)) {
     for (const parent of Object.keys(t.requires)) {
       const from = T[parent], path = document.createElementNS(NS, 'path'), end = t.y + (t.finale ? 52 : 0);
       path.id = `solar-edge-${parent}-${key}`; path.setAttribute('d', `M${from.x} ${from.y} C${from.x} ${(from.y + end) / 2} ${t.x} ${(from.y + end) / 2} ${t.x} ${end}`);
-      path.setAttribute('class', parent === 'voyage' ? 'trunk' : t.finale ? 'trunk finale' : 'branch'); path.dataset.route = t.branch;
+      path.setAttribute('class', parent === 'voyage' ? 'trunk' : t.finale ? 'trunk finale' : 'branch'); path.dataset.route = routeOf(t);
       const flow = path.cloneNode(); flow.id = `solar-flow-${parent}-${key}`; flow.setAttribute('class', 'orbit-flow'); flow.setAttribute('pathLength', '1');
       el('solar-tree-edges').append(path, flow);
     }
     const node = document.createElement('button'); node.id = `solar-node-${key}`; node.type = 'button';
-    node.className = `orbit-node ${t.kind ?? 'ordinary'}${t.finale ? ' finale' : ''}`; node.dataset.route = t.branch;
+    node.className = `orbit-node ${t.kind ?? 'ordinary'}${t.finale ? ' finale' : ''}`; node.dataset.route = routeOf(t);
     node.style.left = `${t.x}px`; node.style.top = `${t.y}px`; node.setAttribute('aria-controls', 'solar-detail');
-    const shape = t.finale ? '<circle class="orbit-finale-ring" cx="32" cy="32" r="31.5"/><circle class="orbit-halo" cx="32" cy="32" r="29"/><circle cx="32" cy="32" r="24"/>'
+    const shape = t.finale || t.kind === 'planet' ? '<circle class="orbit-finale-ring" cx="32" cy="32" r="31.5"/><circle class="orbit-halo" cx="32" cy="32" r="29"/><circle cx="32" cy="32" r="24"/>'
       : t.kind === 'specialist' ? '<path d="M32 2 62 32 32 62 2 32Z"/>' : t.kind === 'keystone' ? '<circle class="orbit-halo" cx="32" cy="32" r="31"/><circle cx="32" cy="32" r="26"/>' : '<path d="M32 2 58 17v30L32 62 6 47V17Z"/>';
     node.innerHTML = `<svg class="orbit-node-frame" viewBox="0 0 64 64" aria-hidden="true">${shape}</svg><span class="orbit-node-glyph">${icon(t.icon)}</span><span id="solar-rank-${key}" class="orbit-rank"></span><small class="orbit-node-price"><span id="solar-cost-${key}"></span>${icon('legacy')}</small><span id="solar-gate-${key}" class="orbit-gate"></span><span class="orbit-node-name">${t.name}</span>`;
     node.addEventListener('click', () => select(key, true)); node.addEventListener('dblclick', () => buy(key));

@@ -243,6 +243,6 @@ body:has(#archives-dialog[data-destruction]) #civilization-bar { display: none; 
 /* One route strip for every star map: branch sections green, the mainline gold,
    the same box and hover everywhere. */
 nav.orbit-route-nav button{font-size:10px;letter-spacing:2px;min-height:37px;padding:5px 12px;border:1px solid transparent;border-radius:4px;background:transparent;box-shadow:none;color:var(--route-branch)}
-nav.orbit-route-nav [data-orbit-route="recovery"],nav.orbit-route-nav [data-home-route="superSoldierPlan"],nav.orbit-route-nav [data-solar-route="main"]{color:var(--route-main)}
+nav.orbit-route-nav [data-orbit-route="recovery"],nav.orbit-route-nav [data-home-route="superSoldierPlan"],nav.orbit-route-nav [data-solar-route="mars"]{color:var(--route-main)}
 nav.orbit-route-nav button:hover{color:var(--gold);background:var(--color-home-talent-node-fill)}
 .home-route-nav{background:#0e181b40;border-bottom:1px solid #8eaaa515}

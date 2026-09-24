@@ -92,3 +92,9 @@
 .solar-colony-block .solar-transfer-pick{display:grid;gap:6px;font-size:9px;letter-spacing:1px;color:var(--solar-muted);margin:8px 0}.solar-colony-block .solar-transfer-pick select{width:100%}
 .solar-war-row{flex-wrap:wrap}.solar-war-row>button{text-align:left}
 @media(max-width:900px){.solar-colony-grid{grid-template-columns:1fr;gap:18px}}
+/* VII map: one large node per world, green except Mars, and a title over each column. */
+.orbit-talents-dialog .orbit-node.planet{width:96px;height:96px;min-height:96px}.orbit-node.planet .orbit-node-glyph{top:25px;width:34px;height:34px}.orbit-node.planet .orbit-rank{top:64px}
+.orbit-node.planet .orbit-node-frame{stroke-width:.9}.orbit-node.planet .orbit-finale-ring{fill:none;stroke-width:.4;stroke-dasharray:1.5 2.5;opacity:.7}
+.orbit-node.planet .orbit-node-name{font-size:12px;letter-spacing:2px;white-space:nowrap}
+.solar-column-label{width:260px}
+.solar-route-nav{overflow-x:auto;scrollbar-width:none}.solar-route-nav button{flex-shrink:0}

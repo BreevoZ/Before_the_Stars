@@ -1,11 +1,12 @@
 // VII · arks, drydocks and planetary industry. The seven lunar arks fly out
-// together as one pioneer fleet and found the Mars harbour. Every other body is
-// reached by dispatching an ark from a drydock (the Moon's, or one built later):
-// the drive limits how far one leg can reach, some bodies need a hull that can
-// survive them, and every drydock can serve as a relay for the next leg.
-// Industry pays Legacy like the lunar base does, on its own ledger (o.solar).
+// together as one pioneer fleet and moor at the Mars harbour: from then on a
+// light at Mars is an ark waiting there. Every foothold elsewhere is founded by
+// sending one of them: it leaves Mars, flies leg by leg through the drydocks in
+// range of its drive, and becomes the station where it lands. New arks come only
+// from the belt's forges. Industry pays Legacy on its own ledger (o.solar).
 import { Q } from './quantity.js';
 import { bodyById } from './solar-config.js';
+import { ORBITAL_RULES } from './orbital-config.js';
 
 // One leg's flight time grows gently with its length, and falls with the drive.
 export const legSeconds = (distance, speed = 1) => Math.round(25 + 50 * distance ** .6 / speed);
@@ -18,41 +19,70 @@ export const DRIVES = Object.freeze([
   Object.freeze({ talent: null, name: '化学推进', range: .8, speed: 1 }),
   Object.freeze({ talent: 'nuclear', name: '核热推进', range: 1.5, speed: 1.25 }),
   Object.freeze({ talent: 'fusion', name: '聚变推进', range: 4, speed: 1.6 }),
+  Object.freeze({ talent: 'deepDrive', name: '深空推进', range: 15, speed: 2.2 }),
 ]);
-// Drydocks: the Moon's is VI's shipyard; the others are VII talents.
-export const DOCKS = Object.freeze({ moon: null, mars: 'harbor' });
-// Bodies an ordinary hull cannot survive, and the talent that makes it able to.
-export const HAZARDS = Object.freeze({ venus: 'heat', mercury: 'heat' });
+// Drydocks an ark can leave from or pass through, and the talent that builds each.
+export const DOCKS = Object.freeze({ mars: 'harbor', jupiter: 'jupiterDock', uranus: 'uranusDock' });
 
-const M = 2 ** 20, G = 2 ** 30;
+const M = 2 ** 20, G = 2 ** 30, T = 2 ** 40;
 // yield: Legacy per second, doubling with every rank after the first.
 // boost: multiplies every yield facility, doubling per rank.
 // The first rank is paid when the ark is dispatched and built when it arrives.
 const facility = (name, body, costs, kind, description, extra = {}) => Object.freeze({ name, body, costs: Object.freeze(costs), kind, description, ...extra });
 export const FACILITIES = Object.freeze({
   venus: facility('高空浮空城', 'venus', [8 * M, 32 * M, 128 * M, 512 * M, 2 * G], 'yield', '在五十公里高空的温和云层里，浮空城采集大气，持续回流 Legacy。', { base: 32768 }),
-  mercury: facility('日冕阵列', 'mercury', [32 * M, 256 * M, 2 * G, 16 * G], 'boost', '贴近太阳铺开的集能阵列，为所有行星工业供能：每级产能翻倍。', { requires: { venus: 1 } }),
+  mercury: facility('日冕阵列', 'mercury', [32 * M, 256 * M, 2 * G, 16 * G], 'boost', '贴近太阳铺开的集能阵列，为所有行星工业供能：每级产能翻倍。'),
   belt: facility('采矿舰队', 'belt', [64 * M, 256 * M, G, 4 * G, 16 * G], 'yield', '从火星港出发，开采小行星的金属与冰。', { base: 262144 }),
-  jupiter: facility('气态采集站', 'jupiter', [512 * M, 2 * G, 8 * G, 32 * G], 'yield', '在木星高层大气中采集氦与氢，是太阳系里最大的产能。', { base: 2 * M }),
+  jupiter: facility('气态采集站', 'jupiter', [512 * M, 2 * G, 8 * G, 32 * G], 'yield', '在木星高层大气中采集氦与氢。', { base: 2 * M }),
+  saturn: facility('冰环采集站', 'saturn', [4 * G, 16 * G, 64 * G, 256 * G], 'yield', '在土星环里开采纯净的水冰，送往内太阳系。', { base: 8 * M }),
+  uranus: facility('冰巨星采集站', 'uranus', [32 * G, 128 * G, 512 * G], 'yield', '从天王星倾斜的大气中提取氘与氦-3。', { base: 32 * M }),
+  neptune: facility('深空前哨', 'neptune', [256 * G, T, 4 * T], 'yield', '太阳系边缘的前哨，从海王星的风暴中采集重氢。', { base: 128 * M }),
 });
+// Save v29 knew only the first four footholds.
+export const V29_FACILITY_KEYS = Object.freeze(['venus', 'mercury', 'belt', 'jupiter']);
 export const facilityAt = body => Object.keys(FACILITIES).find(key => FACILITIES[key].body === body) ?? null;
-export const emptyIndustry = () => ({ facilities: Object.fromEntries(Object.keys(FACILITIES).map(key => [key, 0])), payments: {}, produced: 0, fraction: 0 });
+export const emptyIndustry = (keys = Object.keys(FACILITIES)) => ({ facilities: Object.fromEntries(keys.map(key => [key, 0])), payments: {}, produced: 0, fraction: 0 });
 export const emptyFlights = () => ({ flights: [] });
 
-// ── Reach ──
+// ── Arks ──
 const talent = (o, key) => o.solar.talents?.[key] ?? 0;
 export const drive = o => DRIVES.filter(d => !d.talent || talent(o, d.talent)).at(-1);
-export const docks = o => Object.entries(DOCKS).filter(([, key]) => !key || talent(o, key)).map(([body]) => body);
+export const docks = o => Object.entries(DOCKS).filter(([, key]) => talent(o, key)).map(([body]) => body);
 export const pioneerAt = o => o.completionAt === null ? null : o.completionAt + PIONEER.seconds;
 export const pioneerProgress = o => o.completionAt === null ? 0 : Math.max(0, Math.min(1, (o.elapsed - o.completionAt) / PIONEER.seconds));
-// The next leg to a body: from the nearest drydock in range, or why it cannot go.
+// 光帆加速 shortens every flight, arks and transfers alike.
+// 木卫四's depot shortens them again.
+export const flightFactor = o => (talent(o, 'solarSail') ? .7 : 1) * (talent(o, 'callisto') ? .8 : 1);
+// New arks: the belt's forges and the Ganymede yard.
+export const arkTotal = o => ORBITAL_RULES.arkCount + talent(o, 'arkForge') + talent(o, 'ganymede');
+// Arks away: those in flight and those that became a station.
+export const arksAway = o => (o.solar.flights?.length ?? 0) + Object.values(o.solar.facilities).filter(rank => rank > 0).length;
+export const arksMoored = o => arrived(o, PIONEER.to) ? Math.max(0, arkTotal(o) - arksAway(o)) : 0;
+// The way to a body: from Mars, through drydocks, each leg within the drive's
+// range; the quickest such path. Or why no ark can go yet.
 export function route(o, body) {
-  const hazard = HAZARDS[body];
-  if (hazard && !talent(o, hazard)) return { blocked: 'hazard', need: hazard };
-  const d = drive(o), legs = docks(o).map(from => ({ from, distance: legDistance(from, body) })).sort((a, b) => a.distance - b.distance);
-  const leg = legs.find(l => l.distance <= d.range + 1e-9);
-  if (!leg) return { blocked: 'range', need: DRIVES.find(x => x.range >= legs[0].distance)?.talent ?? null, distance: legs[0].distance };
-  return { ...leg, seconds: legSeconds(leg.distance, d.speed) };
+  if (!talent(o, 'harbor')) return { blocked: 'harbor' };
+  const d = drive(o), factor = flightFactor(o), stops = docks(o).filter(id => id !== body);
+  const time = (a, b) => legSeconds(legDistance(a, b), d.speed) * factor;
+  const best = { mars: { seconds: 0, via: [] } }, open = ['mars'], done = new Set();
+  while (open.length) {
+    open.sort((a, b) => best[a].seconds - best[b].seconds); const at = open.shift(); if (done.has(at)) continue; done.add(at);
+    if (at === body) break;
+    for (const next of [...stops, body]) {
+      if (done.has(next) || legDistance(at, next) > d.range + 1e-9) continue;
+      const seconds = best[at].seconds + time(at, next);
+      if (!best[next] || seconds < best[next].seconds) { best[next] = { seconds, via: at === 'mars' ? [] : [...best[at].via, at] }; open.push(next); }
+    }
+  }
+  if (!best[body]) return { blocked: 'range', distance: Math.min(...[...stops, 'mars'].map(id => legDistance(id, body))) };
+  if (!arksMoored(o)) return { blocked: 'fleet' };
+  return { from: 'mars', via: best[body].via, seconds: Math.round(best[body].seconds) };
+}
+// Where an ark is along its legs: the waypoint it left, the next one and how far between.
+export function flightLeg(o, f) {
+  const points = [f.from, ...(f.via ?? []), f.body], weights = points.slice(1).map((id, i) => legDistance(points[i], id) ** .6 + .5);
+  const total = weights.reduce((a, b) => a + b, 0); let t = Math.max(0, Math.min(1, (o.elapsed - f.departAt) / (f.arriveAt - f.departAt))) * total;
+  for (let i = 0; i < weights.length; i++) { if (t <= weights[i] || i === weights.length - 1) return { from: points[i], to: points[i + 1], t: Math.min(1, t / weights[i]) }; t -= weights[i]; }
 }
 export const flightTo = (o, body) => o.solar.flights?.find(f => f.body === body) ?? null;
 // When the ark bound for a body arrives, or null when none is on its way.
@@ -69,10 +99,14 @@ export function arrived(o, body) {
 }
 export const flightProgress = (o, f) => Math.max(0, Math.min(1, (o.elapsed - f.departAt) / (f.arriveAt - f.departAt)));
 
-export const industryBoost = o => 2 ** (o.solar.facilities.mercury ?? 0);
+// 日冕阵列 doubles every yield per rank; 近日熔炉 and 天卫四 add to all of them;
+// 大气提纯 and each giant's moon double their own world.
+export const industryBoost = o => 2 ** (o.solar.facilities.mercury ?? 0) * (talent(o, 'smelter') ? 1.5 : 1) * (talent(o, 'oberon') ? 1.25 : 1);
+const DOUBLERS = Object.freeze({ venus: 'refinery', jupiter: 'io', saturn: 'enceladus', uranus: 'titania', neptune: 'triton' });
+export const facilityMultiplier = (o, key) => industryBoost(o) * (talent(o, DOUBLERS[key]) ? 2 : 1);
 export function facilityRate(o, key) {
   const f = FACILITIES[key], rank = o.solar.facilities[key];
-  return f.kind === 'yield' && rank ? f.base * 2 ** (rank - 1) * industryBoost(o) : 0;
+  return f.kind === 'yield' && rank ? f.base * 2 ** (rank - 1) * facilityMultiplier(o, key) : 0;
 }
 export const industryRate = o => Object.keys(FACILITIES).reduce((sum, key) => sum + facilityRate(o, key), 0);
 
@@ -82,7 +116,6 @@ export function facilityState(s, key) {
   const rank = o.solar.facilities[key];
   if (rank >= f.costs.length) return 'max';
   if (flightTo(o, f.body)) return 'transit';
-  if (Object.entries(f.requires ?? {}).some(([other, level]) => o.solar.facilities[other] < level)) return 'prerequisite';
   if (!rank && route(o, f.body).blocked) return 'prerequisite';
   return Q.gte(s.permanent.legacy, f.costs[rank]) ? 'ready' : 'legacy';
 }
@@ -94,7 +127,7 @@ export function buildFacility(s, key) {
   (o.solar.payments[key] ??= []).push(cost);
   if (rank) { o.solar.facilities[key]++; return true; }
   const leg = route(o, f.body);
-  o.solar.flights.push({ body: f.body, from: leg.from, departAt: o.elapsed, arriveAt: o.elapsed + leg.seconds });
+  o.solar.flights.push({ body: f.body, from: leg.from, via: leg.via, departAt: o.elapsed, arriveAt: o.elapsed + leg.seconds });
   return true;
 }
 export function landFlights(o) {

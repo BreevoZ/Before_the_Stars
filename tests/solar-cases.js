@@ -1,4 +1,5 @@
 import { voyageReady, voyageFixture, lunarFixture } from './orbital-colony-cases.js';
+import { toV29 } from './colony-war-cases.js';
 import { mountFixture } from './progression-cases.js';
 import { serializeSession, parseSession, mapSessionQuantities, createSaveStore, DEBUG_SAVE_KEY } from '../src/save.js';
 import { purchaseOrbitalTalent, getOrbitalTalentState, orbitalLegacySpent } from '../src/orbital-game.js';
@@ -9,7 +10,8 @@ import { setDebugLegacy } from '../src/debug.js';
 import { drawLunarColony } from '../src/orbital-render.js';
 import { Q } from '../src/quantity.js';
 import { updateOrbital } from '../src/orbital-game.js';
-import { FACILITIES, PIONEER, arrivalAt, arrived, facilityState, buildFacility, industryRate, facilityRate, route, legSeconds } from '../src/solar-industry.js';
+import { FACILITIES, PIONEER, arrivalAt, arrived, facilityState, buildFacility, industryRate, facilityRate, route, legSeconds, legDistance, arksMoored, arksAway, arkTotal } from '../src/solar-industry.js';
+import { reachNeed } from '../src/solar-tree-view-model.js';
 import { SOLAR_TALENTS, solarTalentState, purchaseSolarTalent, windowOpen, windowTiming, transferState, transferCivilization, transferQuote, domeCapacity, colonyRate, colonistRate, COLONY_RULES } from '../src/solar-colony.js';
 import { buildSolarTreeViewModel } from '../src/solar-tree-view-model.js';
 import { buildSolarViewModel } from '../src/solar-view-model.js';
@@ -105,55 +107,82 @@ export function registerSolarTests(test, assert, near) {
     const vii=buildSolarViewModel(s,{view:'system',selected:'saturn'});
     assert(vii['#orbital-game@data-stage']==='VII' && !vii['#colony-system@hidden']);
     assert(vii['#colony-body-name']==='土星' && vii['#colony-body-card@hidden']);
-    assert(vii['#solar-body-note'].includes('尚未开放') && vii['#shipyard-status'].includes('已启航'));
+    assert(vii['#shipyard-status'].includes('已启航'));
     assert(DESTINATIONS.length===9 && new Set(DESTINATIONS.map(b=>b.id)).size===9);
     assert(buildSolarViewModel(s,{view:'europa'})['#solar-body-period'].startsWith('3.6 天')&&buildSolarViewModel(s,{view:'triton'})['#solar-body-period'].includes('逆行'));
   });
-  test('Arks: the pioneer fleet founds the Mars harbour; every other foothold is an ark dispatched from a drydock within reach', () => {
+  test('Arks: seven lights moor at Mars; each foothold takes one away, flies leg by leg through drydocks and stays as the station', () => {
     const s=voyageFixture(),o=s.orbital,run=seconds=>{for(let i=0;i<Math.round(seconds*30);i++)updateOrbital(s,1/30);};
-    setDebugLegacy(s,2**40);const rejects=(raw,why)=>{let failed=false;try{parseSession(raw);}catch{failed=true;}assert(failed,why);};
-    // Only Mars is on the way at launch; nothing else can be reached yet.
-    near(arrivalAt(o,'mars'),o.completionAt+PIONEER.seconds);assert(!arrived(o,'mars')&&arrivalAt(o,'venus')===null);
+    setDebugLegacy(s,2**39);const rejects=(raw,why)=>{let failed=false;try{parseSession(raw);}catch{failed=true;}assert(failed,why);};
+    const land=()=>{while(o.solar.flights.length)run(1);};
+    // The fleet is still flying: nothing is moored and nothing can leave.
+    near(arrivalAt(o,'mars'),o.completionAt+PIONEER.seconds);assert(arksMoored(o)===0&&route(o,'venus').blocked==='harbor');
     for(const key of Object.keys(FACILITIES))assert(facilityState(s,key)==='prerequisite'&&!buildFacility(s,key));
-    assert(route(o,'venus').blocked==='hazard'&&route(o,'belt').blocked==='range'&&solarTalentState(s,'harbor')==='transit');
-    // A heat-proof hull opens Venus from the lunar drydock; the first rank is the ark itself.
-    assert(purchaseSolarTalent(s,'heat')&&facilityState(s,'venus')==='ready');const leg=route(o,'venus');assert(leg.from==='moon'&&leg.seconds===legSeconds(.28));
-    const wallet=s.permanent.legacy,spent=orbitalLegacySpent(o);assert(buildFacility(s,'venus')&&!buildFacility(s,'venus'));
-    assert(o.solar.facilities.venus===0&&o.solar.flights.length===1&&facilityState(s,'venus')==='transit'&&industryRate(o)===0);
-    assert(Q.eq(s.permanent.legacy,Q.sub(wallet,FACILITIES.venus.costs[0]))&&Q.eq(orbitalLegacySpent(o),Q.add(spent,FACILITIES.venus.costs[0])));
+    run(PIONEER.seconds+1);assert(arksMoored(o)===ARK_COUNT&&solarTalentState(s,'harbor')==='ready'&&purchaseSolarTalent(s,'harbor'));
+    // Venus is within a chemical leg of Mars; the ark leaves the moored row.
+    const leg=route(o,'venus');assert(leg.from==='mars'&&leg.via.length===0&&leg.seconds===legSeconds(legDistance('mars','venus')));
+    const wallet=s.permanent.legacy;assert(buildFacility(s,'venus')&&arksMoored(o)===ARK_COUNT-1&&o.solar.flights[0].via.length===0);
+    assert(Q.eq(s.permanent.legacy,Q.sub(wallet,FACILITIES.venus.costs[0]))&&facilityState(s,'venus')==='transit');
     let raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw,'An ark in flight round-trips');
+    const stray=JSON.parse(raw);stray.orbital.solar.flights[0].via=['pluto'];rejects(JSON.stringify(stray),'Arks pass only through drydocks');
     const unpaid=JSON.parse(raw);unpaid.orbital.solar.payments.venus=[];rejects(JSON.stringify(unpaid),'Every ark is paid');
-    const stray=JSON.parse(raw);stray.orbital.solar.flights[0].from='mars';rejects(JSON.stringify(stray),'Arks leave only from owned drydocks');
-    const nohull=JSON.parse(raw);nohull.orbital.solar.talents.heat=0;nohull.orbital.solar.payments.heat=[];rejects(JSON.stringify(nohull),'The leg must be flyable');
-    run(leg.seconds+.5);assert(o.solar.flights.length===0&&o.solar.facilities.venus===1&&arrived(o,'venus'));
+    land();assert(o.solar.facilities.venus===1&&arksMoored(o)===ARK_COUNT-1,'The ark stays at Venus as its station');
     const produced=o.solar.produced;run(10);near(Q.toNumber(Q.sub(o.solar.produced,produced)),FACILITIES.venus.base*10,FACILITIES.venus.base*.05);
-    // Mercury needs Venus first, then multiplies every yield.
-    assert(buildFacility(s,'mercury'));run(route(o,'venus').seconds+60);assert(o.solar.facilities.mercury===1&&industryRate(o)===FACILITIES.venus.base*2);
-    // The belt is out of the chemical drive's reach until the Mars drydock and a nuclear drive.
-    assert(arrived(o,'mars')&&purchaseSolarTalent(s,'harbor')&&route(o,'belt').blocked==='range'&&facilityState(s,'belt')==='prerequisite');
-    assert(purchaseSolarTalent(s,'nuclear'));const belt=route(o,'belt');assert(belt.from==='mars'&&buildFacility(s,'belt'));
-    // Jupiter is only reachable from the Mars harbour, and only with fusion.
-    assert(facilityState(s,'jupiter')==='prerequisite'&&purchaseSolarTalent(s,'fusion'));assert(route(o,'jupiter').from==='mars'&&buildFacility(s,'jupiter'));
-    run(200);assert(o.solar.facilities.belt===1&&o.solar.facilities.jupiter===1&&o.solar.flights.length===0);
-    raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw);
-    const cheap=JSON.parse(raw);cheap.orbital.solar.payments.venus=['1'];rejects(JSON.stringify(cheap),'Payments match the price');
+    // Mercury and the belt need a nuclear drive; Jupiter needs fusion from the belt.
+    assert(route(o,'mercury').blocked==='range'&&reachNeed(o,'mercury')==='需核热推进'&&purchaseSolarTalent(s,'nuclear'));
+    assert(buildFacility(s,'mercury')&&buildFacility(s,'belt'));land();
+    assert(reachNeed(o,'jupiter')==='需聚变推进'&&purchaseSolarTalent(s,'fusion')&&buildFacility(s,'jupiter'));land();
+    // Saturn is one deep leg from Mars; Uranus goes through the Jupiter drydock, Neptune through Uranus.
+    for(const key of ['fuel','jupiterDock','deepDrive'])assert(purchaseSolarTalent(s,key),key);
+    assert(route(o,'saturn').via.length===0&&buildFacility(s,'saturn'));
+    const uranus=route(o,'uranus');assert(uranus.via.join()==='jupiter'&&buildFacility(s,'uranus'));
+    assert(o.solar.flights.find(f=>f.body==='uranus').via.join()==='jupiter');run(5);
+    raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw,'A relayed ark round-trips');land();
+    assert(reachNeed(o,'neptune')==='需天王星船坞中转'&&purchaseSolarTalent(s,'uranusDock'));
+    assert(route(o,'neptune').via.join()==='jupiter,uranus'&&arksMoored(o)===1&&buildFacility(s,'neptune')&&arksMoored(o)===0);
+    // Seven arks, seven stations: the belt's forge is the only way to more.
+    assert(arkTotal(o)===ARK_COUNT&&arksAway(o)===ARK_COUNT);
+    const extra=JSON.parse(serializeSession(s));extra.orbital.solar.flights.push({...extra.orbital.solar.flights[0],body:'belt'});rejects(JSON.stringify(extra),'No more arks away than the fleet');
+    assert(purchaseSolarTalent(s,'arkForge')&&arksMoored(o)===1);
+    // Upgrades by world: Venus refining, the Mercury furnace, sails for every flight.
+    const venus=facilityRate(o,'venus');assert(purchaseSolarTalent(s,'refinery')&&facilityRate(o,'venus')===venus*2);
+    const industry=industryRate(o);assert(purchaseSolarTalent(s,'solarSail')&&purchaseSolarTalent(s,'smelter'));near(industryRate(o),industry*1.5);
+    assert(transferQuote(o,{age:1}).seconds===COLONY_RULES.travelSeconds*.7||!windowOpen(o));
   });
-  test('VI: before 远航协议 every VII view model builds without throwing (VI syncs them every frame)', () => {
-    for(const s of [voyageReady(),lunarFixture()]){
-      assert(Object.keys(buildSolarTreeViewModel(s,{talent:'venus',selected:true})).length===0);
-      for(const d of DESTINATIONS)buildSolarViewModel(s,{view:'earth',selected:d.id});
-    }
+  test('Satellites: each moon branches off its planet, needs that foothold, costs no ark and does what its node says', () => {
+    const s=voyageFixture(),o=s.orbital,run=n=>{for(let i=0;i<Math.round(n*30);i++)updateOrbital(s,1/30);},land=()=>{while(o.solar.flights.length)run(1);};
+    setDebugLegacy(s,2**39);run(PIONEER.seconds+1);
+    for(const [key,t] of Object.entries(SOLAR_TALENTS).filter(([,t])=>t.satellite))assert(Object.keys(t.requires).length===1&&[140,280].includes(Math.abs(t.x-SOLAR_TALENTS[Object.keys(t.requires)[0]].x))&&t.y===1270,key);
+    assert(solarTalentState(s,'phobos')==='prerequisite'&&purchaseSolarTalent(s,'harbor'));
+    const civ={age:3},before=transferQuote(o,civ).cost,moored=arksMoored(o);
+    assert(purchaseSolarTalent(s,'phobos')&&transferQuote(o,civ).cost===Math.round(before*.75)&&arksMoored(o)===moored,'A lander, not an ark');
+    for(const key of ['venus','nuclear','belt'])assert(purchaseSolarTalent(s,key),key);land();assert(purchaseSolarTalent(s,'fusion')&&purchaseSolarTalent(s,'jupiter'));land();
+    const jupiter=facilityRate(o,'jupiter');assert(purchaseSolarTalent(s,'io')&&facilityRate(o,'jupiter')===jupiter*2);
+    const total=arkTotal(o);assert(purchaseSolarTalent(s,'ganymede')&&arkTotal(o)===total+1);
+    assert(solarTalentState(s,'titan')==='planned'&&!purchaseSolarTalent(s,'titan'));
+    const view=buildSolarViewModel(s,{view:'io'});assert(view['#solar-body-note'].includes('木星采集站 ×2'));
+    const raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw);
+  });
+  test('Map v30: v29 saves refund 近日隔热 and talents whose new prerequisite is missing, and keep a dome by granting 火星港 free', () => {
+    const s=voyageFixture();setDebugLegacy(s,2**36);for(let i=0;i<30*(PIONEER.seconds+1);i++)updateOrbital(s,1/30);
+    const old=toV29(JSON.parse(serializeSession(s))),sol=old.orbital.solar,M=2**20;
+    Object.assign(sol.talents,{heat:1,dome:1,fusion:1,harbor:0});Object.assign(sol.payments,{heat:[String(12*M)],dome:[String(16*M)],fusion:[String(320*M)]});
+    const next=parseSession(JSON.stringify(old)),n=next.orbital.solar;
+    assert(n.talents.harbor===1&&Q.eq(n.payments.harbor[0],0),'A dome keeps its harbour, free');
+    assert(n.talents.fusion===0&&!n.payments.fusion&&!('heat' in n.talents)&&!n.payments.heat,'Refunded: 近日隔热, and fusion without a belt foothold');
+    assert(Q.eq(next.permanent.legacy,Q.sub(s.permanent.legacy,16*M)),'Only the dome stays paid; refunds return to the wallet');
+    assert(n.facilities.neptune===0&&serializeSession(parseSession(serializeSession(next)))===serializeSession(next));
   });
   test('Industry v25–v27: older saves gain empty ledgers and new talents; VI saves never own footholds', () => {
     const s=voyageFixture(),old=JSON.parse(serializeSession(s));old.version=24;old.orbital.version=10;delete old.orbital.solar;
     const next=parseSession(JSON.stringify(old));assert(Object.values(next.orbital.solar.facilities).every(v=>v===0)&&Q.eq(next.orbital.solar.produced,0));
     assert(next.orbital.solar.flights.length===0&&next.orbital.solar.talents.harbor===0);
-    setDebugLegacy(s,2**40);const v26=JSON.parse(serializeSession(s));v26.version=26;v26.orbital.version=12;delete v26.orbital.solar.flights;v26.orbital.solar.colonies={mars:[]};for(const k of ['heat','harbor','nuclear','fusion','uplift'])delete v26.orbital.solar.talents[k];
+    setDebugLegacy(s,2**40);const v26=toV29(JSON.parse(serializeSession(s)));v26.version=26;v26.orbital.version=12;delete v26.orbital.solar.flights;v26.orbital.solar.colonies={mars:[]};for(const k of ['heat','harbor','nuclear','fusion','uplift'])delete v26.orbital.solar.talents[k];
     v26.orbital.solar.facilities.jupiter=1;v26.orbital.solar.payments.jupiter=[String(FACILITIES.jupiter.costs[0])];
     const kept=parseSession(JSON.stringify(v26));assert(kept.orbital.solar.facilities.jupiter===1&&kept.orbital.solar.talents.fusion===0,'Footholds built under v26 stay');
     const vi=voyageReady();vi.orbital.solar.facilities.venus=1;vi.orbital.solar.payments.venus=[FACILITIES.venus.costs[0]];
     let rejected=false;try{parseSession(serializeSession(vi));}catch{rejected=true;}assert(rejected,'Industry needs 远航协议');
-    const view=buildSolarViewModel(s,{view:'venus'});assert(!view['#solar-facility@hidden']&&view['#solar-facility-build'].includes('近日隔热')&&view['#solar-facility-build@disabled']);
+    const view=buildSolarViewModel(s,{view:'venus'});assert(!view['#solar-facility@hidden']&&view['#solar-facility-build'].includes('火星港')&&view['#solar-facility-build@disabled']);
     assert(buildSolarViewModel(s,{view:'system',selected:'mars'})['#colony-body-status'].includes('先遣编队'));
     assert(buildSolarViewModel(s,{view:'system',selected:'saturn'})['#solar-facility@hidden']);
   });
@@ -166,8 +195,8 @@ export function registerSolarTests(test, assert, near) {
   });
   test('Transfer: an idle Earth civilization flies to the Mars dome, pays by age and window, frees its site and works on arrival', () => {
     const s=voyageFixture(),o=s.orbital,run=seconds=>{for(let i=0;i<Math.round(seconds*30);i++)updateOrbital(s,1/30);};setDebugLegacy(s,'1e13');
-    assert(solarTalentState(s,'dome')==='transit'&&!purchaseSolarTalent(s,'dome'),'The dome waits for the Mars ark');
-    run(95);assert(purchaseSolarTalent(s,'dome')&&purchaseSolarTalent(s,'transfer')&&solarTalentState(s,'uplift')==='ready');
+    assert(solarTalentState(s,'harbor')==='transit'&&solarTalentState(s,'dome')==='prerequisite'&&!purchaseSolarTalent(s,'dome'),'The dome waits for the Mars harbour');
+    run(95);assert(purchaseSolarTalent(s,'harbor')&&purchaseSolarTalent(s,'dome')&&purchaseSolarTalent(s,'transfer')&&solarTalentState(s,'uplift')==='ready');
     run(70);assert(o.phase==='living');const civ=o.civilizations.find(c=>c.alive&&!c.warId);assert(civ&&transferState(s,civ.id)==='ready');
     const quote=transferQuote(o,civ),wallet=s.permanent.legacy;assert(Q.eq(quote.cost,COLONY_RULES.transferBase*2**(civ.age-1)*(quote.open?1:COLONY_RULES.lateCost)));
     assert(transferCivilization(s,civ.id)&&!o.civilizations.some(c=>c.id===civ.id)&&o.solar.transfers.length===1&&Q.eq(s.permanent.legacy,Q.sub(wallet,quote.cost)));
@@ -185,15 +214,15 @@ export function registerSolarTests(test, assert, near) {
   test('VII tree: the root is owned, facilities are the same nodes as in the dossiers, planned nodes cannot be bought, and v25 saves gain empty colonies', () => {
     const s=voyageFixture(),o=s.orbital;setDebugLegacy(s,'1e13');
     let v=buildSolarTreeViewModel(s,{talent:'venus',selected:true});
-    assert(v['#solar-node-voyage@data-state']==='max'&&v['#solar-node-venus@data-state']==='prerequisite'&&v['#solar-node-harbor@data-state']==='cycles'&&v['#solar-gate-harbor'].startsWith('编队'));
-    assert(purchaseSolarTalent(s,'heat'));v=buildSolarTreeViewModel(s,{talent:'venus',selected:true});
-    assert(v['#solar-node-venus@data-state']==='ready'&&v['#solar-buy'].includes('派遣方舟')&&v['#solar-detail-requires'].includes('月球 → 金星'));
+    assert(v['#solar-node-voyage@data-state']==='max'&&v['#solar-node-venus@data-state']==='prerequisite'&&v['#solar-gate-venus']==='需火星港'&&v['#solar-node-harbor@data-state']==='cycles'&&v['#solar-gate-harbor'].startsWith('编队'));
+    for(let i=0;i<30*(PIONEER.seconds+1);i++)updateOrbital(s,1/30);assert(purchaseSolarTalent(s,'harbor'));v=buildSolarTreeViewModel(s,{talent:'venus',selected:true});
+    assert(v['#solar-node-venus@data-state']==='ready'&&v['#solar-buy'].includes('派遣方舟')&&v['#solar-detail-requires'].includes('火星 → 金星')&&v['#solar-detail-branch'].includes('VENUS'));
     assert(purchaseSolarTalent(s,'venus')&&o.solar.flights.length===1,'Buying the node dispatches the ark');
     v=buildSolarTreeViewModel(s,{talent:'venus',selected:true});assert(v['#solar-node-venus@data-state']==='cycles'&&v['#solar-gate-venus'].startsWith('方舟'));
-    for(let i=0;i<30*60;i++)updateOrbital(s,1/30);assert(o.solar.facilities.venus===1);
+    for(let i=0;i<30*90;i++)updateOrbital(s,1/30);assert(o.solar.facilities.venus===1);
     assert(solarTalentState(s,'starship')==='planned'&&!purchaseSolarTalent(s,'starship'));
     assert(buildSolarTreeViewModel(s,{talent:'starship',selected:true})['#solar-buy@disabled']);
-    const old=JSON.parse(serializeSession(voyageFixture()));old.version=25;old.orbital.version=11;for(const k of ['talents','colonies','transfers','nextTransfer','flights'])delete old.orbital.solar[k];
+    const old=toV29(JSON.parse(serializeSession(voyageFixture())));old.version=25;old.orbital.version=11;for(const k of ['talents','colonies','transfers','nextTransfer','flights'])delete old.orbital.solar[k];
     const next=parseSession(JSON.stringify(old));assert(next.orbital.solar.colonies.mars.civs.length===0&&next.orbital.solar.talents.dome===0);
   });
   test('Solar atlas: uniform projection and shared hit positions stay in bounds at desktop and mobile sizes', () => {
@@ -244,7 +273,7 @@ export function registerSolarTests(test, assert, near) {
     drawVoyageScene(x,700,500,0,{reducedMotion:true});const still=c.toDataURL();drawVoyageScene(x,700,500,12,{reducedMotion:true});assert(c.toDataURL()===still && serializeSession(s)===raw);
   });
   test.browser('World economy UI: dispatch from Venus still pays once, lands while observing another world and restores its saved flight',async()=>{
-    const s=voyageFixture();setDebugLegacy(s,2**40);purchaseSolarTalent(s,'heat');
+    const s=voyageFixture();setDebugLegacy(s,2**36);for(let i=0;i<30*(PIONEER.seconds+1);i++)updateOrbital(s,1/30);assert(purchaseSolarTalent(s,'harbor'));
     const before=s.permanent.legacy,frame=await mountFixture(serializeSession(s),false,'debug',{reducedMotion:true});
     try{
       const d=frame.contentDocument,w=frame.contentWindow,el=id=>d.getElementById(id);let now=0;

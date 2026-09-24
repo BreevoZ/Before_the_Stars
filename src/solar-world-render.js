@@ -1,8 +1,8 @@
-import { drawPlanetSphere, surfacePoint, spinOf } from './planet-render.js';
+import { drawPlanetSphere } from './planet-render.js';
 import { satellitesOf, destination, surfaceOf, satellitePeriodSeconds } from './solar-bodies.js';
 import { drawOrbitStars } from './orbital-render.js';
-import { drawArkLight, ARK_COUNT } from './ark-lights.js';
-import { facilityAt, arrived } from './solar-industry.js';
+import { drawArkLight } from './ark-lights.js';
+import { facilityAt, arksMoored } from './solar-industry.js';
 const TAU=Math.PI*2;
 const noise=n=>{n=Math.imul(n^(n>>>16),0x21f0aaad);n=Math.imul(n^(n>>>15),0x735a2d97);return((n^(n>>>15))>>>0)/4294967296;};
 export function worldGeometry(body,w,h){
@@ -29,26 +29,13 @@ function satellite(c,moon,p,time,hover){
   if(hover===moon.id){c.strokeStyle='#d6c2939c';c.lineWidth=.6;c.beginPath();c.arc(p.x,p.y,p.r+5,0,TAU);c.stroke();}
 }
 function footholds(c,g,body,o,time){
-  const world=o.solar.colonies[body.id],profile=surfaceOf(body),spin=spinOf(body,time);
+  const world=o.solar.colonies[body.id];
   if(world?.phase==='winter'){
     c.save();c.beginPath();c.arc(g.x,g.y,g.r,0,TAU);c.clip();c.fillStyle='#8c989079';c.fillRect(g.x-g.r,g.y-g.r,g.r*2,g.r*2);c.restore();
   }
-  // Every built dome sits at a fixed site on the surface and turns with it;
-  // its two households glow inside, uplifted ones in gold.
-  const domes=body.id==='mars'?o.solar.talents.dome:0,homes=world?[...world.uplifted.map(civ=>({civ,up:true})),...world.civs.map(civ=>({civ,up:false}))]:[];
-  const site=d=>surfacePoint(.4+d*2.4,Math.sin(d*2.1)*.6,spin,profile.tilt);
-  const points=homes.map((h,i)=>({...h,p:site(Math.floor(i/2)),offset:i%2?1:-1}));
-  c.save();c.beginPath();c.arc(g.x,g.y,g.r,0,TAU);c.clip();
-  for(let d=0;d<domes;d++){const p=site(d);if(p.z<=.05)continue;const x=g.x+p.x*g.r,y=g.y+p.y*g.r,r=Math.max(4,g.r*.07)*(.4+.6*p.z);
-    c.strokeStyle=world.phase==='winter'?'#c9d3d3aa':'#e6ddc288';c.lineWidth=.8;c.beginPath();c.ellipse(x,y,r,r*(.35+.65*p.z),0,Math.PI,TAU);c.stroke();
-    c.fillStyle='#e6ddc214';c.fill();}
-  for(const {civ,up,p,offset} of points)if(p.z>.05){const x=g.x+p.x*g.r+offset*Math.max(1.5,g.r*.02),y=g.y+p.y*g.r-1;
-    drawArkLight(c,x,y,up?{radius:1.7,glow:9,brightness:1}:{radius:1+civ.age*.15,glow:5+civ.age,brightness:world.phase==='winter'?.3:.85});}
-  for(const war of world?.wars??[]){const pair=war.sides.map(id=>points.find(p=>p.civ.id===id)?.p);if(pair.some(p=>!p||p.z<.05))continue;
-    const [a,b]=pair;c.strokeStyle='#cb987c99';c.lineWidth=.8;c.setLineDash([2,4]);c.beginPath();c.moveTo(g.x+a.x*g.r,g.y+a.y*g.r);c.quadraticCurveTo(g.x+(a.x+b.x)*g.r*.5,g.y+(a.y+b.y)*g.r*.5-12,g.x+b.x*g.r,g.y+b.y*g.r);c.stroke();c.setLineDash([]);
-  }c.restore();
-  const key=facilityAt(body.id),rank=key?o.solar.facilities[key]:body.id==='mars'&&arrived(o,'mars')?ARK_COUNT:0;
-  for(let i=0;i<rank;i++){
+  // Lights are arks: those moored at the Mars harbour, or the one that founded a station here.
+  const key=facilityAt(body.id),count=body.id==='mars'?arksMoored(o):key&&o.solar.facilities[key]?1:0;
+  for(let i=0;i<count;i++){
     const a=2.7+i*.13+time*.015,x=g.x+Math.cos(a)*g.r*1.12,y=g.y+Math.sin(a)*g.r*.38;
     drawArkLight(c,x,y,{radius:.8,glow:4,brightness:.8});
   }
@@ -68,7 +55,7 @@ export function drawBeltScene(c,w,h,o,time){
     const depth=noise(i+26),drift=time*(.0004+depth*.0006),x=((noise(i+31)+drift)%1)*w;
     const y=h*(.25+noise(i+52)*.54)+(x-w*.5)*.17,r=1+depth**5*Math.min(w*.035,19);
     rock(c,x,y,r,i,time);
-    if(i<rank*3)drawArkLight(c,x+r+4,y,{radius:.9,glow:6});
+    if(i===0&&rank)drawArkLight(c,x+r+4,y,{radius:.9,glow:6});
   }
   const ceres={id:'ceres',name:'谷神星',color:'#9ca799',surface:'rock'},r=Math.min(w*.14,h*.21);
   drawPlanetSphere(c,ceres,w*.37,h*.49,r,{time});

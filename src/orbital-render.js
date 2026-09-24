@@ -1,3 +1,4 @@
+import { ARK_SITES, arkSite, drawArkLight } from './ark-lights.js';
 import { drawOrbitalScene, ORBITAL_SECONDS } from './orbital-scene.js';
 import { SITES, ORBITAL_RULES as R } from './orbital-config.js';
 import { dayPhase, TAU, siteLongitude, lunarOrbitAngle } from './celestial-clock.js';
@@ -208,6 +209,10 @@ function lunarSystem(ctx,o,moon,cx,cy,r,{ambient,reducedMotion}){
   // Base lights on the near side, only once it has turned into night.
   if(o.talents.outpost&&outpost.z>0&&outpost.x<.05){const level=o.talents.lunarIndustry;
     for(let i=0;i<3+level*2;i++){ctx.globalAlpha=clamp(.05-outpost.x)*(.5+noise(i+77)*.5);disc(ctx,x+outpost.x*m+(noise(i+5)-.5)*m*.35*outpost.z,y+outpost.y*m+(noise(i+9)-.5)*m*.3,.7,'#e5d192');}ctx.globalAlpha=1;}
+  if(!o.talents.voyage)for(const [i,f]of ARK_SITES.entries()){
+    if(i>=o.talents.shipyard)break;const p=feature(f.longitude,f.latitude);if(p.z<=0)continue;
+    drawArkLight(ctx,x+p.x*m,y+p.y*m,{radius:.6,glow:2.7,brightness:.8});
+  }
   ctx.restore();ctx.strokeStyle='#b3c0aa45';ctx.lineWidth=.6;ctx.beginPath();ctx.arc(x,y,m,0,TAU);ctx.stroke();
   const dock=ringDock(moon.angle,cx,cy,r),len=Math.hypot(dock[0]-x,dock[1]-y)||1,sx=x+(dock[0]-x)/len*m*.95,sy=y+(dock[1]-y)/len*m*.95;
   // A gentle arc from the moon's limb, bowed away from the planet's centre.
@@ -303,6 +308,10 @@ export function drawLunarColony(ctx,width,height,o,{ambientTime=o.elapsed,reduce
   for(const f of sites){if(f.p.z<=0)continue;const dark=lunarDark(f.p,sun);if(dark<.05)continue;const n=f.kind==='hub'?10:f.kind==='factory'?6:3;
     for(let k=0;k<n;k++){const x=cx+f.p.x*r+(noise(k*13+f.longitude*977|0)-.5)*s*2.4*f.p.z,y=cy+f.p.y*r+(noise(k*29+f.latitude*613|0)-.5)*s*1.8;
       ctx.globalAlpha=dark*.18;disc(ctx,x,y,2.6,'#e8cf8a');ctx.globalAlpha=dark*(.6+noise(k+3)*.4);disc(ctx,x,y,.8,'#f2dea0');}}
+  ctx.globalAlpha=1;
+  if(!o.talents.voyage)for(let i=0;i<o.talents.shipyard;i++){
+    const p=arkSite(i);drawArkLight(ctx,cx+p.x*r,cy+p.y*r,{radius:Math.max(.8,Math.min(1.3,r*.008)),glow:Math.max(4,r*.035)});
+  }
   ctx.globalAlpha=1;ctx.restore();
   ctx.strokeStyle='#acbca455';ctx.lineWidth=.8;ctx.beginPath();ctx.arc(cx,cy,r,0,TAU);ctx.stroke();
   // Transport off the moon. Before the mass driver, shuttles lift off a pad at
@@ -331,5 +340,5 @@ export function drawLunarColony(ctx,width,height,o,{ambientTime=o.elapsed,reduce
       ctx.globalAlpha=fade;ctx.strokeStyle=trail;ctx.lineWidth=1.6;path(ctx,[[qx,qy],[x,y]]);ctx.stroke();disc(ctx,x,y,1.8,'#fff6d6');}
     ctx.globalAlpha=1;
   }
-  ctx.fillStyle='#9baf9e';ctx.font='9px ui-monospace, monospace';ctx.textAlign='center';ctx.fillText(`LUNA  /  ${String(sites.length).padStart(2,'0')} FACILITIES`,cx,cy+r+25);ctx.restore();
+  ctx.fillStyle='#9baf9e';ctx.font='9px ui-monospace, monospace';ctx.textAlign='center';ctx.fillText(`LUNA  /  ${String(sites.length).padStart(2,'0')} FACILITIES  /  ${o.talents.shipyard} ARKS${o.talents.voyage?' DEPARTED':''}`,cx,cy+r+25);ctx.restore();
 }

@@ -1,37 +1,88 @@
-import { drawOrbitalScene, ORBITAL_SECONDS } from './orbital-scene.js';
-import { drawArk, ARK_COUNT } from './shipyard-render.js';
-export const VOYAGE_SECONDS=22;
-const clamp=x=>Math.max(0,Math.min(1,x)),ease=x=>{x=clamp(x);return x*x*(3-2*x);};
-export function voyageFrame(seconds,reduced=false){const t=reduced?VOYAGE_SECONDS:Math.max(0,Math.min(VOYAGE_SECONDS,seconds));return{time:t,treeOpacity:1-ease(t/3),moonRise:ease((t-1)/5),departure:ease((t-6)/12),arrival:ease((t-17)/3),actions:ease((t-20)/2),complete:t>=VOYAGE_SECONDS};}
-export function arkPose(index,seconds,w,h){
-  const f=voyageFrame(seconds),r=Math.min(w*.18,h*.2),moonY=h*.92-f.moonRise*h*.34;
-  const launchX=w*.5+(index-(ARK_COUNT-1)/2)*r*.23,launchY=moonY-r*Math.sqrt(1-((launchX-w*.5)/r)**2)*.79;
-  const flight=clamp((f.time-6-index*.65)/10),travel=flight*flight*(3-2*flight);
-  const targetX=w*(.06+index*.176),targetY=h*(.12+(index%3)*.075);
-  return{x:launchX+(targetX-launchX)*travel,y:launchY+(targetY-launchY)*travel,flight,
-    angle:Math.atan2(targetX-launchX,launchY-targetY),scale:(w<600?.38:.55)*(1-travel*.79),launchX,launchY,targetX,targetY};
+import { drawOrbitalSky } from './orbital-scene.js';
+import { ARK_COUNT, arkSite, drawArkLight } from './ark-lights.js';
+
+export const VOYAGE_SECONDS = 30;
+export const VOYAGE_ARRIVAL = 26;
+// One distant sun lights both the lunar disc and the Earth's atmospheric limb.
+export const VOYAGE_SUN = Object.freeze({x:.68,y:-.38,z:.63});
+const TAU=Math.PI*2,clamp=x=>Math.max(0,Math.min(1,x));
+const ease=x=>{x=clamp(x);return x*x*x*(x*(x*6-15)+10);};
+const disc=(c,x,y,r,color)=>{c.beginPath();c.arc(x,y,r,0,TAU);c.fillStyle=color;c.fill();};
+export function voyageFrame(seconds,reduced=false){
+  const time=reduced?VOYAGE_SECONDS:Math.max(0,Math.min(VOYAGE_SECONDS,seconds));
+  return {time,treeOpacity:1-ease(time/4.5),camera:ease((time-2)/22),
+    moonReveal:.2+.8*ease(time/10),dawn:ease((time-4)/10)*(1-.45*ease((time-21)/9)),
+    arrival:ease((time-VOYAGE_ARRIVAL)/2),actions:ease((time-28)/2),complete:time>=VOYAGE_SECONDS};
 }
-export function drawVoyageScene(c,w,h,seconds,{reducedMotion=false}={}){
-  const f=voyageFrame(seconds,reducedMotion);drawOrbitalScene(c,w,h,ORBITAL_SECONDS);c.save();
-  const r=Math.min(w*.18,h*.2),x=w*.5,y=h*.92-f.moonRise*h*.34;
-  c.globalAlpha=ease((f.time-.7)/2);const halo=c.createRadialGradient(x,y,r*.95,x,y,r*1.2);halo.addColorStop(0,'#95aaa724');halo.addColorStop(1,'#95aaa700');c.fillStyle=halo;c.beginPath();c.arc(x,y,r*1.2,0,Math.PI*2);c.fill();
-  const moon=c.createLinearGradient(x-r,y-r,x+r,y+r);moon.addColorStop(0,'#b5bcb0');moon.addColorStop(.5,'#788c85');moon.addColorStop(1,'#20333c');c.fillStyle=moon;c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.fill();c.save();c.clip();
-  for(let i=0;i<45;i++){const a=i*2.39996,q=Math.sqrt((i+.5)/45)*r;c.fillStyle=i%3?'#19313917':'#d0d3b117';c.beginPath();c.ellipse(x+Math.cos(a)*q,y+Math.sin(a)*q,r*(.018+i%4*.016),r*(.014+i%3*.016),a,0,Math.PI*2);c.fill();}
-  // Surface docks follow the moon's curvature, linked by a thin service route.
-  c.strokeStyle='#afbea455';c.lineWidth=1;c.beginPath();
-  for(let i=0;i<ARK_COUNT;i++){const p=arkPose(i,f.time,w,h);i?c.lineTo(p.launchX,p.launchY+8):c.moveTo(p.launchX,p.launchY+8);}c.stroke();
-  for(let i=0;i<ARK_COUNT;i++){const p=arkPose(i,f.time,w,h);
-    c.fillStyle='#60756f';c.fillRect(p.launchX-8,p.launchY+5,16,5);c.fillStyle='#c4c5a4';c.fillRect(p.launchX-8,p.launchY+4,16,1);
-    for(const side of [-1,1]){c.fillStyle='#435f61';c.fillRect(p.launchX+side*10-1,p.launchY-12,2,22);c.fillStyle='#b9c4ac';c.fillRect(p.launchX+side*10-1,p.launchY-12,2,2);}
-    if(p.flight===0)drawArk(c,p.launchX,p.launchY,p.scale);
+export function voyageGeometry(seconds,w,h){
+  const f=voyageFrame(seconds);
+  // The Moon is already in the sky. Tiny parallax and a lowering foreground
+  // replace the former large upward translation; it never pops up or grows.
+  return {moon:{x:w*(w<600?.60:.64),y:h*(.75-f.camera*.035),r:Math.min(w*.095,h*.115)},
+    earth:{x:w*.5,y:h*(.90+f.camera*.035)+Math.max(w*.8,h*1.2),r:Math.max(w*.8,h*1.2)}};
+}
+function pointOnRoute(start,end,t,h){
+  const u=1-t,c1={x:start.x+(end.x-start.x)*.12,y:start.y-h*.13},c2={x:end.x-(end.x-start.x)*.16,y:end.y+h*.22};
+  return {x:u**3*start.x+3*u*u*t*c1.x+3*u*t*t*c2.x+t**3*end.x,y:u**3*start.y+3*u*u*t*c1.y+3*u*t*t*c2.y+t**3*end.y};
+}
+export function arkPose(index,seconds,w,h){
+  const f=voyageFrame(seconds),m=voyageGeometry(f.time,w,h).moon,p=arkSite(index);
+  const launchX=m.x+p.x*m.r,launchY=m.y+p.y*m.r,delay=8+index*.8;
+  const flight=clamp((f.time-delay)/12),travel=ease(flight);
+  const targetX=w*[.09,.21,.34,.49,.64,.8,.93][index],targetY=h*[.26,.14,.055,.025,.09,.18,.28][index];
+  const start={x:launchX,y:launchY},end={x:targetX,y:targetY},point=pointOnRoute(start,end,travel,h);
+  const tail=pointOnRoute(start,end,Math.max(0,travel-.055*ease(flight*7)),h);
+  return {...point,flight,ignition:ease((f.time-delay+2)/2),launchX,launchY,targetX,targetY,tail,
+    radius:1.25-flight*.4,brightness:1-flight*.1};
+}
+const masks=new WeakMap();
+export function voyageIllumination(x,y,z=0){return clamp(x*VOYAGE_SUN.x+y*VOYAGE_SUN.y+z*VOYAGE_SUN.z);}
+function lunarShadow(ctx){
+  if(masks.has(ctx))return masks.get(ctx);
+  const canvas=ctx.canvas.ownerDocument.createElement('canvas'),size=192;canvas.width=canvas.height=size;
+  const c=canvas.getContext('2d'),pixels=c.createImageData(size,size);
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+    const nx=(x+.5-size/2)/(size/2),ny=(y+.5-size/2)/(size/2),rr=nx*nx+ny*ny;if(rr>1)continue;
+    const lit=voyageIllumination(nx,ny,Math.sqrt(1-rr)),i=(y*size+x)*4;
+    pixels.data[i]=8;pixels.data[i+1]=19;pixels.data[i+2]=22;pixels.data[i+3]=Math.round((.94-.94*lit**.65)*255);
   }
-  c.restore();c.globalAlpha=1;
-  // The Earth's opaque limb hides the rising Moon until it clears the horizon.
-  const hr=Math.max(w*.8,h*1.2),hy=h+hr-h*.1;c.fillStyle='#0b171c';c.beginPath();c.arc(w*.5,hy,hr,0,Math.PI*2);c.fill();c.strokeStyle='#6d989166';c.stroke();
-  for(let i=0;i<ARK_COUNT;i++){const p=arkPose(i,f.time,w,h);if(!p.flight)continue;
-    c.save();c.globalAlpha=(1-f.arrival)*.22;c.strokeStyle='#c0cdb2';c.lineWidth=.7;c.beginPath();c.moveTo(p.launchX,p.launchY);c.lineTo(p.x,p.y);c.stroke();c.restore();
-    drawArk(c,p.x,p.y,p.scale,{angle:p.angle*ease(p.flight*5),thrust:ease(p.flight*8)*(1-p.flight*.7),alpha:1-f.arrival*.5});
+  c.putImageData(pixels,0,0);masks.set(ctx,canvas);return canvas;
+}
+function moon(ctx,m,reveal){
+  ctx.save();ctx.globalAlpha=reveal;disc(ctx,m.x,m.y,m.r,'#9ba58e');
+  ctx.beginPath();ctx.arc(m.x,m.y,m.r,0,TAU);ctx.clip();
+  // Soft lunar maria, with a handful of shallow crater rims. No surface props.
+  for(let i=0;i<11;i++){
+    const a=i*2.39996,q=Math.sqrt((i+.5)/12)*m.r*.85,x=m.x+Math.cos(a)*q,y=m.y+Math.sin(a)*q,r=m.r*(.10+i%3*.025);
+    const g=ctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,'#344c3f38');g.addColorStop(1,'#344c3f00');disc(ctx,x,y,r,g);
+    ctx.strokeStyle='#d2d6b916';ctx.lineWidth=.55;ctx.beginPath();ctx.arc(x,y,r*.6,-1.2,.15);ctx.stroke();
   }
-  // The scene remains in place while the final text/actions fade in above it.
-  c.fillStyle=`rgba(6,14,23,${f.arrival*.42})`;c.fillRect(0,0,w,h);c.restore();return f;
+  ctx.drawImage(lunarShadow(ctx),m.x-m.r,m.y-m.r,m.r*2,m.r*2);ctx.restore();
+}
+function earth(ctx,e,w,h,dawn){
+  // Atmospheric scattering is strongest on the same upper-right side as the Moon.
+  ctx.save();const glow=ctx.createRadialGradient(w*.79,h*1.04,0,w*.79,h*1.04,h*.48);
+  glow.addColorStop(0,`rgba(224,208,158,${.13+dawn*.22})`);glow.addColorStop(.35,`rgba(143,160,129,${.04+dawn*.08})`);glow.addColorStop(1,'#76968d00');
+  ctx.fillStyle=glow;ctx.fillRect(0,0,w,h);
+  disc(ctx,e.x,e.y,e.r,'#0b171c');
+  for(let i=0;i<100;i++){
+    const a=Math.PI+i*Math.PI/100,b=a+Math.PI/100+.002,light=voyageIllumination(Math.cos(a),Math.sin(a));
+    ctx.globalAlpha=.10+light*(.30+dawn*.6);ctx.strokeStyle='#c6c8a2';ctx.lineWidth=1.1;
+    ctx.beginPath();ctx.arc(e.x,e.y,e.r,a,b);ctx.stroke();
+    ctx.globalAlpha*=.12;ctx.lineWidth=6;ctx.beginPath();ctx.arc(e.x,e.y,e.r+2,a,b);ctx.stroke();
+  }ctx.restore();
+}
+export function drawVoyageScene(ctx,w,h,seconds,{reducedMotion=false}={}){
+  const f=voyageFrame(seconds,reducedMotion),g=voyageGeometry(f.time,w,h);
+  ctx.save();drawOrbitalSky(ctx,w,h,1+f.camera*.025);
+  moon(ctx,g.moon,f.moonReveal);earth(ctx,g.earth,w,h,f.dawn);
+  for(let i=0;i<ARK_COUNT;i++){
+    const p=arkPose(i,f.time,w,h);
+    if(p.flight>0&&p.flight<1){
+      const trail=ctx.createLinearGradient(p.tail.x,p.tail.y,p.x,p.y);trail.addColorStop(0,'#d8ddbb00');trail.addColorStop(1,'#f3eac27a');
+      ctx.save();ctx.globalAlpha=1-ease((p.flight-.75)/.25);ctx.strokeStyle=trail;ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(p.tail.x,p.tail.y);ctx.lineTo(p.x,p.y);ctx.stroke();ctx.restore();
+    }
+    drawArkLight(ctx,p.x,p.y,{radius:p.radius,glow:5+p.ignition*8*(1-p.flight*.25),brightness:(.55+p.ignition*.45)*p.brightness*f.moonReveal});
+  }
+  ctx.restore();return f;
 }

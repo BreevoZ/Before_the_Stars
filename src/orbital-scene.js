@@ -35,7 +35,7 @@ export function orbitalLaunchPose(ship, seconds, width, height) {
 const mix = (a, b, t) => `rgb(${a.map((value, i) => Math.round(value + (b[i] - value) * t)).join(',')})`;
 function departureLight(time) { return ease((time - 2) / 7) * (1 - ease((time - 12) / 7)); }
 
-function sky(ctx, width, height, camera) {
+export function drawOrbitalSky(ctx, width, height, camera = 1) {
   const wash = ctx.createLinearGradient(0, 0, 0, height);
   wash.addColorStop(0, '#0c1519'); wash.addColorStop(.7, '#132322'); wash.addColorStop(1, '#192923');
   ctx.fillStyle = wash; ctx.fillRect(0, 0, width, height);
@@ -120,7 +120,7 @@ function horizon(ctx, width, height, amount) {
 
 export function drawOrbitalScene(ctx, width, height, seconds, { reducedMotion = false } = {}) {
   const frame = orbitalFrame(seconds, reducedMotion);
-  ctx.save(); sky(ctx, width, height, frame.camera);
+  ctx.save(); drawOrbitalSky(ctx, width, height, frame.camera);
   dawn(ctx, width, height, frame);
   for (const ship of ORBITAL_FLEET) rocket(ctx, ship, frame.time, width, height);
   ruins(ctx, width, height, frame);

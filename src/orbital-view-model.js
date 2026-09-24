@@ -25,7 +25,7 @@ export function orbitalTalentEffect(o,key,rank=o.talents[key]){
   if(key==='outpost')return rank?`${lunar()} Legacy/s · 战争再 ×2`:'尚未建立月面基地';
   if(key==='lunarIndustry')return `${lunar(rank)} Legacy/s`;
   if(key==='massDriver')return rank?`货运加速 · ${lunar(undefined,rank)} Legacy/s`:'货运舱按常规节奏发射';
-  if(key==='shipyard')return rank?'六艘方舟整备完成':'尚无远航船坞';
+  if(key==='shipyard')return `${rank} / ${R.arkCount} 艘方舟${rank===R.arkCount?' · 整备完成':rank?' · 月面灯火已点亮':' · 等待建造'}`;
   if(key==='voyage')return rank?'方舟已下水 · 行星际空间已打开':'等待启航';
   if(key==='airdrop')return rank?`空投 ${R.airdropGold}× 时代起始金币，每个文明最多 ${R.maximumAirdrops} 次`:'无法向地表投送物资';
   if(key==='intel')return rank?'显示开战前与交战中的胜率预估':'战局只能凭经验判断';

@@ -39,10 +39,10 @@ export function lunarFixture(){
   purchaseOrbitalTalent(s,'transit');purchaseOrbitalTalent(s,'outpost');return s;
 }
 // The eve of VII: every condition for 远航协议 met, inside a nuclear winter.
-export function voyageReady(){
+export function voyageReady({arks=R.arkCount}={}){
   const s=lunarFixture();
   for(let i=0;i<2;i++){pair(s);const w=s.orbital.wars[0];future(w);won(w);resolveOrbitalWar(s,w.id);if(i===0)advance(s,61);}
-  while(purchaseOrbitalTalent(s,'recovery')){}for(const key of ['lunarIndustry','lunarIndustry','massDriver','shipyard'])purchaseOrbitalTalent(s,key);
+  while(purchaseOrbitalTalent(s,'recovery')){}for(const key of ['lunarIndustry','lunarIndustry','massDriver',...Array(arks).fill('shipyard')])purchaseOrbitalTalent(s,key);
   return s;
 }
 export function voyageFixture(){const s=voyageReady();purchaseOrbitalTalent(s,'voyage');return s;}
@@ -73,7 +73,7 @@ export function registerOrbitalColonyTests(test,assert,near){
     for(let i=0;i<2;i++)assert(purchaseOrbitalTalent(s,'lunarIndustry'));
     while(purchaseOrbitalTalent(s,'recovery')){}
     for(let i=0;i<2;i++){pair(s);const w=s.orbital.wars[0];future(w);won(w);resolveOrbitalWar(s,w.id);if(i===0)advance(s,61);}
-    assert(purchaseOrbitalTalent(s,'shipyard')&&s.orbital.nuclearCycles===4&&s.orbital.phase==='winter');
+    while(purchaseOrbitalTalent(s,'shipyard')){}assert(s.orbital.talents.shipyard===R.arkCount&&s.orbital.nuclearCycles===4&&s.orbital.phase==='winter');
     const winter=serializeSession(s);advance(s,61);
     assert(s.orbital.phase==='living'&&getOrbitalTalentState(s,'voyage')==='winter'&&!purchaseOrbitalTalent(s,'voyage'),'The ark leaves only in winter');
     const back=parseSession(winter);assert(getOrbitalTalentState(back,'voyage')==='ready'&&purchaseOrbitalTalent(back,'voyage')&&back.orbital.completionAt!==null);

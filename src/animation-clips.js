@@ -39,7 +39,7 @@ export const ANIMATION_CLIPS = [
   { id: 'stars', category: 'scene', kind: 'stars', name: '星空闪烁', note: '夜间原速 · 每颗星拥有独立的闪烁节奏' },
   { id: 'civilization-destruction', category: 'scene', kind: 'destruction', name: '文明毁灭 · 最后的反扑', note: '超级士兵出动 → 核武库启动 → 世界毁灭 → 废墟静默 · 22 秒压缩到 8 秒，可拖动预览' },
   { id: 'orbital-launch', category: 'scene', kind: 'orbital', name: 'VI · 轨道启航', note: '36 艘火箭从废墟升空，镜头进入星空 · 24 秒演出压缩到 8 秒，可拖动预览' },
-  { id: 'interplanetary-voyage', category: 'scene', kind: 'voyage', name: 'VII · 月面远航', note: '月球升出地平线 → 六艘方舟分赴深空 → 行星际文明 · 22 秒压缩到 8 秒，可拖动预览' },
+  { id: 'interplanetary-voyage', category: 'scene', kind: 'voyage', name: 'VII · 月面远航', note: '月影渐显 → 七点灯火依次启航 → 行星际文明 · 30 秒压缩到 8 秒，可拖动预览' },
 ];
 
 function soldier(id, type, team, x) {

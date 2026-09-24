@@ -1,16 +1,54 @@
 import { voyageReady, voyageFixture, lunarFixture } from './orbital-colony-cases.js';
 import { mountFixture } from './progression-cases.js';
-import { serializeSession, parseSession, DEBUG_SAVE_KEY } from '../src/save.js';
-import { purchaseOrbitalTalent } from '../src/orbital-game.js';
+import { serializeSession, parseSession, mapSessionQuantities, createSaveStore, DEBUG_SAVE_KEY } from '../src/save.js';
+import { purchaseOrbitalTalent, getOrbitalTalentState, orbitalLegacySpent } from '../src/orbital-game.js';
+import { ORBITAL_TALENTS } from '../src/orbital-config.js';
+import { v23Shipyards } from './fixtures/v23-shipyard.js';
+import { fromV23Record } from '../src/save-record.js';
+import { setDebugLegacy } from '../src/debug.js';
+import { drawLunarColony } from '../src/orbital-render.js';
 import { Q } from '../src/quantity.js';
 import { buildSolarViewModel } from '../src/solar-view-model.js';
 import { bodyPosition, BODIES } from '../src/solar-config.js';
 import { solarViewport, bodyAt, DESTINATIONS, drawSolarSystem, drawBodyPortrait } from '../src/solar-render.js';
 import { drawShipyard, ARK_COUNT } from '../src/shipyard-render.js';
-import { voyageFrame, arkPose, drawVoyageScene, VOYAGE_SECONDS } from '../src/voyage-scene.js';
+import { voyageFrame, voyageGeometry, voyageIllumination, arkPose, drawVoyageScene, VOYAGE_SECONDS } from '../src/voyage-scene.js';
 import { ANIMATION_CLIPS } from '../src/animation-clips.js';
 
 export function registerSolarTests(test, assert, near) {
+  const throws=fn=>{let failed=false;try{fn();}catch{failed=true;}assert(failed,'Invalid shipyard record must be rejected');};
+  test('Shipyard: seven paid ranks light seven arks, persist separately, and gate departure until the fleet is complete', () => {
+    const clean=voyageReady({arks:0}),before=clean.permanent.legacy;let total=0;
+    for(let rank=1;rank<=ARK_COUNT;rank++) {
+      assert(getOrbitalTalentState(clean,'voyage')==='prerequisite' && !purchaseOrbitalTalent(clean,'voyage'));
+      assert(purchaseOrbitalTalent(clean,'shipyard'));total+=ORBITAL_TALENTS.shipyard.costs[rank-1];
+      assert(clean.orbital.talents.shipyard===rank && Q.eq(clean.permanent.legacy,Q.sub(before,total)));
+      const raw=serializeSession(clean),back=parseSession(raw);assert(serializeSession(back)===raw && back.orbital.talents.shipyard===rank);
+      const v=buildSolarViewModel(back,{view:'moon'});assert(v['#colony-lunar-arks'].includes(`${rank} / 7`));
+      assert(v['#shipyard-gate-fleet@data-ready']===(rank===7));
+    }
+    assert(total===4161536 && !purchaseOrbitalTalent(clean,'shipyard') && purchaseOrbitalTalent(clean,'voyage'));
+    // Complete prerequisites on a separate fixture; insufficient money must not add a rank.
+    const noMoney=voyageReady({arks:0});setDebugLegacy(noMoney,0);
+    assert(getOrbitalTalentState(noMoney,'shipyard')==='legacy' && !purchaseOrbitalTalent(noMoney,'shipyard') && noMoney.orbital.talents.shipyard===0);
+  });
+  test('Shipyard v24: genuine v23 owners inherit seven arks with their original payment, wallet and departure record intact', () => {
+    for(const [key,raw] of Object.entries(v23Shipyards)) {
+      const record=JSON.parse(raw);mapSessionQuantities(record,Q.decode);
+      const old=fromV23Record(record),next=parseSession(raw),owned=key!=='unbuilt';
+      assert(next.orbital.talents.shipyard===(owned?7:0));
+      assert(Q.eq(next.permanent.legacy,old.permanent.legacy) && Q.eq(orbitalLegacySpent(next.orbital),orbitalLegacySpent(old.orbital)));
+      assert(next.orbital.completionAt===old.orbital.completionAt && next.orbital.talents.voyage===old.orbital.talents.voyage);
+      if(owned)assert(JSON.stringify(next.orbital.payments.shipyard)==='[4194304,0,0,0,0,0,0]');
+      const saved=serializeSession(next);assert(serializeSession(parseSession(saved))===saved);
+      const memory=new Map([[DEBUG_SAVE_KEY,raw]]),storage={getItem:key=>memory.get(key)??null,setItem:(key,value)=>memory.set(key,value)};
+      const store=createSaveStore(()=>storage,{debug:true}),loaded=store.load();assert(loaded.ok&&loaded.migrated&&store.save(loaded.session).ok);
+      assert(memory.get(`${DEBUG_SAVE_KEY}.backup`)===raw,'Keep the original v23 backup');
+    }
+    const bad=JSON.parse(v23Shipyards.ready);bad.orbital.talents.shipyard=7;throws(()=>parseSession(JSON.stringify(bad)));
+    const migrated=JSON.parse(serializeSession(parseSession(v23Shipyards.ready)));migrated.orbital.payments.shipyard[1]='65536';throws(()=>parseSession(JSON.stringify(migrated)));
+    migrated.orbital.payments.shipyard[1]='0';migrated.orbital.payments.shipyard[0]='32768';throws(()=>parseSession(JSON.stringify(migrated)));
+  });
   test('Solar atlas: readiness and destinations derive from the real saved VI state without mutations', () => {
     const s=voyageReady(),raw=serializeSession(s),v=buildSolarViewModel(s,{view:'moon'});
     assert(v['#orbital-game@data-stage']==='VI' && v['#colony-system@hidden']);
@@ -33,17 +71,24 @@ export function registerSolarTests(test, assert, near) {
       }
     }
   });
-  test('Voyage: tree fades before departure, six docked arks stagger toward distinct destinations and actions arrive last', () => {
-    assert(voyageFrame(0).treeOpacity===1 && voyageFrame(3).treeOpacity===0);
-    assert(voyageFrame(6).moonRise===1 && voyageFrame(17).actions===0);
+  test('Voyage: tree fades before seven lights depart, moon stays in place, one sun lights both worlds and actions arrive last', () => {
+    assert(voyageFrame(0).treeOpacity===1 && voyageFrame(4.5).treeOpacity===0);
+    assert(voyageFrame(0).moonReveal>0 && voyageFrame(10).moonReveal===1 && voyageFrame(26).actions===0);
+    assert(voyageIllumination(1,0)>voyageIllumination(-1,0) && voyageIllumination(0,-1)>voyageIllumination(0,1));
+    for(const [w,h] of [[1400,800],[390,750],[320,600]]){
+      const start=voyageGeometry(0,w,h),end=voyageGeometry(VOYAGE_SECONDS,w,h);
+      near(start.moon.r,end.moon.r);near(start.moon.x,end.moon.x);assert(Math.abs(start.moon.y-end.moon.y)<h*.04);
+      assert(start.moon.y+start.moon.r<start.earth.y-start.earth.r,'Moon stays fully above the horizon');
+    }
     const targets=new Set();
     for(let i=0;i<ARK_COUNT;i++) {
       const dock=arkPose(i,5,1000,700),end=arkPose(i,VOYAGE_SECONDS,1000,700);
       assert(dock.flight===0 && dock.x===dock.launchX && dock.y===dock.launchY);
-      assert(end.flight===1 && end.scale<dock.scale);near(end.x,end.targetX);near(end.y,end.targetY);
+      assert(end.flight===1 && end.radius<dock.radius);near(end.x,end.targetX);near(end.y,end.targetY);
+      for(let t=7;t<26;t+=.25){const a=arkPose(i,t,1000,700),b=arkPose(i,t+.001,1000,700);assert(Math.hypot(a.x-b.x,a.y-b.y)<1,'No sudden launch jump');}
       targets.add(`${end.x}:${end.y}`);
     }
-    assert(targets.size===6 && arkPose(0,7,1000,700).flight>arkPose(5,7,1000,700).flight);
+    assert(targets.size===7 && arkPose(0,10,1000,700).flight>arkPose(6,10,1000,700).flight);
     assert(voyageFrame(VOYAGE_SECONDS).actions===1 && voyageFrame(0,true).complete);
     assert(ANIMATION_CLIPS.some(c=>c.id==='interplanetary-voyage' && c.kind==='voyage'));
   });
@@ -58,8 +103,28 @@ export function registerSolarTests(test, assert, near) {
     drawShipyard(x,700,500,s.orbital);const dock=c.toDataURL();drawShipyard(x,700,500,{...s.orbital,talents:{...s.orbital.talents,voyage:1}});assert(c.toDataURL()!==dock);
     const portraits=new Set();for(const b of DESTINATIONS){drawBodyPortrait(x,700,500,b,s.orbital);portraits.add(c.toDataURL());}assert(portraits.size===DESTINATIONS.length);
     drawSolarSystem(x,700,500,s.orbital,{reducedMotion:true});const quiet=c.toDataURL();drawSolarSystem(x,700,500,s.orbital,{reducedMotion:true,ambientTime:90});assert(c.toDataURL()===quiet);
-    const frames=new Set();for(const t of [0,4,8,14,22]){drawVoyageScene(x,700,500,t);frames.add(c.toDataURL());}assert(frames.size===5);
+    const moons=new Set();for(let rank=0;rank<=ARK_COUNT;rank++){drawLunarColony(x,700,500,{...s.orbital,talents:{...s.orbital.talents,shipyard:rank}},{reducedMotion:true});moons.add(c.toDataURL());}assert(moons.size===8,'Each purchased ark appears on the Moon');
+    const frames=new Set();for(const t of [0,4,8,14,22,30]){drawVoyageScene(x,700,500,t);frames.add(c.toDataURL());}assert(frames.size===6);
     drawVoyageScene(x,700,500,0,{reducedMotion:true});const still=c.toDataURL();drawVoyageScene(x,700,500,12,{reducedMotion:true});assert(c.toDataURL()===still && serializeSession(s)===raw);
+  });
+  test.browser('Shipyard UI: seven purchases update the lunar lights, gates, prices and persisted ranks without enabling early departure', async () => {
+    const frame=await mountFixture(serializeSession(voyageReady({arks:0})),false,'debug',{reducedMotion:true});
+    try {
+      const d=frame.contentDocument,w=frame.contentWindow,el=id=>d.getElementById(id);let now=0;
+      el('colony-pause').click();el('colony-view-moon').click();w.__testFrame(now+=100);
+      let moon=el('colony-moon').toDataURL();
+      for(let rank=1;rank<=ARK_COUNT;rank++) {
+        el('shipyard-build').click();assert(el('orbit-buy').textContent.includes(Q.format(ORBITAL_TALENTS.shipyard.costs[rank-1])));
+        el('orbit-buy').click();assert(parseSession(w.__storage.getItem(DEBUG_SAVE_KEY)).orbital.talents.shipyard===rank);
+        el('close-orbit-talents').click();w.__testFrame(now+=100);
+        assert(el('colony-lunar-arks').textContent.includes(`${rank} / 7`));
+        const next=el('colony-moon').toDataURL();assert(next!==moon);moon=next;
+        assert(el('shipyard-gate-fleet').dataset.ready===String(rank===7));
+        assert(el('shipyard-voyage').textContent.includes(rank===7?'签署':'条件'));
+      }
+      el('shipyard-build').click();assert(el('orbit-buy').disabled && !el('orbit-detail').textContent.includes('undefined'));
+      assert(!d.body.dataset.fixtureError,d.body.dataset.fixtureError);
+    } finally {frame.remove();}
   });
   test.browser('VI tree: lunar income and wars continue; tree pause, save dialog and hidden page stop simulation without catch-up', async () => {
     const seed=lunarFixture();seed.debugSpeed=1;
@@ -103,7 +168,7 @@ export function registerSolarTests(test, assert, near) {
       const frame=await mountFixture(serializeSession(voyageFixture()),false,'debug',{reducedMotion});
       try {
         const d=frame.contentDocument,w=frame.contentWindow,el=id=>d.getElementById(id);let now=0;
-        el('colony-pause').click();el('solar-replay').click();for(let i=0;i<230;i++)w.__testFrame(now+=100);
+        el('colony-pause').click();el('solar-replay').click();for(let i=0;i<VOYAGE_SECONDS*10+10;i++)w.__testFrame(now+=100);
         assert(el('voyage-dialog').dataset.phase==='arrived');el('voyage-enter').click();assert(el('colony-pause').getAttribute('aria-pressed')==='true');
         el('voyage-canvas').getContext=()=>{throw Error('Test canvas failure');};el('solar-replay').click();
         assert(!el('voyage-dialog').open && !el('orbit-talents-dialog').open && el('orbital-game').dataset.view==='system');

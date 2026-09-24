@@ -1,4 +1,4 @@
-import { V17_ORBITAL_TALENTS as OLD, v18OrbitalTalents, v19OrbitalTalents, v20OrbitalTalents, v21OrbitalTalents, v22OrbitalTalents } from './orbital-save-history.js';
+import { V17_ORBITAL_TALENTS as OLD, v18OrbitalTalents, v19OrbitalTalents, v20OrbitalTalents, v21OrbitalTalents, v22OrbitalTalents, v23OrbitalTalents, OLD_SHIPYARD_COST } from './orbital-save-history.js';
 import { Q } from './quantity.js';
 import { check, object, num, int, bool, id } from './save-primitives.js';
 import { validateShape, AI_SHAPE } from './save-schema.js';
@@ -15,11 +15,11 @@ const whole=v=>amount(v)&&Q.isInteger(v);
 export function validateOrbital(s,version){
   if(version<=15)return validateOldOrbital(s,version);
   const o=s.orbital;if(s.run.phase!=='orbital'){check(o===undefined,'轨道阶段状态');return;}
-  const V18=v18OrbitalTalents(T),V19=v19OrbitalTalents(T),V20=v20OrbitalTalents(T),V21=v21OrbitalTalents(T),V22=v22OrbitalTalents(T);
-  const configs=version===16?Object.fromEntries(Object.entries(OLD).filter(([key])=>key!=='lunarIndustry')):version===17?OLD:version===18?V18:version===19?V19:version===20?V20:version===21?V21:version===22?V22:T;
+  const V18=v18OrbitalTalents(T),V19=v19OrbitalTalents(T),V20=v20OrbitalTalents(T),V21=v21OrbitalTalents(T),V22=v22OrbitalTalents(T),V23=v23OrbitalTalents(T);
+  const configs=version===16?Object.fromEntries(Object.entries(OLD).filter(([key])=>key!=='lunarIndustry')):version===17?OLD:version===18?V18:version===19?V19:version===20?V20:version===21?V21:version===22?V22:version===23?V23:T;
   keys(o,Object.keys(createOrbitalState(1)).filter(key=>(version>=17||!['lunarProduced','lunarFraction'].includes(key))&&(version>=23||key!=='seedTendency')),'轨道字段');
   if(version>=23)check(int(o.seedTendency,0,3)&&(!o.seedTendency||o.talents.directed>0),'定向播种');
-  check(o.version===(version===16?2:version===17?3:version===18?4:version===19?5:version===20?6:version===21?7:version===22?8:9)&&bool(o.started)&&num(o.elapsed)&&int(o.rng,0,4294967295),'轨道时钟与随机源');
+  check(o.version===(version===16?2:version===17?3:version===18?4:version===19?5:version===20?6:version===21?7:version===22?8:version===23?9:R.version)&&bool(o.started)&&num(o.elapsed)&&int(o.rng,0,4294967295),'轨道时钟与随机源');
   for(const key of ['cycle','settledCycle','nuclearCycles','nextCivilization','nextWar'])check(int(o[key]),key);
   check(o.nuclearCycles===o.settledCycle&&o.settledCycle<=o.cycle,'核毁灭凭据');
   check(['dormant','living','winter'].includes(o.phase)&&o.started===(o.phase!=='dormant'),'萌芽阶段');
@@ -33,9 +33,12 @@ export function validateOrbital(s,version){
     // v18 players who already ran a lunar outpost without it.
     const priced=(table,i,cost)=>table[key]?.costs[i]!==undefined&&Q.eq(cost,table[key].costs[i]);
     const paid=o.payments[key]??[];check(Array.isArray(paid)&&paid.length===(key==='protocol'?0:rank)&&paid.every((cost,i)=>Q.eq(cost,t.costs[i])
-      || version>=18 && [OLD,V18,V19,V20,V21,V22].some(table=>priced(table,i,cost)) || version>=19 && key==='transit' && o.talents.outpost>0 && Q.eq(cost,0)
+      || version>=18 && [OLD,V18,V19,V20,V21,V22,V23].some(table=>priced(table,i,cost)) || version>=19 && key==='transit' && o.talents.outpost>0 && Q.eq(cost,0)
+      // v24 keeps the old complete shipyard's payment and grants the six extra ranks.
+      || version>=24 && key==='shipyard' && rank===R.arkCount && i>0 && Q.eq(paid[0],OLD_SHIPYARD_COST) && Q.eq(cost,0)
       // v22 moved 轨道收割 under 知识封锁 and granted the lock to earlier harvesters.
       || version>=22 && key==='regression' && o.talents.harvest>0 && Q.eq(cost,0)),'轨道天赋实付');
+    if(version>=24&&key==='shipyard'&&paid.length&&Q.eq(paid[0],OLD_SHIPYARD_COST))check(rank===R.arkCount&&paid.slice(1).every(cost=>Q.eq(cost,0)),'旧方舟编队继承');
   }
   check(o.talents.protocol===1,'存续协议继承');
   check(bool(o.autoWar)&&(!o.autoWar||o.talents.weaving>0)&&num(o.autoElapsed,0,.25)&&o.autoElapsed<.25,'战争自动化');

@@ -1,4 +1,4 @@
-import { drawVoyageScene, VOYAGE_SECONDS } from './voyage-scene.js';
+import { drawVoyageScene, VOYAGE_SECONDS, VOYAGE_ARRIVAL } from './voyage-scene.js';
 
 // Presentation never changes the wallet or unlocks a stage. The purchase has
 // already been saved; refresh goes straight to VII, even during this film.
@@ -28,11 +28,11 @@ export function createVoyageUI({ tree, arrive, changed }) {
     dialog.style.background = `rgba(9,18,24,${1 - frame.treeOpacity})`;
     canvas.style.opacity = String(1 - frame.treeOpacity);
     tree.style.setProperty('--voyage-tree-opacity', frame.treeOpacity);
-    el('voyage-arrival').hidden = frame.time < 17;
+    el('voyage-arrival').hidden = frame.time < VOYAGE_ARRIVAL;
     el('voyage-actions').inert = !frame.complete;
     el('voyage-actions').setAttribute('aria-hidden', String(!frame.complete));
     el('voyage-skip').hidden = frame.complete;
-    el('voyage-caption').hidden = frame.time >= 17;
+    el('voyage-caption').hidden = frame.time >= VOYAGE_ARRIVAL;
     dialog.dataset.phase = frame.complete ? 'arrived' : 'launching';
   }
   function exit() {

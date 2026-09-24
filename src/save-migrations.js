@@ -10,7 +10,7 @@ import { getV8RunBonuses } from './progression-bonuses.js';
 import { createAutomation } from './automation.js';
 import { HISTORICAL_TALENTS, HISTORICAL_UPGRADE_COSTS } from './save-history.js';
 import { validateRecord } from './save-validation.js';
-import { cloneRecord, toV8Record, fromV8Record, fromV9Record, fromV10Record, fromV11Record, fromV12Record, fromV13Record, fromV14Record, fromV15Record, fromV16Record, fromV17Record, fromV18Record, fromV19Record, fromV20Record, fromV21Record, fromV22Record } from './save-record.js';
+import { cloneRecord, toV8Record, fromV8Record, fromV9Record, fromV10Record, fromV11Record, fromV12Record, fromV13Record, fromV14Record, fromV15Record, fromV16Record, fromV17Record, fromV18Record, fromV19Record, fromV20Record, fromV21Record, fromV22Record, fromV23Record } from './save-record.js';
 import { TALENTS } from './talents.js';
 const teams = ['player', 'enemy'];
 
@@ -269,11 +269,20 @@ export function migrateV22(input) {
   if(record.orbital){const o=record.orbital;o.version=9;for(const key of ['quickening','chronicle','directed','fallout'])o.talents[key]=0;o.seedTendency=0;}
   record.version=23;return record;
 }
-export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9, 10: migrateV10, 11: migrateV11, 12: migrateV12, 13: migrateV13, 14: migrateV14, 15: migrateV15, 16: migrateV16, 17: migrateV17, 18: migrateV18, 19: migrateV19, 20: migrateV20, 21: migrateV21, 22: migrateV22 });
+// A previously completed shipyard remains a completed fleet. Preserve its
+// original payment, append six explicit grants, and never touch the wallet.
+export function migrateV23(input) {
+  const record=cloneRecord(input);
+  if(record.orbital){const o=record.orbital;o.version=10;
+    if(o.talents.shipyard){o.talents.shipyard=ORBITAL_RULES.arkCount;o.payments.shipyard=[...o.payments.shipyard,...Array(ORBITAL_RULES.arkCount-1).fill(0)];}
+  }
+  record.version=24;return record;
+}
+export const MIGRATIONS = Object.freeze({ 1: migrateV1, 2: migrateV2, 3: migrateV3, 4: migrateV4, 5: migrateV5, 6: migrateV6, 7: migrateV7, 8: migrateV8, 9: migrateV9, 10: migrateV10, 11: migrateV11, 12: migrateV12, 13: migrateV13, 14: migrateV14, 15: migrateV15, 16: migrateV16, 17: migrateV17, 18: migrateV18, 19: migrateV19, 20: migrateV20, 21: migrateV21, 22: migrateV22, 23: migrateV23 });
 export function migrateRecord(input) {
   let record = input;
   while (record.version < SAVE_VERSION) {
-    const hydrate = { 8: fromV8Record, 9: fromV9Record, 10: fromV10Record, 11: fromV11Record, 12: fromV12Record, 13: fromV13Record, 14: fromV14Record, 15: fromV15Record, 16: fromV16Record, 17: fromV17Record, 18: fromV18Record, 19: fromV19Record, 20: fromV20Record, 21: fromV21Record, 22: fromV22Record }[record.version];
+    const hydrate = { 8: fromV8Record, 9: fromV9Record, 10: fromV10Record, 11: fromV11Record, 12: fromV12Record, 13: fromV13Record, 14: fromV14Record, 15: fromV15Record, 16: fromV16Record, 17: fromV17Record, 18: fromV18Record, 19: fromV19Record, 20: fromV20Record, 21: fromV21Record, 22: fromV22Record, 23: fromV23Record }[record.version];
     validateRecord(hydrate ? hydrate(record) : record, record.version);
     record = MIGRATIONS[record.version](record);
   }

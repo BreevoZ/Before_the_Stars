@@ -1,7 +1,9 @@
-// Shared hull design: drydock, launch film and solar-system fleet.
+// Close-view construction diagram; the moon and departure use tiny lights.
+import { ARK_COUNT } from './ark-lights.js';
+export { ARK_COUNT } from './ark-lights.js';
 const TAU=Math.PI*2;
 const poly=(c,p,fill)=>{c.beginPath();p.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.closePath();c.fillStyle=fill;c.fill();};
-export const ARK_COUNT=6;
+
 // The prow points up; the light is restrained, with no outline around the hull.
 export function drawArk(c,x,y,size,{angle=0,thrust=0,alpha=1}={}){
   c.save();c.translate(x,y);c.rotate(angle);c.scale(size,size);c.globalAlpha*=alpha;
@@ -16,10 +18,10 @@ export function drawArk(c,x,y,size,{angle=0,thrust=0,alpha=1}={}){
 }
 export function drawShipyard(c,w,h,o,{time=0,reducedMotion=false}={}){
   c.save();c.clearRect(0,0,w,h);const scale=Math.min(w/720,h/280);c.translate(w/2,h/2);c.scale(scale,scale);
-  const built=Boolean(o.talents.shipyard),launched=Boolean(o.talents.voyage);
+  const rank=o.talents.shipyard,launched=Boolean(o.talents.voyage);
   c.strokeStyle='#779b9526';c.lineWidth=1;c.setLineDash([2,7]);for(const y of [-70,70]){c.beginPath();c.moveTo(-335,y);c.lineTo(335,y);c.stroke();}c.setLineDash([]);
   for(let i=0;i<ARK_COUNT;i++){
-    const x=-270+i*108;c.save();c.translate(x,0);c.globalAlpha=built?1:.3;
+    const x=-294+i*98,built=i<rank;c.save();c.translate(x,0);c.globalAlpha=built?1:.3;
     c.fillStyle='#23373c';c.fillRect(-34,45,68,18);c.fillStyle='#526e6b';c.fillRect(-36,44,72,3);
     for(const side of [-1,1]){c.fillStyle='#3f5659';c.fillRect(side*32-3,-45,6,92);for(const y of [-34,6,38]){c.fillStyle='#7d9690';c.fillRect(side<0?-33:18,y,15,3);}c.fillStyle='#c8b98a';c.fillRect(side*32-1,-46,2,5);}
     if(!launched)drawArk(c,0,3,.93,{alpha:built?1:.35});

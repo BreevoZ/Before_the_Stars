@@ -14,13 +14,21 @@ export const V17_ORBITAL_TALENTS = Object.freeze({
   lunarIndustry: {"costs":[8192,32768,131072,524288],"requires":{"outpost":1}},
   transit: {"costs":[262144],"requires":{"outpost":1,"harvest":1},"cycles":4},
 });
+// v19–v23 bought the entire fleet in a single transaction.
+export const OLD_SHIPYARD_COST = 4194304;
+export function v23OrbitalTalents(current){
+  const talents=Object.fromEntries(Object.entries(current).map(([key,t])=>[key,{costs:t.costs,requires:t.requires,...(t.cycles?{cycles:t.cycles}:{}),...(t.ring?{ring:t.ring}:{})}]));
+  talents.shipyard={...talents.shipyard,costs:[OLD_SHIPYARD_COST]};
+  talents.voyage={...talents.voyage,requires:{shipyard:1}};
+  return Object.freeze(talents);
+}
 const V23_KEYS=['quickening','chronicle','directed','fallout'];
 const V22_KEYS=['overview',...V23_KEYS];
 const V21_KEYS=['airdrop','intel','ceasefire'];
 const V20_KEYS=['tendency','nuclearResearch','chain','doomsday','bonds',...V21_KEYS];
 // Every version before v22: two ranks of 多元萌芽 and no 全域监视.
 function before22(current,exclude){
-  const talents=Object.fromEntries(Object.entries(current).filter(([key])=>![...V22_KEYS,...exclude].includes(key))
+  const talents=Object.fromEntries(Object.entries(v23OrbitalTalents(current)).filter(([key])=>![...V22_KEYS,...exclude].includes(key))
     .map(([key,t])=>[key,{costs:t.costs,requires:t.requires,...(t.cycles?{cycles:t.cycles}:{}),...(t.ring?{ring:t.ring}:{})}]));
   talents.diversity={costs:[512,2048],requires:{reseed:1}};
   return talents;
@@ -49,7 +57,7 @@ export function v20OrbitalTalents(current){
 }
 // v22: as today, without the four later cycle talents.
 export function v22OrbitalTalents(current){
-  return Object.freeze(Object.fromEntries(Object.entries(current).filter(([key])=>!V23_KEYS.includes(key))
+  return Object.freeze(Object.fromEntries(Object.entries(v23OrbitalTalents(current)).filter(([key])=>!V23_KEYS.includes(key))
     .map(([key,t])=>[key,{costs:t.costs,requires:t.requires,...(t.cycles?{cycles:t.cycles}:{}),...(t.ring?{ring:t.ring}:{})}])));
 }
 // v21: as v20 plus the diplomacy talents.

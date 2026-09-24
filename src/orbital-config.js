@@ -1,7 +1,7 @@
 // Orbital wars reuse the surface simulation; Legacy is the only orbital wallet.
-export const ORBITAL_RULES = Object.freeze({ version: 9, finalAge: 5, historyLimit: 12,
+export const ORBITAL_RULES = Object.freeze({ version: 10, finalAge: 5, historyLimit: 12,
   winterSeconds: 60, refugeeSeconds: 30, nuclearVisualSeconds: 7, minCivilizations: 4, maxCivilizations: 8, maxWars: 4,
-  habitatSections: 7, lunarRotationSeconds: 180, lunarBaseIncome: 512, warIncome: 2.5, warBaseHealth: 3,
+  habitatSections: 7, arkCount: 7, lunarRotationSeconds: 180, lunarBaseIncome: 512, warIncome: 2.5, warBaseHealth: 3,
   // A civilization should take minutes, not one, to climb from I to V: each
   // age lasts ~35–40 s of war. Legacy per experience rises by the same factor,
   // so the war income per second stays where it was.
@@ -53,10 +53,10 @@ export const ORBITAL_TALENTS = Object.freeze({
   outpost: talent('月球前哨',[65536],{transit:1},'建立 VI 月面生产基地，货运舱沿地月航线运回遗产；战争与核毁灭遗产再翻倍。',660,615,'moon',{branch:'home',kind:'keystone'}),
   lunarIndustry: talent('月面自动工场',[131072,524288,2097152,8388608],{outpost:1},'每级月面产能翻倍；扩建采掘场、太阳翼与自动生产枢纽。',565,460,'industry',{branch:'home'}),
   massDriver: talent('质量投射器',[1048576],{outpost:1},'在月面铺设电磁发射轨道，货运舱发射更快，月面产能 ×2。',755,460,'railgun',{branch:'home'}),
-  shipyard: talent('深空船坞',[4194304],{lunarIndustry:2,massDriver:1},'在月面建造远航方舟的船坞。',660,285,'drydock',{cycles:3,branch:'home'}),
+  shipyard: talent('深空船坞',Array.from({length:ORBITAL_RULES.arkCount},(_,i)=>32768*2**i),{lunarIndustry:2,massDriver:1},'每级在月面完成一艘方舟，点亮一处灯火。七艘齐备后才能签署远航协议。',660,285,'drydock',{cycles:3,branch:'home'}),
   // The full ring is a stated condition rather than an edge: a drawn link from
   // the ring would cut straight through the route, outpost and shipyard nodes.
-  voyage: talent('远航协议',[16777216],{shipyard:1},'方舟下水，打开行星际空间：观测台扩展为整个太阳系，VI 的一切照常运行。需要完整星环，只能在核冬天期间启航。',660,70,'ark',{cycles:4,ring:7,branch:'home',kind:'keystone',finale:true}),
+  voyage: talent('远航协议',[16777216],{shipyard:ORBITAL_RULES.arkCount},'七艘方舟启航，打开行星际空间：观测台扩展为整个太阳系，VI 的一切照常运行。需要完整星环，只能在核冬天期间启航。',660,70,'ark',{cycles:4,ring:7,branch:'home',kind:'keystone',finale:true}),
   // WAR · 地表干预: observation along the bottom row, then two columns —
   // proxy war rising under 代理人战争, intelligence and truce beside it.
   monitor: talent('地面监控',[128],{protocol:1},'接入地表实况，观看双方 AI 的真实战争；开启干预路线。',1020,935,'eye',{branch:'war',kind:'specialist'}),

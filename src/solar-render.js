@@ -49,7 +49,7 @@ export function drawSolarSystem(c,w,h,o,{ambientTime=o.elapsed,reducedMotion=fal
     if(b.id==='earth'){disc(c,p.x+r*2,p.y-r,2.1,'#b6c4b3');c.fillStyle='#869f96';c.font='8px ui-monospace,monospace';if(w>=600)c.fillText(o.phase==='winter'?'WINTER':'HOME',p.x+sign*(r+13),p.y+18);}
   }
   if(o.talents.voyage){const home=bodyPosition(bodyById('earth'),clock);
-    for(let i=0;i<ARK_COUNT;i++){const end=bodyPosition(BODIES.filter(b=>!b.belt&&b.id!=='earth')[i+1],clock),fraction=.17+i*.055,x=home.x+(end.x-home.x)*fraction,y=home.y+(end.y-home.y)*fraction;
+    for(let i=0;i<ARK_COUNT;i++){const end=bodyPosition(BODIES.filter(b=>!b.belt&&b.id!=='earth')[i],clock),fraction=.17+i*.055,x=home.x+(end.x-home.x)*fraction,y=home.y+(end.y-home.y)*fraction;
       c.strokeStyle='#a7b8b11f';c.setLineDash([2,8]);c.beginPath();c.moveTo(home.x,home.y);c.lineTo(end.x,end.y);c.stroke();c.setLineDash([]);drawArk(c,x,y,.105,{angle:Math.atan2(end.x-home.x,home.y-end.y),thrust:0});}
   }
   c.textAlign='left';c.fillStyle='#5e7a80';c.font='8px ui-monospace,monospace';c.fillText('HELIOCENTRIC SURVEY  /  ORBITS NOT TO SCALE',40,464);c.textAlign='right';c.fillText('30 AU  /  OUTER SYSTEM',960,464);c.restore();

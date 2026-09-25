@@ -3,7 +3,7 @@ import { ORBITAL_RULES as R, ORBITAL_TALENTS as T, ORBITAL_ACTIONS as ACTIONS } 
 import { seedCivilizations, seedRefugee, orbitalYieldMultiplier, civilizationValue, rebirthDelay, refugeeDelay, lunarLegacyRate, nuclearMultiplier, bondRate, chronicleMultiplier } from './celestial-economy.js';
 import { createWar, updateWar, syncWarCivilizations, refreshWarBonuses, changeTechnology } from './orbital-war.js';
 import { AGES } from './game-config.js';
-import { emptyIndustry, emptyFlights, industryRate, industrySpent, landFlights, FACILITIES, facilityAt } from './solar-industry.js';
+import { emptyIndustry, emptyFlights, archiveFactor, industryRate, industrySpent, landFlights, FACILITIES, facilityAt } from './solar-industry.js';
 import { emptyColonies, colonyRate, landTransfers } from './solar-colony.js';
 import { updateColonies } from './colony-war.js';
 import { bodyById } from './solar-config.js';
@@ -127,7 +127,7 @@ export function updateOrbital(s,dt,{paused=false,hidden=false}={}){
   // Colony worlds fight and burn on their own clocks; Earth's phase never stops them.
   const colonies=updateColonies(o,dt);for(const text of colonies.logs)log(o,text);
   if(colonies.reward){o.solar.produced=Q.add(o.solar.produced,colonies.reward);award(s,colonies.reward);}
-  o.solar.fraction+=(industryRate(o)+colonyRate(o))*dt;const solarWhole=Math.floor(o.solar.fraction+1e-10);o.solar.fraction=Math.max(0,o.solar.fraction-solarWhole);
+  o.solar.fraction+=(industryRate(o)+colonyRate(o))*archiveFactor(o)*dt;const solarWhole=Math.floor(o.solar.fraction+1e-10);o.solar.fraction=Math.max(0,o.solar.fraction-solarWhole);
   if(solarWhole){o.solar.produced=Q.add(o.solar.produced,solarWhole);award(s,solarWhole);}
   if(o.phase==='winter'){
     // 余烬观测: the winter itself pays out half the last annihilation, evenly.

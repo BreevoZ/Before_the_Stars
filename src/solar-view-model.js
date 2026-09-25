@@ -31,7 +31,7 @@ export function buildSolarViewModel(s,{view='earth',selected='earth',transferCiv
     '#solar-body-distance':b.parent?`${root.name}的卫星`:`${b.au} AU`,
     '#solar-period-label':b.parent?'绕行周期':'公转周期',
     '#solar-body-period':b.parent?`${Math.abs(b.period).toFixed(Math.abs(b.period)<2?2:1)} 天${b.period<0?' · 逆行':''}`:`${(orbitalPeriod(b.au)/EARTH_YEAR_SECONDS).toFixed(b.au<2?2:1)} 地球年`,
-    '#solar-body-purpose':b.parent&&b.id!=='moon'?'卫星观测':facilityKey&&o.solar.facilities[facilityKey]?'工业驻地':{home:'观测 / 文明轮回',moon:'制造 / 深空船坞',habitable:'殖民候选地',industrial:'工业候选地',relay:'外太阳系勘察'}[b.kind],
+    '#solar-body-purpose':b.parent&&b.id!=='moon'?'卫星观测':facilityKey&&o.solar.facilities[facilityKey]?'工业驻地':{home:'观测 / 文明轮回',moon:'制造 / 深空船坞',habitable:'殖民候选地',industrial:'工业候选地',relay:'外太阳系勘察',dwarf:'柯伊伯带勘察'}[b.kind],
     '#solar-body-note':owned?'家园仍在运转。':b.parent?(SOLAR_TALENTS[b.id]?.planned?'这里将是下一个殖民世界。（后续开放）':o.solar.talents[b.id]?`驻地已建立：${solarTalentEffect(o,b.id)}。`:`在行星际星图的${root.name}一列建立驻地：由${root.name}驻地派出登陆艇，不占用方舟。`):facilityKey?'驻地生产的遗产持续回流到共同的家园。':b.id===COLONY_RULES.target?'火星不会自行萌芽。文明来自地球的转运，核冬天仅影响这颗星球。':b.kind==='habitable'?'卫星等待着未来的殖民者。驻地建设尚未开放。':'遥远的观测信号。深空驻地尚未开放。',
     '#colony-shipyard@hidden':!o.talents.outpost,'#shipyard-status':vii?'七艘方舟已启航':ready?'七艘方舟 · 整备完成':`月面船坞 · 方舟 ${rank} / ${ARK_COUNT}`,
     '#shipyard-detail':vii?'七点灯火已离开月面。家园与工场继续留在后方。':ready?'七艘方舟已经齐备。等待完整星环和核冬天中的远航窗口。':'每完成一级，月面就会多一处灯火。七艘方舟将带着文明的遗产，分赴深空。',

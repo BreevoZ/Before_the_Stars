@@ -109,7 +109,7 @@ export function registerSolarTests(test, assert, near) {
     assert(vii['#orbital-game@data-stage']==='VII' && !vii['#colony-system@hidden']);
     assert(vii['#colony-body-name']==='土星' && vii['#colony-body-card@hidden']);
     assert(vii['#shipyard-status'].includes('已启航'));
-    assert(DESTINATIONS.length===9 && new Set(DESTINATIONS.map(b=>b.id)).size===9);
+    assert(DESTINATIONS.length===10 && new Set(DESTINATIONS.map(b=>b.id)).size===10 && DESTINATIONS.at(-1).id==='pluto');
     assert(buildSolarViewModel(s,{view:'europa'})['#solar-body-period'].startsWith('3.6 天')&&buildSolarViewModel(s,{view:'triton'})['#solar-body-period'].includes('逆行'));
   });
   test('Arks: seven lights moor at Mars; each world opens with a technology on the axis, and each foothold takes one ark away for good', () => {
@@ -165,6 +165,21 @@ export function registerSolarTests(test, assert, near) {
     let raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw);
     assert(debugVoyage(s)&&s.orbital.talents.voyage===1&&s.orbital.talents.shipyard===ARK_COUNT&&s.orbital.nuclearCycles>=ORBITAL_TALENTS.voyage.cycles);
     raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw&&!debugVoyage(s),'Only once');
+  });
+  test('Pluto: the relay opens the Kuiper belt; its station takes an ark like any other, Charon doubles it, comets shorten flights and the cold archive keeps more', () => {
+    const s=voyageFixture(),o=s.orbital,run=n=>{for(let i=0;i<Math.round(n*30);i++)updateOrbital(s,1/30);},land=()=>{while(o.solar.flights.length)run(1);};
+    setDebugLegacy(s,'1e13');run(PIONEER.seconds+1);
+    for(const key of ['harbor','heat','mining','deepDrive'])assert(purchaseSolarTalent(s,key),key);
+    assert(SOLAR_TALENTS.pluto.column==='pluto'&&SOLAR_TALENTS.pluto.y===SOLAR_TALENTS.neptune.y&&SOLAR_TALENTS.pluto.x-SOLAR_TALENTS.relay.x===SOLAR_TALENTS.relay.x-SOLAR_TALENTS.neptune.x,'Neptune and Pluto mirror each other');
+    assert(reachNeed(o,'pluto')==='需深空中继'&&purchaseSolarTalent(s,'relay')&&buildFacility(s,'pluto'));land();
+    const rate=facilityRate(o,'pluto');assert(rate>0&&purchaseSolarTalent(s,'charon')&&facilityRate(o,'pluto')===rate*2);
+    const civ={age:2},before=transferQuote(o,civ).seconds;assert(purchaseSolarTalent(s,'cometCapture'));near(transferQuote(o,civ).seconds,before*.85);
+    const produced=o.solar.produced;run(4);const base=Q.toNumber(Q.sub(o.solar.produced,produced));
+    assert(purchaseSolarTalent(s,'coldArchive'));const again=o.solar.produced;run(4);near(Q.toNumber(Q.sub(o.solar.produced,again))/base,1.15,.05);
+    assert(buildSolarViewModel(s,{view:'pluto'})['#colony-body-kind'].includes('矮行星')&&buildSolarViewModel(s,{view:'charon'})['#solar-body-note'].includes('冰氮前哨 ×2'));
+    const old=JSON.parse(serializeSession(s));old.version=31;old.orbital.version=17;delete old.orbital.solar.facilities.pluto;
+    for(const k of ['cometCapture','coldArchive','charon']){delete old.orbital.solar.talents[k];delete old.orbital.solar.payments[k];}delete old.orbital.solar.payments.pluto;
+    const next=parseSession(JSON.stringify(old)).orbital.solar;assert(next.facilities.pluto===0&&next.talents.charon===0,'v31 saves gain an unbuilt Pluto');
   });
   test('Map v31: v29 saves are refunded their old reach talents, keep a dome by granting 火星港 free, and start the axis unbought', () => {
     const s=voyageFixture();setDebugLegacy(s,2**36);for(let i=0;i<30*(PIONEER.seconds+1);i++)updateOrbital(s,1/30);

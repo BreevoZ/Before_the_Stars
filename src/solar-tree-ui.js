@@ -11,7 +11,7 @@ import { watchSeam } from './tree-flip.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 // The route bar jumps to the axis or to each world's large node.
-const ROUTE_ROOT = { axis: 'heat', earth: 'moonPort', mars: 'harbor', mercury: 'mercury', venus: 'venus', belt: 'belt', jupiter: 'jupiter', saturn: 'saturn', uranus: 'uranus', neptune: 'neptune' };
+const ROUTE_ROOT = { axis: 'heat', earth: 'moonPort', mars: 'harbor', mercury: 'mercury', venus: 'venus', belt: 'belt', jupiter: 'jupiter', saturn: 'saturn', uranus: 'uranus', neptune: 'neptune', pluto: 'pluto' };
 const routeOf = t => t.gold ? (t.root ? 'root' : 'main') : 'branch';
 export function createSolarTree(getSession, { commit, viewChanged, flipOrbit }) {
   const el = id => document.getElementById(id), bind = createBindings(document), dialog = el('solar-talents-dialog');

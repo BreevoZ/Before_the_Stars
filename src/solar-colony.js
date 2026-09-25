@@ -10,7 +10,7 @@ import { FACILITIES, arrived, facilityState, buildFacility, flightFactor } from 
 import { emptyWorld, colonistRate, colonyIncome } from './colony-war.js';
 export { colonistRate } from './colony-war.js';
 
-const M = 2 ** 20, G = 2 ** 30;
+const M = 2 ** 20, G = 2 ** 30, T = 2 ** 40;
 export const COLONY_RULES = Object.freeze({
   // A Hohmann transfer to Mars leaves when Mars leads the Earth by about 44°.
   target: 'mars', lead: .77, window: .8, hohmannWindow: .45,
@@ -41,8 +41,8 @@ export const SOLAR_REGIONS = Object.freeze([
   ['mercury', '水星', 'MERCURY · 近日工业', -1, 1], ['venus', '金星', 'VENUS · 云层与大气', 1, 1],
   ['belt', '小行星带', 'MAIN BELT · 采矿与铸造', -1, 2], ['jupiter', '木星', 'JUPITER · 气态巨行星', 1, 2],
   ['saturn', '土星', 'SATURN · 冰环', -1, 3], ['uranus', '天王星', 'URANUS · 冰巨星', 1, 3],
-  ['neptune', '海王星', 'NEPTUNE · 太阳系边缘', -1, 4], ['reserve', '外太阳系', 'KUIPER BELT · 预留', 1, 4],
-].map(([id, name, en, side, tier]) => Object.freeze({ id, name, en, side, tier, reserved: id === 'reserve' })));
+  ['neptune', '海王星', 'NEPTUNE · 冰巨星', -1, 4], ['pluto', '冥王星', 'PLUTO · 柯伊伯带', 1, 4],
+].map(([id, name, en, side, tier]) => Object.freeze({ id, name, en, side, tier })));
 const R = Object.fromEntries(SOLAR_REGIONS.map(r => [r.id, r]));
 const place = (region, col, row, name, icon, extra) => { const r = R[region]; return node(name, at(r.side, r.tier, col, row).x, at(r.side, r.tier, col, row).y, icon, region, extra); };
 const world = (region, name, icon, gate, extra) => place(region, 0, 0, name, icon, { kind: 'planet', requires: { [gate]: 1 }, ...extra });
@@ -54,7 +54,7 @@ export const SOLAR_TALENTS = Object.freeze({
   heat: axis('耐热外壳', 1, 'heatshield', 12 * M, { voyage: 1 }, '为方舟加装耐热外壳，让它能在水星与金星的高温中停靠。解锁：水星、金星。'),
   mining: axis('小行星采矿', 2, 'drill', 320 * M, { heat: 1 }, '在主带补给、造出聚变引擎：方舟航速 ×1.6。解锁：小行星带、木星。'),
   deepDrive: axis('深空推进', 3, 'deepdrive', 16 * G, { mining: 1 }, '能穿越巨行星之间漫长空隙的推进：方舟航速 ×2.2。解锁：土星、天王星。'),
-  relay: axis('深空中继', 4, 'relay', 128 * G, { deepDrive: 1 }, '在外太阳系布下通讯中继，方舟不再与火星失联。解锁：海王星。'),
+  relay: axis('深空中继', 4, 'relay', 128 * G, { deepDrive: 1 }, '在外太阳系布下通讯中继，方舟不再与火星失联。解锁：海王星、冥王星。'),
   stellar: node('恒星协议', SOLAR_AXIS, SOLAR_TIERS_TOP() - 250, 'dyson', 'axis', { planned: true, requires: { relay: 1 }, finale: true, kind: 'keystone', gold: true, gate: '需要一个升格文明',
     description: 'VII 的终点：把太阳系的工业与升格文明转向太阳，立项开发恒星本身，进入 VIII · 恒星。戴森群将在 VIII 中一步步建起。需要深空中继与至少一个升格文明。（后续开放）' }),
   // Earth–Moon: the harbour that is always there, the Earth–Mars crossing.
@@ -99,6 +99,11 @@ export const SOLAR_TALENTS = Object.freeze({
   oberon: moon('oberon', 'uranus', [1, 1], '天卫四', 'workshop', 'uranus', 256 * G, '深空工坊：远离太阳的精密工坊：所有行星工业产能 ×1.25。'),
   // Neptune, at the edge, once the relay keeps arks in touch.
   neptune: world('neptune', '深空前哨', 'trident', 'relay', { facility: 'neptune' }),
+  // Pluto and the Kuiper belt: ice sent home, and the coldest archive.
+  pluto: world('pluto', '冰氮前哨', 'dwarfplanet', 'relay', { facility: 'pluto' }),
+  cometCapture: place('pluto', 1, 0, '彗星捕获', 'comet', { costs: [T], requires: { pluto: 1 }, description: '把柯伊伯带的冰块推回内太阳系当推进剂：所有方舟与转运方舟的航程再缩短 15%。' }),
+  coldArchive: place('pluto', 2, 0, '冷端档案', 'archive', { costs: [4 * T], requires: { cometCapture: 1 }, description: '把文明的遗产存进太阳系最冷的地方，永不升温：行星际收入（工业与殖民地）×1.15。' }),
+  charon: moon('charon', 'pluto', [0, 1], '卡戎', 'binary', 'pluto', 2 * T, '双星轨道站：冰氮前哨产出翻倍。'),
   triton: moon('triton', 'neptune', [0, 1], '海卫一', 'telescope', 'neptune', 512 * G, '逆行观测站：沿着逆行轨道观测海王星的风暴：深空前哨产出翻倍。'),
 });
 export const SOLAR_TALENT_KEYS = Object.freeze(Object.entries(SOLAR_TALENTS).filter(([, t]) => !t.root && !t.planned && !t.facility).map(([key]) => key));
@@ -106,6 +111,7 @@ export const SOLAR_TALENT_KEYS = Object.freeze(Object.entries(SOLAR_TALENTS).fil
 export const V26_SOLAR_KEYS = Object.freeze(['dome', 'transfer', 'survey', 'hohmann', 'fleet', 'fuel']);
 // v29 added 殖民地存续协议 (it was a planned node before); v30 rebuilt the map by world;
 // v31 put the technology on a central axis.
+export const V31_SOLAR_KEYS = Object.freeze(['heat', 'mining', 'deepDrive', 'relay', 'survey', 'hohmann', 'fleet', 'harbor', 'dome', 'transfer', 'uplift', 'phobos', 'deimos', 'solarSail', 'smelter', 'refinery', 'greenhouse', 'arkForge', 'fuel', 'io', 'europa', 'ganymede', 'callisto', 'iceWater', 'enceladus', 'titania', 'oberon', 'triton']);
 export const V30_SOLAR_KEYS = Object.freeze(['solarSail', 'smelter', 'refinery', 'greenhouse', 'harbor', 'dome', 'transfer', 'uplift', 'nuclear', 'survey', 'hohmann', 'fleet', 'fusion', 'arkForge', 'fuel', 'jupiterDock', 'deepDrive', 'iceWater', 'uranusDock', 'phobos', 'deimos', 'io', 'europa', 'ganymede', 'callisto', 'enceladus', 'titania', 'oberon', 'triton']);
 export const V29_SOLAR_KEYS = Object.freeze(['heat', 'harbor', 'nuclear', 'fusion', 'dome', 'transfer', 'uplift', 'survey', 'hohmann', 'fleet', 'fuel']);
 export const V28_SOLAR_KEYS = Object.freeze(['heat', 'harbor', 'nuclear', 'fusion', 'dome', 'transfer', 'survey', 'hohmann', 'fleet', 'fuel']);
@@ -138,7 +144,7 @@ export function purchaseSolarTalent(s, key) {
   if (solarTalentState(s, key) !== 'ready') return false;
   const o = s.orbital, cost = t.costs[o.solar.talents[key]];
   s.permanent.legacy = Q.sub(s.permanent.legacy, cost);
-  (o.solar.payments[key] ??= []).push(cost); o.solar.talents[key]++;
+  (o.solar.payments[key] ??= []).push(Q.of(cost)); o.solar.talents[key]++;
   return true;
 }
 

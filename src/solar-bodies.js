@@ -6,7 +6,7 @@ import { DAY_NIGHT_CYCLE_SECONDS, LUNAR_ORBIT_SECONDS } from './celestial-clock.
 // Every local system shares one clock, anchored so the Moon keeps VI's month:
 // all satellites keep their true ratios to each other. Orbit radii stay
 // compressed for readability, but their order is the real one.
-const PERIODS=Object.freeze({moon:27.322,phobos:.3189,deimos:1.2624,io:1.7691,europa:3.5512,ganymede:7.1546,callisto:16.689,enceladus:1.3702,titan:15.945,titania:8.7059,oberon:13.463,triton:-5.8769});
+const PERIODS=Object.freeze({charon:6.3872,moon:27.322,phobos:.3189,deimos:1.2624,io:1.7691,europa:3.5512,ganymede:7.1546,callisto:16.689,enceladus:1.3702,titan:15.945,titania:8.7059,oberon:13.463,triton:-5.8769});
 export const SATELLITE_DAY_SECONDS=LUNAR_ORBIT_SECONDS/PERIODS.moon;
 export const satellitePeriodSeconds=m=>m.period*SATELLITE_DAY_SECONDS;
 const moon=(id,name,parent,color,kind,orbit,size,phase,description)=>Object.freeze({id,name,parent,color,surface:kind,orbit,size,phase,period:PERIODS[id],kind:'moon',description});
@@ -23,13 +23,14 @@ export const SATELLITES=Object.freeze([
   moon('titania','天卫三','uranus','#a4afa8','ice',1.8,.12,1,'冰与岩石构成的卫星，在倾斜的行星系统中缓缓运行。'),
   moon('oberon','天卫四','uranus','#989c96','rock',2.3,.11,3.8,'远离太阳的古老冰岩世界。'),
   moon('triton','海卫一','neptune','#b4c0be','ice',2,.16,2.5,'淡色冰面绕行在海王星之外，逆向的轨道划过深空。'),
+  moon('charon','卡戎','pluto','#a3a39a','ice',1.85,.34,1.9,'几乎有冥王星一半大的伴星，两者彼此潮汐锁定，永远以同一面相对。北极一片暗红，是从冥王星逃逸的甲烷留下的。'),
 ]);
 export const MOON=SATELLITES[0];
 export const DESTINATIONS=BODIES;
 export const destination=id=>bodyById(id)??SATELLITES.find(b=>b.id===id);
 export const systemOf=id=>destination(id)?.parent??id;
 export const satellitesOf=id=>SATELLITES.filter(b=>b.parent===id);
-export const bodyKindLabel=b=>b.id==='moon'?'月面家园':b.parent?'自然卫星':({home:'文明摇篮',habitable:'殖民世界',industrial:b.belt?'资源星域':'行星工业',relay:'深空前哨'}[b.kind]);
+export const bodyKindLabel=b=>b.id==='moon'?'月面家园':b.parent?'自然卫星':({home:'文明摇篮',habitable:'殖民世界',industrial:b.belt?'资源星域':'行星工业',relay:'深空前哨',dwarf:'矮行星 · 柯伊伯带'}[b.kind]);
 // Planets turn at their real sidereal day on the surface clock (Earth: one VI
 // day). Mercury and Venus barely turn; Venus and Uranus turn backwards.
 const DAY=DAY_NIGHT_CYCLE_SECONDS;
@@ -39,6 +40,8 @@ export const BODY_SURFACES=Object.freeze({
   jupiter:{surface:'gas',spin:DAY*.4135,tilt:.05,atmosphere:'#bba283'},saturn:{surface:'gas',spin:DAY*.444,tilt:.35,atmosphere:'#bbaa84',rings:{tilt:-.35,inner:1.18,outer:2.03}},
   uranus:{surface:'gas',spin:-DAY*.7183,tilt:1.64,atmosphere:'#9ac4c2',rings:{tilt:-1.64,inner:1.45,outer:1.53,faint:true}},
   neptune:{surface:'gas',spin:DAY*.6713,tilt:.18,atmosphere:'#789bbd'},
+  // Pluto turns backwards, locked face to face with Charon.
+  pluto:{surface:'ice',spin:-DAY*6.3872,tilt:.4,atmosphere:'#c8c3b4'},
 });
 // Satellites are tidally locked: one turn per orbit, so the same face looks home.
 export const surfaceOf=b=>BODY_SURFACES[b.id]??{surface:b.surface??'rock',spin:b.period?satellitePeriodSeconds(b):180,tilt:.12};

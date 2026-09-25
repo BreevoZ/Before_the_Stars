@@ -16,7 +16,7 @@ export const legDistance = (from, to) => Math.abs(auOf(to) - auOf(from));
 // The pioneer fleet: seven arks, Moon to Mars, from the moment of 远航协议.
 export const PIONEER = Object.freeze({ from: 'moon', to: 'mars', seconds: legSeconds(legDistance('moon', 'mars')) });
 // The technology each world waits for, and how fast arks fly once it is known.
-export const GATES = Object.freeze({ mercury: 'heat', venus: 'heat', belt: 'mining', jupiter: 'mining', saturn: 'deepDrive', uranus: 'deepDrive', neptune: 'relay' });
+export const GATES = Object.freeze({ mercury: 'heat', venus: 'heat', belt: 'mining', jupiter: 'mining', saturn: 'deepDrive', uranus: 'deepDrive', neptune: 'relay', pluto: 'relay' });
 export const DRIVES = Object.freeze([
   Object.freeze({ talent: null, name: '化学推进', speed: 1 }),
   Object.freeze({ talent: 'mining', name: '聚变引擎', speed: 1.6 }),
@@ -38,7 +38,10 @@ export const FACILITIES = Object.freeze({
   saturn: facility('冰环采集站', 'saturn', [4 * G, 16 * G, 64 * G, 256 * G], 'yield', '在土星环里开采纯净的水冰，送往内太阳系。', { base: 8 * M }),
   uranus: facility('冰巨星采集站', 'uranus', [32 * G, 128 * G, 512 * G], 'yield', '从天王星倾斜的大气中提取氘与氦-3。', { base: 32 * M }),
   neptune: facility('深空前哨', 'neptune', [256 * G, T, 4 * T], 'yield', '太阳系边缘的前哨，从海王星的风暴中采集重氢。', { base: 128 * M }),
+  pluto: facility('冰氮前哨', 'pluto', [512 * G, 2 * T, 8 * T], 'yield', '在冥王星的氮冰平原上开采挥发物，是柯伊伯带的第一个驻地。', { base: 256 * M }),
 });
+// Save v31 had no Pluto.
+export const V31_FACILITY_KEYS = Object.freeze(['venus', 'mercury', 'belt', 'jupiter', 'saturn', 'uranus', 'neptune']);
 // Save v29 knew only the first four footholds.
 export const V29_FACILITY_KEYS = Object.freeze(['venus', 'mercury', 'belt', 'jupiter']);
 export const facilityAt = body => Object.keys(FACILITIES).find(key => FACILITIES[key].body === body) ?? null;
@@ -52,7 +55,9 @@ export const pioneerAt = o => o.completionAt === null ? null : o.completionAt + 
 export const pioneerProgress = o => o.completionAt === null ? 0 : Math.max(0, Math.min(1, (o.elapsed - o.completionAt) / PIONEER.seconds));
 // 光帆加速 shortens every flight, arks and transfers alike.
 // 木卫四's depot shortens them again.
-export const flightFactor = o => (talent(o, 'solarSail') ? .7 : 1) * (talent(o, 'callisto') ? .8 : 1);
+export const flightFactor = o => (talent(o, 'solarSail') ? .7 : 1) * (talent(o, 'callisto') ? .8 : 1) * (talent(o, 'cometCapture') ? .85 : 1);
+// 冷端档案: everything the other worlds send home is kept a little better.
+export const archiveFactor = o => talent(o, 'coldArchive') ? 1.15 : 1;
 // New arks: the belt's forges and the Ganymede yard.
 export const arkTotal = o => ORBITAL_RULES.arkCount + talent(o, 'arkForge') + talent(o, 'ganymede');
 // Arks away: those in flight and those that became a station.
@@ -90,7 +95,7 @@ export const flightProgress = (o, f) => Math.max(0, Math.min(1, (o.elapsed - f.d
 // 日冕阵列 doubles every yield per rank; 近日熔炉 and 天卫四 add to all of them;
 // 大气提纯 and each giant's moon double their own world.
 export const industryBoost = o => 2 ** (o.solar.facilities.mercury ?? 0) * (talent(o, 'smelter') ? 1.5 : 1) * (talent(o, 'oberon') ? 1.25 : 1);
-const DOUBLERS = Object.freeze({ venus: 'refinery', jupiter: 'io', saturn: 'enceladus', uranus: 'titania', neptune: 'triton' });
+const DOUBLERS = Object.freeze({ venus: 'refinery', jupiter: 'io', saturn: 'enceladus', uranus: 'titania', neptune: 'triton', pluto: 'charon' });
 export const facilityMultiplier = (o, key) => industryBoost(o) * (talent(o, DOUBLERS[key]) ? 2 : 1);
 export function facilityRate(o, key) {
   const f = FACILITIES[key], rank = o.solar.facilities[key];
@@ -112,7 +117,8 @@ export function buildFacility(s, key) {
   if (facilityState(s, key) !== 'ready') return false;
   const o = s.orbital, f = FACILITIES[key], rank = o.solar.facilities[key], cost = f.costs[rank];
   s.permanent.legacy = Q.sub(s.permanent.legacy, cost);
-  (o.solar.payments[key] ??= []).push(cost);
+  // Prices past 1e12 are kept as large quantities, like every other saved amount.
+  (o.solar.payments[key] ??= []).push(Q.of(cost));
   if (rank) { o.solar.facilities[key]++; return true; }
   const leg = route(o, f.body);
   o.solar.flights.push({ body: f.body, from: leg.from, via: leg.via, departAt: o.elapsed, arriveAt: o.elapsed + leg.seconds });

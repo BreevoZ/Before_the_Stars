@@ -16,7 +16,7 @@ export function toV29(record) {
   record.version = 29; record.orbital.version = 15;
   sol.talents = Object.fromEntries(keys.map(k => [k, sol.talents[k] ?? 0]));
   for (const k of Object.keys(sol.payments)) if (!['venus', 'mercury', 'belt', 'jupiter', 'transfers', 'accords', 'seizures', ...keys].includes(k)) delete sol.payments[k];
-  for (const k of ['saturn', 'uranus', 'neptune']) delete sol.facilities[k];
+  for (const k of ['saturn', 'uranus', 'neptune', 'pluto']) delete sol.facilities[k];
   sol.flights = sol.flights.map(({ via, ...f }) => f);
   return record;
 }

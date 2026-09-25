@@ -4,7 +4,7 @@ import { SOLAR_TALENTS as T, solarTalentState, solarRank, solarCosts, COLONY_RUL
 import { FACILITIES, arrivalAt, facilityMultiplier, flightTo, route, arksMoored, arkTotal } from './solar-industry.js';
 import { bodyById } from './solar-config.js';
 
-const BRANCH = { axis: 'AXIS / 航天科技', earth: 'EARTH–MOON / 地月港', mars: 'MARS / 火星', mercury: 'MERCURY / 水星', venus: 'VENUS / 金星', belt: 'MAIN BELT / 小行星带', jupiter: 'JUPITER / 木星', saturn: 'SATURN / 土星', uranus: 'URANUS / 天王星', neptune: 'NEPTUNE / 海王星' };
+const BRANCH = { pluto: 'PLUTO / 冥王星 · 柯伊伯带', axis: 'AXIS / 航天科技', earth: 'EARTH–MOON / 地月港', mars: 'MARS / 火星', mercury: 'MERCURY / 水星', venus: 'VENUS / 金星', belt: 'MAIN BELT / 小行星带', jupiter: 'JUPITER / 木星', saturn: 'SATURN / 土星', uranus: 'URANUS / 天王星', neptune: 'NEPTUNE / 海王星' };
 const placeName = id => id === 'moon' ? '月球' : bodyById(id).name;
 // Why a world cannot be reached yet, in the words of the node's gate.
 export function reachNeed(o, body) {
@@ -22,7 +22,7 @@ export function solarTalentEffect(o, key, rank = solarRank(o, key)) {
   if (t.facility) { const f = FACILITIES[t.facility];
     if (!rank && flightTo(o, f.body)) return '方舟航行中';
     return f.kind === 'boost' ? `行星工业 ×${2 ** rank}` : rank ? `${Q.format(f.base * 2 ** (rank - 1) * facilityMultiplier(o, t.facility))} Legacy/s` : '尚未建成'; }
-  if (t.satellite) return rank ? { phobos: '转运价格 ×0.75', deimos: '转运航程 ×0.8', io: '木星采集站 ×2', europa: '升格文明 ×1.5', ganymede: '多一艘方舟', callisto: '航程 ×0.8', enceladus: '冰环采集站 ×2', titania: '冰巨星采集站 ×2', oberon: '行星工业 ×1.25', triton: '深空前哨 ×2' }[key] ?? '已建立' : '尚未登陆';
+  if (t.satellite) return rank ? { phobos: '转运价格 ×0.75', deimos: '转运航程 ×0.8', io: '木星采集站 ×2', europa: '升格文明 ×1.5', ganymede: '多一艘方舟', callisto: '航程 ×0.8', enceladus: '冰环采集站 ×2', titania: '冰巨星采集站 ×2', oberon: '行星工业 ×1.25', triton: '深空前哨 ×2', charon: '冰氮前哨 ×2' }[key] ?? '已建立' : '尚未登陆';
   if (key === 'harbor') return rank ? `停泊 ${arksMoored(o)} / ${arkTotal(o)} 艘方舟` : '方舟停泊在火星，尚不能派出';
   if (key === 'solarSail') return rank ? '航程 ×0.7' : '航程 ×1';
   if (key === 'smelter') return rank ? '行星工业 ×1.5' : '行星工业 ×1';
@@ -33,7 +33,9 @@ export function solarTalentEffect(o, key, rank = solarRank(o, key)) {
   if (key === 'heat') return rank ? '可以前往水星、金星' : '方舟无法承受近日高温';
   if (key === 'mining') return rank ? '可以前往小行星带、木星 · 航速 ×1.6' : '方舟无法在主带补给';
   if (key === 'deepDrive') return rank ? '可以前往土星、天王星 · 航速 ×2.2' : '巨行星之间太远';
-  if (key === 'relay') return rank ? '可以前往海王星' : '方舟在外太阳系会失联';
+  if (key === 'relay') return rank ? '可以前往海王星、冥王星' : '方舟在外太阳系会失联';
+  if (key === 'cometCapture') return rank ? '航程 ×0.85' : '航程 ×1';
+  if (key === 'coldArchive') return rank ? '行星际收入 ×1.15' : '行星际收入 ×1';
   if (key === 'dome') return rank ? `可容纳 ${rank * householdsPerDome(o)} 户` : '火星尚无穹顶';
   if (key === 'uplift') return rank ? '可以谈判存续协议、接管核武' : '殖民文明终将核毁灭';
   if (key === 'transfer') return rank ? '可以从地球转运文明' : '文明只能留在地球';

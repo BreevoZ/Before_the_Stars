@@ -41,6 +41,7 @@ const PALETTES={
   uranus:['#a9c8c3','#8eafad','#638784'],neptune:['#779cae','#587f95','#3b596f'],
   mars:['#b08d71','#97765f','#66594e'],mercury:['#aaa795','#898c7e','#586961'],
   venus:['#c6bc98','#afa884','#788573'],titan:['#b7ad86','#a49a73','#717761'],
+  pluto:['#d3c3a8','#ad977d','#6b5f51'],charon:['#aeaea4','#8f9189','#5d625d'],
 };
 function gas(c,body,r,spin,tilt){
   if(body.id==='jupiter'){
@@ -85,6 +86,9 @@ function rocky(c,body,r,spin,tilt){
     const p=surfacePoint(i*2.4,Math.sin(i*1.3)*1.1,spin,tilt);if(p.z<=0)continue;
     const pr=r*(.08+noise(seed+i+457)*.12);tangent(c,p,r,()=>{const g=c.createRadialGradient(0,0,0,0,0,pr);g.addColorStop(0,volcanic?'#70634444':'#3a4c4633');g.addColorStop(.7,'#3a4c4620');g.addColorStop(1,'#3a4c4600');disc(c,0,0,pr,g);});
   }
+  // Pluto's bright nitrogen heart, and Charon's dark red polar cap.
+  if(body.id==='pluto'){patch(c,r,spin,tilt,-1.5,-.15,.34,.18,'#6a4f3f33',5,.2);patch(c,r,spin,tilt,.15,.08,.4,.34,'#f3eee3d9',3,.14);}
+  if(body.id==='charon')band(c,r,spin,tilt,1.12,Math.PI/2,'#6f4c4288',.02);
   if(ice){
     // Sparse hairline fractures, projected with the ice instead of a noise map.
     for(let k=0;k<10;k++){

@@ -13,7 +13,7 @@ import { Q } from '../src/quantity.js';
 import { updateOrbital } from '../src/orbital-game.js';
 import { FACILITIES, PIONEER, arrivalAt, arrived, facilityState, buildFacility, industryRate, facilityRate, route, legSeconds, legDistance, arksMoored, arksAway, arkTotal } from '../src/solar-industry.js';
 import { reachNeed } from '../src/solar-tree-view-model.js';
-import { SOLAR_TALENTS, solarTalentState, purchaseSolarTalent, windowOpen, windowTiming, transferState, transferCivilization, transferQuote, domeCapacity, colonyRate, colonistRate, COLONY_RULES } from '../src/solar-colony.js';
+import { SOLAR_TALENTS, SOLAR_ROW, SOLAR_MAP, solarTalentState, purchaseSolarTalent, windowOpen, windowTiming, transferState, transferCivilization, transferQuote, domeCapacity, colonyRate, colonistRate, COLONY_RULES } from '../src/solar-colony.js';
 import { buildSolarTreeViewModel } from '../src/solar-tree-view-model.js';
 import { buildSolarViewModel } from '../src/solar-view-model.js';
 import { bodyPosition, BODIES } from '../src/solar-config.js';
@@ -141,12 +141,14 @@ export function registerSolarTests(test, assert, near) {
     const venus=facilityRate(o,'venus');assert(purchaseSolarTalent(s,'refinery')&&facilityRate(o,'venus')===venus*2);
     const industry=industryRate(o);assert(purchaseSolarTalent(s,'solarSail')&&purchaseSolarTalent(s,'smelter'));near(industryRate(o),industry*1.5);
     // The axis is gold and leads to the Sun (VIII); Mars is one green region among the others.
-    assert(['heat','mining','deepDrive','relay','dyson'].every(k=>SOLAR_TALENTS[k].gold&&SOLAR_TALENTS[k].x===SOLAR_TALENTS.voyage.x)&&!SOLAR_TALENTS.harbor.gold&&!SOLAR_TALENTS.uplift.gold);
+    assert(['heat','mining','deepDrive','relay','stellar'].every(k=>SOLAR_TALENTS[k].gold&&SOLAR_TALENTS[k].x===SOLAR_TALENTS.voyage.x)&&!SOLAR_TALENTS.harbor.gold&&!SOLAR_TALENTS.uplift.gold);
   });
   test('Satellites: each moon branches off its planet, needs that foothold, costs no ark and does what its node says', () => {
     const s=voyageFixture(),o=s.orbital,run=n=>{for(let i=0;i<Math.round(n*30);i++)updateOrbital(s,1/30);},land=()=>{while(o.solar.flights.length)run(1);};
     setDebugLegacy(s,2**39);run(PIONEER.seconds+1);
-    for(const [key,t] of Object.entries(SOLAR_TALENTS).filter(([,t])=>t.satellite)){const parent=SOLAR_TALENTS[Object.keys(t.requires)[0]];assert(parent.kind==='planet'&&parent.column===t.column&&t.y===parent.y-190,key);}
+    // As wide as the other maps; every node stays clear of the edges.
+    assert(SOLAR_MAP.width===1320&&Object.values(SOLAR_TALENTS).every(t=>t.x>=100&&t.x<=1220&&t.y>100&&t.y<SOLAR_MAP.height));
+    for(const [key,t] of Object.entries(SOLAR_TALENTS).filter(([,t])=>t.satellite)){const parent=SOLAR_TALENTS[Object.keys(t.requires)[0]];assert(parent.kind==='planet'&&parent.column===t.column&&t.y===parent.y-SOLAR_ROW,key);}
     assert(solarTalentState(s,'phobos')==='prerequisite'&&purchaseSolarTalent(s,'harbor'));
     const civ={age:3},before=transferQuote(o,civ).cost,moored=arksMoored(o);
     assert(purchaseSolarTalent(s,'phobos')&&transferQuote(o,civ).cost===Math.round(before*.75)&&arksMoored(o)===moored,'A lander, not an ark');
@@ -223,8 +225,8 @@ export function registerSolarTests(test, assert, near) {
     assert(purchaseSolarTalent(s,'venus')&&o.solar.flights.length===1,'Buying the node dispatches the ark');
     v=buildSolarTreeViewModel(s,{talent:'venus',selected:true});assert(v['#solar-node-venus@data-state']==='cycles'&&v['#solar-gate-venus'].startsWith('方舟'));
     for(let i=0;i<30*90;i++)updateOrbital(s,1/30);assert(o.solar.facilities.venus===1);
-    assert(solarTalentState(s,'dyson')==='planned'&&!purchaseSolarTalent(s,'dyson'));
-    assert(buildSolarTreeViewModel(s,{talent:'dyson',selected:true})['#solar-buy@disabled']);
+    assert(solarTalentState(s,'stellar')==='planned'&&!purchaseSolarTalent(s,'stellar'));
+    assert(buildSolarTreeViewModel(s,{talent:'stellar',selected:true})['#solar-buy@disabled']);
     const old=toV29(JSON.parse(serializeSession(voyageFixture())));old.version=25;old.orbital.version=11;for(const k of ['talents','colonies','transfers','nextTransfer','flights'])delete old.orbital.solar[k];
     const next=parseSession(JSON.stringify(old));assert(next.orbital.solar.colonies.mars.civs.length===0&&next.orbital.solar.talents.dome===0);
   });
@@ -383,7 +385,8 @@ export function registerSolarTests(test, assert, near) {
         assert(!el('solar-moon-menu').hidden && !el('solar-moon-europa').hidden && el('solar-moon-titan').hidden && el('solar-moon-menu-title').textContent.includes('4 颗'));
         el('solar-moon-europa').click();w.__testFrame(now+=100);assert(el('solar-moon-menu').hidden);
         assert(el('orbital-game').dataset.view==='europa' && el('solar-select-jupiter').getAttribute('aria-pressed')==='true' && el('solar-facility').hidden);
-        el('solar-select-jupiter').click();assert(el('orbital-game').dataset.view==='jupiter');
+        // Clicking the planet again steps through its moons and back to the planet.
+        for(const next of ['ganymede','callisto','jupiter']){el('solar-select-jupiter').click();assert(el('orbital-game').dataset.view===next,next);}
         el('solar-select-mercury').dispatchEvent(new w.PointerEvent('pointerenter',{pointerType:'mouse'}));assert(el('solar-moon-menu').hidden,'No menu without satellites');
         el('solar-select-earth').click();el('solar-select-earth').dispatchEvent(new w.PointerEvent('pointerenter',{pointerType:'mouse'}));el('solar-moon-moon').click();w.__testFrame(now+=100);
         assert(el('orbital-game').dataset.view==='moon' && !el('colony-shipyard').hidden && el('solar-select-earth').getAttribute('aria-pressed')==='true');

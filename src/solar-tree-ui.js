@@ -2,7 +2,8 @@
 // its styles. 远航协议 is its root and the seam to the VI page below.
 import { createBindings } from './dom-bindings.js';
 import { icon } from './icons.js';
-import { SOLAR_TALENTS as T, SOLAR_MAP, SOLAR_REGIONS, regionFrame, purchaseSolarTalent } from './solar-colony.js';
+import { SOLAR_TALENTS as T, SOLAR_MAP, SOLAR_REGIONS, SOLAR_TIERS, purchaseSolarTalent } from './solar-colony.js';
+import { bodyById } from './solar-config.js';
 import { FACILITIES, flightTo } from './solar-industry.js';
 import { buildSolarTreeViewModel } from './solar-tree-view-model.js';
 import { drawOrbitalTalentSky } from './orbital-render.js';
@@ -21,13 +22,18 @@ export function createSolarTree(getSession, { commit, viewChanged, flipOrbit }) 
   const map = dialog.querySelector('.orbit-tree-map'), root = T.voyage;
   map.style.width = `${SOLAR_MAP.width}px`; map.style.height = `${SOLAR_MAP.height}px`; const edges = el('solar-tree-edges'); edges.setAttribute('viewBox', `0 0 ${SOLAR_MAP.width} ${SOLAR_MAP.height}`); edges.style.width = map.style.width; edges.style.height = map.style.height;
   Object.assign(el('solar-flip-orbit').style, { left: `${root.x}px`, top: `${root.y + 92}px` }); Object.assign(el('solar-legend').style, { left: `${root.x}px`, top: `${root.y + 140}px` });
-  // One framed region per world, behind its nodes: title in the outer top corner.
+  // Regions without frames: a hairline between tiers, and for each world its
+  // planet rising from the outer edge with the name beside it, very faint.
+  const backdrop = document.createElement('div'); backdrop.className = 'solar-backdrop'; map.prepend(backdrop);
+  SOLAR_TIERS.forEach((tier, i) => { if (!i) return; const line = document.createElement('i'); line.className = 'solar-tier-line'; line.style.top = `${(SOLAR_TIERS[i - 1].top + tier.base) / 2}px`; backdrop.append(line); });
   for (const region of SOLAR_REGIONS) {
-    const box = document.createElement('div'), { left, right, top, bottom } = regionFrame(region);
-    box.className = 'solar-region'; box.dataset.side = region.side > 0 ? 'right' : 'left'; if (region.reserved) box.dataset.reserved = 'true';
-    Object.assign(box.style, { left: `${left}px`, top: `${top}px`, width: `${right - left}px`, height: `${bottom - top}px` });
-    box.innerHTML = `<strong>${region.name}</strong><small>${region.en}</small>`;
-    map.prepend(box);
+    const tier = SOLAR_TIERS[region.tier], body = bodyById(region.id === 'earth' ? 'earth' : region.id), side = region.side > 0 ? 'right' : 'left';
+    const planet = document.createElement('i'); planet.className = 'solar-region-planet'; planet.dataset.side = side;
+    planet.style.top = `${(tier.top + tier.base) / 2}px`; planet.style.setProperty('--planet', region.reserved ? '#6f7f86' : body?.color ?? '#8a948f');
+    if (region.reserved) planet.dataset.reserved = 'true';
+    const label = document.createElement('span'); label.className = 'solar-region-name'; label.dataset.side = side; label.style.top = `${tier.top - 118}px`;
+    label.innerHTML = `${region.name}<small>${region.en}</small>`;
+    backdrop.append(planet, label);
   }
   for (const [key, t] of Object.entries(T)) {
     for (const parent of Object.keys(t.requires)) {

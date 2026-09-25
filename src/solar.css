@@ -97,8 +97,15 @@
 .orbit-node.planet .orbit-node-frame{stroke-width:.9}.orbit-node.planet .orbit-finale-ring{fill:none;stroke-width:.4;stroke-dasharray:1.5 2.5;opacity:.7}
 .orbit-node.planet .orbit-node-name{font-size:12px;letter-spacing:2px;white-space:nowrap}
 .solar-route-nav{overflow-x:auto;scrollbar-width:none}.solar-route-nav button{flex-shrink:0}
-/* VII regions: a faint frame per world, title in the outer top corner. */
-.solar-region{position:absolute;border:1px solid #9fb8a61f;border-radius:14px;background:linear-gradient(180deg,#8fb3a00a,#8fb3a003);pointer-events:none}
-.solar-region strong{position:absolute;top:16px;font-size:15px;font-weight:400;letter-spacing:5px;color:#c9d4c2}.solar-region small{position:absolute;top:40px;font-size:9px;letter-spacing:2px;color:var(--muted)}
-.solar-region[data-side="left"] :is(strong,small){left:20px}.solar-region[data-side="right"] :is(strong,small){right:20px;text-align:right}
-.solar-region[data-reserved="true"]{border-style:dashed;background:none}.solar-region[data-reserved="true"] strong{color:var(--muted)}
+/* VII regions: no frames. A hairline between tiers; each world's planet rises
+   faintly from the outer edge of its tier, with its name beside it. */
+.solar-backdrop{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.solar-tier-line{position:absolute;left:40px;right:40px;height:1px;background:linear-gradient(90deg,transparent,#a9c2b12e 18%,#a9c2b12e 82%,transparent)}
+.solar-region-planet{position:absolute;width:240px;height:240px;margin-top:-120px;border-radius:50%;opacity:.2;
+  background:radial-gradient(circle at var(--lit,72%) 38%,color-mix(in srgb,var(--planet) 85%,white),var(--planet) 38%,color-mix(in srgb,var(--planet) 30%,#050b0f) 72%);box-shadow:0 0 60px color-mix(in srgb,var(--planet) 40%,transparent)}
+/* Centred on the map's edge and faded out before it, so nothing is ever cut straight. */
+.solar-region-planet[data-side="left"]{left:-120px;--lit:78%;-webkit-mask-image:linear-gradient(90deg,transparent 50%,#000 82%);mask-image:linear-gradient(90deg,transparent 50%,#000 82%)}
+.solar-region-planet[data-side="right"]{right:-120px;--lit:22%;-webkit-mask-image:linear-gradient(270deg,transparent 50%,#000 82%);mask-image:linear-gradient(270deg,transparent 50%,#000 82%)}
+.solar-region-planet[data-reserved="true"]{background:none;border:1px dashed #9fb8a640;opacity:.5;box-shadow:none}
+.solar-region-name{position:absolute;font-size:15px;font-weight:400;letter-spacing:6px;color:#c9d4c2bf}.solar-region-name small{display:block;margin-top:8px;font-size:9px;letter-spacing:2px;color:var(--muted)}
+.solar-region-name[data-side="left"]{left:40px}.solar-region-name[data-side="right"]{right:40px;text-align:right}

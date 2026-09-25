@@ -48,7 +48,7 @@ export function buildSolarViewModel(s,{view='earth',selected='earth',transferCiv
   for(const d of DESTINATIONS){
     v[`#solar-select-${d.id}@aria-pressed`]=String(view!=='system'&&d.id===root.id);
     v[`#solar-select-${d.id}@data-reach`]=reachState(o,d);
-    v[`#solar-select-${d.id}@title`]=`${d.name} · ${bodyStatus(o,d)}`;
+    v[`#solar-select-${d.id}@title`]=`${d.name} · ${bodyStatus(o,d)}${satellitesOf(d.id).length?' · 再次点击切换卫星':''}`;
     v[`#solar-nav-state-${d.id}`]={home:'家园',reached:'驻地',transit:'航行中',available:'可派遣',survey:'待抵达'}[reachState(o,d)];
   }
   for(const m of SATELLITES)v[`#solar-moon-${m.id}@aria-pressed`]=String(view===m.id);

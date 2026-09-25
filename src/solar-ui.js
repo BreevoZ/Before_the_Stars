@@ -27,7 +27,10 @@ export function createSolarUI(getSession,{openTree,replay,commit,openSolarTree})
     if(view!=='mars')watching=null;if(!watchColonyWar(s.orbital,'mars',watching))watching=null;
     bind(buildSolarViewModel(s,{view,selected,transferCiv:el('solar-transfer-civ').value,watching}));}
   function setView(next){view=allowed(next);selected=view==='system'?systemOf(selected):view;moonHover=null;sync();}
-  function choose(id){if(!destination(id))return;setView(id);}
+  // Clicking the world you are already in steps through its satellites and back.
+  function choose(id){if(!destination(id))return;const moons=satellitesOf(id);
+    if(moons.length&&view!=='system'&&systemOf(view)===id){const cycle=[id,...moons.map(m=>m.id)];setView(cycle[(cycle.indexOf(view)+1)%cycle.length]);return;}
+    setView(id);}
   for(const [i,b]of DESTINATIONS.entries()){
     const button=document.createElement('button');button.id=`solar-select-${b.id}`;button.type='button';button.setAttribute('aria-controls','colony-body-card');button.style.setProperty('--body-color',b.color);
     button.innerHTML=`<small>${String(i+1).padStart(2,'0')}</small><i aria-hidden="true"></i><span>${b.name}</span><em id="solar-nav-state-${b.id}"></em>`;

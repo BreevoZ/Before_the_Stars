@@ -1,5 +1,6 @@
 import { ORBITAL_RULES as R, SITES, CIVILIZATION_NAMES } from './orbital-config.js';
 import { AGES } from './game-config.js';
+import { effectProduct } from './solar-effects.js';
 // Persisted PRNG: refresh cannot reroll civilizations or change ongoing wars.
 export function nextRandom(state) {
   state.rng = (Math.imul(state.rng, 1664525) + 1013904223) >>> 0;
@@ -42,8 +43,9 @@ export const civilizationValue = (state,civ,kind='harvest') => R[`${kind}Legacy`
 
 // The ring multiplies what comes from the surface, not the moon: war and
 // annihilation stay the heart of VI, the moon is its supply line.
+// VII's 行星际回流 multiplies it once the arks are out.
 export const lunarLegacyRate = state => state.talents.outpost
-  ? R.lunarBaseIncome * 2 ** (state.talents.lunarIndustry + (state.talents.massDriver ?? 0)) : 0;
+  ? R.lunarBaseIncome * 2 ** (state.talents.lunarIndustry + (state.talents.massDriver ?? 0)) * effectProduct(state, 'lunar') : 0;
 // A cycle begins when the previous winter ends (or when VI opens).
 export const cycleStartedAt = state => state.lastCatastropheAt === null ? 0 : state.lastCatastropheAt + state.winterDuration;
 export function doomsdayMultiplier(state) {

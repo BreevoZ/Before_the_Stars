@@ -23,7 +23,7 @@ export function safeTree(value, depth = 0, key = '') {
     check(value.length <= 2048, '数组过长');
     value.forEach(item => safeTree(item, depth + 1));
   } else if (object(value)) {
-    check(Object.keys(value).length <= 60, '字段过多');
+    check(Object.keys(value).length <= 128, '字段过多');
     for (const [name, item] of Object.entries(value)) {
       check(!['__proto__', 'constructor', 'prototype'].includes(name), '非法字段');
       // Undefined optional fields are omitted by JSON.stringify.

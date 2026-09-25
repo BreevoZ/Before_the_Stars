@@ -89,6 +89,8 @@ function rocky(c,body,r,spin,tilt){
   // Pluto's bright nitrogen heart, and Charon's dark red polar cap.
   if(body.id==='pluto'){patch(c,r,spin,tilt,-1.5,-.15,.34,.18,'#6a4f3f33',5,.2);patch(c,r,spin,tilt,.15,.08,.4,.34,'#f3eee3d9',3,.14);}
   if(body.id==='charon')band(c,r,spin,tilt,1.12,Math.PI/2,'#6f4c4288',.02);
+  // Iapetus: one hemisphere dark as soot, the other bright ice.
+  if(body.id==='iapetus')patch(c,r,spin,tilt,0,0,1.2,1.3,'#2f2a24aa',7,.08);
   if(ice){
     // Sparse hairline fractures, projected with the ice instead of a noise map.
     for(let k=0;k<10;k++){

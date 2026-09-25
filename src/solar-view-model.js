@@ -10,7 +10,7 @@ import { AGES } from './game-config.js';
 import { reachNeed, solarTalentEffect } from './solar-tree-view-model.js';
 import { FACILITIES, arksMoored, arrivalAt, arrived, facilityRate, facilityState, industryRate, industryBoost, flightTo, route, pioneerAt } from './solar-industry.js';
 import { bodyById } from './solar-config.js';
-import { WORLDS, UPLIFT, accordState, seizeState, upliftedRate } from './colony-war.js';
+import { WORLDS, UPLIFT, accordState, seizeState, upliftedRate, fuseSeconds, seizeLine } from './colony-war.js';
 import { TENDENCIES } from './orbital-config.js';
 const temper=c=>TENDENCIES[c.tendency]?.name??'无倾向';
 const placeName=id=>id==='moon'?'月球':bodyById(id).name;
@@ -63,13 +63,13 @@ export function buildSolarViewModel(s,{view='earth',selected='earth',transferCiv
     // What the planet is doing: its own winter, its wars, or the fuse between idle neighbours.
     v['#solar-colony-status']=winter?`火星核冬天：穹顶暂时无法居住，在途的方舟停在轨道上等待。地球不受影响。${world.nuclear>1?`（第 ${world.nuclear} 次）`:''}`
       :world.wars.length?`${world.wars.length} 场战争 · 两个第五时代文明结束战争时，火星将核毁灭${sol.talents.uplift?'，除非你接管它们的核武':''}。`
-      :idle>=2?`火星资源稀缺：闲置的邻居 ${Math.ceil(env.fuse-world.fuse)} 秒内会开战。`:residents.length?'火星收入 ×0.75，战争伤害 ×1.5。':'';
+      :idle>=2?`火星资源稀缺：闲置的邻居 ${Math.ceil(fuseSeconds(o,'mars')-world.fuse)} 秒内会开战。`:residents.length?'火星收入 ×0.75，战争伤害 ×1.5。':'';
     world.wars.forEach((war,i)=>{if(i>2)return;const [a,b]=war.sides.map(id=>residents.find(c=>c.id===id));
       v[`#solar-war-${i}`]=`${a.name} ${AGES[a.age].numeral} ⚔ ${b.name} ${AGES[b.age].numeral} · 基地 ${Math.round(war.base[0]*100)}% : ${Math.round(war.base[1]*100)}% · ${watching===war.id?'观看中':'观看'}`;
       v[`#solar-war-${i}@aria-pressed`]=String(watching===war.id);
       // Seizing the arsenals: only in a final-age war, only at the brink.
       const seize=seizeState(s,'mars',war.id);v[`#solar-seize-${i}@hidden`]=['locked','age'].includes(seize);v[`#solar-seize-${i}@disabled`]=seize!=='ready';
-      v[`#solar-seize-${i}`]={ready:`接管双方核武 · ${Q.format(UPLIFT.seizeCost)} Legacy`,early:`接管核武 · 等待一方基地跌破 ${Math.round(UPLIFT.seizeThreshold*100)}%`,seized:'核武已接管 · 胜者将升格',legacy:`${Q.format(UPLIFT.seizeCost)} Legacy · 遗产不足`}[seize]??'';});
+      v[`#solar-seize-${i}`]={ready:`接管双方核武 · ${Q.format(UPLIFT.seizeCost)} Legacy`,early:`接管核武 · 等待一方基地跌破 ${Math.round(seizeLine(o)*100)}%`,seized:'核武已接管 · 胜者将升格',legacy:`${Q.format(UPLIFT.seizeCost)} Legacy · 遗产不足`}[seize]??'';});
     for(let i=0;i<3;i++){v[`#solar-war-${i}@hidden`]=!world.wars[i];if(!world.wars[i])v[`#solar-seize-${i}@hidden`]=true;}
     const shown=world.wars.find(w=>w.id===watching);v['#solar-battle-panel@hidden']=!shown;
     if(shown){const [a,b]=shown.sides.map(id=>residents.find(c=>c.id===id));v['#solar-battle-hud']=`◀ ${a.name} · ${AGES[a.age].numeral} · 基地 ${Math.round(shown.base[0]*100)}%　　${b.name} · ${AGES[b.age].numeral} · 基地 ${Math.round(shown.base[1]*100)}% ▶`;}

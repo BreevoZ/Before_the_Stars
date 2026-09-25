@@ -18,6 +18,7 @@ import { Q } from './quantity.js';
 import { AGES } from './game-config.js';
 import { nextRandom } from './celestial-economy.js';
 import { createWar, updateWar } from './orbital-war.js';
+import { effectProduct, effectSum } from './solar-effects.js';
 
 const FINAL_AGE = 5;
 // Each world changes how its colonists live. Mars is scarce and harsh: less
@@ -41,11 +42,14 @@ export const emptyWorld = () => ({ phase: 'living', remaining: 0, civs: [], wars
 export const colonistRate = (civ, world = 'mars') => COLONIST_BASE * 2 ** (civ.age - 1) * WORLDS[world].income;
 // Uplifted civilizations work through winters: they are past the filter.
 export const upliftedRate = (world = 'mars') => COLONIST_BASE * 2 ** (FINAL_AGE - 1) * WORLDS[world].income * UPLIFT.rate;
-// 温室气体输送 lifts Mars from its scarcity back to Earth's level.
-export const worldWarmth = (o, world) => world === 'mars' && o.solar.talents.greenhouse ? 1 / WORLDS[world].income : 1;
+// Talents lift what residents and uplifted civilizations produce (温室气体输送, 大气改造, 木卫二…).
 export const worldIncome = (o, world) => { const w = o.solar.colonies[world];
-  // 木卫二's ocean gives the uplifted something new to study.
-  return ((w.phase === 'living' ? w.civs.reduce((sum, c) => sum + colonistRate(c, world), 0) : 0) + w.uplifted.length * upliftedRate(world) * (o.solar.talents.europa ? 1.5 : 1)) * worldWarmth(o, world); };
+  return (w.phase === 'living' ? w.civs.reduce((sum, c) => sum + colonistRate(c, world), 0) * effectProduct(o, 'colonists') : 0) + w.uplifted.length * upliftedRate(world) * effectProduct(o, 'uplifted'); };
+// The colony's own clocks and thresholds, as the talents set them.
+export const fuseSeconds = (o, key) => WORLDS[key].fuse * effectProduct(o, 'fuse');
+export const winterSeconds = (o, key) => WORLDS[key].winter * effectProduct(o, 'marsWinter');
+export const accordSeconds = o => UPLIFT.accordSeconds * effectProduct(o, 'accordTime');
+export const seizeLine = o => UPLIFT.seizeThreshold + effectSum(o, 'seizeLine');
 export const colonyIncome = o => Object.keys(WORLDS).reduce((sum, world) => sum + worldIncome(o, world), 0);
 export const settlementValue = (civs, world, seconds) => Math.floor(civs.reduce((sum, c) => sum + colonistRate(c, world), 0) * seconds);
 
@@ -127,13 +131,13 @@ export function updateColonies(o, dt) {
     }
     // Negotiations advance at peace; a finished one uplifts the civilization.
     for (const c of [...world.civs]) if (c.accord !== null && !c.warId) {
-      c.accord = Math.min(1, c.accord + dt / UPLIFT.accordSeconds);
+      c.accord = Math.min(1, c.accord + dt / accordSeconds(o));
       if (c.accord >= 1) logs.push(uplift(o, key, c, 'accord'));
     }
     // Idle neighbours pick a fight: the two youngest idle colonists, after a
     // short fuse. A civilization at the negotiating table is left alone.
     const idle = world.civs.filter(c => !c.warId && c.accord === null).sort((a, b) => a.age - b.age);
-    if (idle.length >= 2) { world.fuse += dt; if (world.fuse >= env.fuse) { world.fuse = 0; startColonyWar(o, key, idle[0], idle[1]); logs.push(`${env.name}：${idle[0].name}与${idle[1].name}开战。`); } }
+    if (idle.length >= 2) { world.fuse += dt; if (world.fuse >= fuseSeconds(o, key)) { world.fuse = 0; startColonyWar(o, key, idle[0], idle[1]); logs.push(`${env.name}：${idle[0].name}与${idle[1].name}开战。`); } }
     else world.fuse = 0;
     const view = watched.get(o);
     for (const war of [...world.wars]) {
@@ -178,9 +182,10 @@ function uplift(o, key, civ, via) {
 function burnWorld(o, key) {
   const world = o.solar.colonies[key], env = WORLDS[key], reward = settlementValue(world.civs, key, COLONY_WAR.nuclearSeconds);
   for (const war of world.wars) live.delete(war);
-  world.civs = []; world.wars = []; world.fuse = 0; world.nuclear++; world.phase = 'winter'; world.remaining = env.winter;
+  const winter = winterSeconds(o, key);
+  world.civs = []; world.wars = []; world.fuse = 0; world.nuclear++; world.phase = 'winter'; world.remaining = winter;
   // Arks already on their way wait in orbit until the winter lifts.
-  for (const t of o.solar.transfers) if (t.to === key) t.arriveAt = Math.max(t.arriveAt, o.elapsed + env.winter);
+  for (const t of o.solar.transfers) if (t.to === key) t.arriveAt = Math.max(t.arriveAt, o.elapsed + winter);
   return { reward, text: `${env.name}核毁灭：殖民文明全部消亡，收获 ${Q.format(reward)} Legacy。${env.name}进入核冬天${world.uplifted.length ? '，升格文明安然无恙' : ''}，地球不受影响。` };
 }
 
@@ -209,7 +214,7 @@ export function seizeState(s, key, id) {
   if (!war) return 'selection';
   if (war.seized) return 'seized';
   if (war.sides.some(side => world.civs.find(c => c.id === side).age < FINAL_AGE)) return 'age';
-  if (Math.min(...war.base) >= UPLIFT.seizeThreshold) return 'early';
+  if (Math.min(...war.base) >= seizeLine(o)) return 'early';
   return Q.gte(s.permanent.legacy, UPLIFT.seizeCost) ? 'ready' : 'legacy';
 }
 export function seizeArsenals(s, key, id) {

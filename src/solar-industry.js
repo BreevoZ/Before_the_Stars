@@ -8,6 +8,7 @@
 import { Q } from './quantity.js';
 import { bodyById } from './solar-config.js';
 import { ORBITAL_RULES } from './orbital-config.js';
+import { effectProduct, effectSum } from './solar-effects.js';
 
 // One leg's flight time grows gently with its length, and falls with the drive.
 export const legSeconds = (distance, speed = 1) => Math.round(25 + 50 * distance ** .6 / speed);
@@ -55,11 +56,11 @@ export const pioneerAt = o => o.completionAt === null ? null : o.completionAt + 
 export const pioneerProgress = o => o.completionAt === null ? 0 : Math.max(0, Math.min(1, (o.elapsed - o.completionAt) / PIONEER.seconds));
 // 光帆加速 shortens every flight, arks and transfers alike.
 // 木卫四's depot shortens them again.
-export const flightFactor = o => (talent(o, 'solarSail') ? .7 : 1) * (talent(o, 'callisto') ? .8 : 1) * (talent(o, 'cometCapture') ? .85 : 1);
+export const flightFactor = o => effectProduct(o, 'flight');
 // 冷端档案: everything the other worlds send home is kept a little better.
-export const archiveFactor = o => talent(o, 'coldArchive') ? 1.15 : 1;
+export const archiveFactor = o => effectProduct(o, 'income');
 // New arks: the belt's forges and the Ganymede yard.
-export const arkTotal = o => ORBITAL_RULES.arkCount + talent(o, 'arkForge') + talent(o, 'ganymede');
+export const arkTotal = o => ORBITAL_RULES.arkCount + effectSum(o, 'arks');
 // Arks away: those in flight and those that became a station.
 export const arksAway = o => (o.solar.flights?.length ?? 0) + Object.values(o.solar.facilities).filter(rank => rank > 0).length;
 export const arksMoored = o => arrived(o, PIONEER.to) ? Math.max(0, arkTotal(o) - arksAway(o)) : 0;
@@ -94,9 +95,8 @@ export const flightProgress = (o, f) => Math.max(0, Math.min(1, (o.elapsed - f.d
 
 // 日冕阵列 doubles every yield per rank; 近日熔炉 and 天卫四 add to all of them;
 // 大气提纯 and each giant's moon double their own world.
-export const industryBoost = o => 2 ** (o.solar.facilities.mercury ?? 0) * (talent(o, 'smelter') ? 1.5 : 1) * (talent(o, 'oberon') ? 1.25 : 1);
-const DOUBLERS = Object.freeze({ venus: 'refinery', jupiter: 'io', saturn: 'enceladus', uranus: 'titania', neptune: 'triton', pluto: 'charon' });
-export const facilityMultiplier = (o, key) => industryBoost(o) * (talent(o, DOUBLERS[key]) ? 2 : 1);
+export const industryBoost = o => 2 ** (o.solar.facilities.mercury ?? 0) * effectProduct(o, 'industry');
+export const facilityMultiplier = (o, key) => industryBoost(o) * effectProduct(o, 'yield', key);
 export function facilityRate(o, key) {
   const f = FACILITIES[key], rank = o.solar.facilities[key];
   return f.kind === 'yield' && rank ? f.base * 2 ** (rank - 1) * facilityMultiplier(o, key) : 0;

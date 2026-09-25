@@ -13,7 +13,12 @@ import { Q } from '../src/quantity.js';
 import { updateOrbital } from '../src/orbital-game.js';
 import { FACILITIES, PIONEER, arrivalAt, arrived, facilityState, buildFacility, industryRate, facilityRate, route, legSeconds, legDistance, arksMoored, arksAway, arkTotal } from '../src/solar-industry.js';
 import { reachNeed } from '../src/solar-tree-view-model.js';
-import { SOLAR_TALENTS, SOLAR_ROW, SOLAR_MAP, solarTalentState, purchaseSolarTalent, windowOpen, windowTiming, transferState, transferCivilization, transferQuote, domeCapacity, colonyRate, colonistRate, COLONY_RULES } from '../src/solar-colony.js';
+import { EFFECTS, effectText, effectSum } from '../src/solar-effects.js';
+import { flightFactor, industryBoost, archiveFactor, facilityMultiplier } from '../src/solar-industry.js';
+import { householdsPerDome, windowWidth, fleetCapacity, SOLAR_TALENT_KEYS } from '../src/solar-colony.js';
+import { lunarLegacyRate } from '../src/celestial-economy.js';
+import { worldIncome, accordSeconds, seizeLine, fuseSeconds, winterSeconds, WORLDS, UPLIFT } from '../src/colony-war.js';
+import { SOLAR_TALENTS, SOLAR_ROW, SOLAR_MAP, V31_SOLAR_KEYS, solarTalentState, purchaseSolarTalent, windowOpen, windowTiming, transferState, transferCivilization, transferQuote, domeCapacity, colonyRate, colonistRate, COLONY_RULES } from '../src/solar-colony.js';
 import { buildSolarTreeViewModel } from '../src/solar-tree-view-model.js';
 import { buildSolarViewModel } from '../src/solar-view-model.js';
 import { bodyPosition, BODIES } from '../src/solar-config.js';
@@ -148,15 +153,16 @@ export function registerSolarTests(test, assert, near) {
     setDebugLegacy(s,2**39);run(PIONEER.seconds+1);
     // As wide as the other maps; every node stays clear of the edges.
     assert(SOLAR_MAP.width===1320&&Object.values(SOLAR_TALENTS).every(t=>t.x>=100&&t.x<=1220&&t.y>100&&t.y<SOLAR_MAP.height));
-    for(const [key,t] of Object.entries(SOLAR_TALENTS).filter(([,t])=>t.satellite)){const parent=SOLAR_TALENTS[Object.keys(t.requires)[0]];assert(parent.kind==='planet'&&parent.column===t.column&&t.y===parent.y-SOLAR_ROW,key);}
+    for(const [key,t] of Object.entries(SOLAR_TALENTS).filter(([,t])=>t.satellite)){const parent=SOLAR_TALENTS[Object.keys(t.requires)[0]];assert((parent.kind==='planet'||parent.satellite)&&parent.column===t.column&&parent.x===t.x&&t.y===parent.y-SOLAR_ROW,key);}
     assert(solarTalentState(s,'phobos')==='prerequisite'&&purchaseSolarTalent(s,'harbor'));
     const civ={age:3},before=transferQuote(o,civ).cost,moored=arksMoored(o);
     assert(purchaseSolarTalent(s,'phobos')&&transferQuote(o,civ).cost===Math.round(before*.75)&&arksMoored(o)===moored,'A lander, not an ark');
     for(const key of ['heat','mining','belt','jupiter'])assert(purchaseSolarTalent(s,key),key);land();
     const jupiter=facilityRate(o,'jupiter');assert(purchaseSolarTalent(s,'io')&&facilityRate(o,'jupiter')===jupiter*2);
-    const total=arkTotal(o);assert(purchaseSolarTalent(s,'ganymede')&&arkTotal(o)===total+1);
+    // Moons open from the nearest out: Ganymede waits for Europa.
+    const total=arkTotal(o);assert(!purchaseSolarTalent(s,'ganymede')&&purchaseSolarTalent(s,'europa')&&purchaseSolarTalent(s,'ganymede')&&arkTotal(o)===total+1);
     assert(solarTalentState(s,'titan')==='planned'&&!purchaseSolarTalent(s,'titan'));
-    const view=buildSolarViewModel(s,{view:'io'});assert(view['#solar-body-note'].includes('木星采集站 ×2'));
+    const view=buildSolarViewModel(s,{view:'io'});assert(view['#solar-body-note'].includes('气态采集站 ×2'));
     const raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw);
   });
   test('Debug skips: 存续协议 and 远航协议 are signed through the real purchases, only in debug saves, and the saves stay valid', () => {
@@ -178,8 +184,34 @@ export function registerSolarTests(test, assert, near) {
     assert(purchaseSolarTalent(s,'coldArchive'));const again=o.solar.produced;run(4);near(Q.toNumber(Q.sub(o.solar.produced,again))/base,1.15,.05);
     assert(buildSolarViewModel(s,{view:'pluto'})['#colony-body-kind'].includes('矮行星')&&buildSolarViewModel(s,{view:'charon'})['#solar-body-note'].includes('冰氮前哨 ×2'));
     const old=JSON.parse(serializeSession(s));old.version=31;old.orbital.version=17;delete old.orbital.solar.facilities.pluto;
-    for(const k of ['cometCapture','coldArchive','charon']){delete old.orbital.solar.talents[k];delete old.orbital.solar.payments[k];}delete old.orbital.solar.payments.pluto;
+    for(const k of Object.keys(old.orbital.solar.talents))if(!V31_SOLAR_KEYS.includes(k)){delete old.orbital.solar.talents[k];delete old.orbital.solar.payments[k];}delete old.orbital.solar.payments.pluto;
     const next=parseSession(JSON.stringify(old)).orbital.solar;assert(next.facilities.pluto===0&&next.talents.charon===0,'v31 saves gain an unbuilt Pluto');
+  });
+  test('VII map: every region carries at least seven talents, and every effect in the table reaches the simulation', () => {
+    const counts={};for(const t of Object.values(SOLAR_TALENTS))if(t.column!=='axis')counts[t.column]=(counts[t.column]??0)+1;
+    assert(Object.keys(counts).length===10&&Object.entries(counts).every(([,n])=>n>=7),JSON.stringify(counts));
+    for(const key of Object.keys(EFFECTS))assert(SOLAR_TALENTS[key]&&!SOLAR_TALENTS[key].planned&&SOLAR_TALENT_KEYS.includes(key),key);
+    // One probe per effect type: flipping the talent on must move the number the game uses.
+    const s=voyageFixture(),o=s.orbital,world=o.solar.colonies.mars;o.talents.outpost=1;
+    world.civs.push({id:'c9-1',name:'x',age:3,tendency:0,doctrine:0,arrivedAt:0,progress:0,warId:null,accord:null});world.uplifted.push({id:'c9-2',name:'y',age:5,tendency:0,doctrine:0,arrivedAt:0,upliftedAt:0,via:'accord'});
+    o.solar.facilities={venus:1,mercury:0,belt:1,jupiter:1,saturn:1,uranus:1,neptune:1,pluto:1};
+    const civ={age:2},probes={flight:()=>flightFactor(o),industry:()=>industryBoost(o),arks:()=>arkTotal(o),households:()=>householdsPerDome(o),window:()=>windowWidth(o),convoy:()=>fleetCapacity(o),
+      income:()=>archiveFactor(o),lunar:()=>lunarLegacyRate(o),transferCost:()=>transferQuote(o,civ).cost,transferTime:()=>transferQuote(o,civ).seconds,colonists:()=>worldIncome(o,'mars'),uplifted:()=>worldIncome(o,'mars'),
+      accordTime:()=>accordSeconds(o),seizeLine:()=>seizeLine(o),fuse:()=>fuseSeconds(o,'mars'),marsWinter:()=>winterSeconds(o,'mars'),arrivalAge:()=>effectSum(o,'arrivalAge'),yield:target=>facilityMultiplier(o,target)};
+    for(const [key,list] of Object.entries(EFFECTS))for(const e of list){
+      const probe=probes[e.type];assert(probe,`No probe for ${e.type}`);const before=probe(e.target);o.solar.talents[key]=1;const after=probe(e.target);o.solar.talents[key]=0;
+      assert(after!==before,`${key} → ${e.type}`);assert(effectText(key,1).length>0);
+    }
+  });
+  test('Colony talents: 殖民学院 lands transfers an age further on; 配给, 掩体, 使团 and 联锁 reshape the Mars clocks', () => {
+    const s=voyageFixture(),o=s.orbital,run=n=>{for(let i=0;i<Math.round(n*30);i++)updateOrbital(s,1/30);};setDebugLegacy(s,2**36);run(PIONEER.seconds+1);
+    for(const key of ['harbor','dome','transfer','survey','fleet','academy'])assert(purchaseSolarTalent(s,key),key);run(70);
+    const civ=o.civilizations.find(c=>c.alive&&!c.warId),age=civ.age;assert(transferCivilization(s,civ.id));while(o.solar.transfers.length)run(.5);
+    assert(o.solar.colonies.mars.civs[0].age===Math.min(5,age+1),'Trained on the way');
+    const fuse=fuseSeconds(o,'mars');assert(purchaseSolarTalent(s,'rations')&&fuseSeconds(o,'mars')===fuse*3);
+    for(const key of ['terraform','shelters'])assert(purchaseSolarTalent(s,key),key);assert(winterSeconds(o,'mars')===WORLDS.mars.winter/2);
+    for(const key of ['uplift','envoys','arsenalLocks'])assert(purchaseSolarTalent(s,key),key);near(seizeLine(o),.5);assert(accordSeconds(o)===UPLIFT.accordSeconds/2);
+    const raw=serializeSession(s);assert(serializeSession(parseSession(raw))===raw);
   });
   test('Map v31: v29 saves are refunded their old reach talents, keep a dome by granting 火星港 free, and start the axis unbought', () => {
     const s=voyageFixture();setDebugLegacy(s,2**36);for(let i=0;i<30*(PIONEER.seconds+1);i++)updateOrbital(s,1/30);
